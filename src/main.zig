@@ -46,6 +46,7 @@ const DemoState = struct {
     pipeline: zgpu.RenderPipelineHandle,
     bind_group: zgpu.BindGroupHandle,
 
+    vert_count: u32,
     vertex_buffer: zgpu.BufferHandle,
     index_buffer: zgpu.BufferHandle,
 
@@ -120,13 +121,24 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !DemoState {
     // Base mesh data.
     const mesh = mesh: {
         const vertices = [_]Vertex{
-            .{ .position = [3]f32{ 0.0, 0.5, 0.0 }, .color = [3]f32{ 1.0, 0.0, 0.0 } },
-            .{ .position = [3]f32{ -0.5, -0.5, 0.0 }, .color = [3]f32{ 1.0, 1.0, 0.0 } },
-            .{ .position = [3]f32{ 0.5, -0.5, 0.0 }, .color = [3]f32{ 1.0, 0.0, 1.0 } },
-            .{ .position = [3]f32{ 1.0, 0.5, 0.0 }, .color = [3]f32{ 1.0, 0.0, 0.0 } },
+            .{ .position = [3]f32{ 0.0, 0.0, 0.0 }, .color = [3]f32{ 1.0, 0.0, 0.0 } },
+            .{ .position = [3]f32{ 1.0, 0.0, 0.0 }, .color = [3]f32{ 1.0, 1.0, 0.0 } },
+            .{ .position = [3]f32{ 1.0, 1.0, 0.0 }, .color = [3]f32{ 1.0, 0.0, 1.0 } },
+            .{ .position = [3]f32{ 0.0, 1.0, 0.0 }, .color = [3]f32{ 1.0, 0.0, 0.0 } },
         };
         const subdiv = @import("./subdiv.zig");
         const faces = [_]subdiv.Face{.{ 0, 1, 2, 3 }};
+        // break :mesh subdiv.Mesh{
+        //     .points = points: {
+        //         var points = std.ArrayList(subdiv.Point).init(allocator);
+        //         for (vertices) |vertex| {
+        //             const point = subdiv.Point{ vertex.position[0], vertex.position[1], vertex.position[2] };
+        //             try points.append(point);
+        //         }
+        //         break :points points.items;
+        //     },
+        //     .faces = &faces,
+        // };
         break :mesh try subdiv.cmcSubdiv(allocator, input_points: {
             // Using allocator, convert the vertex_data into a list of points (3D vector)
             // that can be passed to the subdivision algorithm.
@@ -139,10 +151,12 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !DemoState {
         }, &faces);
     };
 
+    const triColors = [_][3]f32{ .{ 1.0, 0.0, 0.0 }, .{ 0.0, 1.0, 0.0 }, .{ 0.0, 0.0, 1.0 } };
+
     var vertex_data = vertex_data: {
         var vertex_data = std.ArrayList(Vertex).init(allocator);
-        for (mesh.points) |point| {
-            try vertex_data.append(Vertex{ .position = @as([3]f32, point), .color = .{ 1.0, 1.0, 1.0 } });
+        for (mesh.points, 0..) |point, i| {
+            try vertex_data.append(Vertex{ .position = @as([3]f32, point), .color = triColors[i % 3] });
         }
         break :vertex_data vertex_data.items;
     };
@@ -150,9 +164,11 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !DemoState {
     var index_data = index_data: {
         var index_data = std.ArrayList(u32).init(allocator);
         for (mesh.faces) |face| {
-            try index_data.append(face[0]);
             try index_data.append(face[1]);
             try index_data.append(face[2]);
+            try index_data.append(face[0]);
+            try index_data.append(face[2]);
+            try index_data.append(face[0]);
             try index_data.append(face[3]);
         }
         break :index_data index_data.items;
@@ -175,10 +191,13 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !DemoState {
     // Create a depth texture and its 'view'.
     const depth = createDepthTexture(gctx);
 
+    std.debug.print("faces: {}\n", .{mesh.faces.len});
+
     return DemoState{
         .gctx = gctx,
         .pipeline = pipeline,
         .bind_group = bind_group,
+        .vert_count = @intCast(index_data.len),
         .vertex_buffer = vertex_buffer,
         .index_buffer = index_buffer,
         .depth_texture = depth.texture,
@@ -268,7 +287,7 @@ fn draw(demo: *DemoState) void {
                 mem.slice[0] = zm.transpose(object_to_clip);
 
                 pass.setBindGroup(0, bind_group, &.{mem.offset});
-                pass.drawIndexed(6, 1, 0, 0, 0);
+                pass.drawIndexed(demo.vert_count, 1, 0, 0, 0);
             }
 
             // Draw triangle 2.
@@ -280,7 +299,7 @@ fn draw(demo: *DemoState) void {
                 mem.slice[0] = zm.transpose(object_to_clip);
 
                 pass.setBindGroup(0, bind_group, &.{mem.offset});
-                pass.drawIndexed(6, 1, 0, 0, 0);
+                pass.drawIndexed(demo.vert_count, 1, 0, 0, 0);
             }
         }
         {
