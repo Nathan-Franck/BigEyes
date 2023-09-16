@@ -2,8 +2,8 @@ const std = @import("std");
 const math = std.math;
 const ArrayList = std.ArrayList;
 
-const Point = @Vector(3, f32);
-const Face = [4]u32;
+pub const Point = @Vector(3, f32);
+pub const Face = [4]u32;
 const EdgesFace = struct {
     point1: u32,
     point2: u32,
@@ -192,7 +192,7 @@ fn switchNums(pointNums: [2]u32) [2]u32 {
     return [_]u32{ pointNums[1], pointNums[0] };
 }
 
-fn cmcSubdiv(allocator: std.mem.Allocator, inputPoints: []const Point, inputFaces: []const Face) !struct { points: []Point, faces: []Face } {
+pub fn cmcSubdiv(allocator: std.mem.Allocator, inputPoints: []const Point, inputFaces: []const Face) !struct { points: []Point, faces: []Face } {
     var facePoints = try getFacePoints(allocator, inputPoints, inputFaces);
     var edgesFaces = try getEdgesFaces(allocator, inputPoints, inputFaces);
     var edgePoints = try getEdgePoints(allocator, edgesFaces, facePoints);

@@ -117,15 +117,48 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !DemoState {
         .{ .binding = 0, .buffer_handle = gctx.uniforms.buffer, .offset = 0, .size = @sizeOf(zm.Mat) },
     });
 
-    // Create a vertex buffer.
-    const vertex_data = [_]Vertex{
-        .{ .position = [3]f32{ 0.0, 0.5, 0.0 }, .color = [3]f32{ 1.0, 0.0, 0.0 } },
-        .{ .position = [3]f32{ -0.5, -0.5, 0.0 }, .color = [3]f32{ 1.0, 1.0, 0.0 } },
-        .{ .position = [3]f32{ 0.5, -0.5, 0.0 }, .color = [3]f32{ 1.0, 0.0, 1.0 } },
-        .{ .position = [3]f32{ 1.0, 0.5, 0.0 }, .color = [3]f32{ 1.0, 0.0, 0.0 } },
-        .{ .position = [3]f32{ 0.5, -0.5, 0.0 }, .color = [3]f32{ 0.0, 1.0, 0.0 } },
-        .{ .position = [3]f32{ 1.5, -0.5, 0.0 }, .color = [3]f32{ 0.0, 0.0, 1.0 } },
+    // Base mesh data.
+    const mesh = mesh: {
+        const vertices = [_]Vertex{
+            .{ .position = [3]f32{ 0.0, 0.5, 0.0 }, .color = [3]f32{ 1.0, 0.0, 0.0 } },
+            .{ .position = [3]f32{ -0.5, -0.5, 0.0 }, .color = [3]f32{ 1.0, 1.0, 0.0 } },
+            .{ .position = [3]f32{ 0.5, -0.5, 0.0 }, .color = [3]f32{ 1.0, 0.0, 1.0 } },
+            .{ .position = [3]f32{ 1.0, 0.5, 0.0 }, .color = [3]f32{ 1.0, 0.0, 0.0 } },
+        };
+        const subdiv = @import("./subdiv.zig");
+        const faces = [_]subdiv.Face{.{ 0, 1, 2, 3 }};
+        break :mesh try subdiv.cmcSubdiv(allocator, input_points: {
+            // Using allocator, convert the vertex_data into a list of points (3D vector)
+            // that can be passed to the subdivision algorithm.
+            var points = std.ArrayList(subdiv.Point).init(allocator);
+            for (vertices) |vertex| {
+                const point = subdiv.Point{ vertex.position[0], vertex.position[1], vertex.position[2] };
+                try points.append(point);
+            }
+            break :input_points points.items;
+        }, &faces);
     };
+
+    var vertex_data = vertex_data: {
+        var vertex_data = std.ArrayList(Vertex).init(allocator);
+        for (mesh.points) |point| {
+            try vertex_data.append(Vertex{ .position = @as([3]f32, point), .color = .{ 1.0, 1.0, 1.0 } });
+        }
+        break :vertex_data vertex_data.items;
+    };
+
+    var index_data = index_data: {
+        var index_data = std.ArrayList(u32).init(allocator);
+        for (mesh.faces) |face| {
+            try index_data.append(face[0]);
+            try index_data.append(face[1]);
+            try index_data.append(face[2]);
+            try index_data.append(face[3]);
+        }
+        break :index_data index_data.items;
+    };
+
+    // Create a vertex buffer.
     const vertex_buffer = gctx.createBuffer(.{
         .usage = .{ .copy_dst = true, .vertex = true },
         .size = vertex_data.len * @sizeOf(Vertex),
@@ -133,7 +166,6 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !DemoState {
     gctx.queue.writeBuffer(gctx.lookupResource(vertex_buffer).?, 0, Vertex, vertex_data[0..]);
 
     // Create an index buffer.
-    const index_data = [_]u32{ 0, 1, 2, 3, 4, 5 };
     const index_buffer = gctx.createBuffer(.{
         .usage = .{ .copy_dst = true, .index = true },
         .size = index_data.len * @sizeOf(u32),
