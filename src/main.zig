@@ -118,23 +118,26 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !DemoState {
     });
 
     // Create a vertex buffer.
-    const vertex_buffer = gctx.createBuffer(.{
-        .usage = .{ .copy_dst = true, .vertex = true },
-        .size = 3 * @sizeOf(Vertex),
-    });
     const vertex_data = [_]Vertex{
         .{ .position = [3]f32{ 0.0, 0.5, 0.0 }, .color = [3]f32{ 1.0, 0.0, 0.0 } },
-        .{ .position = [3]f32{ -0.5, -0.5, 0.0 }, .color = [3]f32{ 0.0, 1.0, 0.0 } },
-        .{ .position = [3]f32{ 0.5, -0.5, 0.0 }, .color = [3]f32{ 0.0, 0.0, 1.0 } },
+        .{ .position = [3]f32{ -0.5, -0.5, 0.0 }, .color = [3]f32{ 1.0, 1.0, 0.0 } },
+        .{ .position = [3]f32{ 0.5, -0.5, 0.0 }, .color = [3]f32{ 1.0, 0.0, 1.0 } },
+        .{ .position = [3]f32{ 1.0, 0.5, 0.0 }, .color = [3]f32{ 1.0, 0.0, 0.0 } },
+        .{ .position = [3]f32{ 0.5, -0.5, 0.0 }, .color = [3]f32{ 0.0, 1.0, 0.0 } },
+        .{ .position = [3]f32{ 1.5, -0.5, 0.0 }, .color = [3]f32{ 0.0, 0.0, 1.0 } },
     };
+    const vertex_buffer = gctx.createBuffer(.{
+        .usage = .{ .copy_dst = true, .vertex = true },
+        .size = vertex_data.len * @sizeOf(Vertex),
+    });
     gctx.queue.writeBuffer(gctx.lookupResource(vertex_buffer).?, 0, Vertex, vertex_data[0..]);
 
     // Create an index buffer.
+    const index_data = [_]u32{ 0, 1, 2, 3, 4, 5 };
     const index_buffer = gctx.createBuffer(.{
         .usage = .{ .copy_dst = true, .index = true },
-        .size = 3 * @sizeOf(u32),
+        .size = index_data.len * @sizeOf(u32),
     });
-    const index_data = [_]u32{ 0, 1, 2 };
     gctx.queue.writeBuffer(gctx.lookupResource(index_buffer).?, 0, u32, index_data[0..]);
 
     // Create a depth texture and its 'view'.
@@ -233,7 +236,7 @@ fn draw(demo: *DemoState) void {
                 mem.slice[0] = zm.transpose(object_to_clip);
 
                 pass.setBindGroup(0, bind_group, &.{mem.offset});
-                pass.drawIndexed(3, 1, 0, 0, 0);
+                pass.drawIndexed(6, 1, 0, 0, 0);
             }
 
             // Draw triangle 2.
@@ -245,7 +248,7 @@ fn draw(demo: *DemoState) void {
                 mem.slice[0] = zm.transpose(object_to_clip);
 
                 pass.setBindGroup(0, bind_group, &.{mem.offset});
-                pass.drawIndexed(3, 1, 0, 0, 0);
+                pass.drawIndexed(6, 1, 0, 0, 0);
             }
         }
         {
