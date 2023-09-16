@@ -128,18 +128,17 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !DemoState {
         };
         const subdiv = @import("./subdiv.zig");
         const faces = [_]subdiv.Face{.{ 0, 1, 2, 3 }};
-        // break :mesh subdiv.Mesh{
-        //     .points = points: {
-        //         var points = std.ArrayList(subdiv.Point).init(allocator);
-        //         for (vertices) |vertex| {
-        //             const point = subdiv.Point{ vertex.position[0], vertex.position[1], vertex.position[2] };
-        //             try points.append(point);
-        //         }
-        //         break :points points.items;
-        //     },
-        //     .faces = &faces,
-        // };
-        break :mesh try subdiv.cmcSubdiv(allocator, input_points: {
+        break :mesh if (false) subdiv.Mesh{
+            .points = points: {
+                var points = std.ArrayList(subdiv.Point).init(allocator);
+                for (vertices) |vertex| {
+                    const point = subdiv.Point{ vertex.position[0], vertex.position[1], vertex.position[2] };
+                    try points.append(point);
+                }
+                break :points points.items;
+            },
+            .faces = &faces,
+        } else try subdiv.cmcSubdiv(allocator, input_points: {
             // Using allocator, convert the vertex_data into a list of points (3D vector)
             // that can be passed to the subdivision algorithm.
             var points = std.ArrayList(subdiv.Point).init(allocator);
@@ -151,12 +150,19 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !DemoState {
         }, &faces);
     };
 
-    const triColors = [_][3]f32{ .{ 1.0, 0.0, 0.0 }, .{ 0.0, 1.0, 0.0 }, .{ 0.0, 0.0, 1.0 } };
+    const hexColors = [_][3]f32{
+        .{ 1.0, 0.0, 0.0 },
+        .{ 0.0, 1.0, 0.0 },
+        .{ 0.0, 0.0, 1.0 },
+        .{ 1.0, 1.0, 0.0 },
+        .{ 1.0, 0.0, 1.0 },
+        .{ 0.0, 1.0, 1.0 },
+    };
 
     var vertex_data = vertex_data: {
         var vertex_data = std.ArrayList(Vertex).init(allocator);
         for (mesh.points, 0..) |point, i| {
-            try vertex_data.append(Vertex{ .position = @as([3]f32, point), .color = triColors[i % 3] });
+            try vertex_data.append(Vertex{ .position = @as([3]f32, point), .color = hexColors[i % hexColors.len] });
         }
         break :vertex_data vertex_data.items;
     };
@@ -197,7 +203,7 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !DemoState {
         .gctx = gctx,
         .pipeline = pipeline,
         .bind_group = bind_group,
-        .vert_count = @intCast(index_data.len),
+        .vert_count = if (false) 6 else @intCast(index_data.len),
         .vertex_buffer = vertex_buffer,
         .index_buffer = index_buffer,
         .depth_texture = depth.texture,
