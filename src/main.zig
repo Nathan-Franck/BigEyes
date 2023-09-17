@@ -134,15 +134,17 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !DemoState {
 
         // pack into subdiv mesh for processing
         const subdiv = @import("./subdiv.zig");
-        const points = std.ArrayList(subdiv.Point).init(allocator);
-        const faces = std.ArrayList(subdiv.Face).init(allocator);
+        var points = std.ArrayList(subdiv.Point).init(allocator);
+        var faces = std.ArrayList(subdiv.Face).init(allocator);
         for (positions.items) |pos| {
-            try points.append(subdiv.Point{.{ pos[0], pos[1], pos[2] }});
+            try points.append(subdiv.Point{ pos[0], pos[1], pos[2] });
         }
-        for (indices.items) |face| {
-            try faces.append(subdiv.Face{.{ face[0], face[1], face[2], face[3] }});
+        // indices is a flat list, assume that they are quads, loop through them 4-at-a-time
+        for (0..faces.items.len / 3) |i| {
+            try faces.append(subdiv.Face{ indices.items[i * 3], indices.items[i * 3 + 1], indices.items[i * 3 + 2], 0 });
         }
-        break :cube_mesh;
+
+        break :cube_mesh .{ .points = points.items, .faces = faces.items };
     };
     _ = cube_mesh;
 
