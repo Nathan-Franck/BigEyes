@@ -120,34 +120,28 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !DemoState {
 
     // Base mesh data.
     const mesh = mesh: {
-        const vertices = [_]Vertex{
-            .{ .position = [3]f32{ -1.0, -1.0, 0.0 }, .color = [3]f32{ 1.0, 0.0, 0.0 } },
-            .{ .position = [3]f32{ 1.0, -1.0, 0.0 }, .color = [3]f32{ 1.0, 1.0, 0.0 } },
-            .{ .position = [3]f32{ 1.0, 1.0, 0.0 }, .color = [3]f32{ 1.0, 0.0, 1.0 } },
-            .{ .position = [3]f32{ -1.0, 1.0, 0.0 }, .color = [3]f32{ 1.0, 0.0, 0.0 } },
-        };
         const subdiv = @import("./subdiv.zig");
-        const faces = [_]subdiv.Face{.{ 0, 1, 2, 3 }};
-        break :mesh if (false) subdiv.Mesh{
-            .points = points: {
-                var points = std.ArrayList(subdiv.Point).init(allocator);
-                for (vertices) |vertex| {
-                    const point = subdiv.Point{ vertex.position[0], vertex.position[1], vertex.position[2] };
-                    try points.append(point);
-                }
-                break :points points.items;
-            },
-            .faces = &faces,
-        } else try subdiv.cmcSubdiv(allocator, input_points: {
-            // Using allocator, convert the vertex_data into a list of points (3D vector)
-            // that can be passed to the subdivision algorithm.
-            var points = std.ArrayList(subdiv.Point).init(allocator);
-            for (vertices) |vertex| {
-                const point = subdiv.Point{ vertex.position[0], vertex.position[1], vertex.position[2] };
-                try points.append(point);
-            }
-            break :input_points points.items;
-        }, &faces);
+        const points = [_]subdiv.Point{
+            .{ -1.0, 1.0, 1.0 },
+            .{ -1.0, -1.0, 1.0 },
+            .{ 1.0, -1.0, 1.0 },
+            .{ 1.0, 1.0, 1.0 },
+            .{ -1.0, 1.0, -1.0 },
+            .{ -1.0, -1.0, -1.0 },
+            .{ 1.0, -1.0, -1.0 },
+            .{ 1.0, 1.0, -1.0 },
+        };
+        const faces = [_]subdiv.Face{
+            .{ 0, 1, 2, 3 },
+            .{ 0, 1, 5, 4 },
+            .{ 4, 5, 6, 7 },
+            .{ 1, 2, 6, 5 },
+            .{ 2, 3, 7, 6 },
+            .{ 0, 3, 7, 4 },
+        };
+        var first_round = try subdiv.cmcSubdiv(allocator, &points, &faces);
+        var second_round = try subdiv.cmcSubdiv(allocator, first_round.points, first_round.faces);
+        break :mesh second_round;
     };
 
     // debug print point count and face count
@@ -156,14 +150,11 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !DemoState {
 
     const hexColors = [_][3]f32{
         .{ 1.0, 0.0, 0.0 },
-        .{ 1.0, 0.0, 0.0 },
-        .{ 1.0, 0.0, 0.0 },
-        .{ 0.0, 1.0, 0.0 },
-        .{ 0.0, 1.0, 0.0 },
         .{ 0.0, 1.0, 0.0 },
         .{ 0.0, 0.0, 1.0 },
-        .{ 0.0, 0.0, 1.0 },
-        .{ 0.0, 0.0, 1.0 },
+        .{ 1.0, 1.0, 0.0 },
+        .{ 1.0, 0.0, 1.0 },
+        .{ 0.0, 1.0, 1.0 },
     };
 
     var vertex_data = vertex_data: {
