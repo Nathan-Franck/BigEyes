@@ -16,11 +16,13 @@ pub fn build(b: *std.Build) void {
     const zglfw_pkg = @import("libs/zig-gamedev/libs/zglfw/build.zig").package(b, exe.target, exe.optimize, .{});
     const zpool_pkg = @import("libs/zig-gamedev/libs/zpool/build.zig").package(b, exe.target, exe.optimize, .{});
     const zgpu_pkg = @import("libs/zig-gamedev/libs/zgpu/build.zig").package(b, exe.target, exe.optimize, .{ .deps = .{ .zglfw = zglfw_pkg.zglfw, .zpool = zpool_pkg.zpool } });
+    const zmesh_pkg = @import("libs/zig-gamedev/libs/zmesh/build.zig").package(b, exe.target, exe.optimize, .{});
 
     zgui_pkg.link(exe);
     zgpu_pkg.link(exe);
     zglfw_pkg.link(exe);
     zmath_pkg.link(exe);
+    zmesh_pkg.link(exe);
 
     const exe_options = b.addOptions();
     exe.addOptions("build_options", exe_options);

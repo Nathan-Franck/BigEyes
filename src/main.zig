@@ -118,6 +118,34 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !DemoState {
         .{ .binding = 0, .buffer_handle = gctx.uniforms.buffer, .offset = 0, .size = @sizeOf(zm.Mat) },
     });
 
+    const cube_mesh = cube_mesh: {
+        const zmesh = @import("zmesh");
+        zmesh.init(allocator);
+
+        const data = try zmesh.io.parseAndLoadFile(content_dir ++ "cube.gltf");
+        defer zmesh.io.freeData(data);
+
+        var indices = std.ArrayList(u32).init(allocator);
+        var positions = std.ArrayList([3]f32).init(allocator);
+        var normals = std.ArrayList([3]f32).init(allocator);
+        var texcoords = std.ArrayList([2]f32).init(allocator);
+        var tangents = std.ArrayList([4]f32).init(allocator);
+        try zmesh.io.appendMeshPrimitive(data, 0, 0, &indices, &positions, &normals, &texcoords, &tangents);
+
+        // pack into subdiv mesh for processing
+        const subdiv = @import("./subdiv.zig");
+        const points = std.ArrayList(subdiv.Point).init(allocator);
+        const faces = std.ArrayList(subdiv.Face).init(allocator);
+        for (positions.items) |pos| {
+            try points.append(subdiv.Point{.{ pos[0], pos[1], pos[2] }});
+        }
+        for (indices.items) |face| {
+            try faces.append(subdiv.Face{.{ face[0], face[1], face[2], face[3] }});
+        }
+        break :cube_mesh;
+    };
+    _ = cube_mesh;
+
     // Base mesh data.
     const mesh = mesh: {
         const subdiv = @import("./subdiv.zig");
