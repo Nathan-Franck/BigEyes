@@ -121,10 +121,10 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !DemoState {
     // Base mesh data.
     const mesh = mesh: {
         const vertices = [_]Vertex{
-            .{ .position = [3]f32{ 0.0, 0.0, 0.0 }, .color = [3]f32{ 1.0, 0.0, 0.0 } },
-            .{ .position = [3]f32{ 1.0, 0.0, 0.0 }, .color = [3]f32{ 1.0, 1.0, 0.0 } },
+            .{ .position = [3]f32{ -1.0, -1.0, 0.0 }, .color = [3]f32{ 1.0, 0.0, 0.0 } },
+            .{ .position = [3]f32{ 1.0, -1.0, 0.0 }, .color = [3]f32{ 1.0, 1.0, 0.0 } },
             .{ .position = [3]f32{ 1.0, 1.0, 0.0 }, .color = [3]f32{ 1.0, 0.0, 1.0 } },
-            .{ .position = [3]f32{ 0.0, 1.0, 0.0 }, .color = [3]f32{ 1.0, 0.0, 0.0 } },
+            .{ .position = [3]f32{ -1.0, 1.0, 0.0 }, .color = [3]f32{ 1.0, 0.0, 0.0 } },
         };
         const subdiv = @import("./subdiv.zig");
         const faces = [_]subdiv.Face{.{ 0, 1, 2, 3 }};
@@ -150,13 +150,20 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !DemoState {
         }, &faces);
     };
 
+    // debug print point count and face count
+    std.debug.print("points: {}\n", .{mesh.points.len});
+    std.debug.print("faces: {}\n", .{mesh.faces.len});
+
     const hexColors = [_][3]f32{
         .{ 1.0, 0.0, 0.0 },
+        .{ 1.0, 0.0, 0.0 },
+        .{ 1.0, 0.0, 0.0 },
+        .{ 0.0, 1.0, 0.0 },
+        .{ 0.0, 1.0, 0.0 },
         .{ 0.0, 1.0, 0.0 },
         .{ 0.0, 0.0, 1.0 },
-        .{ 1.0, 1.0, 0.0 },
-        .{ 1.0, 0.0, 1.0 },
-        .{ 0.0, 1.0, 1.0 },
+        .{ 0.0, 0.0, 1.0 },
+        .{ 0.0, 0.0, 1.0 },
     };
 
     var vertex_data = vertex_data: {
@@ -196,8 +203,6 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !DemoState {
 
     // Create a depth texture and its 'view'.
     const depth = createDepthTexture(gctx);
-
-    std.debug.print("faces: {}\n", .{mesh.faces.len});
 
     return DemoState{
         .gctx = gctx,

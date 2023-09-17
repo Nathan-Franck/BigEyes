@@ -40,12 +40,10 @@ fn getEdgesFaces(allocator: std.mem.Allocator, inputPoints: []const Point, input
         const numPoints = face.len;
         for (face, 0..) |pointNum, pointIndex| {
             var point1 = pointNum;
-            var point2: u32 = 0;
-            if (pointIndex < numPoints - 1) {
-                point2 = face[pointIndex + 1];
-            } else {
-                point2 = face[0];
-            }
+            var point2: u32 = if (pointIndex < numPoints - 1)
+                face[pointIndex + 1]
+            else
+                face[0];
             if (point1 > point2) {
                 var swap = point1;
                 point1 = point2;
@@ -103,12 +101,10 @@ fn getEdgePoints(allocator: std.mem.Allocator, edgesFaces: []const EdgesFace, fa
     for (edgesFaces) |edge| {
         var cp = edge.centerPoint;
         var fp1 = facePoints[edge.face1];
-        var fp2: Point = undefined;
-        if (edge.face2 == std.math.maxInt(u32)) {
-            fp2 = fp1;
-        } else {
-            fp2 = facePoints[edge.face2];
-        }
+        var fp2 = if (edge.face2 == std.math.maxInt(u32))
+            fp1
+        else
+            facePoints[edge.face2];
         var cfp = centerPoint(fp1, fp2);
         try edgePoints.append(centerPoint(cp, cfp));
     }
@@ -141,8 +137,7 @@ fn getAvgMidEdges(allocator: std.mem.Allocator, inputPoints: []const Point, edge
         try tempPoints.append(PointEx{ .p = Point{ 0, 0, 0 }, .n = 0 });
     }
     for (edgesFaces) |edge| {
-        var edges: []const u32 = &.{ edge.point1, edge.point2 };
-        for (edges) |pointNum| {
+        for ([_]u32{ edge.point1, edge.point2 }) |pointNum| {
             var tp = tempPoints.items[pointNum].p;
             tempPoints.items[pointNum].p = tp + edge.centerPoint;
             tempPoints.items[pointNum].n += 1;
@@ -172,9 +167,10 @@ fn getNewPoints(allocator: std.mem.Allocator, inputPoints: []const Point, points
     var newPoints = try ArrayList(Point).initCapacity(allocator, inputPoints.len);
     for (inputPoints, 0..) |point, pointNum| {
         var n = @as(f32, @floatFromInt(pointsFaces[pointNum]));
-        var m1 = (n - 3) / n;
+        var m1 = @max(n - 3, 0) / n;
         var m2 = 1.0 / n;
         var m3 = 2.0 / n;
+        std.debug.print("{}, {}, {}\n", .{ m1, m2, m3 });
         var p1 = point * @as(Point, @splat(m1));
         var afp = avgFacePoints[pointNum];
         var p2 = afp * @as(Point, @splat(m2));
