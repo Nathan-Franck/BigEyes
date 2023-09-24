@@ -14,3 +14,10 @@ Requires Zig 0.11
 git submodule update 
 zig build run
 ```
+
+### Custom Blender Export
+
+* Ensure your blender is in the path
+```
+blender triangle_wgpu_content/cube.blend --background --python .\tools\custom-gltf.py
+```

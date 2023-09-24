@@ -118,65 +118,37 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !DemoState {
         .{ .binding = 0, .buffer_handle = gctx.uniforms.buffer, .offset = 0, .size = @sizeOf(zm.Mat) },
     });
 
-    const cube_mesh = cube_mesh: {
-        const zmesh = @import("zmesh");
-        zmesh.init(allocator);
+    var arena = std.heap.ArenaAllocator.init(allocator);
+    defer arena.deinit();
 
-        const data = try zmesh.io.parseAndLoadFile(content_dir ++ "cube.gltf");
-        defer zmesh.io.freeData(data);
+    const mesh = mesh: {
 
-        var indices = std.ArrayList(u32).init(allocator);
-        var positions = std.ArrayList([3]f32).init(allocator);
-        var normals = std.ArrayList([3]f32).init(allocator);
-        var texcoords = std.ArrayList([2]f32).init(allocator);
-        var tangents = std.ArrayList([4]f32).init(allocator);
-        try zmesh.io.appendMeshPrimitive(data, 0, 0, &indices, &positions, &normals, &texcoords, &tangents);
+        // Load seperately a json file with the polygon data, should be called *.gltf.json
+        const subdiv = @import("./subdiv.zig");
+
+        const polygonJSON = json: {
+            const json_data = std.fs.cwd().readFileAlloc(arena.allocator(), content_dir ++ "cube.blend.json", 512 * 1024 * 1024) catch |err| {
+                std.log.err("Failed to read JSON file: {}", .{err});
+                return err;
+            };
+            const Config = []const struct {
+                name: []const u8,
+                polygons: []const subdiv.Face,
+                vertices: []const subdiv.Point,
+            };
+            break :json std.json.parseFromSlice(Config, arena.allocator(), json_data, .{}) catch |err| {
+                std.log.err("Failed to parse JSON: {}", .{err});
+                return err;
+            };
+        };
 
         // pack into subdiv mesh for processing
-        const subdiv = @import("./subdiv.zig");
-        var points = std.ArrayList(subdiv.Point).init(allocator);
-        var faces = std.ArrayList(subdiv.Face).init(allocator);
-        for (positions.items) |pos| {
-            try points.append(subdiv.Point{ pos[0], pos[1], pos[2] });
-        }
-        // indices is a flat list, assume that they are quads, loop through them 4-at-a-time
-        for (0..faces.items.len / 3) |i| {
-            try faces.append(subdiv.Face{ indices.items[i * 3], indices.items[i * 3 + 1], indices.items[i * 3 + 2], 0 });
-        }
+        const first = polygonJSON.value[0];
+        var first_round = try subdiv.cmcSubdiv(arena.allocator(), first.vertices, first.polygons);
+        var second_round = try subdiv.cmcSubdiv(arena.allocator(), first_round.points, first_round.faces);
 
-        break :cube_mesh .{ .points = points.items, .faces = faces.items };
-    };
-    _ = cube_mesh;
-
-    // Base mesh data.
-    const mesh = mesh: {
-        const subdiv = @import("./subdiv.zig");
-        const points = [_]subdiv.Point{
-            .{ -1.0, 1.0, 1.0 },
-            .{ -1.0, -1.0, 1.0 },
-            .{ 1.0, -1.0, 1.0 },
-            .{ 1.0, 1.0, 1.0 },
-            .{ -1.0, 1.0, -1.0 },
-            .{ -1.0, -1.0, -1.0 },
-            .{ 1.0, -1.0, -1.0 },
-            .{ 1.0, 1.0, -1.0 },
-        };
-        const faces = [_]subdiv.Face{
-            .{ 0, 1, 2, 3 },
-            .{ 0, 1, 5, 4 },
-            .{ 4, 5, 6, 7 },
-            .{ 1, 2, 6, 5 },
-            .{ 2, 3, 7, 6 },
-            .{ 0, 3, 7, 4 },
-        };
-        var first_round = try subdiv.cmcSubdiv(allocator, &points, &faces);
-        var second_round = try subdiv.cmcSubdiv(allocator, first_round.points, first_round.faces);
         break :mesh second_round;
     };
-
-    // debug print point count and face count
-    std.debug.print("points: {}\n", .{mesh.points.len});
-    std.debug.print("faces: {}\n", .{mesh.faces.len});
 
     const hexColors = [_][3]f32{
         .{ 1.0, 0.0, 0.0 },
@@ -188,7 +160,7 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !DemoState {
     };
 
     var vertex_data = vertex_data: {
-        var vertex_data = std.ArrayList(Vertex).init(allocator);
+        var vertex_data = std.ArrayList(Vertex).init(arena.allocator());
         for (mesh.points, 0..) |point, i| {
             try vertex_data.append(Vertex{ .position = @as([3]f32, point), .color = hexColors[i % hexColors.len] });
         }
@@ -196,7 +168,7 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !DemoState {
     };
 
     var index_data = index_data: {
-        var index_data = std.ArrayList(u32).init(allocator);
+        var index_data = std.ArrayList(u32).init(arena.allocator());
         for (mesh.faces) |face| {
             try index_data.append(face[1]);
             try index_data.append(face[2]);
