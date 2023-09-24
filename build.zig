@@ -1,7 +1,7 @@
 const std = @import("std");
 const content_dir = "content/";
 
-pub fn build(b: *std.Build) void {
+pub fn build(b: *std.Build) !void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
     const exe = b.addExecutable(.{
@@ -23,6 +23,22 @@ pub fn build(b: *std.Build) void {
     zglfw_pkg.link(exe);
     zmath_pkg.link(exe);
     zmesh_pkg.link(exe);
+
+    var allocator = std.heap.page_allocator;
+
+    const res = try std.ChildProcess.exec(.{
+        .allocator = allocator,
+        .argv = &[_][]const u8{
+            "blender",
+            "content/cube.blend",
+            "--background",
+            "--python",
+            "content/custom-gltf.py",
+        },
+        .cwd = try std.process.getCwdAlloc(allocator),
+    });
+
+    std.debug.print("stdout: {s}\n", .{res.stdout});
 
     const exe_options = b.addOptions();
     exe.addOptions("build_options", exe_options);

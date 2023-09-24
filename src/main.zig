@@ -55,20 +55,6 @@ const DemoState = struct {
 };
 
 fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !DemoState {
-    const res = try std.ChildProcess.exec(.{
-        .allocator = allocator,
-        .argv = &[_][]const u8{
-            "blender",
-            "content/cube.blend",
-            "--background",
-            "--python",
-            "content/custom-gltf.py",
-        },
-        .cwd = try std.process.getCwdAlloc(allocator),
-    });
-
-    std.debug.print("stdout: {s}\n", .{res.stdout});
-
     const gctx = try zgpu.GraphicsContext.create(allocator, window, .{});
 
     // Create a bind group layout needed for our render pipeline.
