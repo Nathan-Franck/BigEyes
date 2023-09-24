@@ -1,5 +1,5 @@
 const std = @import("std");
-const content_dir = "triangle_wgpu_content/";
+const content_dir = "content/";
 
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});

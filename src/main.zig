@@ -55,6 +55,20 @@ const DemoState = struct {
 };
 
 fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !DemoState {
+    const res = try std.ChildProcess.exec(.{
+        .allocator = allocator,
+        .argv = &[_][]const u8{
+            "blender",
+            "content/cube.blend",
+            "--background",
+            "--python",
+            "content/custom-gltf.py",
+        },
+        .cwd = try std.process.getCwdAlloc(allocator),
+    });
+
+    std.debug.print("stdout: {s}\n", .{res.stdout});
+
     const gctx = try zgpu.GraphicsContext.create(allocator, window, .{});
 
     // Create a bind group layout needed for our render pipeline.
@@ -122,6 +136,9 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !DemoState {
     defer arena.deinit();
 
     const mesh = mesh: {
+
+        // Run `blender triangle_wgpu_content/cube.blend --background --python .\tools\custom-gltf.py` from command line
+        // build a [*:null]const ?[*:0]const u8 from a simple list of arguments
 
         // Load seperately a json file with the polygon data, should be called *.gltf.json
         const subdiv = @import("./subdiv.zig");
