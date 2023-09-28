@@ -3,6 +3,9 @@ import bpy
 # set undo point
 bpy.ops.ed.undo_push()
 
+# get out of edit mode
+bpy.ops.object.mode_set(mode='OBJECT')
+
 # For each mesh, gather all polygons, these we'll export seperately to a json format - mesh -> polygons (indices)
 meshes = []
 for object in bpy.data.objects:

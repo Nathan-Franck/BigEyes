@@ -145,21 +145,70 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !DemoState {
         // pack into subdiv mesh for processing
         const first = polygonJSON.value[0];
 
+        const firstRoundSubd = subdiv.Subdiv(true);
+        const secondRoundSubd = subdiv.Subdiv(false);
+
         // Start a timer
-        var timer = try std.time.Timer.start();
+        var first_results = first_results: {
+            var timer = try std.time.Timer.start();
 
-        var first_round = try subdiv.cmcSubdiv(arena.allocator(), first.vertices, first.polygons);
-        var second_round = try subdiv.cmcSubdiv(arena.allocator(), first_round.points, first_round.faces);
-        var third_round = try subdiv.cmcSubdiv(arena.allocator(), second_round.points, second_round.faces);
-        var fourth_round = try subdiv.cmcSubdiv(arena.allocator(), third_round.points, third_round.faces);
+            var first_round = try firstRoundSubd.cmcSubdiv(arena.allocator(), first.vertices, first.polygons);
+            var second_round = try secondRoundSubd.cmcSubdiv(arena.allocator(), first_round.points, first_round.quads);
+            var third_round = try secondRoundSubd.cmcSubdiv(arena.allocator(), second_round.points, second_round.quads);
 
-        var ns = timer.read();
+            var ns = timer.read();
 
-        std.debug.print("Subdiv took {d} ms\n", .{@as(f64, @floatFromInt(ns)) / 1_000_000});
+            std.debug.print("Subdiv took {d} ms\n", .{@as(f64, @floatFromInt(ns)) / 1_000_000});
+            break :first_results [_]subdiv.Mesh{ first_round, second_round, third_round };
+        };
 
-        std.debug.print("Got {} points and {} faces\n", .{ fourth_round.points.len, fourth_round.faces.len });
+        // Second round with only points calculations (have to reuse the face calcs from first pass)
+        var second_results = second_results: {
+            var timer = try std.time.Timer.start();
 
-        break :mesh fourth_round;
+            var first_round = try firstRoundSubd.cmcSubdivOnlyPoints(arena.allocator(), first.vertices, first.polygons);
+            var second_round = try secondRoundSubd.cmcSubdivOnlyPoints(arena.allocator(), first_round, first_results[0].quads);
+            var third_round = try secondRoundSubd.cmcSubdivOnlyPoints(arena.allocator(), second_round, first_results[1].quads);
+
+            var ns = timer.read();
+
+            std.debug.print("Second round took {d} ms\n", .{@as(f64, @floatFromInt(ns)) / 1_000_000});
+            break :second_results third_round;
+        };
+
+        // Start a timer
+        var third_results = third_results: {
+            var timer = try std.time.Timer.start();
+
+            var first_round = try firstRoundSubd.cmcSubdiv(arena.allocator(), first.vertices, first.polygons);
+            var second_round = try secondRoundSubd.cmcSubdiv(arena.allocator(), first_round.points, first_round.quads);
+            var third_round = try secondRoundSubd.cmcSubdiv(arena.allocator(), second_round.points, second_round.quads);
+
+            var ns = timer.read();
+
+            std.debug.print("Subdiv took {d} ms\n", .{@as(f64, @floatFromInt(ns)) / 1_000_000});
+            break :third_results [_]subdiv.Mesh{ first_round, second_round, third_round };
+        };
+        _ = third_results;
+
+        // Second round with only points calculations (have to reuse the face calcs from first pass)
+        var fourth_results = fourth_results: {
+            var timer = try std.time.Timer.start();
+
+            var first_round = try firstRoundSubd.cmcSubdivOnlyPoints(arena.allocator(), first.vertices, first.polygons);
+            var second_round = try secondRoundSubd.cmcSubdivOnlyPoints(arena.allocator(), first_round, first_results[0].quads);
+            var third_round = try secondRoundSubd.cmcSubdivOnlyPoints(arena.allocator(), second_round, first_results[1].quads);
+
+            var ns = timer.read();
+
+            std.debug.print("Second round took {d} ms\n", .{@as(f64, @floatFromInt(ns)) / 1_000_000});
+            break :fourth_results third_round;
+        };
+        _ = fourth_results;
+
+        std.debug.print("Got {} points and {} faces\n", .{ second_results.len, first_results[2].quads.len });
+
+        break :mesh subdiv.Mesh{ .points = second_results, .quads = first_results[2].quads };
     };
 
     const hexColors = [_][3]f32{
@@ -181,7 +230,7 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !DemoState {
 
     var index_data = index_data: {
         var index_data = std.ArrayList(u32).init(arena.allocator());
-        for (mesh.faces) |face| {
+        for (mesh.quads) |face| {
             try index_data.append(face[1]);
             try index_data.append(face[2]);
             try index_data.append(face[0]);
