@@ -26,3 +26,4 @@ import os
 import json
 with open(bpy.path.abspath("//") + os.path.basename(bpy.context.blend_data.filepath) + ".json", "w") as file:
     json.dump(meshes, file, indent=4)
+print("Export of " + bpy.path.abspath("//") + os.path.basename(bpy.context.blend_data.filepath) + ".json" + " complete")

@@ -6,6 +6,8 @@ const wgpu = zgpu.wgpu;
 const zgui = @import("zgui");
 const zm = @import("zmath");
 
+const subdiv = @import("./subdiv.zig");
+
 const content_dir = @import("build_options").content_dir;
 const window_title = "zig-gamedev: triangle (wgpu)";
 
@@ -123,11 +125,7 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !DemoState {
 
     const mesh = mesh: {
 
-        // Run `blender triangle_wgpu_content/cube.blend --background --python .\tools\custom-gltf.py` from command line
-        // build a [*:null]const ?[*:0]const u8 from a simple list of arguments
-
         // Load seperately a json file with the polygon data, should be called *.gltf.json
-        const subdiv = @import("./subdiv.zig");
 
         const polygonJSON = json: {
             const json_data = std.fs.cwd().readFileAlloc(arena.allocator(), content_dir ++ "cube.blend.json", 512 * 1024 * 1024) catch |err| {
@@ -147,8 +145,18 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !DemoState {
 
         // pack into subdiv mesh for processing
         const first = polygonJSON.value[0];
+
+        // Start a timer
+        var timer = try std.time.Timer.start();
+
         var first_round = try subdiv.cmcSubdiv(arena.allocator(), first.vertices, first.polygons);
         var second_round = try subdiv.cmcSubdiv(arena.allocator(), first_round.points, first_round.faces);
+
+        var ns = timer.read();
+
+        std.debug.print("Subdiv took {d} ms\n", .{@as(f64, @floatFromInt(ns)) / 1_000_000});
+
+        std.debug.print("Got {} points and {} faces\n", .{ second_round.points.len, second_round.faces.len });
 
         break :mesh second_round;
     };

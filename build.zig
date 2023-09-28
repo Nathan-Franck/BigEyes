@@ -10,10 +10,11 @@ pub fn build(b: *std.Build) !void {
         .target = target,
         .optimize = optimize,
     });
+    exe.linkLibC();
 
     const zgui_pkg = @import("libs/zig-gamedev/libs/zgui/build.zig").package(b, exe.target, exe.optimize, .{ .options = .{ .backend = .glfw_wgpu } });
     const zmath_pkg = @import("libs/zig-gamedev/libs/zmath/build.zig").package(b, exe.target, exe.optimize, .{});
-    const zglfw_pkg = @import("libs/zig-gamedev/libs/zglfw/build.zig").package(b, exe.target, exe.optimize, .{});
+    const zglfw_pkg = @import("libs/zig-gamedev/libs/zglfw/build.zig").package(b, exe.target, exe.optimize, .{ .options = .{ .shared = true } });
     const zpool_pkg = @import("libs/zig-gamedev/libs/zpool/build.zig").package(b, exe.target, exe.optimize, .{});
     const zgpu_pkg = @import("libs/zig-gamedev/libs/zgpu/build.zig").package(b, exe.target, exe.optimize, .{ .deps = .{ .zglfw = zglfw_pkg.zglfw, .zpool = zpool_pkg.zpool } });
     const zmesh_pkg = @import("libs/zig-gamedev/libs/zmesh/build.zig").package(b, exe.target, exe.optimize, .{});
@@ -50,6 +51,13 @@ pub fn build(b: *std.Build) !void {
         .install_subdir = "bin/" ++ content_dir,
     });
     exe.step.dependOn(&install_content_step.step);
+
+    // Windows hax
+    exe.want_lto = false;
+    if (exe.optimize == .ReleaseFast)
+        exe.strip = true;
+
+    // exe.single_threaded = true;
 
     b.installArtifact(exe);
     const run_cmd = b.addRunArtifact(exe);
