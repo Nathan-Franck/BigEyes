@@ -1,13 +1,20 @@
 import bpy
 
-# Export glTF 2.0 using project path as the file name
-# bpy.ops.export_scene.gltf(filepath=bpy.path.abspath("//") + bpy.path.basename(bpy.context.blend_data.filepath) + ".gltf")
-# Save as above, but ensure it uses the gltf encoding instead of glb
-bpy.ops.export_scene.gltf(filepath=bpy.path.abspath("//") + bpy.path.basename(bpy.context.blend_data.filepath) + ".gltf", export_format='GLTF_EMBEDDED')
+# set undo point
+bpy.ops.ed.undo_push()
 
 # For each mesh, gather all polygons, these we'll export seperately to a json format - mesh -> polygons (indices)
 meshes = []
-for mesh in bpy.data.meshes:
+for object in bpy.data.objects:
+    if object.type != "MESH":
+        continue
+    mesh = object.data
+    bpy.context.view_layer.objects.active = object
+    for modifier in object.modifiers:
+        if modifier.show_render:
+            bpy.ops.object.modifier_apply(modifier=modifier.name)
+    # apply mesh modifiers if they are enabled in the render
+    # mesh.transform(mesh.matrix_world)
     polygons = []
     vertices = []
     for polygon in mesh.polygons:
@@ -27,3 +34,6 @@ import json
 with open(bpy.path.abspath("//") + os.path.basename(bpy.context.blend_data.filepath) + ".json", "w") as file:
     json.dump(meshes, file, indent=4)
 print("Export of " + bpy.path.abspath("//") + os.path.basename(bpy.context.blend_data.filepath) + ".json" + " complete")
+
+# restore undo point
+bpy.ops.ed.undo()

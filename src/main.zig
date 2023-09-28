@@ -151,14 +151,15 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !DemoState {
         var first_round = try subdiv.cmcSubdiv(arena.allocator(), first.vertices, first.polygons);
         var second_round = try subdiv.cmcSubdiv(arena.allocator(), first_round.points, first_round.faces);
         var third_round = try subdiv.cmcSubdiv(arena.allocator(), second_round.points, second_round.faces);
+        var fourth_round = try subdiv.cmcSubdiv(arena.allocator(), third_round.points, third_round.faces);
 
         var ns = timer.read();
 
         std.debug.print("Subdiv took {d} ms\n", .{@as(f64, @floatFromInt(ns)) / 1_000_000});
 
-        std.debug.print("Got {} points and {} faces\n", .{ third_round.points.len, third_round.faces.len });
+        std.debug.print("Got {} points and {} faces\n", .{ fourth_round.points.len, fourth_round.faces.len });
 
-        break :mesh third_round;
+        break :mesh fourth_round;
     };
 
     const hexColors = [_][3]f32{
