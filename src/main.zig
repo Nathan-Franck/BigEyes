@@ -127,7 +127,7 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !DemoState {
 
         // Load seperately a json file with the polygon data, should be called *.gltf.json
         const polygonJSON = json: {
-            const json_data = std.fs.cwd().readFileAlloc(arena.allocator(), content_dir ++ "cube.blend.json", 512 * 1024 * 1024) catch |err| {
+            const json_data = std.fs.cwd().readFileAlloc(arena.allocator(), content_dir ++ "boss.blend.json", 512 * 1024 * 1024) catch |err| {
                 std.log.err("Failed to read JSON file: {}", .{err});
                 return err;
             };
@@ -135,6 +135,7 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !DemoState {
                 name: []const u8,
                 polygons: []const subdiv.Face,
                 vertices: []const subdiv.Point,
+                shapeKeys: []struct { name: []const u8, vertices: []const subdiv.Point },
             };
             break :json std.json.parseFromSlice(Config, arena.allocator(), json_data, .{}) catch |err| {
                 std.log.err("Failed to parse JSON: {}", .{err});
@@ -143,7 +144,7 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !DemoState {
         };
 
         // pack into subdiv mesh for processing
-        const first = polygonJSON.value[0];
+        const first = polygonJSON.value[4];
 
         const firstRoundSubd = subdiv.Subdiv(true);
         const secondRoundSubd = subdiv.Subdiv(false);
@@ -152,7 +153,7 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !DemoState {
         var first_results = first_results: {
             var timer = try std.time.Timer.start();
 
-            var first_round = try firstRoundSubd.cmcSubdiv(arena.allocator(), first.vertices, first.polygons);
+            var first_round = try firstRoundSubd.cmcSubdiv(arena.allocator(), first.shapeKeys[0].vertices, first.polygons);
             var second_round = try secondRoundSubd.cmcSubdiv(arena.allocator(), first_round.points, first_round.quads);
             var third_round = try secondRoundSubd.cmcSubdiv(arena.allocator(), second_round.points, second_round.quads);
 
@@ -166,7 +167,7 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !DemoState {
         var second_results = second_results: {
             var timer = try std.time.Timer.start();
 
-            var first_round = try firstRoundSubd.cmcSubdivOnlyPoints(arena.allocator(), first.vertices, first.polygons);
+            var first_round = try firstRoundSubd.cmcSubdivOnlyPoints(arena.allocator(), first.shapeKeys[1].vertices, first.polygons);
             var second_round = try secondRoundSubd.cmcSubdivOnlyPoints(arena.allocator(), first_round, first_results[0].quads);
             var third_round = try secondRoundSubd.cmcSubdivOnlyPoints(arena.allocator(), second_round, first_results[1].quads);
 

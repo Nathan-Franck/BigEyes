@@ -1,8 +1,5 @@
 import bpy
 
-# set undo point
-bpy.ops.ed.undo_push()
-
 # get out of edit mode
 bpy.ops.object.mode_set(mode='OBJECT')
 
@@ -27,16 +24,18 @@ for object in bpy.data.objects:
         polygons.append(polygonRes)
     for vertex in mesh.vertices:
         vertices.append([vertex.co.x, vertex.co.y, vertex.co.z])
-    meshes.append({ "name":mesh.name, "polygons":polygons, "vertices":vertices })
-# import json
-# with open(bpy.path.abspath("//") + "polygons.json", "w") as file:
-#     json.dump(meshes, file, indent=4)
-# Instead, export using the name of the file as the json file name
+    # Extract shape keys
+    shapeKeys = []
+    if mesh.shape_keys != None:
+        for shapeKey in mesh.shape_keys.key_blocks:
+            shapeVerts = shapeKey.data.values()
+            verts = []
+            for vert in shapeVerts:
+                verts.append([vert.co.x, vert.co.y, vert.co.z])
+            shapeKeys.append({ "name":shapeKey.name, "vertices":verts })
+    meshes.append({ "name":mesh.name, "polygons":polygons, "vertices":vertices, "shapeKeys":shapeKeys })
 import os
 import json
 with open(bpy.path.abspath("//") + os.path.basename(bpy.context.blend_data.filepath) + ".json", "w") as file:
     json.dump(meshes, file, indent=4)
 print("Export of " + bpy.path.abspath("//") + os.path.basename(bpy.context.blend_data.filepath) + ".json" + " complete")
-
-# restore undo point
-bpy.ops.ed.undo()

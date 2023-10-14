@@ -1,6 +1,27 @@
 const std = @import("std");
 const content_dir = "content/";
 
+fn exportMeshes(allocator: std.mem.Allocator, paths: []const []const u8) !void {
+    for (paths) |path| {
+        std.debug.print("Working on {s}", .{path});
+        var timer = try std.time.Timer.start();
+        const res = try std.ChildProcess.exec(.{
+            .allocator = allocator,
+            .argv = &[_][]const u8{
+                "blender",
+                try std.fmt.allocPrint(allocator, "content/{s}.blend", .{path}),
+                "--background",
+                "--python",
+                "content/custom-gltf.py",
+            },
+            .cwd = try std.process.getCwdAlloc(allocator),
+        });
+        std.debug.print("stdout: {s}\n", .{res.stdout});
+        var ns = timer.read();
+        std.debug.print("Process took {d} ms\n", .{@as(f64, @floatFromInt(ns)) / 1_000_000});
+    }
+}
+
 pub fn build(b: *std.Build) !void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
@@ -26,20 +47,7 @@ pub fn build(b: *std.Build) !void {
     zmesh_pkg.link(exe);
 
     var allocator = std.heap.page_allocator;
-
-    const res = try std.ChildProcess.exec(.{
-        .allocator = allocator,
-        .argv = &[_][]const u8{
-            "blender",
-            "content/cube.blend",
-            "--background",
-            "--python",
-            "content/custom-gltf.py",
-        },
-        .cwd = try std.process.getCwdAlloc(allocator),
-    });
-
-    std.debug.print("stdout: {s}\n", .{res.stdout});
+    try exportMeshes(allocator, &.{"boss"});
 
     const exe_options = b.addOptions();
     exe.addOptions("build_options", exe_options);
