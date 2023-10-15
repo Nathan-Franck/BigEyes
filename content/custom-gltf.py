@@ -23,7 +23,7 @@ for object in bpy.data.objects:
             polygonRes.append(index)
         polygons.append(polygonRes)
     for vertex in mesh.vertices:
-        vertices.append([vertex.co.x, vertex.co.y, vertex.co.z])
+        vertices.append([vertex.co.x, vertex.co.y, vertex.co.z, 1])
     # Extract shape keys
     shapeKeys = []
     if mesh.shape_keys != None:
@@ -31,7 +31,7 @@ for object in bpy.data.objects:
             shapeVerts = shapeKey.data.values()
             verts = []
             for vert in shapeVerts:
-                verts.append([vert.co.x, vert.co.y, vert.co.z])
+                verts.append([vert.co.x, vert.co.y, vert.co.z, 1])
             shapeKeys.append({ "name":shapeKey.name, "vertices":verts })
     meshes.append({ "name":mesh.name, "polygons":polygons, "vertices":vertices, "shapeKeys":shapeKeys })
 import os

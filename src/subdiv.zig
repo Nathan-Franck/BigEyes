@@ -1,8 +1,8 @@
 const std = @import("std");
-const math = std.math;
+const zmath = @import("zmath");
 const ArrayList = std.ArrayList;
 
-pub const Point = @Vector(3, f32);
+pub const Point = zmath.Vec;
 pub const Face = []const u32;
 pub const Quad = [4]u32;
 pub const Mesh = struct { points: []const Point, quads: []const Quad };
@@ -25,7 +25,7 @@ pub fn Subdiv(comptime first_pass: bool) type {
         fn getFacePoints(allocator: std.mem.Allocator, inputPoints: []const Point, inputFaces: []const FaceType) ![]Point {
             var facePoints = try ArrayList(Point).initCapacity(allocator, inputFaces.len);
             for (inputFaces) |face| {
-                var facePoint = Point{ 0, 0, 0 };
+                var facePoint = Point{ 0, 0, 0, 1 };
                 for (face) |pointNum| {
                     facePoint += inputPoints[pointNum];
                 }
@@ -119,7 +119,7 @@ pub fn Subdiv(comptime first_pass: bool) type {
         fn getAvgFacePoints(allocator: std.mem.Allocator, inputPoints: []const Point, inputFaces: []const FaceType, facePoints: []const Point) ![]Point {
             var tempPoints = try ArrayList(PointEx).initCapacity(allocator, inputPoints.len);
             for (inputPoints) |_| {
-                try tempPoints.append(PointEx{ .p = Point{ 0, 0, 0 }, .n = 0 });
+                try tempPoints.append(PointEx{ .p = Point{ 0, 0, 0, 1 }, .n = 0 });
             }
             for (inputFaces, 0..) |face, faceNum| {
                 var fp = facePoints[faceNum];
@@ -139,7 +139,7 @@ pub fn Subdiv(comptime first_pass: bool) type {
         fn getAvgMidEdges(allocator: std.mem.Allocator, inputPoints: []const Point, edgesFaces: []const EdgesFace) ![]Point {
             var tempPoints = try ArrayList(PointEx).initCapacity(allocator, inputPoints.len);
             for (inputPoints) |_| {
-                try tempPoints.append(PointEx{ .p = Point{ 0, 0, 0 }, .n = 0 });
+                try tempPoints.append(PointEx{ .p = Point{ 0, 0, 0, 1 }, .n = 0 });
             }
             for (edgesFaces) |edge| {
                 for ([_]u32{ edge.point1, edge.point2 }) |pointNum| {
@@ -277,12 +277,12 @@ test "getFacePoints" {
     std.debug.print("Hello!", .{});
     var allocator = std.heap.page_allocator;
     var points = [_]Point{
-        Point{ -1.0, 1.0, 1.0 },
-        Point{ -1.0, -1.0, 1.0 },
-        Point{ 1.0, -1.0, 1.0 },
-        Point{ 1.0, 1.0, 1.0 },
-        Point{ -1.0, 1.0, -1.0 },
-        Point{ -1.0, -1.0, -1.0 },
+        Point{ -1.0, 1.0, 1.0, 1.0 },
+        Point{ -1.0, -1.0, 1.0, 1.0 },
+        Point{ 1.0, -1.0, 1.0, 1.0 },
+        Point{ 1.0, 1.0, 1.0, 1.0 },
+        Point{ -1.0, 1.0, -1.0, 1.0 },
+        Point{ -1.0, -1.0, -1.0, 1.0 },
     };
     var faces = [_]Face{
         &[_]u32{ 0, 1, 2, 3 },
@@ -295,8 +295,8 @@ test "getFacePoints" {
     );
 
     var expected = [_]Point{
-        Point{ 0.0, 0.0, 1.0 },
-        Point{ -1.0, 0.0, 0.0 },
+        Point{ 0.0, 0.0, 1.0, 1.0 },
+        Point{ -1.0, 0.0, 0.0, 1.0 },
     };
 
     try std.testing.expectEqual(expected.len, result.len);
@@ -308,12 +308,12 @@ test "getFacePoints" {
 test "getEdgesFaces" {
     var allocator = std.heap.page_allocator;
     var points = [_]Point{
-        Point{ -1.0, 1.0, 1.0 },
-        Point{ -1.0, -1.0, 1.0 },
-        Point{ 1.0, -1.0, 1.0 },
-        Point{ 1.0, 1.0, 1.0 },
-        Point{ -1.0, 1.0, -1.0 },
-        Point{ -1.0, -1.0, -1.0 },
+        Point{ -1.0, 1.0, 1.0, 1.0 },
+        Point{ -1.0, -1.0, 1.0, 1.0 },
+        Point{ 1.0, -1.0, 1.0, 1.0 },
+        Point{ 1.0, 1.0, 1.0, 1.0 },
+        Point{ -1.0, 1.0, -1.0, 1.0 },
+        Point{ -1.0, -1.0, -1.0, 1.0 },
     };
     var faces = [_]Face{
         &[_]u32{ 0, 1, 2, 3 },
@@ -337,12 +337,12 @@ test "getEdgesFaces" {
 test "getPointsFaces" {
     var allocator = std.heap.page_allocator;
     var points = [_]Point{
-        Point{ -1.0, 1.0, 1.0 },
-        Point{ -1.0, -1.0, 1.0 },
-        Point{ 1.0, -1.0, 1.0 },
-        Point{ 1.0, 1.0, 1.0 },
-        Point{ -1.0, 1.0, -1.0 },
-        Point{ -1.0, -1.0, -1.0 },
+        Point{ -1.0, 1.0, 1.0, 1.0 },
+        Point{ -1.0, -1.0, 1.0, 1.0 },
+        Point{ 1.0, -1.0, 1.0, 1.0 },
+        Point{ 1.0, 1.0, 1.0, 1.0 },
+        Point{ -1.0, 1.0, -1.0, 1.0 },
+        Point{ -1.0, -1.0, -1.0, 1.0 },
     };
     var faces = [_]Face{
         &[_]u32{ 0, 1, 2, 3 },
@@ -360,12 +360,12 @@ test "getPointsFaces" {
 test "cmcSubdiv" {
     var allocator = std.heap.page_allocator;
     var points = [_]Point{
-        Point{ -1.0, 1.0, 1.0 },
-        Point{ -1.0, -1.0, 1.0 },
-        Point{ 1.0, -1.0, 1.0 },
-        Point{ 1.0, 1.0, 1.0 },
-        Point{ -1.0, 1.0, -1.0 },
-        Point{ -1.0, -1.0, -1.0 },
+        Point{ -1.0, 1.0, 1.0, 1.0 },
+        Point{ -1.0, -1.0, 1.0, 1.0 },
+        Point{ 1.0, -1.0, 1.0, 1.0 },
+        Point{ 1.0, 1.0, 1.0, 1.0 },
+        Point{ -1.0, 1.0, -1.0, 1.0 },
+        Point{ -1.0, -1.0, -1.0, 1.0 },
     };
     var faces = [_]Face{
         &[_]u32{ 0, 1, 2, 3 },

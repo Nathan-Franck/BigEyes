@@ -17,22 +17,26 @@ const wgsl_vs =
 \\  struct VertexOut {
 \\      @builtin(position) position_clip: vec4<f32>,
 \\      @location(0) color: vec3<f32>,
+\\      @location(1) normal: vec3<f32>,
 \\  }
 \\  @vertex fn main(
 \\      @location(0) position: vec3<f32>,
 \\      @location(1) color: vec3<f32>,
+\\      @location(2) normal: vec3<f32>,
 \\  ) -> VertexOut {
 \\      var output: VertexOut;
 \\      output.position_clip = vec4(position, 1.0) * object_to_clip;
 \\      output.color = color;
+\\      output.normal = normal;
 \\      return output;
 \\  }
 ;
 const wgsl_fs =
 \\  @fragment fn main(
 \\      @location(0) color: vec3<f32>,
+\\      @location(1) normal: vec3<f32>,
 \\  ) -> @location(0) vec4<f32> {
-\\      return vec4(color, 1.0);
+\\      return vec4(normal, 1.0);
 \\  }
 // zig fmt: on
 ;
@@ -40,6 +44,7 @@ const wgsl_fs =
 const Vertex = struct {
     position: [3]f32,
     color: [3]f32,
+    normal: [3]f32,
 };
 
 const DemoState = struct {
@@ -82,6 +87,7 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !DemoState {
         const vertex_attributes = [_]wgpu.VertexAttribute{
             .{ .format = .float32x3, .offset = 0, .shader_location = 0 },
             .{ .format = .float32x3, .offset = @offsetOf(Vertex, "color"), .shader_location = 1 },
+            .{ .format = .float32x3, .offset = @offsetOf(Vertex, "normal"), .shader_location = 2 },
         };
         const vertex_buffers = [_]wgpu.VertexBufferLayout{.{
             .array_stride = @sizeOf(Vertex),
@@ -223,8 +229,24 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !DemoState {
 
     var vertex_data = vertex_data: {
         var vertex_data = std.ArrayList(Vertex).init(arena.allocator());
+        var vertexToQuad = std.AutoHashMap(u32, std.ArrayList(*const [4]u32)).init(arena.allocator());
+        for (mesh.quads) |*quad| {
+            for (quad) |vertex| {
+                var quadsList = if (vertexToQuad.get(vertex)) |existing| existing else std.ArrayList(*const [4]u32).init(arena.allocator());
+                try quadsList.append(quad);
+                try vertexToQuad.put(vertex, quadsList);
+            }
+        }
         for (mesh.points, 0..) |point, i| {
-            try vertex_data.append(Vertex{ .position = @as([3]f32, point), .color = hexColors[i % hexColors.len] });
+            var normal = if (vertexToQuad.get(@intCast(i))) |quads| normal: {
+                var normal = subdiv.Point{ 0, 0, 0, 0 };
+                for (quads.items) |quad| {
+                    var quad_normal = zm.cross3(mesh.points[quad[0]] - mesh.points[quad[2]], mesh.points[quad[1]] - mesh.points[quad[2]]);
+                    normal += zm.normalize3(quad_normal) / @as(@Vector(4, f32), @splat(@floatFromInt(quads.items.len)));
+                }
+                break :normal normal;
+            } else subdiv.Point{ 0, 0, 0, 0 };
+            try vertex_data.append(Vertex{ .position = @as([4]f32, point)[0..3].*, .color = hexColors[i % hexColors.len], .normal = @as([4]f32, normal)[0..3].* });
         }
         break :vertex_data vertex_data.items;
     };
