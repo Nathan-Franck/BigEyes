@@ -1,7 +1,7 @@
 const std = @import("std");
-const subdiv = @import("libs/subdiv/subdiv.zig");
+const subdiv = @import("subdiv");
 
-export fn testSubdiv(inp: c_uint) c_uint {
+export fn testSubdiv() void {
     var allocator = std.heap.page_allocator;
     var points = [_]subdiv.Point{
         subdiv.Point{ -1.0, 1.0, 1.0, 1.0 },
@@ -15,11 +15,11 @@ export fn testSubdiv(inp: c_uint) c_uint {
         &[_]u32{ 0, 1, 2, 3 },
         &[_]u32{ 0, 1, 5, 4 },
     };
-    var result = try subdiv.Subdiv(true).cmcSubdiv(
+    var result = subdiv.Subdiv(true).cmcSubdiv(
         allocator,
         &points,
         &faces,
-    );
+    ) catch @panic("subdiv.Subdiv.cmcSubdiv");
     _ = result;
-    return inp * 2;
+    // return inp * 2;
 }

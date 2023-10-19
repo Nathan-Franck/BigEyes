@@ -1,25 +1,54 @@
 const std = @import("std");
 const content_dir = "content/";
 
-fn exportMeshes(allocator: std.mem.Allocator, paths: []const []const u8) !void {
-    for (paths) |path| {
-        std.debug.print("Working on {s}", .{path});
-        var timer = try std.time.Timer.start();
-        const res = try std.ChildProcess.exec(.{
-            .allocator = allocator,
-            .argv = &[_][]const u8{
-                "blender",
-                try std.fmt.allocPrint(allocator, "content/{s}.blend", .{path}),
-                "--background",
-                "--python",
-                "content/custom-gltf.py",
-            },
-            .cwd = try std.process.getCwdAlloc(allocator),
-        });
-        std.debug.print("stdout: {s}\n", .{res.stdout});
-        var ns = timer.read();
-        std.debug.print("Process took {d} ms\n", .{@as(f64, @floatFromInt(ns)) / 1_000_000});
+const ExportMeshes = struct {
+    allocator: std.mem.Allocator,
+    paths: []const []const u8,
+    step: std.build.Step,
+    pub fn create(b: *std.Build, paths: []const []const u8) *ExportMeshes {
+        var self = b.allocator.create(ExportMeshes) catch @panic("OOM");
+        self.* = .{
+            .allocator = b.allocator,
+            .paths = paths,
+            .step = std.build.Step.init(.{
+                .id = .custom,
+                .name = "export_meshes",
+                .owner = b,
+                .makeFn = exportMeshes,
+            }),
+        };
+        return self;
     }
+    fn exportMeshes(step: *std.build.Step, prog_node: *std.Progress.Node) !void {
+        _ = prog_node;
+        const self = @fieldParentPtr(ExportMeshes, "step", step);
+        for (self.paths) |path| {
+            std.debug.print("Working on {s}", .{path});
+            var timer = try std.time.Timer.start();
+            const res = try std.ChildProcess.exec(.{
+                .allocator = self.allocator,
+                .argv = &[_][]const u8{
+                    "blender",
+                    try std.fmt.allocPrint(self.allocator, "content/{s}.blend", .{path}),
+                    "--background",
+                    "--python",
+                    "content/custom-gltf.py",
+                },
+                .cwd = try std.process.getCwdAlloc(self.allocator),
+            });
+            std.debug.print("stdout: {s}\n", .{res.stdout});
+            var ns = timer.read();
+            std.debug.print("Process took {d} ms\n", .{@as(f64, @floatFromInt(ns)) / 1_000_000});
+        }
+    }
+};
+
+fn makeNoOp(step: *std.build.Step, prog_node: *std.Progress.Node) anyerror!void {
+    _ = prog_node;
+
+    var all_cached = true;
+
+    step.result_cached = all_cached;
 }
 
 pub fn build(b: *std.Build) !*std.Build.Step {
@@ -48,8 +77,11 @@ pub fn build(b: *std.Build) !*std.Build.Step {
 
     @import("../../libs/subdiv/build.zig").addModule(b, exe, .{ .zmath = zmath_pkg.zmath });
 
-    var allocator = std.heap.page_allocator;
-    try exportMeshes(allocator, &.{"boss"});
+    // var step = b.step("export_meshes", "Export meshes from blender");
+    // _ = step;
+
+    // try exportMeshes(allocator, &.{"boss"});
+    const export_meshes = ExportMeshes.create(b, &.{"boss"});
 
     const exe_options = b.addOptions();
     exe.addOptions("build_options", exe_options);
@@ -61,6 +93,7 @@ pub fn build(b: *std.Build) !*std.Build.Step {
         .install_subdir = "bin/" ++ content_dir,
     });
     exe.step.dependOn(&install_content_step.step);
+    exe.step.dependOn(&export_meshes.step);
 
     // Windows hax
     exe.want_lto = false;

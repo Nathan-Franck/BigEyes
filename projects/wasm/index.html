@@ -1,0 +1,25 @@
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <title>WebAssembly</title>
+    <script>
+        WebAssembly.instantiateStreaming(fetch("../../zig-out/lib/wasm.wasm"), {}).then((results) => {
+            var testSubdiv = results.instance.exports.testSubdiv;
+            console.log(testSubdiv());
+        });
+        fetch("../../basicTest.wasm")
+            .then(response => response.arrayBuffer())
+            .then(bytes => WebAssembly.instantiate(bytes, { env: {} }))
+            .then(results => {
+                var basicTest = results.instance.exports.basicTest;
+                console.log(basicTest());
+            });
+    </script>
+</head>
+
+<body>
+    <h1>WebAssembly</h1>
+</body>
+
+</html>
