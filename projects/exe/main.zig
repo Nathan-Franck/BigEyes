@@ -6,7 +6,7 @@ const wgpu = zgpu.wgpu;
 const zgui = @import("zgui");
 const zm = @import("zmath");
 
-const subdiv = @import("./subdiv.zig");
+const subdiv = @import("subdiv");
 
 const content_dir = @import("build_options").content_dir;
 const window_title = "zig-gamedev: triangle (wgpu)";

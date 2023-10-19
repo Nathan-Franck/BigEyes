@@ -1,0 +1,5 @@
+{
+    "scripts": {
+        "build webgl": "zig build-lib webgl.zig -target wasm32-freestanding -dynamic -OReleaseSmall"
+    }
+}
