@@ -3,13 +3,13 @@ const content_dir = "content/";
 
 const ExportMeshes = struct {
     allocator: std.mem.Allocator,
-    paths: []const []const u8,
+    files: []const []const u8,
     step: std.build.Step,
-    pub fn create(b: *std.Build, paths: []const []const u8) *ExportMeshes {
+    pub fn create(b: *std.Build, files: []const []const u8) *ExportMeshes {
         var self = b.allocator.create(ExportMeshes) catch @panic("OOM");
         self.* = .{
             .allocator = b.allocator,
-            .paths = paths,
+            .files = files,
             .step = std.build.Step.init(.{
                 .id = .custom,
                 .name = "export_meshes",
@@ -22,14 +22,30 @@ const ExportMeshes = struct {
     fn exportMeshes(step: *std.build.Step, prog_node: *std.Progress.Node) !void {
         _ = prog_node;
         const self = @fieldParentPtr(ExportMeshes, "step", step);
-        for (self.paths) |path| {
-            std.debug.print("Working on {s}", .{path});
+
+        var b = step.owner;
+
+        for (self.files) |file| {
+            var full_path = try std.fmt.allocPrint(self.allocator, "content/{s}.blend", .{file});
+
+            var man = b.cache.obtain();
+            defer man.deinit();
+            _ = try man.addFile(full_path, null);
+            if (try step.cacheHit(&man)) {
+                std.debug.print("No work needed for {s}\n", .{file});
+                _ = man.final();
+                continue;
+            }
+            _ = man.final();
+            try man.writeManifest();
+
+            std.debug.print("Working on {s}", .{file});
             var timer = try std.time.Timer.start();
             const res = try std.ChildProcess.exec(.{
                 .allocator = self.allocator,
                 .argv = &[_][]const u8{
                     "blender",
-                    try std.fmt.allocPrint(self.allocator, "content/{s}.blend", .{path}),
+                    full_path,
                     "--background",
                     "--python",
                     "content/custom-gltf.py",
@@ -60,7 +76,6 @@ pub fn build(b: *std.Build) !*std.Build.Step {
         .target = target,
         .optimize = optimize,
     });
-    exe.linkLibC();
 
     const zgui_pkg = @import("../../libs/zig-gamedev/libs/zgui/build.zig").package(b, exe.target, exe.optimize, .{ .options = .{ .backend = .glfw_wgpu } });
     const zmath_pkg = @import("../../libs/zig-gamedev/libs/zmath/build.zig").package(b, exe.target, exe.optimize, .{});
@@ -75,12 +90,13 @@ pub fn build(b: *std.Build) !*std.Build.Step {
     zmath_pkg.link(exe);
     zmesh_pkg.link(exe);
 
-    @import("../../libs/subdiv/build.zig").addModule(b, exe, .{ .zmath = zmath_pkg.zmath });
+    exe.addModule("subdiv", b.createModule(.{
+        .source_file = .{ .path = thisDir() ++ "/../../libs/subdiv/subdiv.zig" },
+        .dependencies = &.{
+            .{ .name = "zmath", .module = zmath_pkg.zmath },
+        },
+    }));
 
-    // var step = b.step("export_meshes", "Export meshes from blender");
-    // _ = step;
-
-    // try exportMeshes(allocator, &.{"boss"});
     const export_meshes = ExportMeshes.create(b, &.{"boss"});
 
     const exe_options = b.addOptions();
@@ -101,6 +117,9 @@ pub fn build(b: *std.Build) !*std.Build.Step {
         exe.strip = true;
 
     // exe.single_threaded = true;
+
+    const install_lib_artifact = b.addInstallArtifact(zglfw_pkg.zglfw_c_cpp, .{});
+    exe.step.dependOn(&install_lib_artifact.step);
 
     const install_artifact = b.addInstallArtifact(exe, .{});
     // const run_cmd = b.addRunArtifact(exe);

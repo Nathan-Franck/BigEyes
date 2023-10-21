@@ -1,7 +1,8 @@
 const std = @import("std");
 const subdiv = @import("subdiv");
 
-export fn testSubdiv() void {
+export fn testSubdiv(inp: u32) u32 {
+    _ = inp;
     var allocator = std.heap.page_allocator;
     var points = [_]subdiv.Point{
         subdiv.Point{ -1.0, 1.0, 1.0, 1.0 },
@@ -20,6 +21,5 @@ export fn testSubdiv() void {
         &points,
         &faces,
     ) catch @panic("subdiv.Subdiv.cmcSubdiv");
-    _ = result;
-    // return inp * 2;
+    return result.points.len;
 }

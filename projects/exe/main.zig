@@ -179,7 +179,7 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !DemoState {
 
             var ns = timer.read();
 
-            std.debug.print("Second round took {d} ms!\n", .{@as(f64, @floatFromInt(ns)) / 1_000_000});
+            std.debug.print("Second round took {d} ms\n", .{@as(f64, @floatFromInt(ns)) / 1_000_000});
             break :second_results third_round;
         };
 
