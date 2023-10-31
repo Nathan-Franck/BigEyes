@@ -32,7 +32,6 @@ const ExportMeshes = struct {
             defer man.deinit();
             _ = try man.addFile(full_path, null);
             if (try step.cacheHit(&man)) {
-                std.debug.print("No work needed for {s}\n", .{file});
                 _ = man.final();
                 continue;
             }
@@ -41,7 +40,7 @@ const ExportMeshes = struct {
 
             std.debug.print("Working on {s}", .{file});
             var timer = try std.time.Timer.start();
-            const res = try std.ChildProcess.exec(.{
+            const res = try std.ChildProcess.run(.{
                 .allocator = self.allocator,
                 .argv = &[_][]const u8{
                     "blender",
@@ -59,14 +58,6 @@ const ExportMeshes = struct {
     }
 };
 
-fn makeNoOp(step: *std.build.Step, prog_node: *std.Progress.Node) anyerror!void {
-    _ = prog_node;
-
-    var all_cached = true;
-
-    step.result_cached = all_cached;
-}
-
 pub fn build(b: *std.Build) !*std.Build.Step {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
@@ -79,7 +70,7 @@ pub fn build(b: *std.Build) !*std.Build.Step {
 
     const zgui_pkg = @import("../../libs/zig-gamedev/libs/zgui/build.zig").package(b, exe.target, exe.optimize, .{ .options = .{ .backend = .glfw_wgpu } });
     const zmath_pkg = @import("../../libs/zig-gamedev/libs/zmath/build.zig").package(b, exe.target, exe.optimize, .{});
-    const zglfw_pkg = @import("../../libs/zig-gamedev/libs/zglfw/build.zig").package(b, exe.target, exe.optimize, .{ .options = .{ .shared = true } });
+    const zglfw_pkg = @import("../../libs/zig-gamedev/libs/zglfw/build.zig").package(b, exe.target, exe.optimize, .{ .options = .{ .shared = false } });
     const zpool_pkg = @import("../../libs/zig-gamedev/libs/zpool/build.zig").package(b, exe.target, exe.optimize, .{});
     const zgpu_pkg = @import("../../libs/zig-gamedev/libs/zgpu/build.zig").package(b, exe.target, exe.optimize, .{ .deps = .{ .zglfw = zglfw_pkg.zglfw, .zpool = zpool_pkg.zpool } });
     const zmesh_pkg = @import("../../libs/zig-gamedev/libs/zmesh/build.zig").package(b, exe.target, exe.optimize, .{});
@@ -97,7 +88,7 @@ pub fn build(b: *std.Build) !*std.Build.Step {
         },
     }));
 
-    const export_meshes = ExportMeshes.create(b, &.{"boss"});
+    const export_meshes = ExportMeshes.create(b, &.{ "boss", "cube" });
 
     const exe_options = b.addOptions();
     exe.addOptions("build_options", exe_options);
@@ -118,8 +109,10 @@ pub fn build(b: *std.Build) !*std.Build.Step {
 
     // exe.single_threaded = true;
 
-    const install_lib_artifact = b.addInstallArtifact(zglfw_pkg.zglfw_c_cpp, .{});
-    exe.step.dependOn(&install_lib_artifact.step);
+    // const install_lib_artifact = b.addInstallArtifact(zglfw_pkg.zglfw_c_cpp, .{});
+    // const move_lib = b.addInstallBinFile(.{ .path = "zig-out/lib/zglfw.dll" }, "zglfw.dll");
+    // move_lib.step.dependOn(&install_lib_artifact.step);
+    // exe.step.dependOn(&move_lib.step);
 
     const install_artifact = b.addInstallArtifact(exe, .{});
     // const run_cmd = b.addRunArtifact(exe);
