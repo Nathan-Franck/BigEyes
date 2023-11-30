@@ -263,6 +263,8 @@ fn sdlEventWatch(userdata: ?*anyopaque, sdl_event: [*c]c.SDL_Event) callconv(.C)
 }
 
 pub fn main() !void {
+    std.debug.print("Hello, world!\n", .{});
+
     const video_width: i32 = 1024;
     const video_height: i32 = 640;
 

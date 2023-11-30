@@ -21,8 +21,11 @@ pub fn build(
     if (exe.target.isWindows()) {
         try exe.addVcpkgPaths(.dynamic);
         if (exe.vcpkg_bin_path) |path| {
+            std.debug.print("vcpkg_bin_path: {s}\n", .{path});
             const sdl2dll_path = try std.fs.path.join(b.allocator, &[_][]const u8{ path, "SDL2.dll" });
-            b.installBinFile(sdl2dll_path, "SDL2.dll");
+            const install_sdl = b.addInstallBinFile(.{ .path = sdl2dll_path }, "SDL2.dll");
+            exe.step.dependOn(&install_sdl.step);
+            std.debug.print("sdl2dll_path: {s}\n", .{sdl2dll_path});
         }
         exe.subsystem = .Windows;
         exe.linkSystemLibrary("Shell32");
@@ -43,14 +46,14 @@ pub fn build(
     exe.linkLibC();
     const install_artifact = b.addInstallArtifact(exe, .{});
 
-    if (exe.target.isWindows()) {
-        const outputresource = try std.mem.join(b.allocator, "", &[_][]const u8{ "-outputresource:", "zig-cache\\bin\\", exe.out_filename, ";1" });
-        const mt_exe = "C:\\Program Files (x86)\\Windows Kits\\10\\bin\\10.0.18362.0\\x64\\mt.exe";
-        const manifest_cmd = b.addSystemCommand(&[_][]const u8{ mt_exe, "-manifest", "app.manifest", outputresource });
-        manifest_cmd.step.dependOn(b.getInstallStep());
-        const manifest_step = b.step("manifest", "Embed manifest");
-        manifest_step.dependOn(&manifest_cmd.step);
-    }
+    // const zmath_pkg = @import("../../libs/zig-gamedev/libs/zmath/build.zig").package(b, exe.target, exe.optimize, .{});
+    // zmath_pkg.link(exe);
+    // exe.addModule("subdiv", b.createModule(.{
+    //     .source_file = .{ .path = thisDir() ++ "/../../libs/subdiv/subdiv.zig" },
+    //     .dependencies = &.{
+    //         .{ .name = "zmath", .module = zmath_pkg.zmath },
+    //     },
+    // }));
 
     return &install_artifact.step;
 }
