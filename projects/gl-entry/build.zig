@@ -46,14 +46,14 @@ pub fn build(
     exe.linkLibC();
     const install_artifact = b.addInstallArtifact(exe, .{});
 
-    // const zmath_pkg = @import("../../libs/zig-gamedev/libs/zmath/build.zig").package(b, exe.target, exe.optimize, .{});
-    // zmath_pkg.link(exe);
-    // exe.addModule("subdiv", b.createModule(.{
-    //     .source_file = .{ .path = thisDir() ++ "/../../libs/subdiv/subdiv.zig" },
-    //     .dependencies = &.{
-    //         .{ .name = "zmath", .module = zmath_pkg.zmath },
-    //     },
-    // }));
+    const zmath_pkg = @import("../../libs/zig-gamedev/libs/zmath/build.zig").package(b, exe.target, exe.optimize, .{});
+    zmath_pkg.link(exe);
+    exe.addModule("subdiv", b.createModule(.{
+        .source_file = .{ .path = thisDir() ++ "/../../libs/subdiv/subdiv.zig" },
+        .dependencies = &.{
+            .{ .name = "zmath", .module = zmath_pkg.zmath },
+        },
+    }));
 
     return &install_artifact.step;
 }

@@ -262,7 +262,37 @@ fn sdlEventWatch(userdata: ?*anyopaque, sdl_event: [*c]c.SDL_Event) callconv(.C)
     return 1;
 }
 
+const subdiv = @import("subdiv");
+
 pub fn main() !void {
+    const allocator = std.heap.page_allocator;
+    var points = [_]subdiv.Point{
+        subdiv.Point{ -1.0, 1.0, 1.0, 1.0 },
+        subdiv.Point{ -1.0, -1.0, 1.0, 1.0 },
+        subdiv.Point{ 1.0, -1.0, 1.0, 1.0 },
+        subdiv.Point{ 1.0, 1.0, 1.0, 1.0 },
+        subdiv.Point{ -1.0, 1.0, -1.0, 1.0 },
+        subdiv.Point{ -1.0, -1.0, -1.0, 1.0 },
+    };
+    var faces = [_]subdiv.Face{
+        &[_]u32{ 0, 1, 2, 3 },
+        &[_]u32{ 0, 1, 5, 4 },
+    };
+    const result = try subdiv.Subdiv(true).cmcSubdiv(
+        allocator,
+        &points,
+        &faces,
+    );
+
+    try std.testing.expectEqual(result.points.len, 15);
+    try std.testing.expectEqual(result.quads.len, 8);
+    for (result.quads) |face| {
+        for (face) |pointNum| {
+            try std.testing.expect(pointNum >= 0);
+            try std.testing.expect(pointNum < 15);
+        }
+    }
+
     std.debug.print("Hello, world!\n", .{});
 
     const video_width: i32 = 1024;
