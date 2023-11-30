@@ -6,7 +6,7 @@ const ExportMeshes = struct {
     files: []const []const u8,
     step: std.build.Step,
     pub fn create(b: *std.Build, files: []const []const u8) *ExportMeshes {
-        var self = b.allocator.create(ExportMeshes) catch @panic("OOM");
+        const self = b.allocator.create(ExportMeshes) catch @panic("OOM");
         self.* = .{
             .allocator = b.allocator,
             .files = files,
@@ -26,7 +26,7 @@ const ExportMeshes = struct {
         var b = step.owner;
 
         for (self.files) |file| {
-            var full_path = try std.fmt.allocPrint(self.allocator, "content/{s}.blend", .{file});
+            const full_path = try std.fmt.allocPrint(self.allocator, "content/{s}.blend", .{file});
 
             var man = b.cache.obtain();
             defer man.deinit();
@@ -52,15 +52,17 @@ const ExportMeshes = struct {
                 .cwd = try std.process.getCwdAlloc(self.allocator),
             });
             std.debug.print("stdout: {s}\n", .{res.stdout});
-            var ns = timer.read();
+            const ns = timer.read();
             std.debug.print("Process took {d} ms\n", .{@as(f64, @floatFromInt(ns)) / 1_000_000});
         }
     }
 };
 
-pub fn build(b: *std.Build) !*std.Build.Step {
-    const target = b.standardTargetOptions(.{});
-    const optimize = b.standardOptimizeOption(.{});
+pub fn build(
+    b: *std.Build,
+    target: std.zig.CrossTarget,
+    optimize: std.builtin.OptimizeMode,
+) !*std.Build.Step {
     const exe = b.addExecutable(.{
         .name = "triangle_wgpu",
         .root_source_file = .{ .path = thisDir() ++ "/main.zig" },

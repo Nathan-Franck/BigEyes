@@ -50,7 +50,7 @@ pub fn Subdiv(comptime first_pass: bool) type {
                     else
                         face[0];
                     if (point1 > point2) {
-                        var swap = point1;
+                        const swap = point1;
                         point1 = point2;
                         point2 = swap;
                     }
@@ -69,13 +69,13 @@ pub fn Subdiv(comptime first_pass: bool) type {
                     return a[0] < b[0];
                 }
             }.sort);
-            var numEdges = edges.items.len;
+            const numEdges = edges.items.len;
             var eIndex: usize = 0;
             var mergedEdges = try ArrayList([4]u32).initCapacity(allocator, numEdges);
             while (eIndex < numEdges) : (eIndex += 1) {
-                var e1 = edges.items[eIndex];
+                const e1 = edges.items[eIndex];
                 if (eIndex < numEdges - 1) {
-                    var e2 = edges.items[eIndex + 1];
+                    const e2 = edges.items[eIndex + 1];
                     if (e1[0] == e2[0] and e1[1] == e2[1]) {
                         try mergedEdges.append([4]u32{ e1[0], e1[1], e1[2], e2[2] });
                         eIndex += 1;
@@ -88,8 +88,8 @@ pub fn Subdiv(comptime first_pass: bool) type {
             }
             var edgesCenters = try ArrayList(EdgesFace).initCapacity(allocator, mergedEdges.items.len);
             for (mergedEdges.items) |me| {
-                var p1 = inputPoints[me[0]];
-                var p2 = inputPoints[me[1]];
+                const p1 = inputPoints[me[0]];
+                const p2 = inputPoints[me[1]];
                 try edgesCenters.append(EdgesFace{
                     .point1 = me[0],
                     .point2 = me[1],
@@ -104,13 +104,13 @@ pub fn Subdiv(comptime first_pass: bool) type {
         fn getEdgePoints(allocator: std.mem.Allocator, edgesFaces: []const EdgesFace, facePoints: []const Point) ![]Point {
             var edgePoints = try ArrayList(Point).initCapacity(allocator, edgesFaces.len);
             for (edgesFaces) |edge| {
-                var cp = edge.centerPoint;
-                var fp1 = facePoints[edge.face1];
-                var fp2 = if (edge.face2 == std.math.maxInt(u32))
+                const cp = edge.centerPoint;
+                const fp1 = facePoints[edge.face1];
+                const fp2 = if (edge.face2 == std.math.maxInt(u32))
                     fp1
                 else
                     facePoints[edge.face2];
-                var cfp = centerPoint(fp1, fp2);
+                const cfp = centerPoint(fp1, fp2);
                 try edgePoints.append(centerPoint(cp, cfp));
             }
             return edgePoints.items;
@@ -122,9 +122,9 @@ pub fn Subdiv(comptime first_pass: bool) type {
                 try tempPoints.append(PointEx{ .p = Point{ 0, 0, 0, 1 }, .n = 0 });
             }
             for (inputFaces, 0..) |face, faceNum| {
-                var fp = facePoints[faceNum];
+                const fp = facePoints[faceNum];
                 for (face) |pointNum| {
-                    var tp = tempPoints.items[pointNum].p;
+                    const tp = tempPoints.items[pointNum].p;
                     tempPoints.items[pointNum].p = tp + fp;
                     tempPoints.items[pointNum].n += 1;
                 }
@@ -143,7 +143,7 @@ pub fn Subdiv(comptime first_pass: bool) type {
             }
             for (edgesFaces) |edge| {
                 for ([_]u32{ edge.point1, edge.point2 }) |pointNum| {
-                    var tp = tempPoints.items[pointNum].p;
+                    const tp = tempPoints.items[pointNum].p;
                     tempPoints.items[pointNum].p = tp + edge.centerPoint;
                     tempPoints.items[pointNum].n += 1;
                 }
@@ -172,21 +172,21 @@ pub fn Subdiv(comptime first_pass: bool) type {
             var arena = std.heap.ArenaAllocator.init(allocator);
             defer arena.deinit();
 
-            var avgFacePoints = try getAvgFacePoints(arena.allocator(), inputPoints, inputFaces, facePoints);
-            var avgMidEdges = try getAvgMidEdges(arena.allocator(), inputPoints, edgesFaces);
-            var pointsFaces = try getPointsFaces(arena.allocator(), inputPoints, inputFaces);
+            const avgFacePoints = try getAvgFacePoints(arena.allocator(), inputPoints, inputFaces, facePoints);
+            const avgMidEdges = try getAvgMidEdges(arena.allocator(), inputPoints, edgesFaces);
+            const pointsFaces = try getPointsFaces(arena.allocator(), inputPoints, inputFaces);
             var newPoints = try ArrayList(Point).initCapacity(allocator, inputPoints.len);
             for (inputPoints, 0..) |point, pointNum| {
-                var n = @as(f32, @floatFromInt(pointsFaces[pointNum]));
-                var m1 = @max(n - 3, 0) / n;
-                var m2 = 1.0 / n;
-                var m3 = 2.0 / n;
-                var p1 = point * @as(Point, @splat(m1));
-                var afp = avgFacePoints[pointNum];
-                var p2 = afp * @as(Point, @splat(m2));
-                var ame = avgMidEdges[pointNum];
-                var p3 = ame * @as(Point, @splat(m3));
-                var p4 = p1 + p2;
+                const n = @as(f32, @floatFromInt(pointsFaces[pointNum]));
+                const m1 = @max(n - 3, 0) / n;
+                const m2 = 1.0 / n;
+                const m3 = 2.0 / n;
+                const p1 = point * @as(Point, @splat(m1));
+                const afp = avgFacePoints[pointNum];
+                const p2 = afp * @as(Point, @splat(m2));
+                const ame = avgMidEdges[pointNum];
+                const p3 = ame * @as(Point, @splat(m3));
+                const p4 = p1 + p2;
                 try newPoints.append(p4 + p3);
             }
             return newPoints.items;
@@ -203,10 +203,10 @@ pub fn Subdiv(comptime first_pass: bool) type {
             var arena = std.heap.ArenaAllocator.init(allocator);
             defer arena.deinit();
 
-            var facePoints = try getFacePoints(arena.allocator(), inputPoints, inputFaces);
-            var edgesFaces = try getEdgesFaces(arena.allocator(), inputPoints, inputFaces);
-            var edgePoints = try getEdgePoints(arena.allocator(), edgesFaces, facePoints);
-            var initialNewPoints = try getNewPoints(arena.allocator(), inputPoints, inputFaces, facePoints, edgesFaces);
+            const facePoints = try getFacePoints(arena.allocator(), inputPoints, inputFaces);
+            const edgesFaces = try getEdgesFaces(arena.allocator(), inputPoints, inputFaces);
+            const edgePoints = try getEdgePoints(arena.allocator(), edgesFaces, facePoints);
+            const initialNewPoints = try getNewPoints(arena.allocator(), inputPoints, inputFaces, facePoints, edgesFaces);
             var facePointNums = try ArrayList(u32).initCapacity(arena.allocator(), facePoints.len);
             var newPoints = try ArrayList(Point).initCapacity(arena.allocator(), initialNewPoints.len);
             try newPoints.appendSlice(initialNewPoints);
@@ -218,9 +218,9 @@ pub fn Subdiv(comptime first_pass: bool) type {
             }
             var edgePointNums = std.AutoHashMap([2]u32, u32).init(allocator);
             for (edgesFaces, 0..) |edgeFace, edgeNum| {
-                var point1 = edgeFace.point1;
-                var point2 = edgeFace.point2;
-                var edgePoint = edgePoints[edgeNum];
+                const point1 = edgeFace.point1;
+                const point2 = edgeFace.point2;
+                const edgePoint = edgePoints[edgeNum];
                 try newPoints.append(edgePoint);
                 try edgePointNums.put(switchNums([2]u32{ point1, point2 }), @as(u32, @intCast(nextPointNum)));
                 nextPointNum += 1;
@@ -228,14 +228,14 @@ pub fn Subdiv(comptime first_pass: bool) type {
             var newFaces = try ArrayList(Quad).initCapacity(allocator, inputFaces.len);
             for (inputFaces, 0..) |oldFace, oldFaceNum| {
                 for (0..oldFace.len) |pointIndex| {
-                    var nextPointIndex = if (pointIndex == oldFace.len - 1) 0 else pointIndex + 1;
-                    var prevPointIndex = if (pointIndex == 0) oldFace.len - 1 else pointIndex - 1;
-                    var a = oldFace[pointIndex];
-                    var b = oldFace[nextPointIndex];
-                    var z = oldFace[prevPointIndex];
-                    var facePointAbcdZ = facePointNums.items[oldFaceNum];
-                    var edgePointAb = edgePointNums.get(switchNums([2]u32{ a, b })).?;
-                    var edgePointZa = edgePointNums.get(switchNums([2]u32{ z, a })).?;
+                    const nextPointIndex = if (pointIndex == oldFace.len - 1) 0 else pointIndex + 1;
+                    const prevPointIndex = if (pointIndex == 0) oldFace.len - 1 else pointIndex - 1;
+                    const a = oldFace[pointIndex];
+                    const b = oldFace[nextPointIndex];
+                    const z = oldFace[prevPointIndex];
+                    const facePointAbcdZ = facePointNums.items[oldFaceNum];
+                    const edgePointAb = edgePointNums.get(switchNums([2]u32{ a, b })).?;
+                    const edgePointZa = edgePointNums.get(switchNums([2]u32{ z, a })).?;
                     try newFaces.append([_]u32{ a, edgePointAb, facePointAbcdZ, edgePointZa });
                 }
             }
@@ -246,10 +246,10 @@ pub fn Subdiv(comptime first_pass: bool) type {
             var arena = std.heap.ArenaAllocator.init(allocator);
             defer arena.deinit();
 
-            var facePoints = try getFacePoints(arena.allocator(), inputPoints, inputFaces);
-            var edgesFaces = try getEdgesFaces(arena.allocator(), inputPoints, inputFaces);
-            var edgePoints = try getEdgePoints(arena.allocator(), edgesFaces, facePoints);
-            var initialNewPoints = try getNewPoints(arena.allocator(), inputPoints, inputFaces, facePoints, edgesFaces);
+            const facePoints = try getFacePoints(arena.allocator(), inputPoints, inputFaces);
+            const edgesFaces = try getEdgesFaces(arena.allocator(), inputPoints, inputFaces);
+            const edgePoints = try getEdgePoints(arena.allocator(), edgesFaces, facePoints);
+            const initialNewPoints = try getNewPoints(arena.allocator(), inputPoints, inputFaces, facePoints, edgesFaces);
             var facePointNums = try ArrayList(u32).initCapacity(arena.allocator(), facePoints.len);
             var newPoints = try ArrayList(Point).initCapacity(allocator, initialNewPoints.len);
             try newPoints.appendSlice(initialNewPoints);
@@ -261,9 +261,9 @@ pub fn Subdiv(comptime first_pass: bool) type {
             }
             var edgePointNums = std.AutoHashMap([2]u32, u32).init(allocator);
             for (edgesFaces, 0..) |edgeFace, edgeNum| {
-                var point1 = edgeFace.point1;
-                var point2 = edgeFace.point2;
-                var edgePoint = edgePoints[edgeNum];
+                const point1 = edgeFace.point1;
+                const point2 = edgeFace.point2;
+                const edgePoint = edgePoints[edgeNum];
                 try newPoints.append(edgePoint);
                 try edgePointNums.put(switchNums([2]u32{ point1, point2 }), @as(u32, @intCast(nextPointNum)));
                 nextPointNum += 1;
@@ -275,7 +275,7 @@ pub fn Subdiv(comptime first_pass: bool) type {
 
 test "getFacePoints" {
     std.debug.print("Hello!", .{});
-    var allocator = std.heap.page_allocator;
+    const allocator = std.heap.page_allocator;
     var points = [_]Point{
         Point{ -1.0, 1.0, 1.0, 1.0 },
         Point{ -1.0, -1.0, 1.0, 1.0 },
@@ -288,13 +288,13 @@ test "getFacePoints" {
         &[_]u32{ 0, 1, 2, 3 },
         &[_]u32{ 0, 1, 5, 4 },
     };
-    var result = try Subdiv(true).getFacePoints(
+    const result = try Subdiv(true).getFacePoints(
         allocator,
         &points,
         &faces,
     );
 
-    var expected = [_]Point{
+    const expected = [_]Point{
         Point{ 0.0, 0.0, 1.0, 1.0 },
         Point{ -1.0, 0.0, 0.0, 1.0 },
     };
@@ -306,7 +306,7 @@ test "getFacePoints" {
 }
 
 test "getEdgesFaces" {
-    var allocator = std.heap.page_allocator;
+    const allocator = std.heap.page_allocator;
     var points = [_]Point{
         Point{ -1.0, 1.0, 1.0, 1.0 },
         Point{ -1.0, -1.0, 1.0, 1.0 },
@@ -319,7 +319,7 @@ test "getEdgesFaces" {
         &[_]u32{ 0, 1, 2, 3 },
         &[_]u32{ 0, 1, 5, 4 },
     };
-    var result = try Subdiv(true).getEdgesFaces(
+    const result = try Subdiv(true).getEdgesFaces(
         allocator,
         &points,
         &faces,
@@ -335,7 +335,7 @@ test "getEdgesFaces" {
 }
 
 test "getPointsFaces" {
-    var allocator = std.heap.page_allocator;
+    const allocator = std.heap.page_allocator;
     var points = [_]Point{
         Point{ -1.0, 1.0, 1.0, 1.0 },
         Point{ -1.0, -1.0, 1.0, 1.0 },
@@ -348,7 +348,7 @@ test "getPointsFaces" {
         &[_]u32{ 0, 1, 2, 3 },
         &[_]u32{ 0, 1, 5, 4 },
     };
-    var result = try Subdiv(true).getPointsFaces(
+    const result = try Subdiv(true).getPointsFaces(
         allocator,
         &points,
         &faces,
@@ -358,7 +358,7 @@ test "getPointsFaces" {
 }
 
 test "cmcSubdiv" {
-    var allocator = std.heap.page_allocator;
+    const allocator = std.heap.page_allocator;
     var points = [_]Point{
         Point{ -1.0, 1.0, 1.0, 1.0 },
         Point{ -1.0, -1.0, 1.0, 1.0 },
@@ -371,7 +371,7 @@ test "cmcSubdiv" {
         &[_]u32{ 0, 1, 2, 3 },
         &[_]u32{ 0, 1, 5, 4 },
     };
-    var result = try Subdiv(true).cmcSubdiv(
+    const result = try Subdiv(true).cmcSubdiv(
         allocator,
         &points,
         &faces,
