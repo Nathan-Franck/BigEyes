@@ -1,4 +1,2271 @@
 {
+    "actions": [
+        {
+            "name": "Idle",
+            "fcurves": [
+                {
+                    "data_path": "pose.bones[\"Body\"].location",
+                    "array_index": 0,
+                    "keyframes": [
+                        [
+                            0.0,
+                            0.0
+                        ],
+                        [
+                            10.0,
+                            0.4777316749095917
+                        ],
+                        [
+                            20.0,
+                            0.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"Body\"].location",
+                    "array_index": 1,
+                    "keyframes": [
+                        [
+                            0.0,
+                            0.0
+                        ],
+                        [
+                            10.0,
+                            0.014612630009651184
+                        ],
+                        [
+                            20.0,
+                            0.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"Body\"].location",
+                    "array_index": 2,
+                    "keyframes": [
+                        [
+                            0.0,
+                            0.0
+                        ],
+                        [
+                            10.0,
+                            -0.029184184968471527
+                        ],
+                        [
+                            20.0,
+                            0.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"Body\"].rotation_quaternion",
+                    "array_index": 0,
+                    "keyframes": [
+                        [
+                            0.0,
+                            1.0
+                        ],
+                        [
+                            10.0,
+                            1.0
+                        ],
+                        [
+                            20.0,
+                            1.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"Body\"].rotation_quaternion",
+                    "array_index": 1,
+                    "keyframes": [
+                        [
+                            0.0,
+                            0.0
+                        ],
+                        [
+                            10.0,
+                            0.0
+                        ],
+                        [
+                            20.0,
+                            0.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"Body\"].rotation_quaternion",
+                    "array_index": 2,
+                    "keyframes": [
+                        [
+                            0.0,
+                            0.0
+                        ],
+                        [
+                            10.0,
+                            0.0
+                        ],
+                        [
+                            20.0,
+                            0.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"Body\"].rotation_quaternion",
+                    "array_index": 3,
+                    "keyframes": [
+                        [
+                            0.0,
+                            0.0
+                        ],
+                        [
+                            10.0,
+                            0.0
+                        ],
+                        [
+                            20.0,
+                            0.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"Body\"].scale",
+                    "array_index": 0,
+                    "keyframes": [
+                        [
+                            0.0,
+                            1.0
+                        ],
+                        [
+                            10.0,
+                            1.0
+                        ],
+                        [
+                            20.0,
+                            1.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"Body\"].scale",
+                    "array_index": 1,
+                    "keyframes": [
+                        [
+                            0.0,
+                            1.0
+                        ],
+                        [
+                            10.0,
+                            1.0
+                        ],
+                        [
+                            20.0,
+                            1.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"Body\"].scale",
+                    "array_index": 2,
+                    "keyframes": [
+                        [
+                            0.0,
+                            1.0
+                        ],
+                        [
+                            10.0,
+                            1.0
+                        ],
+                        [
+                            20.0,
+                            1.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"FrontUpperLeg.L\"].location",
+                    "array_index": 0,
+                    "keyframes": [
+                        [
+                            0.0,
+                            0.0
+                        ],
+                        [
+                            10.0,
+                            0.004449024330824614
+                        ],
+                        [
+                            20.0,
+                            0.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"FrontUpperLeg.L\"].location",
+                    "array_index": 1,
+                    "keyframes": [
+                        [
+                            0.0,
+                            0.0
+                        ],
+                        [
+                            10.0,
+                            0.4621434211730957
+                        ],
+                        [
+                            20.0,
+                            0.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"FrontUpperLeg.L\"].location",
+                    "array_index": 2,
+                    "keyframes": [
+                        [
+                            0.0,
+                            0.0
+                        ],
+                        [
+                            10.0,
+                            -0.12528541684150696
+                        ],
+                        [
+                            20.0,
+                            0.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"FrontUpperLeg.L\"].rotation_quaternion",
+                    "array_index": 0,
+                    "keyframes": [
+                        [
+                            0.0,
+                            1.0
+                        ],
+                        [
+                            10.0,
+                            0.9654611349105835
+                        ],
+                        [
+                            20.0,
+                            1.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"FrontUpperLeg.L\"].rotation_quaternion",
+                    "array_index": 1,
+                    "keyframes": [
+                        [
+                            0.0,
+                            0.0
+                        ],
+                        [
+                            10.0,
+                            -0.26038306951522827
+                        ],
+                        [
+                            20.0,
+                            0.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"FrontUpperLeg.L\"].rotation_quaternion",
+                    "array_index": 2,
+                    "keyframes": [
+                        [
+                            0.0,
+                            0.0
+                        ],
+                        [
+                            10.0,
+                            -3.762096412174287e-08
+                        ],
+                        [
+                            20.0,
+                            0.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"FrontUpperLeg.L\"].rotation_quaternion",
+                    "array_index": 3,
+                    "keyframes": [
+                        [
+                            0.0,
+                            0.0
+                        ],
+                        [
+                            10.0,
+                            -0.009246367029845715
+                        ],
+                        [
+                            20.0,
+                            0.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"FrontUpperLeg.L\"].scale",
+                    "array_index": 0,
+                    "keyframes": [
+                        [
+                            0.0,
+                            1.0
+                        ],
+                        [
+                            10.0,
+                            1.0
+                        ],
+                        [
+                            20.0,
+                            1.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"FrontUpperLeg.L\"].scale",
+                    "array_index": 1,
+                    "keyframes": [
+                        [
+                            0.0,
+                            1.0
+                        ],
+                        [
+                            10.0,
+                            1.0
+                        ],
+                        [
+                            20.0,
+                            1.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"FrontUpperLeg.L\"].scale",
+                    "array_index": 2,
+                    "keyframes": [
+                        [
+                            0.0,
+                            1.0
+                        ],
+                        [
+                            10.0,
+                            1.0
+                        ],
+                        [
+                            20.0,
+                            1.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"FrontLowerLeg.L\"].location",
+                    "array_index": 0,
+                    "keyframes": [
+                        [
+                            0.0,
+                            0.0
+                        ],
+                        [
+                            10.0,
+                            0.0
+                        ],
+                        [
+                            20.0,
+                            0.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"FrontLowerLeg.L\"].location",
+                    "array_index": 1,
+                    "keyframes": [
+                        [
+                            0.0,
+                            0.0
+                        ],
+                        [
+                            10.0,
+                            0.0
+                        ],
+                        [
+                            20.0,
+                            0.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"FrontLowerLeg.L\"].location",
+                    "array_index": 2,
+                    "keyframes": [
+                        [
+                            0.0,
+                            0.0
+                        ],
+                        [
+                            10.0,
+                            0.0
+                        ],
+                        [
+                            20.0,
+                            0.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"FrontLowerLeg.L\"].rotation_quaternion",
+                    "array_index": 0,
+                    "keyframes": [
+                        [
+                            0.0,
+                            1.0
+                        ],
+                        [
+                            10.0,
+                            0.883373498916626
+                        ],
+                        [
+                            20.0,
+                            1.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"FrontLowerLeg.L\"].rotation_quaternion",
+                    "array_index": 1,
+                    "keyframes": [
+                        [
+                            0.0,
+                            0.0
+                        ],
+                        [
+                            10.0,
+                            0.46730703115463257
+                        ],
+                        [
+                            20.0,
+                            0.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"FrontLowerLeg.L\"].rotation_quaternion",
+                    "array_index": 2,
+                    "keyframes": [
+                        [
+                            0.0,
+                            0.0
+                        ],
+                        [
+                            10.0,
+                            1.3916489649545838e-07
+                        ],
+                        [
+                            20.0,
+                            0.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"FrontLowerLeg.L\"].rotation_quaternion",
+                    "array_index": 3,
+                    "keyframes": [
+                        [
+                            0.0,
+                            0.0
+                        ],
+                        [
+                            10.0,
+                            0.03571413829922676
+                        ],
+                        [
+                            20.0,
+                            0.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"FrontLowerLeg.L\"].scale",
+                    "array_index": 0,
+                    "keyframes": [
+                        [
+                            0.0,
+                            1.0
+                        ],
+                        [
+                            10.0,
+                            1.0
+                        ],
+                        [
+                            20.0,
+                            1.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"FrontLowerLeg.L\"].scale",
+                    "array_index": 1,
+                    "keyframes": [
+                        [
+                            0.0,
+                            1.0
+                        ],
+                        [
+                            10.0,
+                            1.0
+                        ],
+                        [
+                            20.0,
+                            1.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"FrontLowerLeg.L\"].scale",
+                    "array_index": 2,
+                    "keyframes": [
+                        [
+                            0.0,
+                            1.0
+                        ],
+                        [
+                            10.0,
+                            1.0
+                        ],
+                        [
+                            20.0,
+                            1.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"BackUpperLeg.L\"].location",
+                    "array_index": 0,
+                    "keyframes": [
+                        [
+                            0.0,
+                            0.0
+                        ],
+                        [
+                            10.0,
+                            0.33912599086761475
+                        ],
+                        [
+                            20.0,
+                            0.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"BackUpperLeg.L\"].location",
+                    "array_index": 1,
+                    "keyframes": [
+                        [
+                            0.0,
+                            0.0
+                        ],
+                        [
+                            10.0,
+                            -0.2100665271282196
+                        ],
+                        [
+                            20.0,
+                            0.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"BackUpperLeg.L\"].location",
+                    "array_index": 2,
+                    "keyframes": [
+                        [
+                            0.0,
+                            0.0
+                        ],
+                        [
+                            10.0,
+                            0.12011431157588959
+                        ],
+                        [
+                            20.0,
+                            0.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"BackUpperLeg.L\"].rotation_quaternion",
+                    "array_index": 0,
+                    "keyframes": [
+                        [
+                            0.0,
+                            1.0
+                        ],
+                        [
+                            10.0,
+                            0.9867870807647705
+                        ],
+                        [
+                            20.0,
+                            1.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"BackUpperLeg.L\"].rotation_quaternion",
+                    "array_index": 1,
+                    "keyframes": [
+                        [
+                            0.0,
+                            0.0
+                        ],
+                        [
+                            10.0,
+                            -0.05968503654003143
+                        ],
+                        [
+                            20.0,
+                            0.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"BackUpperLeg.L\"].rotation_quaternion",
+                    "array_index": 2,
+                    "keyframes": [
+                        [
+                            0.0,
+                            0.0
+                        ],
+                        [
+                            10.0,
+                            -0.010432785376906395
+                        ],
+                        [
+                            20.0,
+                            0.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"BackUpperLeg.L\"].rotation_quaternion",
+                    "array_index": 3,
+                    "keyframes": [
+                        [
+                            0.0,
+                            0.0
+                        ],
+                        [
+                            10.0,
+                            0.15026652812957764
+                        ],
+                        [
+                            20.0,
+                            0.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"BackUpperLeg.L\"].scale",
+                    "array_index": 0,
+                    "keyframes": [
+                        [
+                            0.0,
+                            1.0
+                        ],
+                        [
+                            10.0,
+                            1.0
+                        ],
+                        [
+                            20.0,
+                            1.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"BackUpperLeg.L\"].scale",
+                    "array_index": 1,
+                    "keyframes": [
+                        [
+                            0.0,
+                            1.0
+                        ],
+                        [
+                            10.0,
+                            1.0
+                        ],
+                        [
+                            20.0,
+                            1.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"BackUpperLeg.L\"].scale",
+                    "array_index": 2,
+                    "keyframes": [
+                        [
+                            0.0,
+                            1.0
+                        ],
+                        [
+                            10.0,
+                            1.0
+                        ],
+                        [
+                            20.0,
+                            1.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"BackLowerLeg.L\"].location",
+                    "array_index": 0,
+                    "keyframes": [
+                        [
+                            0.0,
+                            0.0
+                        ],
+                        [
+                            10.0,
+                            0.0
+                        ],
+                        [
+                            20.0,
+                            0.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"BackLowerLeg.L\"].location",
+                    "array_index": 1,
+                    "keyframes": [
+                        [
+                            0.0,
+                            0.0
+                        ],
+                        [
+                            10.0,
+                            0.0
+                        ],
+                        [
+                            20.0,
+                            0.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"BackLowerLeg.L\"].location",
+                    "array_index": 2,
+                    "keyframes": [
+                        [
+                            0.0,
+                            0.0
+                        ],
+                        [
+                            10.0,
+                            0.0
+                        ],
+                        [
+                            20.0,
+                            0.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"BackLowerLeg.L\"].rotation_quaternion",
+                    "array_index": 0,
+                    "keyframes": [
+                        [
+                            0.0,
+                            1.0
+                        ],
+                        [
+                            10.0,
+                            0.9915857315063477
+                        ],
+                        [
+                            20.0,
+                            1.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"BackLowerLeg.L\"].rotation_quaternion",
+                    "array_index": 1,
+                    "keyframes": [
+                        [
+                            0.0,
+                            0.0
+                        ],
+                        [
+                            10.0,
+                            0.04716235771775246
+                        ],
+                        [
+                            20.0,
+                            0.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"BackLowerLeg.L\"].rotation_quaternion",
+                    "array_index": 2,
+                    "keyframes": [
+                        [
+                            0.0,
+                            0.0
+                        ],
+                        [
+                            10.0,
+                            -0.040648043155670166
+                        ],
+                        [
+                            20.0,
+                            0.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"BackLowerLeg.L\"].rotation_quaternion",
+                    "array_index": 3,
+                    "keyframes": [
+                        [
+                            0.0,
+                            0.0
+                        ],
+                        [
+                            10.0,
+                            -0.1134953424334526
+                        ],
+                        [
+                            20.0,
+                            0.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"BackLowerLeg.L\"].scale",
+                    "array_index": 0,
+                    "keyframes": [
+                        [
+                            0.0,
+                            1.0
+                        ],
+                        [
+                            10.0,
+                            1.0
+                        ],
+                        [
+                            20.0,
+                            1.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"BackLowerLeg.L\"].scale",
+                    "array_index": 1,
+                    "keyframes": [
+                        [
+                            0.0,
+                            1.0
+                        ],
+                        [
+                            10.0,
+                            1.0
+                        ],
+                        [
+                            20.0,
+                            1.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"BackLowerLeg.L\"].scale",
+                    "array_index": 2,
+                    "keyframes": [
+                        [
+                            0.0,
+                            1.0
+                        ],
+                        [
+                            10.0,
+                            1.0
+                        ],
+                        [
+                            20.0,
+                            1.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"Tail.0\"].location",
+                    "array_index": 0,
+                    "keyframes": [
+                        [
+                            0.0,
+                            0.0
+                        ],
+                        [
+                            10.0,
+                            -0.11828402429819107
+                        ],
+                        [
+                            20.0,
+                            0.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"Tail.0\"].location",
+                    "array_index": 1,
+                    "keyframes": [
+                        [
+                            0.0,
+                            0.0
+                        ],
+                        [
+                            10.0,
+                            0.06057509407401085
+                        ],
+                        [
+                            20.0,
+                            0.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"Tail.0\"].location",
+                    "array_index": 2,
+                    "keyframes": [
+                        [
+                            0.0,
+                            0.0
+                        ],
+                        [
+                            10.0,
+                            -0.46003517508506775
+                        ],
+                        [
+                            20.0,
+                            0.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"Tail.0\"].rotation_quaternion",
+                    "array_index": 0,
+                    "keyframes": [
+                        [
+                            0.0,
+                            1.0
+                        ],
+                        [
+                            10.0,
+                            1.0
+                        ],
+                        [
+                            20.0,
+                            1.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"Tail.0\"].rotation_quaternion",
+                    "array_index": 1,
+                    "keyframes": [
+                        [
+                            0.0,
+                            0.0
+                        ],
+                        [
+                            10.0,
+                            0.0
+                        ],
+                        [
+                            20.0,
+                            0.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"Tail.0\"].rotation_quaternion",
+                    "array_index": 2,
+                    "keyframes": [
+                        [
+                            0.0,
+                            0.0
+                        ],
+                        [
+                            10.0,
+                            0.0
+                        ],
+                        [
+                            20.0,
+                            0.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"Tail.0\"].rotation_quaternion",
+                    "array_index": 3,
+                    "keyframes": [
+                        [
+                            0.0,
+                            0.0
+                        ],
+                        [
+                            10.0,
+                            0.0
+                        ],
+                        [
+                            20.0,
+                            0.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"Tail.0\"].scale",
+                    "array_index": 0,
+                    "keyframes": [
+                        [
+                            0.0,
+                            1.0
+                        ],
+                        [
+                            10.0,
+                            1.0
+                        ],
+                        [
+                            20.0,
+                            1.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"Tail.0\"].scale",
+                    "array_index": 1,
+                    "keyframes": [
+                        [
+                            0.0,
+                            1.0
+                        ],
+                        [
+                            10.0,
+                            1.0
+                        ],
+                        [
+                            20.0,
+                            1.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"Tail.0\"].scale",
+                    "array_index": 2,
+                    "keyframes": [
+                        [
+                            0.0,
+                            1.0
+                        ],
+                        [
+                            10.0,
+                            1.0
+                        ],
+                        [
+                            20.0,
+                            1.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"Tail.1\"].location",
+                    "array_index": 0,
+                    "keyframes": [
+                        [
+                            0.0,
+                            0.0
+                        ],
+                        [
+                            20.0,
+                            0.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"Tail.1\"].location",
+                    "array_index": 1,
+                    "keyframes": [
+                        [
+                            0.0,
+                            0.0
+                        ],
+                        [
+                            20.0,
+                            0.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"Tail.1\"].location",
+                    "array_index": 2,
+                    "keyframes": [
+                        [
+                            0.0,
+                            0.0
+                        ],
+                        [
+                            20.0,
+                            0.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"Tail.1\"].rotation_quaternion",
+                    "array_index": 0,
+                    "keyframes": [
+                        [
+                            0.0,
+                            1.0
+                        ],
+                        [
+                            20.0,
+                            1.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"Tail.1\"].rotation_quaternion",
+                    "array_index": 1,
+                    "keyframes": [
+                        [
+                            0.0,
+                            0.0
+                        ],
+                        [
+                            20.0,
+                            0.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"Tail.1\"].rotation_quaternion",
+                    "array_index": 2,
+                    "keyframes": [
+                        [
+                            0.0,
+                            0.0
+                        ],
+                        [
+                            20.0,
+                            0.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"Tail.1\"].rotation_quaternion",
+                    "array_index": 3,
+                    "keyframes": [
+                        [
+                            0.0,
+                            0.0
+                        ],
+                        [
+                            20.0,
+                            0.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"Tail.1\"].scale",
+                    "array_index": 0,
+                    "keyframes": [
+                        [
+                            0.0,
+                            1.0
+                        ],
+                        [
+                            20.0,
+                            1.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"Tail.1\"].scale",
+                    "array_index": 1,
+                    "keyframes": [
+                        [
+                            0.0,
+                            1.0
+                        ],
+                        [
+                            20.0,
+                            1.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"Tail.1\"].scale",
+                    "array_index": 2,
+                    "keyframes": [
+                        [
+                            0.0,
+                            1.0
+                        ],
+                        [
+                            20.0,
+                            1.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"Tail.2\"].location",
+                    "array_index": 0,
+                    "keyframes": [
+                        [
+                            0.0,
+                            0.0
+                        ],
+                        [
+                            20.0,
+                            0.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"Tail.2\"].location",
+                    "array_index": 1,
+                    "keyframes": [
+                        [
+                            0.0,
+                            0.0
+                        ],
+                        [
+                            20.0,
+                            0.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"Tail.2\"].location",
+                    "array_index": 2,
+                    "keyframes": [
+                        [
+                            0.0,
+                            0.0
+                        ],
+                        [
+                            20.0,
+                            0.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"Tail.2\"].rotation_quaternion",
+                    "array_index": 0,
+                    "keyframes": [
+                        [
+                            0.0,
+                            1.0
+                        ],
+                        [
+                            20.0,
+                            1.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"Tail.2\"].rotation_quaternion",
+                    "array_index": 1,
+                    "keyframes": [
+                        [
+                            0.0,
+                            0.0
+                        ],
+                        [
+                            20.0,
+                            0.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"Tail.2\"].rotation_quaternion",
+                    "array_index": 2,
+                    "keyframes": [
+                        [
+                            0.0,
+                            0.0
+                        ],
+                        [
+                            20.0,
+                            0.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"Tail.2\"].rotation_quaternion",
+                    "array_index": 3,
+                    "keyframes": [
+                        [
+                            0.0,
+                            0.0
+                        ],
+                        [
+                            20.0,
+                            0.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"Tail.2\"].scale",
+                    "array_index": 0,
+                    "keyframes": [
+                        [
+                            0.0,
+                            1.0
+                        ],
+                        [
+                            20.0,
+                            1.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"Tail.2\"].scale",
+                    "array_index": 1,
+                    "keyframes": [
+                        [
+                            0.0,
+                            1.0
+                        ],
+                        [
+                            20.0,
+                            1.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"Tail.2\"].scale",
+                    "array_index": 2,
+                    "keyframes": [
+                        [
+                            0.0,
+                            1.0
+                        ],
+                        [
+                            20.0,
+                            1.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"Head\"].location",
+                    "array_index": 0,
+                    "keyframes": [
+                        [
+                            0.0,
+                            0.0
+                        ],
+                        [
+                            10.0,
+                            0.4787846505641937
+                        ],
+                        [
+                            20.0,
+                            0.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"Head\"].location",
+                    "array_index": 1,
+                    "keyframes": [
+                        [
+                            0.0,
+                            0.0
+                        ],
+                        [
+                            10.0,
+                            0.002938224468380213
+                        ],
+                        [
+                            20.0,
+                            0.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"Head\"].location",
+                    "array_index": 2,
+                    "keyframes": [
+                        [
+                            0.0,
+                            0.0
+                        ],
+                        [
+                            10.0,
+                            -0.00702468678355217
+                        ],
+                        [
+                            20.0,
+                            0.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"Head\"].rotation_quaternion",
+                    "array_index": 0,
+                    "keyframes": [
+                        [
+                            0.0,
+                            1.0
+                        ],
+                        [
+                            10.0,
+                            1.0
+                        ],
+                        [
+                            20.0,
+                            1.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"Head\"].rotation_quaternion",
+                    "array_index": 1,
+                    "keyframes": [
+                        [
+                            0.0,
+                            0.0
+                        ],
+                        [
+                            10.0,
+                            0.0
+                        ],
+                        [
+                            20.0,
+                            0.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"Head\"].rotation_quaternion",
+                    "array_index": 2,
+                    "keyframes": [
+                        [
+                            0.0,
+                            0.0
+                        ],
+                        [
+                            10.0,
+                            0.0
+                        ],
+                        [
+                            20.0,
+                            0.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"Head\"].rotation_quaternion",
+                    "array_index": 3,
+                    "keyframes": [
+                        [
+                            0.0,
+                            0.0
+                        ],
+                        [
+                            10.0,
+                            0.0
+                        ],
+                        [
+                            20.0,
+                            0.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"Head\"].scale",
+                    "array_index": 0,
+                    "keyframes": [
+                        [
+                            0.0,
+                            1.0
+                        ],
+                        [
+                            10.0,
+                            1.0
+                        ],
+                        [
+                            20.0,
+                            1.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"Head\"].scale",
+                    "array_index": 1,
+                    "keyframes": [
+                        [
+                            0.0,
+                            1.0
+                        ],
+                        [
+                            10.0,
+                            1.0
+                        ],
+                        [
+                            20.0,
+                            1.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"Head\"].scale",
+                    "array_index": 2,
+                    "keyframes": [
+                        [
+                            0.0,
+                            1.0
+                        ],
+                        [
+                            10.0,
+                            1.0
+                        ],
+                        [
+                            20.0,
+                            1.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"FrontUpperLeg.R\"].location",
+                    "array_index": 0,
+                    "keyframes": [
+                        [
+                            0.0,
+                            0.0
+                        ],
+                        [
+                            10.0,
+                            -0.004448894876986742
+                        ],
+                        [
+                            20.0,
+                            0.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"FrontUpperLeg.R\"].location",
+                    "array_index": 1,
+                    "keyframes": [
+                        [
+                            0.0,
+                            0.0
+                        ],
+                        [
+                            10.0,
+                            0.4621433913707733
+                        ],
+                        [
+                            20.0,
+                            0.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"FrontUpperLeg.R\"].location",
+                    "array_index": 2,
+                    "keyframes": [
+                        [
+                            0.0,
+                            0.0
+                        ],
+                        [
+                            10.0,
+                            -0.12528541684150696
+                        ],
+                        [
+                            20.0,
+                            0.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"FrontUpperLeg.R\"].rotation_quaternion",
+                    "array_index": 0,
+                    "keyframes": [
+                        [
+                            0.0,
+                            1.0
+                        ],
+                        [
+                            10.0,
+                            0.9654611349105835
+                        ],
+                        [
+                            20.0,
+                            1.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"FrontUpperLeg.R\"].rotation_quaternion",
+                    "array_index": 1,
+                    "keyframes": [
+                        [
+                            0.0,
+                            0.0
+                        ],
+                        [
+                            10.0,
+                            -0.26038306951522827
+                        ],
+                        [
+                            20.0,
+                            0.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"FrontUpperLeg.R\"].rotation_quaternion",
+                    "array_index": 2,
+                    "keyframes": [
+                        [
+                            0.0,
+                            0.0
+                        ],
+                        [
+                            10.0,
+                            -4.063546654720085e-08
+                        ],
+                        [
+                            20.0,
+                            0.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"FrontUpperLeg.R\"].rotation_quaternion",
+                    "array_index": 3,
+                    "keyframes": [
+                        [
+                            0.0,
+                            0.0
+                        ],
+                        [
+                            10.0,
+                            0.009246346540749073
+                        ],
+                        [
+                            20.0,
+                            0.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"FrontUpperLeg.R\"].scale",
+                    "array_index": 0,
+                    "keyframes": [
+                        [
+                            0.0,
+                            1.0
+                        ],
+                        [
+                            10.0,
+                            1.0
+                        ],
+                        [
+                            20.0,
+                            1.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"FrontUpperLeg.R\"].scale",
+                    "array_index": 1,
+                    "keyframes": [
+                        [
+                            0.0,
+                            1.0
+                        ],
+                        [
+                            10.0,
+                            1.0
+                        ],
+                        [
+                            20.0,
+                            1.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"FrontUpperLeg.R\"].scale",
+                    "array_index": 2,
+                    "keyframes": [
+                        [
+                            0.0,
+                            1.0
+                        ],
+                        [
+                            10.0,
+                            1.0
+                        ],
+                        [
+                            20.0,
+                            1.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"FrontLowerLeg.R\"].location",
+                    "array_index": 0,
+                    "keyframes": [
+                        [
+                            0.0,
+                            0.0
+                        ],
+                        [
+                            10.0,
+                            0.0
+                        ],
+                        [
+                            20.0,
+                            0.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"FrontLowerLeg.R\"].location",
+                    "array_index": 1,
+                    "keyframes": [
+                        [
+                            0.0,
+                            0.0
+                        ],
+                        [
+                            10.0,
+                            0.0
+                        ],
+                        [
+                            20.0,
+                            0.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"FrontLowerLeg.R\"].location",
+                    "array_index": 2,
+                    "keyframes": [
+                        [
+                            0.0,
+                            0.0
+                        ],
+                        [
+                            10.0,
+                            0.0
+                        ],
+                        [
+                            20.0,
+                            0.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"FrontLowerLeg.R\"].rotation_quaternion",
+                    "array_index": 0,
+                    "keyframes": [
+                        [
+                            0.0,
+                            1.0
+                        ],
+                        [
+                            10.0,
+                            0.8833734393119812
+                        ],
+                        [
+                            20.0,
+                            1.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"FrontLowerLeg.R\"].rotation_quaternion",
+                    "array_index": 1,
+                    "keyframes": [
+                        [
+                            0.0,
+                            0.0
+                        ],
+                        [
+                            10.0,
+                            0.46730703115463257
+                        ],
+                        [
+                            20.0,
+                            0.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"FrontLowerLeg.R\"].rotation_quaternion",
+                    "array_index": 2,
+                    "keyframes": [
+                        [
+                            0.0,
+                            0.0
+                        ],
+                        [
+                            10.0,
+                            3.162838657644329e-09
+                        ],
+                        [
+                            20.0,
+                            0.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"FrontLowerLeg.R\"].rotation_quaternion",
+                    "array_index": 3,
+                    "keyframes": [
+                        [
+                            0.0,
+                            0.0
+                        ],
+                        [
+                            10.0,
+                            -0.03571411967277527
+                        ],
+                        [
+                            20.0,
+                            0.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"FrontLowerLeg.R\"].scale",
+                    "array_index": 0,
+                    "keyframes": [
+                        [
+                            0.0,
+                            1.0
+                        ],
+                        [
+                            10.0,
+                            1.0
+                        ],
+                        [
+                            20.0,
+                            1.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"FrontLowerLeg.R\"].scale",
+                    "array_index": 1,
+                    "keyframes": [
+                        [
+                            0.0,
+                            1.0
+                        ],
+                        [
+                            10.0,
+                            1.0
+                        ],
+                        [
+                            20.0,
+                            1.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"FrontLowerLeg.R\"].scale",
+                    "array_index": 2,
+                    "keyframes": [
+                        [
+                            0.0,
+                            1.0
+                        ],
+                        [
+                            10.0,
+                            1.0
+                        ],
+                        [
+                            20.0,
+                            1.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"BackUpperLeg.R\"].location",
+                    "array_index": 0,
+                    "keyframes": [
+                        [
+                            0.0,
+                            0.0
+                        ],
+                        [
+                            10.0,
+                            -0.3391260504722595
+                        ],
+                        [
+                            20.0,
+                            0.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"BackUpperLeg.R\"].location",
+                    "array_index": 1,
+                    "keyframes": [
+                        [
+                            0.0,
+                            0.0
+                        ],
+                        [
+                            10.0,
+                            -0.21006658673286438
+                        ],
+                        [
+                            20.0,
+                            0.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"BackUpperLeg.R\"].location",
+                    "array_index": 2,
+                    "keyframes": [
+                        [
+                            0.0,
+                            0.0
+                        ],
+                        [
+                            10.0,
+                            0.12011434137821198
+                        ],
+                        [
+                            20.0,
+                            0.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"BackUpperLeg.R\"].rotation_quaternion",
+                    "array_index": 0,
+                    "keyframes": [
+                        [
+                            0.0,
+                            1.0
+                        ],
+                        [
+                            10.0,
+                            0.9867870807647705
+                        ],
+                        [
+                            20.0,
+                            1.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"BackUpperLeg.R\"].rotation_quaternion",
+                    "array_index": 1,
+                    "keyframes": [
+                        [
+                            0.0,
+                            0.0
+                        ],
+                        [
+                            10.0,
+                            -0.05968498811125755
+                        ],
+                        [
+                            20.0,
+                            0.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"BackUpperLeg.R\"].rotation_quaternion",
+                    "array_index": 2,
+                    "keyframes": [
+                        [
+                            0.0,
+                            0.0
+                        ],
+                        [
+                            10.0,
+                            0.010432805866003036
+                        ],
+                        [
+                            20.0,
+                            0.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"BackUpperLeg.R\"].rotation_quaternion",
+                    "array_index": 3,
+                    "keyframes": [
+                        [
+                            0.0,
+                            0.0
+                        ],
+                        [
+                            10.0,
+                            -0.15026649832725525
+                        ],
+                        [
+                            20.0,
+                            0.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"BackUpperLeg.R\"].scale",
+                    "array_index": 0,
+                    "keyframes": [
+                        [
+                            0.0,
+                            1.0
+                        ],
+                        [
+                            10.0,
+                            1.0
+                        ],
+                        [
+                            20.0,
+                            1.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"BackUpperLeg.R\"].scale",
+                    "array_index": 1,
+                    "keyframes": [
+                        [
+                            0.0,
+                            1.0
+                        ],
+                        [
+                            10.0,
+                            1.0
+                        ],
+                        [
+                            20.0,
+                            1.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"BackUpperLeg.R\"].scale",
+                    "array_index": 2,
+                    "keyframes": [
+                        [
+                            0.0,
+                            1.0
+                        ],
+                        [
+                            10.0,
+                            1.0
+                        ],
+                        [
+                            20.0,
+                            1.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"BackLowerLeg.R\"].location",
+                    "array_index": 0,
+                    "keyframes": [
+                        [
+                            0.0,
+                            0.0
+                        ],
+                        [
+                            10.0,
+                            0.0
+                        ],
+                        [
+                            20.0,
+                            0.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"BackLowerLeg.R\"].location",
+                    "array_index": 1,
+                    "keyframes": [
+                        [
+                            0.0,
+                            0.0
+                        ],
+                        [
+                            10.0,
+                            0.0
+                        ],
+                        [
+                            20.0,
+                            0.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"BackLowerLeg.R\"].location",
+                    "array_index": 2,
+                    "keyframes": [
+                        [
+                            0.0,
+                            0.0
+                        ],
+                        [
+                            10.0,
+                            0.0
+                        ],
+                        [
+                            20.0,
+                            0.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"BackLowerLeg.R\"].rotation_quaternion",
+                    "array_index": 0,
+                    "keyframes": [
+                        [
+                            0.0,
+                            1.0
+                        ],
+                        [
+                            10.0,
+                            0.9915857315063477
+                        ],
+                        [
+                            20.0,
+                            1.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"BackLowerLeg.R\"].rotation_quaternion",
+                    "array_index": 1,
+                    "keyframes": [
+                        [
+                            0.0,
+                            0.0
+                        ],
+                        [
+                            10.0,
+                            0.04716235771775246
+                        ],
+                        [
+                            20.0,
+                            0.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"BackLowerLeg.R\"].rotation_quaternion",
+                    "array_index": 2,
+                    "keyframes": [
+                        [
+                            0.0,
+                            0.0
+                        ],
+                        [
+                            10.0,
+                            0.04064808040857315
+                        ],
+                        [
+                            20.0,
+                            0.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"BackLowerLeg.R\"].rotation_quaternion",
+                    "array_index": 3,
+                    "keyframes": [
+                        [
+                            0.0,
+                            0.0
+                        ],
+                        [
+                            10.0,
+                            0.11349531263113022
+                        ],
+                        [
+                            20.0,
+                            0.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"BackLowerLeg.R\"].scale",
+                    "array_index": 0,
+                    "keyframes": [
+                        [
+                            0.0,
+                            1.0
+                        ],
+                        [
+                            10.0,
+                            1.0
+                        ],
+                        [
+                            20.0,
+                            1.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"BackLowerLeg.R\"].scale",
+                    "array_index": 1,
+                    "keyframes": [
+                        [
+                            0.0,
+                            1.0
+                        ],
+                        [
+                            10.0,
+                            1.0
+                        ],
+                        [
+                            20.0,
+                            1.0
+                        ]
+                    ]
+                },
+                {
+                    "data_path": "pose.bones[\"BackLowerLeg.R\"].scale",
+                    "array_index": 2,
+                    "keyframes": [
+                        [
+                            0.0,
+                            1.0
+                        ],
+                        [
+                            10.0,
+                            1.0
+                        ],
+                        [
+                            20.0,
+                            1.0
+                        ]
+                    ]
+                }
+            ]
+        }
+    ],
     "nodes": [
         {
             "name": "Armature",
@@ -9,6 +2276,65 @@
             "name": "Cat",
             "type": "MESH",
             "parent": "Armature"
+        }
+    ],
+    "armatures": [
+        {
+            "name": "Armature",
+            "bones": [
+                {
+                    "name": "Body",
+                    "parent": null
+                },
+                {
+                    "name": "FrontUpperLeg.L",
+                    "parent": null
+                },
+                {
+                    "name": "FrontLowerLeg.L",
+                    "parent": "FrontUpperLeg.L"
+                },
+                {
+                    "name": "BackUpperLeg.L",
+                    "parent": null
+                },
+                {
+                    "name": "BackLowerLeg.L",
+                    "parent": "BackUpperLeg.L"
+                },
+                {
+                    "name": "Tail.0",
+                    "parent": null
+                },
+                {
+                    "name": "Tail.1",
+                    "parent": "Tail.0"
+                },
+                {
+                    "name": "Tail.2",
+                    "parent": "Tail.1"
+                },
+                {
+                    "name": "Head",
+                    "parent": null
+                },
+                {
+                    "name": "FrontUpperLeg.R",
+                    "parent": null
+                },
+                {
+                    "name": "FrontLowerLeg.R",
+                    "parent": "FrontUpperLeg.R"
+                },
+                {
+                    "name": "BackUpperLeg.R",
+                    "parent": null
+                },
+                {
+                    "name": "BackLowerLeg.R",
+                    "parent": "BackUpperLeg.R"
+                }
+            ]
         }
     ],
     "meshes": [
@@ -2518,7 +4844,1355 @@
                     1
                 ]
             ],
-            "shapeKeys": []
+            "shapeKeys": [],
+            "vertexGroups": {
+                "Body": [
+                    [
+                        0,
+                        0.9537241458892822
+                    ],
+                    [
+                        1,
+                        0.7965707182884216
+                    ],
+                    [
+                        2,
+                        0.9024031758308411
+                    ],
+                    [
+                        3,
+                        0.82454514503479
+                    ],
+                    [
+                        5,
+                        0.25107720494270325
+                    ],
+                    [
+                        6,
+                        0.8015992641448975
+                    ],
+                    [
+                        7,
+                        0.7399173974990845
+                    ],
+                    [
+                        8,
+                        0.8013003468513489
+                    ],
+                    [
+                        10,
+                        0.10738998651504517
+                    ],
+                    [
+                        11,
+                        0.15208257734775543
+                    ],
+                    [
+                        12,
+                        0.06041615456342697
+                    ],
+                    [
+                        17,
+                        0.558498740196228
+                    ],
+                    [
+                        19,
+                        0.15442359447479248
+                    ],
+                    [
+                        27,
+                        0.12786372005939484
+                    ],
+                    [
+                        28,
+                        0.6651495099067688
+                    ],
+                    [
+                        29,
+                        0.07617592811584473
+                    ],
+                    [
+                        30,
+                        0.14226742088794708
+                    ],
+                    [
+                        31,
+                        0.14369721710681915
+                    ],
+                    [
+                        36,
+                        0.07525447010993958
+                    ],
+                    [
+                        45,
+                        0.08168987184762955
+                    ],
+                    [
+                        71,
+                        0.0025510601699352264
+                    ],
+                    [
+                        88,
+                        0.3869006037712097
+                    ],
+                    [
+                        89,
+                        0.6942363381385803
+                    ],
+                    [
+                        95,
+                        0.7500027418136597
+                    ],
+                    [
+                        96,
+                        0.7740740180015564
+                    ],
+                    [
+                        97,
+                        0.2728867530822754
+                    ],
+                    [
+                        98,
+                        0.3649168014526367
+                    ],
+                    [
+                        99,
+                        0.863632321357727
+                    ],
+                    [
+                        100,
+                        0.0733347088098526
+                    ],
+                    [
+                        119,
+                        0.9024031758308411
+                    ],
+                    [
+                        120,
+                        0.82454514503479
+                    ],
+                    [
+                        122,
+                        0.8015992641448975
+                    ],
+                    [
+                        123,
+                        0.8013003468513489
+                    ],
+                    [
+                        124,
+                        0.10738998651504517
+                    ],
+                    [
+                        125,
+                        0.06041615456342697
+                    ],
+                    [
+                        128,
+                        0.558498740196228
+                    ],
+                    [
+                        130,
+                        0.15442359447479248
+                    ],
+                    [
+                        138,
+                        0.12786372005939484
+                    ],
+                    [
+                        139,
+                        0.07617592811584473
+                    ],
+                    [
+                        140,
+                        0.14226742088794708
+                    ],
+                    [
+                        141,
+                        0.14369721710681915
+                    ],
+                    [
+                        167,
+                        0.0025510601699352264
+                    ],
+                    [
+                        181,
+                        0.3869006037712097
+                    ],
+                    [
+                        182,
+                        0.6942363381385803
+                    ],
+                    [
+                        188,
+                        0.7500027418136597
+                    ],
+                    [
+                        189,
+                        0.7740740180015564
+                    ],
+                    [
+                        190,
+                        0.2728867530822754
+                    ],
+                    [
+                        191,
+                        0.3649168014526367
+                    ],
+                    [
+                        192,
+                        0.0733347088098526
+                    ]
+                ],
+                "FrontUpperLeg.L": [
+                    [
+                        7,
+                        0.018166834488511086
+                    ],
+                    [
+                        9,
+                        0.04841304197907448
+                    ],
+                    [
+                        36,
+                        0.48369503021240234
+                    ],
+                    [
+                        120,
+                        0.10036875307559967
+                    ],
+                    [
+                        123,
+                        0.09146089106798172
+                    ],
+                    [
+                        124,
+                        0.09265463799238205
+                    ],
+                    [
+                        131,
+                        0.9455288648605347
+                    ],
+                    [
+                        132,
+                        0.9606329798698425
+                    ],
+                    [
+                        133,
+                        0.7530393600463867
+                    ],
+                    [
+                        134,
+                        0.8369598388671875
+                    ],
+                    [
+                        135,
+                        0.014994191937148571
+                    ],
+                    [
+                        136,
+                        0.05893566459417343
+                    ],
+                    [
+                        137,
+                        0.06006979942321777
+                    ],
+                    [
+                        142,
+                        0.02125474438071251
+                    ],
+                    [
+                        181,
+                        0.5831701159477234
+                    ],
+                    [
+                        188,
+                        0.05305686965584755
+                    ],
+                    [
+                        191,
+                        0.17404963076114655
+                    ],
+                    [
+                        192,
+                        0.8206401467323303
+                    ]
+                ],
+                "FrontLowerLeg.L": [
+                    [
+                        36,
+                        0.009673560038208961
+                    ],
+                    [
+                        129,
+                        0.9980477690696716
+                    ],
+                    [
+                        131,
+                        0.004922274500131607
+                    ],
+                    [
+                        132,
+                        0.004946421831846237
+                    ],
+                    [
+                        133,
+                        0.10179940611124039
+                    ],
+                    [
+                        134,
+                        0.09456478804349899
+                    ],
+                    [
+                        135,
+                        0.9701991081237793
+                    ],
+                    [
+                        136,
+                        0.9358588457107544
+                    ],
+                    [
+                        137,
+                        0.9361962676048279
+                    ],
+                    [
+                        142,
+                        0.9641696214675903
+                    ],
+                    [
+                        143,
+                        0.9948782324790955
+                    ],
+                    [
+                        144,
+                        0.9951725006103516
+                    ],
+                    [
+                        145,
+                        0.998640775680542
+                    ],
+                    [
+                        180,
+                        0.9980025291442871
+                    ]
+                ],
+                "BackUpperLeg.L": [
+                    [
+                        0,
+                        0.0005511082708835602
+                    ],
+                    [
+                        1,
+                        0.11124061048030853
+                    ],
+                    [
+                        5,
+                        0.053246598690748215
+                    ],
+                    [
+                        28,
+                        0.14157170057296753
+                    ],
+                    [
+                        45,
+                        0.008418427780270576
+                    ],
+                    [
+                        99,
+                        0.02117610163986683
+                    ],
+                    [
+                        119,
+                        0.0715247392654419
+                    ],
+                    [
+                        120,
+                        0.06964034587144852
+                    ],
+                    [
+                        122,
+                        0.09333595633506775
+                    ],
+                    [
+                        128,
+                        0.25886648893356323
+                    ],
+                    [
+                        130,
+                        0.8312013745307922
+                    ],
+                    [
+                        138,
+                        0.8316390514373779
+                    ],
+                    [
+                        139,
+                        0.9204450845718384
+                    ],
+                    [
+                        140,
+                        0.8071808815002441
+                    ],
+                    [
+                        141,
+                        0.8618706464767456
+                    ],
+                    [
+                        146,
+                        0.9275040030479431
+                    ],
+                    [
+                        147,
+                        0.9343249201774597
+                    ],
+                    [
+                        148,
+                        0.9656013250350952
+                    ],
+                    [
+                        149,
+                        0.9344346523284912
+                    ],
+                    [
+                        152,
+                        0.060711827129125595
+                    ],
+                    [
+                        153,
+                        0.0793592631816864
+                    ],
+                    [
+                        181,
+                        0.006499648094177246
+                    ],
+                    [
+                        182,
+                        0.3306104242801666
+                    ],
+                    [
+                        189,
+                        0.18316377699375153
+                    ],
+                    [
+                        190,
+                        0.7156662940979004
+                    ]
+                ],
+                "BackLowerLeg.L": [
+                    [
+                        146,
+                        0.04937232658267021
+                    ],
+                    [
+                        147,
+                        0.030004490166902542
+                    ],
+                    [
+                        148,
+                        0.008688442409038544
+                    ],
+                    [
+                        149,
+                        0.05315713584423065
+                    ],
+                    [
+                        150,
+                        0.979193389415741
+                    ],
+                    [
+                        151,
+                        0.9801408648490906
+                    ],
+                    [
+                        152,
+                        0.9389758706092834
+                    ],
+                    [
+                        153,
+                        0.9197857975959778
+                    ],
+                    [
+                        183,
+                        0.9979575872421265
+                    ],
+                    [
+                        184,
+                        0.9979990124702454
+                    ],
+                    [
+                        185,
+                        0.9971207976341248
+                    ],
+                    [
+                        186,
+                        0.9925732612609863
+                    ],
+                    [
+                        187,
+                        0.9975470304489136
+                    ]
+                ],
+                "Tail.0": [
+                    [
+                        5,
+                        0.6405794620513916
+                    ],
+                    [
+                        6,
+                        0.10524941980838776
+                    ],
+                    [
+                        17,
+                        0.17804579436779022
+                    ],
+                    [
+                        27,
+                        0.01098591461777687
+                    ],
+                    [
+                        28,
+                        0.05300503969192505
+                    ],
+                    [
+                        30,
+                        0.02420893684029579
+                    ],
+                    [
+                        45,
+                        0.884049117565155
+                    ],
+                    [
+                        46,
+                        0.9833947420120239
+                    ],
+                    [
+                        47,
+                        1.0086499452590942
+                    ],
+                    [
+                        48,
+                        0.9994906187057495
+                    ],
+                    [
+                        50,
+                        0.9604588747024536
+                    ],
+                    [
+                        51,
+                        0.9846657514572144
+                    ],
+                    [
+                        96,
+                        0.019149724394083023
+                    ],
+                    [
+                        99,
+                        0.08894935250282288
+                    ],
+                    [
+                        122,
+                        0.10524941980838776
+                    ],
+                    [
+                        128,
+                        0.17804579436779022
+                    ],
+                    [
+                        138,
+                        0.01098591461777687
+                    ],
+                    [
+                        140,
+                        0.02420893684029579
+                    ],
+                    [
+                        154,
+                        0.9833947420120239
+                    ],
+                    [
+                        155,
+                        0.9994906187057495
+                    ],
+                    [
+                        189,
+                        0.019149724394083023
+                    ]
+                ],
+                "Tail.1": [
+                    [
+                        4,
+                        0.9904791712760925
+                    ],
+                    [
+                        50,
+                        0.028342856094241142
+                    ],
+                    [
+                        52,
+                        1.0462641716003418
+                    ],
+                    [
+                        53,
+                        0.9373144507408142
+                    ],
+                    [
+                        121,
+                        0.9904791712760925
+                    ]
+                ],
+                "Tail.2": [
+                    [
+                        49,
+                        1.0000507831573486
+                    ],
+                    [
+                        53,
+                        0.038685936480760574
+                    ],
+                    [
+                        54,
+                        0.9833320379257202
+                    ],
+                    [
+                        55,
+                        0.9936044812202454
+                    ],
+                    [
+                        56,
+                        1.0297869443893433
+                    ],
+                    [
+                        156,
+                        0.9936044812202454
+                    ]
+                ],
+                "Head": [
+                    [
+                        7,
+                        0.21781492233276367
+                    ],
+                    [
+                        8,
+                        0.09724248945713043
+                    ],
+                    [
+                        9,
+                        0.8776633739471436
+                    ],
+                    [
+                        10,
+                        0.8031972050666809
+                    ],
+                    [
+                        11,
+                        0.8353145718574524
+                    ],
+                    [
+                        12,
+                        0.9284680485725403
+                    ],
+                    [
+                        13,
+                        0.9784923791885376
+                    ],
+                    [
+                        14,
+                        0.9837225079536438
+                    ],
+                    [
+                        15,
+                        0.9988983869552612
+                    ],
+                    [
+                        16,
+                        0.9754836559295654
+                    ],
+                    [
+                        22,
+                        0.12047238647937775
+                    ],
+                    [
+                        23,
+                        0.05619749799370766
+                    ],
+                    [
+                        57,
+                        0.9983787536621094
+                    ],
+                    [
+                        58,
+                        0.9937514066696167
+                    ],
+                    [
+                        59,
+                        0.9852049946784973
+                    ],
+                    [
+                        60,
+                        0.9856288433074951
+                    ],
+                    [
+                        61,
+                        0.9978923797607422
+                    ],
+                    [
+                        62,
+                        0.9977421164512634
+                    ],
+                    [
+                        63,
+                        0.9976431727409363
+                    ],
+                    [
+                        64,
+                        0.9964723587036133
+                    ],
+                    [
+                        65,
+                        0.9982582330703735
+                    ],
+                    [
+                        66,
+                        0.9976775050163269
+                    ],
+                    [
+                        67,
+                        0.9973907470703125
+                    ],
+                    [
+                        68,
+                        0.9987208843231201
+                    ],
+                    [
+                        69,
+                        0.9986060857772827
+                    ],
+                    [
+                        70,
+                        0.9748415350914001
+                    ],
+                    [
+                        71,
+                        0.967985987663269
+                    ],
+                    [
+                        72,
+                        0.9881764650344849
+                    ],
+                    [
+                        73,
+                        0.9847849011421204
+                    ],
+                    [
+                        74,
+                        0.9984062314033508
+                    ],
+                    [
+                        75,
+                        0.9985724091529846
+                    ],
+                    [
+                        76,
+                        0.998864471912384
+                    ],
+                    [
+                        77,
+                        0.9987303018569946
+                    ],
+                    [
+                        78,
+                        0.9987422227859497
+                    ],
+                    [
+                        79,
+                        0.9988669157028198
+                    ],
+                    [
+                        80,
+                        0.9986490607261658
+                    ],
+                    [
+                        81,
+                        0.9985795021057129
+                    ],
+                    [
+                        82,
+                        0.9986484050750732
+                    ],
+                    [
+                        83,
+                        0.9980896711349487
+                    ],
+                    [
+                        84,
+                        0.9984497427940369
+                    ],
+                    [
+                        85,
+                        0.9837177395820618
+                    ],
+                    [
+                        86,
+                        0.979261040687561
+                    ],
+                    [
+                        95,
+                        0.195888489484787
+                    ],
+                    [
+                        98,
+                        0.4747043251991272
+                    ],
+                    [
+                        100,
+                        0.1496991515159607
+                    ],
+                    [
+                        101,
+                        0.9986687898635864
+                    ],
+                    [
+                        102,
+                        0.9986942410469055
+                    ],
+                    [
+                        103,
+                        0.9984542727470398
+                    ],
+                    [
+                        104,
+                        0.9986251592636108
+                    ],
+                    [
+                        105,
+                        0.9985278248786926
+                    ],
+                    [
+                        106,
+                        0.9985888004302979
+                    ],
+                    [
+                        107,
+                        0.9986988306045532
+                    ],
+                    [
+                        108,
+                        0.9988731741905212
+                    ],
+                    [
+                        109,
+                        0.9986286759376526
+                    ],
+                    [
+                        110,
+                        0.9967766404151917
+                    ],
+                    [
+                        111,
+                        0.9944948554039001
+                    ],
+                    [
+                        112,
+                        0.9790274500846863
+                    ],
+                    [
+                        113,
+                        0.9957713484764099
+                    ],
+                    [
+                        114,
+                        0.9939301013946533
+                    ],
+                    [
+                        115,
+                        0.9988607168197632
+                    ],
+                    [
+                        116,
+                        0.9980427026748657
+                    ],
+                    [
+                        117,
+                        0.996817409992218
+                    ],
+                    [
+                        118,
+                        0.981360137462616
+                    ],
+                    [
+                        123,
+                        0.09724248945713043
+                    ],
+                    [
+                        124,
+                        0.8031972050666809
+                    ],
+                    [
+                        125,
+                        0.9284680485725403
+                    ],
+                    [
+                        126,
+                        0.9784923791885376
+                    ],
+                    [
+                        127,
+                        0.9754836559295654
+                    ],
+                    [
+                        133,
+                        0.12047238647937775
+                    ],
+                    [
+                        134,
+                        0.05619749799370766
+                    ],
+                    [
+                        157,
+                        0.9937514066696167
+                    ],
+                    [
+                        158,
+                        0.9856288433074951
+                    ],
+                    [
+                        159,
+                        0.9977421164512634
+                    ],
+                    [
+                        160,
+                        0.9976431727409363
+                    ],
+                    [
+                        161,
+                        0.9964723587036133
+                    ],
+                    [
+                        162,
+                        0.9982582330703735
+                    ],
+                    [
+                        163,
+                        0.9976775050163269
+                    ],
+                    [
+                        164,
+                        0.9973907470703125
+                    ],
+                    [
+                        165,
+                        0.9986060857772827
+                    ],
+                    [
+                        166,
+                        0.9748415350914001
+                    ],
+                    [
+                        167,
+                        0.967985987663269
+                    ],
+                    [
+                        168,
+                        0.9881764650344849
+                    ],
+                    [
+                        169,
+                        0.9847849011421204
+                    ],
+                    [
+                        170,
+                        0.9984062314033508
+                    ],
+                    [
+                        171,
+                        0.9985724091529846
+                    ],
+                    [
+                        172,
+                        0.9987422227859497
+                    ],
+                    [
+                        173,
+                        0.9986490607261658
+                    ],
+                    [
+                        174,
+                        0.9985795021057129
+                    ],
+                    [
+                        175,
+                        0.9986484050750732
+                    ],
+                    [
+                        176,
+                        0.9980896711349487
+                    ],
+                    [
+                        177,
+                        0.9984497427940369
+                    ],
+                    [
+                        178,
+                        0.9837177395820618
+                    ],
+                    [
+                        179,
+                        0.979261040687561
+                    ],
+                    [
+                        188,
+                        0.195888489484787
+                    ],
+                    [
+                        191,
+                        0.4747043251991272
+                    ],
+                    [
+                        192,
+                        0.1496991515159607
+                    ],
+                    [
+                        193,
+                        0.9986687898635864
+                    ],
+                    [
+                        194,
+                        0.9986942410469055
+                    ],
+                    [
+                        195,
+                        0.9986251592636108
+                    ],
+                    [
+                        196,
+                        0.9985278248786926
+                    ],
+                    [
+                        197,
+                        0.9985888004302979
+                    ],
+                    [
+                        198,
+                        0.9986286759376526
+                    ],
+                    [
+                        199,
+                        0.9967766404151917
+                    ],
+                    [
+                        200,
+                        0.9944948554039001
+                    ],
+                    [
+                        201,
+                        0.9790274500846863
+                    ],
+                    [
+                        202,
+                        0.9939301013946533
+                    ],
+                    [
+                        203,
+                        0.9980427026748657
+                    ],
+                    [
+                        204,
+                        0.996817409992218
+                    ],
+                    [
+                        205,
+                        0.981360137462616
+                    ]
+                ],
+                "FrontUpperLeg.R": [
+                    [
+                        3,
+                        0.10036875307559967
+                    ],
+                    [
+                        7,
+                        0.018166834488511086
+                    ],
+                    [
+                        8,
+                        0.09146089106798172
+                    ],
+                    [
+                        9,
+                        0.04841304197907448
+                    ],
+                    [
+                        10,
+                        0.09265463799238205
+                    ],
+                    [
+                        20,
+                        0.9455288648605347
+                    ],
+                    [
+                        21,
+                        0.9606329798698425
+                    ],
+                    [
+                        22,
+                        0.7530393600463867
+                    ],
+                    [
+                        23,
+                        0.8369598388671875
+                    ],
+                    [
+                        24,
+                        0.014994191937148571
+                    ],
+                    [
+                        25,
+                        0.05893566459417343
+                    ],
+                    [
+                        26,
+                        0.06006979942321777
+                    ],
+                    [
+                        32,
+                        0.02125474438071251
+                    ],
+                    [
+                        36,
+                        0.48369503021240234
+                    ],
+                    [
+                        88,
+                        0.5831701159477234
+                    ],
+                    [
+                        95,
+                        0.05305686965584755
+                    ],
+                    [
+                        98,
+                        0.17404963076114655
+                    ],
+                    [
+                        100,
+                        0.8206401467323303
+                    ]
+                ],
+                "FrontLowerLeg.R": [
+                    [
+                        18,
+                        0.9980477690696716
+                    ],
+                    [
+                        20,
+                        0.004922274500131607
+                    ],
+                    [
+                        21,
+                        0.004946421831846237
+                    ],
+                    [
+                        22,
+                        0.10179940611124039
+                    ],
+                    [
+                        23,
+                        0.09456478804349899
+                    ],
+                    [
+                        24,
+                        0.9701991081237793
+                    ],
+                    [
+                        25,
+                        0.9358588457107544
+                    ],
+                    [
+                        26,
+                        0.9361962676048279
+                    ],
+                    [
+                        32,
+                        0.9641696214675903
+                    ],
+                    [
+                        33,
+                        0.9948782324790955
+                    ],
+                    [
+                        34,
+                        0.9951725006103516
+                    ],
+                    [
+                        35,
+                        0.998640775680542
+                    ],
+                    [
+                        36,
+                        0.009673560038208961
+                    ],
+                    [
+                        87,
+                        0.9980025291442871
+                    ]
+                ],
+                "BackUpperLeg.R": [
+                    [
+                        0,
+                        0.0005511082708835602
+                    ],
+                    [
+                        1,
+                        0.11124061048030853
+                    ],
+                    [
+                        2,
+                        0.0715247392654419
+                    ],
+                    [
+                        3,
+                        0.06964034587144852
+                    ],
+                    [
+                        5,
+                        0.053246598690748215
+                    ],
+                    [
+                        6,
+                        0.09333595633506775
+                    ],
+                    [
+                        17,
+                        0.25886648893356323
+                    ],
+                    [
+                        19,
+                        0.8312013745307922
+                    ],
+                    [
+                        27,
+                        0.8316390514373779
+                    ],
+                    [
+                        28,
+                        0.14157170057296753
+                    ],
+                    [
+                        29,
+                        0.9204450845718384
+                    ],
+                    [
+                        30,
+                        0.8071808815002441
+                    ],
+                    [
+                        31,
+                        0.8618706464767456
+                    ],
+                    [
+                        37,
+                        0.9275040030479431
+                    ],
+                    [
+                        38,
+                        0.9343249201774597
+                    ],
+                    [
+                        39,
+                        0.9656013250350952
+                    ],
+                    [
+                        40,
+                        0.9344346523284912
+                    ],
+                    [
+                        43,
+                        0.060711827129125595
+                    ],
+                    [
+                        44,
+                        0.0793592631816864
+                    ],
+                    [
+                        45,
+                        0.008418427780270576
+                    ],
+                    [
+                        88,
+                        0.006499648094177246
+                    ],
+                    [
+                        89,
+                        0.3306104242801666
+                    ],
+                    [
+                        96,
+                        0.18316377699375153
+                    ],
+                    [
+                        97,
+                        0.7156662940979004
+                    ],
+                    [
+                        99,
+                        0.02117610163986683
+                    ]
+                ],
+                "BackLowerLeg.R": [
+                    [
+                        37,
+                        0.04937232658267021
+                    ],
+                    [
+                        38,
+                        0.030004490166902542
+                    ],
+                    [
+                        39,
+                        0.008688442409038544
+                    ],
+                    [
+                        40,
+                        0.05315713584423065
+                    ],
+                    [
+                        41,
+                        0.979193389415741
+                    ],
+                    [
+                        42,
+                        0.9801408648490906
+                    ],
+                    [
+                        43,
+                        0.9389758706092834
+                    ],
+                    [
+                        44,
+                        0.9197857975959778
+                    ],
+                    [
+                        90,
+                        0.9979575872421265
+                    ],
+                    [
+                        91,
+                        0.9979990124702454
+                    ],
+                    [
+                        92,
+                        0.9971207976341248
+                    ],
+                    [
+                        93,
+                        0.9925732612609863
+                    ],
+                    [
+                        94,
+                        0.9975470304489136
+                    ]
+                ]
+            }
         }
     ]
 }

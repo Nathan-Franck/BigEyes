@@ -6,9 +6,16 @@ bpy.ops.object.mode_set(mode='OBJECT')
 # For each mesh, gather all polygons, these we'll export seperately to a json format - mesh -> polygons (indices)
 meshes = []
 nodes = []
+armatures = []
 for object in bpy.data.objects:
     print("Exporting " + object.name + " " + object.type)
     nodes.append({ "name":object.name, "type":object.type, "parent": object.parent.name if object.parent != None else None })
+    if object.type == "ARMATURE":
+        armature = object.data
+        bones = []
+        for bone in armature.bones:
+            bones.append({ "name":bone.name, "parent":bone.parent.name if bone.parent != None else None })
+        armatures.append({ "name":armature.name, "bones":bones })
     if object.type == "MESH":
         mesh = object.data
         bpy.context.view_layer.objects.active = object
@@ -26,6 +33,13 @@ for object in bpy.data.objects:
             polygons.append(polygonRes)
         for vertex in mesh.vertices:
             vertices.append([vertex.co.x, vertex.co.y, vertex.co.z, 1])
+        # Extract armature weighting
+        vertexGroups = {}
+        for vertexGroup in object.vertex_groups:
+            vertexGroups[vertexGroup.name] = []
+        for vertex in mesh.vertices:
+            for group in vertex.groups:
+                vertexGroups[object.vertex_groups[group.group].name].append([vertex.index, group.weight])
         # Extract shape keys
         shapeKeys = []
         if mesh.shape_keys != None:
@@ -35,9 +49,19 @@ for object in bpy.data.objects:
                 for vert in shapeVerts:
                     verts.append([vert.co.x, vert.co.y, vert.co.z, 1])
                 shapeKeys.append({ "name":shapeKey.name, "vertices":verts })
-        meshes.append({ "name":mesh.name, "polygons":polygons, "vertices":vertices, "shapeKeys":shapeKeys })
+        meshes.append({ "name":mesh.name, "polygons":polygons, "vertices":vertices, "shapeKeys":shapeKeys, "vertexGroups":vertexGroups })
+# Get animation data
+actions = []
+for action in bpy.data.actions:
+    fcurves = []
+    for fcurve in action.fcurves:
+        keyframes = []
+        for keyframe in fcurve.keyframe_points:
+            keyframes.append([keyframe.co.x, keyframe.co.y])
+        fcurves.append({ "data_path":fcurve.data_path, "array_index":fcurve.array_index, "keyframes":keyframes })
+    actions.append({ "name":action.name, "fcurves":fcurves })
 import os
 import json
 with open(bpy.path.abspath("//") + os.path.basename(bpy.context.blend_data.filepath) + ".json", "w") as file:
-    json.dump({ "nodes": nodes, "meshes": meshes }, file, indent=4)
+    json.dump({ "actions":actions, "nodes":nodes, "armatures":armatures, "meshes":meshes }, file, indent=4)
 print("Export of " + bpy.path.abspath("//") + os.path.basename(bpy.context.blend_data.filepath) + ".json" + " complete")
