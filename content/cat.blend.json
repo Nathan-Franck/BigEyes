@@ -22,186 +22,6 @@
                     ]
                 },
                 {
-                    "data_path": "pose.bones[\"Body\"].location",
-                    "array_index": 1,
-                    "keyframes": [
-                        [
-                            0.0,
-                            0.0
-                        ],
-                        [
-                            10.0,
-                            0.014612630009651184
-                        ],
-                        [
-                            20.0,
-                            0.0
-                        ]
-                    ]
-                },
-                {
-                    "data_path": "pose.bones[\"Body\"].location",
-                    "array_index": 2,
-                    "keyframes": [
-                        [
-                            0.0,
-                            0.0
-                        ],
-                        [
-                            10.0,
-                            -0.029184184968471527
-                        ],
-                        [
-                            20.0,
-                            0.0
-                        ]
-                    ]
-                },
-                {
-                    "data_path": "pose.bones[\"Body\"].rotation_quaternion",
-                    "array_index": 0,
-                    "keyframes": [
-                        [
-                            0.0,
-                            1.0
-                        ],
-                        [
-                            10.0,
-                            1.0
-                        ],
-                        [
-                            20.0,
-                            1.0
-                        ]
-                    ]
-                },
-                {
-                    "data_path": "pose.bones[\"Body\"].rotation_quaternion",
-                    "array_index": 1,
-                    "keyframes": [
-                        [
-                            0.0,
-                            0.0
-                        ],
-                        [
-                            10.0,
-                            0.0
-                        ],
-                        [
-                            20.0,
-                            0.0
-                        ]
-                    ]
-                },
-                {
-                    "data_path": "pose.bones[\"Body\"].rotation_quaternion",
-                    "array_index": 2,
-                    "keyframes": [
-                        [
-                            0.0,
-                            0.0
-                        ],
-                        [
-                            10.0,
-                            0.0
-                        ],
-                        [
-                            20.0,
-                            0.0
-                        ]
-                    ]
-                },
-                {
-                    "data_path": "pose.bones[\"Body\"].rotation_quaternion",
-                    "array_index": 3,
-                    "keyframes": [
-                        [
-                            0.0,
-                            0.0
-                        ],
-                        [
-                            10.0,
-                            0.0
-                        ],
-                        [
-                            20.0,
-                            0.0
-                        ]
-                    ]
-                },
-                {
-                    "data_path": "pose.bones[\"Body\"].scale",
-                    "array_index": 0,
-                    "keyframes": [
-                        [
-                            0.0,
-                            1.0
-                        ],
-                        [
-                            10.0,
-                            1.0
-                        ],
-                        [
-                            20.0,
-                            1.0
-                        ]
-                    ]
-                },
-                {
-                    "data_path": "pose.bones[\"Body\"].scale",
-                    "array_index": 1,
-                    "keyframes": [
-                        [
-                            0.0,
-                            1.0
-                        ],
-                        [
-                            10.0,
-                            1.0
-                        ],
-                        [
-                            20.0,
-                            1.0
-                        ]
-                    ]
-                },
-                {
-                    "data_path": "pose.bones[\"Body\"].scale",
-                    "array_index": 2,
-                    "keyframes": [
-                        [
-                            0.0,
-                            1.0
-                        ],
-                        [
-                            10.0,
-                            1.0
-                        ],
-                        [
-                            20.0,
-                            1.0
-                        ]
-                    ]
-                },
-                {
-                    "data_path": "pose.bones[\"FrontUpperLeg.L\"].location",
-                    "array_index": 0,
-                    "keyframes": [
-                        [
-                            0.0,
-                            0.0
-                        ],
-                        [
-                            10.0,
-                            0.004449024330824614
-                        ],
-                        [
-                            20.0,
-                            0.0
-                        ]
-                    ]
-                },
-                {
                     "data_path": "pose.bones[\"FrontUpperLeg.L\"].location",
                     "array_index": 1,
                     "keyframes": [
@@ -239,24 +59,6 @@
                 },
                 {
                     "data_path": "pose.bones[\"FrontUpperLeg.L\"].rotation_quaternion",
-                    "array_index": 0,
-                    "keyframes": [
-                        [
-                            0.0,
-                            1.0
-                        ],
-                        [
-                            10.0,
-                            0.9654611349105835
-                        ],
-                        [
-                            20.0,
-                            1.0
-                        ]
-                    ]
-                },
-                {
-                    "data_path": "pose.bones[\"FrontUpperLeg.L\"].rotation_quaternion",
                     "array_index": 1,
                     "keyframes": [
                         [
@@ -266,150 +68,6 @@
                         [
                             10.0,
                             -0.26038306951522827
-                        ],
-                        [
-                            20.0,
-                            0.0
-                        ]
-                    ]
-                },
-                {
-                    "data_path": "pose.bones[\"FrontUpperLeg.L\"].rotation_quaternion",
-                    "array_index": 2,
-                    "keyframes": [
-                        [
-                            0.0,
-                            0.0
-                        ],
-                        [
-                            10.0,
-                            -3.762096412174287e-08
-                        ],
-                        [
-                            20.0,
-                            0.0
-                        ]
-                    ]
-                },
-                {
-                    "data_path": "pose.bones[\"FrontUpperLeg.L\"].rotation_quaternion",
-                    "array_index": 3,
-                    "keyframes": [
-                        [
-                            0.0,
-                            0.0
-                        ],
-                        [
-                            10.0,
-                            -0.009246367029845715
-                        ],
-                        [
-                            20.0,
-                            0.0
-                        ]
-                    ]
-                },
-                {
-                    "data_path": "pose.bones[\"FrontUpperLeg.L\"].scale",
-                    "array_index": 0,
-                    "keyframes": [
-                        [
-                            0.0,
-                            1.0
-                        ],
-                        [
-                            10.0,
-                            1.0
-                        ],
-                        [
-                            20.0,
-                            1.0
-                        ]
-                    ]
-                },
-                {
-                    "data_path": "pose.bones[\"FrontUpperLeg.L\"].scale",
-                    "array_index": 1,
-                    "keyframes": [
-                        [
-                            0.0,
-                            1.0
-                        ],
-                        [
-                            10.0,
-                            1.0
-                        ],
-                        [
-                            20.0,
-                            1.0
-                        ]
-                    ]
-                },
-                {
-                    "data_path": "pose.bones[\"FrontUpperLeg.L\"].scale",
-                    "array_index": 2,
-                    "keyframes": [
-                        [
-                            0.0,
-                            1.0
-                        ],
-                        [
-                            10.0,
-                            1.0
-                        ],
-                        [
-                            20.0,
-                            1.0
-                        ]
-                    ]
-                },
-                {
-                    "data_path": "pose.bones[\"FrontLowerLeg.L\"].location",
-                    "array_index": 0,
-                    "keyframes": [
-                        [
-                            0.0,
-                            0.0
-                        ],
-                        [
-                            10.0,
-                            0.0
-                        ],
-                        [
-                            20.0,
-                            0.0
-                        ]
-                    ]
-                },
-                {
-                    "data_path": "pose.bones[\"FrontLowerLeg.L\"].location",
-                    "array_index": 1,
-                    "keyframes": [
-                        [
-                            0.0,
-                            0.0
-                        ],
-                        [
-                            10.0,
-                            0.0
-                        ],
-                        [
-                            20.0,
-                            0.0
-                        ]
-                    ]
-                },
-                {
-                    "data_path": "pose.bones[\"FrontLowerLeg.L\"].location",
-                    "array_index": 2,
-                    "keyframes": [
-                        [
-                            0.0,
-                            0.0
-                        ],
-                        [
-                            10.0,
-                            0.0
                         ],
                         [
                             20.0,
@@ -450,96 +108,6 @@
                         [
                             20.0,
                             0.0
-                        ]
-                    ]
-                },
-                {
-                    "data_path": "pose.bones[\"FrontLowerLeg.L\"].rotation_quaternion",
-                    "array_index": 2,
-                    "keyframes": [
-                        [
-                            0.0,
-                            0.0
-                        ],
-                        [
-                            10.0,
-                            1.3916489649545838e-07
-                        ],
-                        [
-                            20.0,
-                            0.0
-                        ]
-                    ]
-                },
-                {
-                    "data_path": "pose.bones[\"FrontLowerLeg.L\"].rotation_quaternion",
-                    "array_index": 3,
-                    "keyframes": [
-                        [
-                            0.0,
-                            0.0
-                        ],
-                        [
-                            10.0,
-                            0.03571413829922676
-                        ],
-                        [
-                            20.0,
-                            0.0
-                        ]
-                    ]
-                },
-                {
-                    "data_path": "pose.bones[\"FrontLowerLeg.L\"].scale",
-                    "array_index": 0,
-                    "keyframes": [
-                        [
-                            0.0,
-                            1.0
-                        ],
-                        [
-                            10.0,
-                            1.0
-                        ],
-                        [
-                            20.0,
-                            1.0
-                        ]
-                    ]
-                },
-                {
-                    "data_path": "pose.bones[\"FrontLowerLeg.L\"].scale",
-                    "array_index": 1,
-                    "keyframes": [
-                        [
-                            0.0,
-                            1.0
-                        ],
-                        [
-                            10.0,
-                            1.0
-                        ],
-                        [
-                            20.0,
-                            1.0
-                        ]
-                    ]
-                },
-                {
-                    "data_path": "pose.bones[\"FrontLowerLeg.L\"].scale",
-                    "array_index": 2,
-                    "keyframes": [
-                        [
-                            0.0,
-                            1.0
-                        ],
-                        [
-                            10.0,
-                            1.0
-                        ],
-                        [
-                            20.0,
-                            1.0
                         ]
                     ]
                 },
@@ -599,24 +167,6 @@
                 },
                 {
                     "data_path": "pose.bones[\"BackUpperLeg.L\"].rotation_quaternion",
-                    "array_index": 0,
-                    "keyframes": [
-                        [
-                            0.0,
-                            1.0
-                        ],
-                        [
-                            10.0,
-                            0.9867870807647705
-                        ],
-                        [
-                            20.0,
-                            1.0
-                        ]
-                    ]
-                },
-                {
-                    "data_path": "pose.bones[\"BackUpperLeg.L\"].rotation_quaternion",
                     "array_index": 1,
                     "keyframes": [
                         [
@@ -626,24 +176,6 @@
                         [
                             10.0,
                             -0.05968503654003143
-                        ],
-                        [
-                            20.0,
-                            0.0
-                        ]
-                    ]
-                },
-                {
-                    "data_path": "pose.bones[\"BackUpperLeg.L\"].rotation_quaternion",
-                    "array_index": 2,
-                    "keyframes": [
-                        [
-                            0.0,
-                            0.0
-                        ],
-                        [
-                            10.0,
-                            -0.010432785376906395
                         ],
                         [
                             20.0,
@@ -670,132 +202,6 @@
                     ]
                 },
                 {
-                    "data_path": "pose.bones[\"BackUpperLeg.L\"].scale",
-                    "array_index": 0,
-                    "keyframes": [
-                        [
-                            0.0,
-                            1.0
-                        ],
-                        [
-                            10.0,
-                            1.0
-                        ],
-                        [
-                            20.0,
-                            1.0
-                        ]
-                    ]
-                },
-                {
-                    "data_path": "pose.bones[\"BackUpperLeg.L\"].scale",
-                    "array_index": 1,
-                    "keyframes": [
-                        [
-                            0.0,
-                            1.0
-                        ],
-                        [
-                            10.0,
-                            1.0
-                        ],
-                        [
-                            20.0,
-                            1.0
-                        ]
-                    ]
-                },
-                {
-                    "data_path": "pose.bones[\"BackUpperLeg.L\"].scale",
-                    "array_index": 2,
-                    "keyframes": [
-                        [
-                            0.0,
-                            1.0
-                        ],
-                        [
-                            10.0,
-                            1.0
-                        ],
-                        [
-                            20.0,
-                            1.0
-                        ]
-                    ]
-                },
-                {
-                    "data_path": "pose.bones[\"BackLowerLeg.L\"].location",
-                    "array_index": 0,
-                    "keyframes": [
-                        [
-                            0.0,
-                            0.0
-                        ],
-                        [
-                            10.0,
-                            0.0
-                        ],
-                        [
-                            20.0,
-                            0.0
-                        ]
-                    ]
-                },
-                {
-                    "data_path": "pose.bones[\"BackLowerLeg.L\"].location",
-                    "array_index": 1,
-                    "keyframes": [
-                        [
-                            0.0,
-                            0.0
-                        ],
-                        [
-                            10.0,
-                            0.0
-                        ],
-                        [
-                            20.0,
-                            0.0
-                        ]
-                    ]
-                },
-                {
-                    "data_path": "pose.bones[\"BackLowerLeg.L\"].location",
-                    "array_index": 2,
-                    "keyframes": [
-                        [
-                            0.0,
-                            0.0
-                        ],
-                        [
-                            10.0,
-                            0.0
-                        ],
-                        [
-                            20.0,
-                            0.0
-                        ]
-                    ]
-                },
-                {
-                    "data_path": "pose.bones[\"BackLowerLeg.L\"].rotation_quaternion",
-                    "array_index": 0,
-                    "keyframes": [
-                        [
-                            0.0,
-                            1.0
-                        ],
-                        [
-                            10.0,
-                            0.9915857315063477
-                        ],
-                        [
-                            20.0,
-                            1.0
-                        ]
-                    ]
-                },
-                {
                     "data_path": "pose.bones[\"BackLowerLeg.L\"].rotation_quaternion",
                     "array_index": 1,
                     "keyframes": [
@@ -806,24 +212,6 @@
                         [
                             10.0,
                             0.04716235771775246
-                        ],
-                        [
-                            20.0,
-                            0.0
-                        ]
-                    ]
-                },
-                {
-                    "data_path": "pose.bones[\"BackLowerLeg.L\"].rotation_quaternion",
-                    "array_index": 2,
-                    "keyframes": [
-                        [
-                            0.0,
-                            0.0
-                        ],
-                        [
-                            10.0,
-                            -0.040648043155670166
                         ],
                         [
                             20.0,
@@ -846,60 +234,6 @@
                         [
                             20.0,
                             0.0
-                        ]
-                    ]
-                },
-                {
-                    "data_path": "pose.bones[\"BackLowerLeg.L\"].scale",
-                    "array_index": 0,
-                    "keyframes": [
-                        [
-                            0.0,
-                            1.0
-                        ],
-                        [
-                            10.0,
-                            1.0
-                        ],
-                        [
-                            20.0,
-                            1.0
-                        ]
-                    ]
-                },
-                {
-                    "data_path": "pose.bones[\"BackLowerLeg.L\"].scale",
-                    "array_index": 1,
-                    "keyframes": [
-                        [
-                            0.0,
-                            1.0
-                        ],
-                        [
-                            10.0,
-                            1.0
-                        ],
-                        [
-                            20.0,
-                            1.0
-                        ]
-                    ]
-                },
-                {
-                    "data_path": "pose.bones[\"BackLowerLeg.L\"].scale",
-                    "array_index": 2,
-                    "keyframes": [
-                        [
-                            0.0,
-                            1.0
-                        ],
-                        [
-                            10.0,
-                            1.0
-                        ],
-                        [
-                            20.0,
-                            1.0
                         ]
                     ]
                 },
@@ -958,412 +292,6 @@
                     ]
                 },
                 {
-                    "data_path": "pose.bones[\"Tail.0\"].rotation_quaternion",
-                    "array_index": 0,
-                    "keyframes": [
-                        [
-                            0.0,
-                            1.0
-                        ],
-                        [
-                            10.0,
-                            1.0
-                        ],
-                        [
-                            20.0,
-                            1.0
-                        ]
-                    ]
-                },
-                {
-                    "data_path": "pose.bones[\"Tail.0\"].rotation_quaternion",
-                    "array_index": 1,
-                    "keyframes": [
-                        [
-                            0.0,
-                            0.0
-                        ],
-                        [
-                            10.0,
-                            0.0
-                        ],
-                        [
-                            20.0,
-                            0.0
-                        ]
-                    ]
-                },
-                {
-                    "data_path": "pose.bones[\"Tail.0\"].rotation_quaternion",
-                    "array_index": 2,
-                    "keyframes": [
-                        [
-                            0.0,
-                            0.0
-                        ],
-                        [
-                            10.0,
-                            0.0
-                        ],
-                        [
-                            20.0,
-                            0.0
-                        ]
-                    ]
-                },
-                {
-                    "data_path": "pose.bones[\"Tail.0\"].rotation_quaternion",
-                    "array_index": 3,
-                    "keyframes": [
-                        [
-                            0.0,
-                            0.0
-                        ],
-                        [
-                            10.0,
-                            0.0
-                        ],
-                        [
-                            20.0,
-                            0.0
-                        ]
-                    ]
-                },
-                {
-                    "data_path": "pose.bones[\"Tail.0\"].scale",
-                    "array_index": 0,
-                    "keyframes": [
-                        [
-                            0.0,
-                            1.0
-                        ],
-                        [
-                            10.0,
-                            1.0
-                        ],
-                        [
-                            20.0,
-                            1.0
-                        ]
-                    ]
-                },
-                {
-                    "data_path": "pose.bones[\"Tail.0\"].scale",
-                    "array_index": 1,
-                    "keyframes": [
-                        [
-                            0.0,
-                            1.0
-                        ],
-                        [
-                            10.0,
-                            1.0
-                        ],
-                        [
-                            20.0,
-                            1.0
-                        ]
-                    ]
-                },
-                {
-                    "data_path": "pose.bones[\"Tail.0\"].scale",
-                    "array_index": 2,
-                    "keyframes": [
-                        [
-                            0.0,
-                            1.0
-                        ],
-                        [
-                            10.0,
-                            1.0
-                        ],
-                        [
-                            20.0,
-                            1.0
-                        ]
-                    ]
-                },
-                {
-                    "data_path": "pose.bones[\"Tail.1\"].location",
-                    "array_index": 0,
-                    "keyframes": [
-                        [
-                            0.0,
-                            0.0
-                        ],
-                        [
-                            20.0,
-                            0.0
-                        ]
-                    ]
-                },
-                {
-                    "data_path": "pose.bones[\"Tail.1\"].location",
-                    "array_index": 1,
-                    "keyframes": [
-                        [
-                            0.0,
-                            0.0
-                        ],
-                        [
-                            20.0,
-                            0.0
-                        ]
-                    ]
-                },
-                {
-                    "data_path": "pose.bones[\"Tail.1\"].location",
-                    "array_index": 2,
-                    "keyframes": [
-                        [
-                            0.0,
-                            0.0
-                        ],
-                        [
-                            20.0,
-                            0.0
-                        ]
-                    ]
-                },
-                {
-                    "data_path": "pose.bones[\"Tail.1\"].rotation_quaternion",
-                    "array_index": 0,
-                    "keyframes": [
-                        [
-                            0.0,
-                            1.0
-                        ],
-                        [
-                            20.0,
-                            1.0
-                        ]
-                    ]
-                },
-                {
-                    "data_path": "pose.bones[\"Tail.1\"].rotation_quaternion",
-                    "array_index": 1,
-                    "keyframes": [
-                        [
-                            0.0,
-                            0.0
-                        ],
-                        [
-                            20.0,
-                            0.0
-                        ]
-                    ]
-                },
-                {
-                    "data_path": "pose.bones[\"Tail.1\"].rotation_quaternion",
-                    "array_index": 2,
-                    "keyframes": [
-                        [
-                            0.0,
-                            0.0
-                        ],
-                        [
-                            20.0,
-                            0.0
-                        ]
-                    ]
-                },
-                {
-                    "data_path": "pose.bones[\"Tail.1\"].rotation_quaternion",
-                    "array_index": 3,
-                    "keyframes": [
-                        [
-                            0.0,
-                            0.0
-                        ],
-                        [
-                            20.0,
-                            0.0
-                        ]
-                    ]
-                },
-                {
-                    "data_path": "pose.bones[\"Tail.1\"].scale",
-                    "array_index": 0,
-                    "keyframes": [
-                        [
-                            0.0,
-                            1.0
-                        ],
-                        [
-                            20.0,
-                            1.0
-                        ]
-                    ]
-                },
-                {
-                    "data_path": "pose.bones[\"Tail.1\"].scale",
-                    "array_index": 1,
-                    "keyframes": [
-                        [
-                            0.0,
-                            1.0
-                        ],
-                        [
-                            20.0,
-                            1.0
-                        ]
-                    ]
-                },
-                {
-                    "data_path": "pose.bones[\"Tail.1\"].scale",
-                    "array_index": 2,
-                    "keyframes": [
-                        [
-                            0.0,
-                            1.0
-                        ],
-                        [
-                            20.0,
-                            1.0
-                        ]
-                    ]
-                },
-                {
-                    "data_path": "pose.bones[\"Tail.2\"].location",
-                    "array_index": 0,
-                    "keyframes": [
-                        [
-                            0.0,
-                            0.0
-                        ],
-                        [
-                            20.0,
-                            0.0
-                        ]
-                    ]
-                },
-                {
-                    "data_path": "pose.bones[\"Tail.2\"].location",
-                    "array_index": 1,
-                    "keyframes": [
-                        [
-                            0.0,
-                            0.0
-                        ],
-                        [
-                            20.0,
-                            0.0
-                        ]
-                    ]
-                },
-                {
-                    "data_path": "pose.bones[\"Tail.2\"].location",
-                    "array_index": 2,
-                    "keyframes": [
-                        [
-                            0.0,
-                            0.0
-                        ],
-                        [
-                            20.0,
-                            0.0
-                        ]
-                    ]
-                },
-                {
-                    "data_path": "pose.bones[\"Tail.2\"].rotation_quaternion",
-                    "array_index": 0,
-                    "keyframes": [
-                        [
-                            0.0,
-                            1.0
-                        ],
-                        [
-                            20.0,
-                            1.0
-                        ]
-                    ]
-                },
-                {
-                    "data_path": "pose.bones[\"Tail.2\"].rotation_quaternion",
-                    "array_index": 1,
-                    "keyframes": [
-                        [
-                            0.0,
-                            0.0
-                        ],
-                        [
-                            20.0,
-                            0.0
-                        ]
-                    ]
-                },
-                {
-                    "data_path": "pose.bones[\"Tail.2\"].rotation_quaternion",
-                    "array_index": 2,
-                    "keyframes": [
-                        [
-                            0.0,
-                            0.0
-                        ],
-                        [
-                            20.0,
-                            0.0
-                        ]
-                    ]
-                },
-                {
-                    "data_path": "pose.bones[\"Tail.2\"].rotation_quaternion",
-                    "array_index": 3,
-                    "keyframes": [
-                        [
-                            0.0,
-                            0.0
-                        ],
-                        [
-                            20.0,
-                            0.0
-                        ]
-                    ]
-                },
-                {
-                    "data_path": "pose.bones[\"Tail.2\"].scale",
-                    "array_index": 0,
-                    "keyframes": [
-                        [
-                            0.0,
-                            1.0
-                        ],
-                        [
-                            20.0,
-                            1.0
-                        ]
-                    ]
-                },
-                {
-                    "data_path": "pose.bones[\"Tail.2\"].scale",
-                    "array_index": 1,
-                    "keyframes": [
-                        [
-                            0.0,
-                            1.0
-                        ],
-                        [
-                            20.0,
-                            1.0
-                        ]
-                    ]
-                },
-                {
-                    "data_path": "pose.bones[\"Tail.2\"].scale",
-                    "array_index": 2,
-                    "keyframes": [
-                        [
-                            0.0,
-                            1.0
-                        ],
-                        [
-                            20.0,
-                            1.0
-                        ]
-                    ]
-                },
-                {
                     "data_path": "pose.bones[\"Head\"].location",
                     "array_index": 0,
                     "keyframes": [
@@ -1374,186 +302,6 @@
                         [
                             10.0,
                             0.4787846505641937
-                        ],
-                        [
-                            20.0,
-                            0.0
-                        ]
-                    ]
-                },
-                {
-                    "data_path": "pose.bones[\"Head\"].location",
-                    "array_index": 1,
-                    "keyframes": [
-                        [
-                            0.0,
-                            0.0
-                        ],
-                        [
-                            10.0,
-                            0.002938224468380213
-                        ],
-                        [
-                            20.0,
-                            0.0
-                        ]
-                    ]
-                },
-                {
-                    "data_path": "pose.bones[\"Head\"].location",
-                    "array_index": 2,
-                    "keyframes": [
-                        [
-                            0.0,
-                            0.0
-                        ],
-                        [
-                            10.0,
-                            -0.00702468678355217
-                        ],
-                        [
-                            20.0,
-                            0.0
-                        ]
-                    ]
-                },
-                {
-                    "data_path": "pose.bones[\"Head\"].rotation_quaternion",
-                    "array_index": 0,
-                    "keyframes": [
-                        [
-                            0.0,
-                            1.0
-                        ],
-                        [
-                            10.0,
-                            1.0
-                        ],
-                        [
-                            20.0,
-                            1.0
-                        ]
-                    ]
-                },
-                {
-                    "data_path": "pose.bones[\"Head\"].rotation_quaternion",
-                    "array_index": 1,
-                    "keyframes": [
-                        [
-                            0.0,
-                            0.0
-                        ],
-                        [
-                            10.0,
-                            0.0
-                        ],
-                        [
-                            20.0,
-                            0.0
-                        ]
-                    ]
-                },
-                {
-                    "data_path": "pose.bones[\"Head\"].rotation_quaternion",
-                    "array_index": 2,
-                    "keyframes": [
-                        [
-                            0.0,
-                            0.0
-                        ],
-                        [
-                            10.0,
-                            0.0
-                        ],
-                        [
-                            20.0,
-                            0.0
-                        ]
-                    ]
-                },
-                {
-                    "data_path": "pose.bones[\"Head\"].rotation_quaternion",
-                    "array_index": 3,
-                    "keyframes": [
-                        [
-                            0.0,
-                            0.0
-                        ],
-                        [
-                            10.0,
-                            0.0
-                        ],
-                        [
-                            20.0,
-                            0.0
-                        ]
-                    ]
-                },
-                {
-                    "data_path": "pose.bones[\"Head\"].scale",
-                    "array_index": 0,
-                    "keyframes": [
-                        [
-                            0.0,
-                            1.0
-                        ],
-                        [
-                            10.0,
-                            1.0
-                        ],
-                        [
-                            20.0,
-                            1.0
-                        ]
-                    ]
-                },
-                {
-                    "data_path": "pose.bones[\"Head\"].scale",
-                    "array_index": 1,
-                    "keyframes": [
-                        [
-                            0.0,
-                            1.0
-                        ],
-                        [
-                            10.0,
-                            1.0
-                        ],
-                        [
-                            20.0,
-                            1.0
-                        ]
-                    ]
-                },
-                {
-                    "data_path": "pose.bones[\"Head\"].scale",
-                    "array_index": 2,
-                    "keyframes": [
-                        [
-                            0.0,
-                            1.0
-                        ],
-                        [
-                            10.0,
-                            1.0
-                        ],
-                        [
-                            20.0,
-                            1.0
-                        ]
-                    ]
-                },
-                {
-                    "data_path": "pose.bones[\"FrontUpperLeg.R\"].location",
-                    "array_index": 0,
-                    "keyframes": [
-                        [
-                            0.0,
-                            0.0
-                        ],
-                        [
-                            10.0,
-                            -0.004448894876986742
                         ],
                         [
                             20.0,
@@ -1599,24 +347,6 @@
                 },
                 {
                     "data_path": "pose.bones[\"FrontUpperLeg.R\"].rotation_quaternion",
-                    "array_index": 0,
-                    "keyframes": [
-                        [
-                            0.0,
-                            1.0
-                        ],
-                        [
-                            10.0,
-                            0.9654611349105835
-                        ],
-                        [
-                            20.0,
-                            1.0
-                        ]
-                    ]
-                },
-                {
-                    "data_path": "pose.bones[\"FrontUpperLeg.R\"].rotation_quaternion",
                     "array_index": 1,
                     "keyframes": [
                         [
@@ -1626,150 +356,6 @@
                         [
                             10.0,
                             -0.26038306951522827
-                        ],
-                        [
-                            20.0,
-                            0.0
-                        ]
-                    ]
-                },
-                {
-                    "data_path": "pose.bones[\"FrontUpperLeg.R\"].rotation_quaternion",
-                    "array_index": 2,
-                    "keyframes": [
-                        [
-                            0.0,
-                            0.0
-                        ],
-                        [
-                            10.0,
-                            -4.063546654720085e-08
-                        ],
-                        [
-                            20.0,
-                            0.0
-                        ]
-                    ]
-                },
-                {
-                    "data_path": "pose.bones[\"FrontUpperLeg.R\"].rotation_quaternion",
-                    "array_index": 3,
-                    "keyframes": [
-                        [
-                            0.0,
-                            0.0
-                        ],
-                        [
-                            10.0,
-                            0.009246346540749073
-                        ],
-                        [
-                            20.0,
-                            0.0
-                        ]
-                    ]
-                },
-                {
-                    "data_path": "pose.bones[\"FrontUpperLeg.R\"].scale",
-                    "array_index": 0,
-                    "keyframes": [
-                        [
-                            0.0,
-                            1.0
-                        ],
-                        [
-                            10.0,
-                            1.0
-                        ],
-                        [
-                            20.0,
-                            1.0
-                        ]
-                    ]
-                },
-                {
-                    "data_path": "pose.bones[\"FrontUpperLeg.R\"].scale",
-                    "array_index": 1,
-                    "keyframes": [
-                        [
-                            0.0,
-                            1.0
-                        ],
-                        [
-                            10.0,
-                            1.0
-                        ],
-                        [
-                            20.0,
-                            1.0
-                        ]
-                    ]
-                },
-                {
-                    "data_path": "pose.bones[\"FrontUpperLeg.R\"].scale",
-                    "array_index": 2,
-                    "keyframes": [
-                        [
-                            0.0,
-                            1.0
-                        ],
-                        [
-                            10.0,
-                            1.0
-                        ],
-                        [
-                            20.0,
-                            1.0
-                        ]
-                    ]
-                },
-                {
-                    "data_path": "pose.bones[\"FrontLowerLeg.R\"].location",
-                    "array_index": 0,
-                    "keyframes": [
-                        [
-                            0.0,
-                            0.0
-                        ],
-                        [
-                            10.0,
-                            0.0
-                        ],
-                        [
-                            20.0,
-                            0.0
-                        ]
-                    ]
-                },
-                {
-                    "data_path": "pose.bones[\"FrontLowerLeg.R\"].location",
-                    "array_index": 1,
-                    "keyframes": [
-                        [
-                            0.0,
-                            0.0
-                        ],
-                        [
-                            10.0,
-                            0.0
-                        ],
-                        [
-                            20.0,
-                            0.0
-                        ]
-                    ]
-                },
-                {
-                    "data_path": "pose.bones[\"FrontLowerLeg.R\"].location",
-                    "array_index": 2,
-                    "keyframes": [
-                        [
-                            0.0,
-                            0.0
-                        ],
-                        [
-                            10.0,
-                            0.0
                         ],
                         [
                             20.0,
@@ -1810,96 +396,6 @@
                         [
                             20.0,
                             0.0
-                        ]
-                    ]
-                },
-                {
-                    "data_path": "pose.bones[\"FrontLowerLeg.R\"].rotation_quaternion",
-                    "array_index": 2,
-                    "keyframes": [
-                        [
-                            0.0,
-                            0.0
-                        ],
-                        [
-                            10.0,
-                            3.162838657644329e-09
-                        ],
-                        [
-                            20.0,
-                            0.0
-                        ]
-                    ]
-                },
-                {
-                    "data_path": "pose.bones[\"FrontLowerLeg.R\"].rotation_quaternion",
-                    "array_index": 3,
-                    "keyframes": [
-                        [
-                            0.0,
-                            0.0
-                        ],
-                        [
-                            10.0,
-                            -0.03571411967277527
-                        ],
-                        [
-                            20.0,
-                            0.0
-                        ]
-                    ]
-                },
-                {
-                    "data_path": "pose.bones[\"FrontLowerLeg.R\"].scale",
-                    "array_index": 0,
-                    "keyframes": [
-                        [
-                            0.0,
-                            1.0
-                        ],
-                        [
-                            10.0,
-                            1.0
-                        ],
-                        [
-                            20.0,
-                            1.0
-                        ]
-                    ]
-                },
-                {
-                    "data_path": "pose.bones[\"FrontLowerLeg.R\"].scale",
-                    "array_index": 1,
-                    "keyframes": [
-                        [
-                            0.0,
-                            1.0
-                        ],
-                        [
-                            10.0,
-                            1.0
-                        ],
-                        [
-                            20.0,
-                            1.0
-                        ]
-                    ]
-                },
-                {
-                    "data_path": "pose.bones[\"FrontLowerLeg.R\"].scale",
-                    "array_index": 2,
-                    "keyframes": [
-                        [
-                            0.0,
-                            1.0
-                        ],
-                        [
-                            10.0,
-                            1.0
-                        ],
-                        [
-                            20.0,
-                            1.0
                         ]
                     ]
                 },
@@ -1959,24 +455,6 @@
                 },
                 {
                     "data_path": "pose.bones[\"BackUpperLeg.R\"].rotation_quaternion",
-                    "array_index": 0,
-                    "keyframes": [
-                        [
-                            0.0,
-                            1.0
-                        ],
-                        [
-                            10.0,
-                            0.9867870807647705
-                        ],
-                        [
-                            20.0,
-                            1.0
-                        ]
-                    ]
-                },
-                {
-                    "data_path": "pose.bones[\"BackUpperLeg.R\"].rotation_quaternion",
                     "array_index": 1,
                     "keyframes": [
                         [
@@ -1986,24 +464,6 @@
                         [
                             10.0,
                             -0.05968498811125755
-                        ],
-                        [
-                            20.0,
-                            0.0
-                        ]
-                    ]
-                },
-                {
-                    "data_path": "pose.bones[\"BackUpperLeg.R\"].rotation_quaternion",
-                    "array_index": 2,
-                    "keyframes": [
-                        [
-                            0.0,
-                            0.0
-                        ],
-                        [
-                            10.0,
-                            0.010432805866003036
                         ],
                         [
                             20.0,
@@ -2030,132 +490,6 @@
                     ]
                 },
                 {
-                    "data_path": "pose.bones[\"BackUpperLeg.R\"].scale",
-                    "array_index": 0,
-                    "keyframes": [
-                        [
-                            0.0,
-                            1.0
-                        ],
-                        [
-                            10.0,
-                            1.0
-                        ],
-                        [
-                            20.0,
-                            1.0
-                        ]
-                    ]
-                },
-                {
-                    "data_path": "pose.bones[\"BackUpperLeg.R\"].scale",
-                    "array_index": 1,
-                    "keyframes": [
-                        [
-                            0.0,
-                            1.0
-                        ],
-                        [
-                            10.0,
-                            1.0
-                        ],
-                        [
-                            20.0,
-                            1.0
-                        ]
-                    ]
-                },
-                {
-                    "data_path": "pose.bones[\"BackUpperLeg.R\"].scale",
-                    "array_index": 2,
-                    "keyframes": [
-                        [
-                            0.0,
-                            1.0
-                        ],
-                        [
-                            10.0,
-                            1.0
-                        ],
-                        [
-                            20.0,
-                            1.0
-                        ]
-                    ]
-                },
-                {
-                    "data_path": "pose.bones[\"BackLowerLeg.R\"].location",
-                    "array_index": 0,
-                    "keyframes": [
-                        [
-                            0.0,
-                            0.0
-                        ],
-                        [
-                            10.0,
-                            0.0
-                        ],
-                        [
-                            20.0,
-                            0.0
-                        ]
-                    ]
-                },
-                {
-                    "data_path": "pose.bones[\"BackLowerLeg.R\"].location",
-                    "array_index": 1,
-                    "keyframes": [
-                        [
-                            0.0,
-                            0.0
-                        ],
-                        [
-                            10.0,
-                            0.0
-                        ],
-                        [
-                            20.0,
-                            0.0
-                        ]
-                    ]
-                },
-                {
-                    "data_path": "pose.bones[\"BackLowerLeg.R\"].location",
-                    "array_index": 2,
-                    "keyframes": [
-                        [
-                            0.0,
-                            0.0
-                        ],
-                        [
-                            10.0,
-                            0.0
-                        ],
-                        [
-                            20.0,
-                            0.0
-                        ]
-                    ]
-                },
-                {
-                    "data_path": "pose.bones[\"BackLowerLeg.R\"].rotation_quaternion",
-                    "array_index": 0,
-                    "keyframes": [
-                        [
-                            0.0,
-                            1.0
-                        ],
-                        [
-                            10.0,
-                            0.9915857315063477
-                        ],
-                        [
-                            20.0,
-                            1.0
-                        ]
-                    ]
-                },
-                {
                     "data_path": "pose.bones[\"BackLowerLeg.R\"].rotation_quaternion",
                     "array_index": 1,
                     "keyframes": [
@@ -2166,24 +500,6 @@
                         [
                             10.0,
                             0.04716235771775246
-                        ],
-                        [
-                            20.0,
-                            0.0
-                        ]
-                    ]
-                },
-                {
-                    "data_path": "pose.bones[\"BackLowerLeg.R\"].rotation_quaternion",
-                    "array_index": 2,
-                    "keyframes": [
-                        [
-                            0.0,
-                            0.0
-                        ],
-                        [
-                            10.0,
-                            0.04064808040857315
                         ],
                         [
                             20.0,
@@ -2208,60 +524,6 @@
                             0.0
                         ]
                     ]
-                },
-                {
-                    "data_path": "pose.bones[\"BackLowerLeg.R\"].scale",
-                    "array_index": 0,
-                    "keyframes": [
-                        [
-                            0.0,
-                            1.0
-                        ],
-                        [
-                            10.0,
-                            1.0
-                        ],
-                        [
-                            20.0,
-                            1.0
-                        ]
-                    ]
-                },
-                {
-                    "data_path": "pose.bones[\"BackLowerLeg.R\"].scale",
-                    "array_index": 1,
-                    "keyframes": [
-                        [
-                            0.0,
-                            1.0
-                        ],
-                        [
-                            10.0,
-                            1.0
-                        ],
-                        [
-                            20.0,
-                            1.0
-                        ]
-                    ]
-                },
-                {
-                    "data_path": "pose.bones[\"BackLowerLeg.R\"].scale",
-                    "array_index": 2,
-                    "keyframes": [
-                        [
-                            0.0,
-                            1.0
-                        ],
-                        [
-                            10.0,
-                            1.0
-                        ],
-                        [
-                            20.0,
-                            1.0
-                        ]
-                    ]
                 }
             ]
         }
@@ -2270,12 +532,42 @@
         {
             "name": "Armature",
             "type": "ARMATURE",
-            "parent": null
+            "parent": null,
+            "position": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "rotation": [
+                0.0,
+                -0.0,
+                1.570796251296997
+            ],
+            "scale": [
+                1.0,
+                1.0,
+                1.0
+            ]
         },
         {
             "name": "Cat",
             "type": "MESH",
-            "parent": "Armature"
+            "parent": "Armature",
+            "position": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "rotation": [
+                0.0,
+                -0.0,
+                0.0
+            ],
+            "scale": [
+                1.0,
+                1.0,
+                1.0
+            ]
         }
     ],
     "armatures": [
@@ -2284,55 +576,250 @@
             "bones": [
                 {
                     "name": "Body",
-                    "parent": null
+                    "parent": null,
+                    "position": [
+                        -0.03880840539932251,
+                        -0.019559621810913086,
+                        0.0467984676361084
+                    ],
+                    "rotation": [
+                        -0.4642094373703003,
+                        1.5025832653045654,
+                        2.678314685821533
+                    ],
+                    "scale": [
+                        1.0,
+                        1.0,
+                        1.0000001192092896
+                    ]
                 },
                 {
                     "name": "FrontUpperLeg.L",
-                    "parent": null
+                    "parent": null,
+                    "position": [
+                        0.9751585721969604,
+                        -4.722884654998779,
+                        -0.5737134218215942
+                    ],
+                    "rotation": [
+                        -1.3060630559921265,
+                        0.00929114781320095,
+                        3.1073341369628906
+                    ],
+                    "scale": [
+                        1.0,
+                        1.000000238418579,
+                        1.0
+                    ]
                 },
                 {
                     "name": "FrontLowerLeg.L",
-                    "parent": "FrontUpperLeg.L"
+                    "parent": "FrontUpperLeg.L",
+                    "position": [
+                        0.9751585721969604,
+                        -3.5883699655532837,
+                        -2.0569863319396973
+                    ],
+                    "rotation": [
+                        -1.1859955787658691,
+                        0.028680138289928436,
+                        3.0709030628204346
+                    ],
+                    "scale": [
+                        1.0,
+                        1.000000238418579,
+                        1.0
+                    ]
                 },
                 {
                     "name": "BackUpperLeg.L",
-                    "parent": null
+                    "parent": null,
+                    "position": [
+                        1.23295259475708,
+                        -0.9538606405258179,
+                        -1.304616093635559
+                    ],
+                    "rotation": [
+                        1.141863226890564,
+                        2.415372133255005,
+                        1.0556232929229736
+                    ],
+                    "scale": [
+                        1.0,
+                        1.0000001192092896,
+                        1.0
+                    ]
                 },
                 {
                     "name": "BackLowerLeg.L",
-                    "parent": "BackUpperLeg.L"
+                    "parent": "BackUpperLeg.L",
+                    "position": [
+                        1.1160467863082886,
+                        2.187819480895996,
+                        -2.5391173362731934
+                    ],
+                    "rotation": [
+                        -0.9541615843772888,
+                        -0.6029718518257141,
+                        -2.028987407684326
+                    ],
+                    "scale": [
+                        1.0000001192092896,
+                        0.9999999403953552,
+                        1.0
+                    ]
                 },
                 {
                     "name": "Tail.0",
-                    "parent": null
+                    "parent": null,
+                    "position": [
+                        -0.038808465003967285,
+                        1.711983323097229,
+                        0.40558671951293945
+                    ],
+                    "rotation": [
+                        -0.13092173635959625,
+                        -0.24960286915302277,
+                        0.03251487389206886
+                    ],
+                    "scale": [
+                        1.0,
+                        0.9999999403953552,
+                        1.0
+                    ]
                 },
                 {
                     "name": "Tail.1",
-                    "parent": "Tail.0"
+                    "parent": "Tail.0",
+                    "position": [
+                        -0.03880870342254639,
+                        5.960407257080078,
+                        0.13578498363494873
+                    ],
+                    "rotation": [
+                        -1.1210427284240723,
+                        -0.7690953016281128,
+                        0.9640270471572876
+                    ],
+                    "scale": [
+                        1.0,
+                        1.0,
+                        1.0
+                    ]
                 },
                 {
                     "name": "Tail.2",
-                    "parent": "Tail.1"
+                    "parent": "Tail.1",
+                    "position": [
+                        -0.038808997720479965,
+                        7.695674419403076,
+                        -1.2843958139419556
+                    ],
+                    "rotation": [
+                        0.20813660323619843,
+                        0.3727811276912689,
+                        0.07676756381988525
+                    ],
+                    "scale": [
+                        1.000000238418579,
+                        1.000000238418579,
+                        1.0000001192092896
+                    ]
                 },
                 {
                     "name": "Head",
-                    "parent": null
+                    "parent": null,
+                    "position": [
+                        -0.0864180326461792,
+                        -6.070931434631348,
+                        0.43720054626464844
+                    ],
+                    "rotation": [
+                        2.74544358253479,
+                        1.5866987705230713,
+                        -0.36413514614105225
+                    ],
+                    "scale": [
+                        1.000000238418579,
+                        0.9999995827674866,
+                        0.9999998807907104
+                    ]
                 },
                 {
                     "name": "FrontUpperLeg.R",
-                    "parent": null
+                    "parent": null,
+                    "position": [
+                        -0.9751585721969604,
+                        -4.722884654998779,
+                        -0.5737134218215942
+                    ],
+                    "rotation": [
+                        -1.3060630559921265,
+                        -0.00929114781320095,
+                        -3.1073341369628906
+                    ],
+                    "scale": [
+                        1.0,
+                        1.000000238418579,
+                        1.0
+                    ]
                 },
                 {
                     "name": "FrontLowerLeg.R",
-                    "parent": "FrontUpperLeg.R"
+                    "parent": "FrontUpperLeg.R",
+                    "position": [
+                        -0.9751585721969604,
+                        -3.5883699655532837,
+                        -2.0569863319396973
+                    ],
+                    "rotation": [
+                        -1.1859955787658691,
+                        -0.028680138289928436,
+                        -3.0709030628204346
+                    ],
+                    "scale": [
+                        1.0,
+                        1.000000238418579,
+                        1.0
+                    ]
                 },
                 {
                     "name": "BackUpperLeg.R",
-                    "parent": null
+                    "parent": null,
+                    "position": [
+                        -1.23295259475708,
+                        -0.9538606405258179,
+                        -1.304616093635559
+                    ],
+                    "rotation": [
+                        1.141863226890564,
+                        -2.415372133255005,
+                        -1.0556232929229736
+                    ],
+                    "scale": [
+                        1.0,
+                        1.0000001192092896,
+                        1.0
+                    ]
                 },
                 {
                     "name": "BackLowerLeg.R",
-                    "parent": "BackUpperLeg.R"
+                    "parent": "BackUpperLeg.R",
+                    "position": [
+                        -1.1160467863082886,
+                        2.187819480895996,
+                        -2.5391173362731934
+                    ],
+                    "rotation": [
+                        -0.9541615843772888,
+                        0.6029718518257141,
+                        2.028987407684326
+                    ],
+                    "scale": [
+                        1.0000001192092896,
+                        0.9999999403953552,
+                        1.0
+                    ]
                 }
             ]
         }
