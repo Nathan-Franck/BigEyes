@@ -1,6 +1,7 @@
 const std = @import("std");
 const Builder = std.build.Builder;
 const fs = std.fs;
+const content_dir = "content/";
 
 const ExportMeshes = struct {
     allocator: std.mem.Allocator,
@@ -102,6 +103,10 @@ pub fn build(
     exe.linkSystemLibrary("SDL2");
     exe.linkLibC();
     const install_artifact = b.addInstallArtifact(exe, .{});
+
+    const exe_options = b.addOptions();
+    exe.addOptions("build_options", exe_options);
+    exe_options.addOption([]const u8, "content_dir", content_dir);
 
     const export_meshes = ExportMeshes.create(b, &.{"cat"});
     exe.step.dependOn(&export_meshes.step);

@@ -74,7 +74,7 @@ for object in bpy.data.objects:
         for vertex in mesh.vertices:
             for group in vertex.groups:
                 vertexGroups[object.vertex_groups[group.group].name].append(
-                    [vertex.index, group.weight]
+                    {"index": vertex.index, "weight": group.weight}
                 )
         # Extract shape keys
         shapeKeys = []
@@ -91,7 +91,13 @@ for object in bpy.data.objects:
                 "polygons": polygons,
                 "vertices": vertices,
                 "shapeKeys": shapeKeys,
-                "vertexGroups": vertexGroups,
+                "vertexGroups": [
+                    {
+                        "name": key,
+                        "vertices": vertexGroups[key],
+                    }
+                    for key in vertexGroups
+                ],
             }
         )
 # Get animation data

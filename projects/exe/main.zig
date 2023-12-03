@@ -133,15 +133,47 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !DemoState {
 
         // Load seperately a json file with the polygon data, should be called *.gltf.json
         const polygonJSON = json: {
-            const json_data = std.fs.cwd().readFileAlloc(arena.allocator(), content_dir ++ "boss.blend.json", 512 * 1024 * 1024) catch |err| {
+            const json_data = std.fs.cwd().readFileAlloc(arena.allocator(), content_dir ++ "cat.blend.json", 512 * 1024 * 1024) catch |err| {
                 std.log.err("Failed to read JSON file: {}", .{err});
                 return err;
             };
-            const Config = []const struct {
-                name: []const u8,
-                polygons: []const subdiv.Face,
-                vertices: []const subdiv.Point,
-                shapeKeys: []struct { name: []const u8, vertices: []const subdiv.Point },
+            const Config = struct {
+                actions: []const struct {
+                    name: []const u8,
+                    fcurves: []const struct {
+                        data_path: []const u8,
+                        array_index: u32,
+                        keyframes: []const [2]f32,
+                    },
+                },
+                nodes: []const struct {
+                    name: []const u8,
+                    type: []const u8,
+                    parent: ?[]const u8,
+                    position: [3]f32,
+                    rotation: [3]f32,
+                    scale: [3]f32,
+                },
+                armatures: []const struct {
+                    name: []const u8,
+                    bones: []const struct {
+                        name: []const u8,
+                        parent: ?[]const u8,
+                        position: [3]f32,
+                        rotation: [3]f32,
+                        scale: [3]f32,
+                    },
+                },
+                meshes: []const struct {
+                    name: []const u8,
+                    polygons: []const subdiv.Face,
+                    vertices: []const subdiv.Point,
+                    shapeKeys: []struct { name: []const u8, vertices: []const subdiv.Point },
+                    vertexGroups: []const struct {
+                        name: []const u8,
+                        vertices: []const struct { index: u32, weight: f32 },
+                    },
+                },
             };
             break :json std.json.parseFromSlice(Config, arena.allocator(), json_data, .{}) catch |err| {
                 std.log.err("Failed to parse JSON: {}", .{err});
@@ -150,7 +182,7 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !DemoState {
         };
 
         // pack into subdiv mesh for processing
-        const first = polygonJSON.value[4];
+        const first = polygonJSON.value.meshes[0];
 
         const firstRoundSubd = subdiv.Subdiv(true);
         const secondRoundSubd = subdiv.Subdiv(false);
@@ -159,7 +191,7 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !DemoState {
         const first_results = first_results: {
             var timer = try std.time.Timer.start();
 
-            const first_round = try firstRoundSubd.cmcSubdiv(arena.allocator(), first.shapeKeys[0].vertices, first.polygons);
+            const first_round = try firstRoundSubd.cmcSubdiv(arena.allocator(), first.vertices, first.polygons);
             const second_round = try secondRoundSubd.cmcSubdiv(arena.allocator(), first_round.points, first_round.quads);
             const third_round = try secondRoundSubd.cmcSubdiv(arena.allocator(), second_round.points, second_round.quads);
 
@@ -173,7 +205,7 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !DemoState {
         const second_results = second_results: {
             var timer = try std.time.Timer.start();
 
-            const first_round = try firstRoundSubd.cmcSubdivOnlyPoints(arena.allocator(), first.shapeKeys[1].vertices, first.polygons);
+            const first_round = try firstRoundSubd.cmcSubdivOnlyPoints(arena.allocator(), first.vertices, first.polygons);
             const second_round = try secondRoundSubd.cmcSubdivOnlyPoints(arena.allocator(), first_round, first_results[0].quads);
             const third_round = try secondRoundSubd.cmcSubdivOnlyPoints(arena.allocator(), second_round, first_results[1].quads);
 

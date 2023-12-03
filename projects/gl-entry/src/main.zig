@@ -3,6 +3,7 @@ const panic = std.debug.panic;
 const c_allocator = std.heap.c_allocator;
 const rand = std.rand;
 const builtin = @import("builtin");
+const zmath = @import("zmath");
 
 const c = @cImport({
     @cInclude("SDL2/SDL.h");
@@ -10,8 +11,6 @@ const c = @cImport({
     @cDefine("GL_GLEXT_PROTOTYPES", "1");
     @cInclude("SDL2/SDL_opengl.h");
 });
-
-const Game = @import("Game.zig");
 
 extern fn gladLoadGL() callconv(.C) c_int; // init OpenGL function pointers on Windows and Linux
 
@@ -115,21 +114,16 @@ fn makeShader(vert_src: []const u8, frag_src: []const u8) !c.GLuint {
     return program;
 }
 
-var game: Game = undefined;
-
 var default_shader: c.GLuint = undefined;
 var transform_loc: c.GLint = undefined;
 var color_loc: c.GLint = undefined;
-var sprite_vertex_buffer: c.GLuint = undefined;
-var rect_vertex_buffer: c.GLuint = undefined;
 
 fn initGL() void {
     default_shader = makeShader(
-        \\uniform mat3 transform;
-        \\attribute vec2 position;
+        \\uniform mat4 transform;
+        \\attribute vec3 position;
         \\void main() {
-        \\    vec3 p = transform * vec3(position, 1.0);
-        \\    gl_Position = vec4(p.xy, 0.0, 1.0);
+        \\    gl_Position = transform * vec4(position, 1.0);
         \\}
     ,
         \\uniform vec3 color;
@@ -140,123 +134,94 @@ fn initGL() void {
     c.glUseProgram(default_shader);
     transform_loc = c.glGetUniformLocation(default_shader, "transform");
     color_loc = c.glGetUniformLocation(default_shader, "color");
-
-    const rect_data = [_]f32{
-        -1.0, -1.0,
-        1.0,  -1.0,
-        1.0,  1.0,
-        -1.0, 1.0,
-    };
-    c.glGenBuffers(1, &sprite_vertex_buffer);
-    c.glBindBuffer(c.GL_ARRAY_BUFFER, sprite_vertex_buffer);
-    c.glBufferData(c.GL_ARRAY_BUFFER, 4 * vertex_buffer.len * @sizeOf(f32), null, c.GL_DYNAMIC_DRAW);
-    c.glGenBuffers(1, &rect_vertex_buffer);
-    c.glBindBuffer(c.GL_ARRAY_BUFFER, rect_vertex_buffer);
-    c.glBufferData(c.GL_ARRAY_BUFFER, rect_data.len * @sizeOf(f32), &rect_data[0], c.GL_STATIC_DRAW);
 }
 
-const draw_detail = 16;
-var vertex_buffer: [4 * (draw_detail + 1)]f32 = undefined;
+// fn drawGame(alpha: f32) void {
+//     var width: c_int = undefined;
+//     var height: c_int = undefined;
+//     c.SDL_GL_GetDrawableSize(sdl_window, &width, &height);
+//     c.glViewport(0, 0, width, height);
+//     c.glClearColor(1.0, 1.0, 1.0, 1.0);
+//     c.glClear(c.GL_COLOR_BUFFER_BIT);
 
-fn drawGame(alpha: f32) void {
-    var width: c_int = undefined;
-    var height: c_int = undefined;
-    c.SDL_GL_GetDrawableSize(sdl_window, &width, &height);
-    c.glViewport(0, 0, width, height);
-    c.glClearColor(1.0, 1.0, 1.0, 1.0);
-    c.glClear(c.GL_COLOR_BUFFER_BIT);
+//     // background
+//     c.glBindBuffer(c.GL_ARRAY_BUFFER, rect_vertex_buffer);
 
-    var scale: [9]f32 = undefined;
+//     var transform = zmath.identity();
+//     c.glEnableVertexAttribArray(0); // position
+//     c.glVertexAttribPointer(0, 2, c.GL_FLOAT, c.GL_FALSE, 2 * @sizeOf(f32), null);
+//     c.glUniformMatrix3fv(transform_loc, 1, c.GL_FALSE, &transform[0]);
+//     c.glUniform3f(color_loc, 0.3, 0.3, 0.5);
+//     c.glDrawArrays(c.GL_QUADS, 0, 4);
 
-    const N = Game.width * Game.height;
-    const a0: f32 = @as(f32, @floatFromInt(width)) / @as(f32, @floatFromInt(height));
-    const a1: f32 = @as(f32, Game.width) / @as(f32, Game.height);
-    var sx: f32 = 1.0;
-    var sy: f32 = 1.0;
-    if (a0 > a1) {
-        sx = a1 / a0;
-    } else {
-        sy = a0 / a1;
-    }
+//     // sprite types
+//     c.glBindBuffer(c.GL_ARRAY_BUFFER, sprite_vertex_buffer);
+//     c.glEnableVertexAttribArray(0); // position
+//     c.glVertexAttribPointer(0, 2, c.GL_FLOAT, c.GL_FALSE, 2 * @sizeOf(f32), null);
+//     for ([_]usize{ 0, 1, 2, 3 }) |s| {
+//         var i: usize = 0;
+//         while (i <= draw_detail) : (i += 1) {
+//             const angle = @as(f32, @floatFromInt(i)) / draw_detail * std.math.pi;
+//             vertex_buffer[2 * i + 0] = @cos(angle);
+//             vertex_buffer[2 * i + 1] = @sin(angle);
+//             vertex_buffer[2 * (draw_detail + 1 + i) + 0] = -@cos(angle);
+//             vertex_buffer[2 * (draw_detail + 1 + i) + 1] = -@sin(angle) - 2;
+//             if (s == 1) { // head
+//                 vertex_buffer[2 * i + 1] += 2 * alpha - 2;
+//             } else if (s == 2) { // tail
+//                 vertex_buffer[2 * (draw_detail + 1 + i) + 1] += if (game.snake.eaten) 2 else 2 * alpha;
+//             } else if (s == 3) { // food
+//                 vertex_buffer[2 * (draw_detail + 1 + i) + 1] += 2;
+//             }
+//         }
+//         c.glBufferSubData(c.GL_ARRAY_BUFFER, @intCast(s * vertex_buffer.len * @sizeOf(f32)), vertex_buffer.len * @sizeOf(f32), &vertex_buffer[0]);
+//     }
+//     const n = 2 * (draw_detail + 1);
 
-    // background
-    c.glBindBuffer(c.GL_ARRAY_BUFFER, rect_vertex_buffer);
-    c.glEnableVertexAttribArray(0); // position
-    c.glVertexAttribPointer(0, 2, c.GL_FLOAT, c.GL_FALSE, 2 * @sizeOf(f32), null);
-    scale = scaleM3(sx, sy);
-    c.glUniformMatrix3fv(transform_loc, 1, c.GL_FALSE, &scale[0]);
-    c.glUniform3f(color_loc, 0.3, 0.3, 0.5);
-    c.glDrawArrays(c.GL_LINE_LOOP, 0, 4);
+//     // snake
+//     c.glUniform3f(color_loc, 0.3, 0.7, 0.1);
+//     const snake = &game.snake;
+//     var it = snake.iter();
+//     while (it.next()) |s| {
+//         const i = (it.i + N - 1) % N;
+//         const stype: i32 = if (i == snake.tail) 2 else if (i == snake.head) 1 else 0;
+//         const x: f32 = @floatFromInt(s.x);
+//         const y: f32 = @floatFromInt(s.y);
+//         const translation = translateM3(2 * x - Game.width + 1, 2 * y - Game.height + 1);
+//         const rt: f32 = switch (s.dir) {
+//             .up => 0,
+//             .down => 2,
+//             .left => 1,
+//             .right => 3,
+//         };
+//         const rotation = rotateM3(rt / 2.0 * std.math.pi);
+//         const tmp = multiplyM3(translation, scale);
+//         const transform = multiplyM3(rotation, tmp);
+//         c.glUniformMatrix3fv(transform_loc, 1, c.GL_FALSE, &transform[0]);
 
-    // sprite types
-    c.glBindBuffer(c.GL_ARRAY_BUFFER, sprite_vertex_buffer);
-    c.glEnableVertexAttribArray(0); // position
-    c.glVertexAttribPointer(0, 2, c.GL_FLOAT, c.GL_FALSE, 2 * @sizeOf(f32), null);
-    for ([_]usize{ 0, 1, 2, 3 }) |s| {
-        var i: usize = 0;
-        while (i <= draw_detail) : (i += 1) {
-            const angle = @as(f32, @floatFromInt(i)) / draw_detail * std.math.pi;
-            vertex_buffer[2 * i + 0] = @cos(angle);
-            vertex_buffer[2 * i + 1] = @sin(angle);
-            vertex_buffer[2 * (draw_detail + 1 + i) + 0] = -@cos(angle);
-            vertex_buffer[2 * (draw_detail + 1 + i) + 1] = -@sin(angle) - 2;
-            if (s == 1) { // head
-                vertex_buffer[2 * i + 1] += 2 * alpha - 2;
-            } else if (s == 2) { // tail
-                vertex_buffer[2 * (draw_detail + 1 + i) + 1] += if (game.snake.eaten) 2 else 2 * alpha;
-            } else if (s == 3) { // food
-                vertex_buffer[2 * (draw_detail + 1 + i) + 1] += 2;
-            }
-        }
-        c.glBufferSubData(c.GL_ARRAY_BUFFER, @intCast(s * vertex_buffer.len * @sizeOf(f32)), vertex_buffer.len * @sizeOf(f32), &vertex_buffer[0]);
-    }
-    const n = 2 * (draw_detail + 1);
+//         c.glDrawArrays(c.GL_TRIANGLE_FAN, stype * n, n);
+//     }
 
-    // snake
-    scale = scaleM3(sx / Game.width, sy / Game.height);
-    c.glUniform3f(color_loc, 0.3, 0.7, 0.1);
-    const snake = &game.snake;
-    var it = snake.iter();
-    while (it.next()) |s| {
-        const i = (it.i + N - 1) % N;
-        const stype: i32 = if (i == snake.tail) 2 else if (i == snake.head) 1 else 0;
-        const x: f32 = @floatFromInt(s.x);
-        const y: f32 = @floatFromInt(s.y);
-        const translation = translateM3(2 * x - Game.width + 1, 2 * y - Game.height + 1);
-        const rt: f32 = switch (s.dir) {
-            .up => 0,
-            .down => 2,
-            .left => 1,
-            .right => 3,
-        };
-        const rotation = rotateM3(rt / 2.0 * std.math.pi);
-        const tmp = multiplyM3(translation, scale);
-        const transform = multiplyM3(rotation, tmp);
-        c.glUniformMatrix3fv(transform_loc, 1, c.GL_FALSE, &transform[0]);
+//     // food
+//     if (!game.gameover) {
+//         c.glUniform3f(color_loc, 1.0, 0.2, 0.0);
+//         const x: f32 = @floatFromInt(game.food_x);
+//         const y: f32 = @floatFromInt(game.food_y);
+//         const translation = translateM3(2 * x - Game.width + 1, 2 * y - Game.height + 1);
+//         var transform = multiplyM3(translation, scale);
+//         c.glUniformMatrix3fv(transform_loc, 1, c.GL_FALSE, &transform[0]);
+//         c.glDrawArrays(c.GL_TRIANGLE_FAN, 3 * n, n);
+//     }
 
-        c.glDrawArrays(c.GL_TRIANGLE_FAN, stype * n, n);
-    }
-
-    // food
-    if (!game.gameover) {
-        c.glUniform3f(color_loc, 1.0, 0.2, 0.0);
-        const x: f32 = @floatFromInt(game.food_x);
-        const y: f32 = @floatFromInt(game.food_y);
-        const translation = translateM3(2 * x - Game.width + 1, 2 * y - Game.height + 1);
-        var transform = multiplyM3(translation, scale);
-        c.glUniformMatrix3fv(transform_loc, 1, c.GL_FALSE, &transform[0]);
-        c.glDrawArrays(c.GL_TRIANGLE_FAN, 3 * n, n);
-    }
-
-    c.SDL_GL_SwapWindow(sdl_window);
-}
+//     c.SDL_GL_SwapWindow(sdl_window);
+// }
 
 fn sdlEventWatch(userdata: ?*anyopaque, sdl_event: [*c]c.SDL_Event) callconv(.C) c_int {
     _ = userdata;
     if (sdl_event.*.type == c.SDL_WINDOWEVENT and
         sdl_event.*.window.event == c.SDL_WINDOWEVENT_RESIZED)
     {
-        drawGame(1.0); // draw while resizing
+        // drawGame(1.0); // draw while resizing
         return 0; // handled
     }
     return 1;
@@ -265,6 +230,7 @@ fn sdlEventWatch(userdata: ?*anyopaque, sdl_event: [*c]c.SDL_Event) callconv(.C)
 const subdiv = @import("subdiv");
 
 pub fn main() !void {
+    std.debug.print("Press ESC to quit\n", .{});
     const allocator = std.heap.page_allocator;
     var points = [_]subdiv.Point{
         subdiv.Point{ -1.0, 1.0, 1.0, 1.0 },
@@ -330,11 +296,36 @@ pub fn main() !void {
 
     initGL();
 
-    game.reset();
-    game.gameover = true;
-    var last_ticks = c.SDL_GetTicks();
+    var arena = std.heap.ArenaAllocator.init(allocator);
+    defer arena.deinit();
+
+    const mesh = mesh: {
+
+        // Load seperately a json file with the polygon data, should be called *.gltf.json
+        const polygonJSON = json: {
+            const content_dir = @import("build_options").content_dir;
+            const json_data = std.fs.cwd().readFileAlloc(arena.allocator(), content_dir ++ "cat.blend.json", 512 * 1024 * 1024) catch |err| {
+                std.log.err("Failed to read JSON file: {}", .{err});
+                return err;
+            };
+            const Config = []const struct {
+                name: []const u8,
+                polygons: []const subdiv.Face,
+                vertices: []const subdiv.Point,
+                shapeKeys: []struct { name: []const u8, vertices: []const subdiv.Point },
+            };
+            break :json std.json.parseFromSlice(Config, arena.allocator(), json_data, .{}) catch |err| {
+                std.log.err("Failed to parse JSON: {}", .{err});
+                return err;
+            };
+        };
+        _ = polygonJSON;
+        break :mesh;
+    };
+    _ = mesh;
 
     var quit = false;
+    std.debug.print("Press ESC to quit\n", .{});
     while (!quit) {
         var event: c.SDL_Event = undefined;
         while (c.SDL_PollEvent(&event) != 0) {
@@ -343,32 +334,18 @@ pub fn main() !void {
                 c.SDL_KEYDOWN => {
                     if (event.key.keysym.sym == c.SDLK_ESCAPE) quit = true;
                     switch (event.key.keysym.sym) {
-                        c.SDLK_UP => game.addNextInput(.up),
-                        c.SDLK_DOWN => game.addNextInput(.down),
-                        c.SDLK_RIGHT => game.addNextInput(.right),
-                        c.SDLK_LEFT => game.addNextInput(.left),
+                        // c.SDLK_UP => game.addNextInput(.up),
+                        // c.SDLK_DOWN => game.addNextInput(.down),
+                        // c.SDLK_RIGHT => game.addNextInput(.right),
+                        // c.SDLK_LEFT => game.addNextInput(.left),
                         else => {},
-                    }
-                    if (c.SDL_GetTicks() - last_ticks > 500 and game.gameover) {
-                        game.reset();
-                        last_ticks = c.SDL_GetTicks();
-                        game.tick();
                     }
                 },
                 else => {},
             }
         }
-
-        var alpha: f32 = 1.0;
-        if (!game.gameover) {
-            const ticks = c.SDL_GetTicks();
-            while (ticks >= last_ticks + 120) {
-                game.tick();
-                last_ticks += 120;
-            }
-            alpha = @as(f32, @floatFromInt(ticks - last_ticks)) / 120.0;
-        }
-        if (game.gameover) alpha = 1.0;
-        drawGame(alpha);
+        std.debug.print("Game loop\n", .{});
+        // if (game.gameover) alpha = 1.0;
+        // drawGame(alpha);
     }
 }

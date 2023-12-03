@@ -90,7 +90,7 @@ pub fn build(
         },
     }));
 
-    const export_meshes = ExportMeshes.create(b, &.{ "boss", "cube" });
+    const export_meshes = ExportMeshes.create(b, &.{ "boss", "cube", "cat" });
 
     const exe_options = b.addOptions();
     exe.addOptions("build_options", exe_options);
