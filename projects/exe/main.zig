@@ -530,7 +530,18 @@ pub fn main() !void {
 
     zgui.getStyle().scaleAllSizes(scale_factor);
 
+    // There's a socket 12345 where blender is sending view data over. We should start a socket server and listen to it.
+    // Then we should update the view matrix based on the data we get from the socket.
+
+    // Create a TCP listener on port 12345
+    const stream = try std.net.tcpConnectToHost(allocator, "127.0.0.1", 12348);
+
     while (!window.shouldClose() and window.getKey(.escape) != .press) {
+        const bytes = try stream.reader().readAllAlloc(allocator, 8192);
+        if (bytes.len > 0) {
+            std.debug.print("Got {} bytes\n", .{bytes.len});
+        }
+
         zglfw.pollEvents();
         update(&demo);
         draw(&demo);
