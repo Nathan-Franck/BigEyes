@@ -541,7 +541,6 @@ pub fn main() !void {
         rotation: [3]f32,
         translation: [3]f32,
     };
-    _ = ViewUpdate;
 
     while (!window.shouldClose() and window.getKey(.escape) != .press) {
 
@@ -551,12 +550,14 @@ pub fn main() !void {
         // const view_update = try std.json.parseFromTokenSource(ViewUpdate, allocator, &token_stream, .{});
         // std.debug.print("Got view update: {?}\n", .{view_update});
 
-        const json_data = socket.reader().readUntilDelimiterOrEofAlloc(allocator, '\n', 4096) catch |err| {
+        const chunk = socket.reader().readUntilDelimiterOrEofAlloc(allocator, '\n', 4096) catch |err| {
             std.debug.print("Failed to read JSON file: {any}", .{err});
             return err;
         };
-        if (json_data) |result| {
-            std.debug.print("Got JSON: {s}\n", .{result});
+        if (chunk) |json_data| {
+            std.debug.print("Got JSON: {s}\n", .{json_data});
+            const view_update = try std.json.parseFromSlice(ViewUpdate, allocator, json_data, .{});
+            std.debug.print("Got view update: {?}\n", .{view_update});
         }
 
         zglfw.pollEvents();
