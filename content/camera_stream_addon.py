@@ -6,6 +6,7 @@ bl_info = {
 
 import bpy
 import socket
+import json
 
 server = None
 clients = []
@@ -42,10 +43,16 @@ def send_view():
     # Check if camera coordinates have changed
     if view_data != previous_camera_coordinates:
         # Convert the dictionary to a string and send it over the socket
-        data_str = str(view_data)
+        # data_str = str(view_data)
+        # send as json
+        data_str = json.dumps(view_data)
         for client in clients:
-            print(f"Sending view data to {client}")
-            client.sendall(data_str.encode('utf-8'))
+            try:
+                print(f"Sending view data to {client}")
+                client.sendall(data_str.encode('utf-8'))
+                client.sendall(b'\n')
+            except socket.error:
+                pass
 
         # Update the previous camera coordinates
         previous_camera_coordinates = view_data

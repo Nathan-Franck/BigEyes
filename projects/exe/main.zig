@@ -534,12 +534,29 @@ pub fn main() !void {
     // Then we should update the view matrix based on the data we get from the socket.
 
     // Create a TCP listener on port 12345
-    const stream = try std.net.tcpConnectToHost(allocator, "127.0.0.1", 12348);
+    const socket = try std.net.tcpConnectToHost(allocator, "127.0.0.1", 12348);
+
+    // Define a struct for the expected JSON object
+    const ViewUpdate = struct {
+        rotation: [3]f32,
+        translation: [3]f32,
+    };
+    _ = ViewUpdate;
 
     while (!window.shouldClose() and window.getKey(.escape) != .press) {
-        const bytes = try stream.reader().readAllAlloc(allocator, 8192);
-        if (bytes.len > 0) {
-            std.debug.print("Got {} bytes\n", .{bytes.len});
+
+        // // Create a TokenStream from the socket
+        // var token_stream = std.json.Reader(256, std.net.Stream.Reader).init(allocator, socket.reader());
+        // // Parse the JSON object from the token stream
+        // const view_update = try std.json.parseFromTokenSource(ViewUpdate, allocator, &token_stream, .{});
+        // std.debug.print("Got view update: {?}\n", .{view_update});
+
+        const json_data = socket.reader().readUntilDelimiterOrEofAlloc(allocator, '\n', 4096) catch |err| {
+            std.debug.print("Failed to read JSON file: {any}", .{err});
+            return err;
+        };
+        if (json_data) |result| {
+            std.debug.print("Got JSON: {s}\n", .{result});
         }
 
         zglfw.pollEvents();
