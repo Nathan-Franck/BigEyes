@@ -479,6 +479,30 @@ fn createDepthTexture(gctx: *zgpu.GraphicsContext) struct {
     return .{ .texture = texture, .view = view };
 }
 
+pub fn clientJob(allocator: std.mem.Allocator) !void {
+
+    // Create a TCP listener on port 12345
+    const socket = try std.net.tcpConnectToHost(allocator, "127.0.0.1", 12348);
+
+    // Define a struct for the expected JSON object
+    const ViewUpdate = struct {
+        rotation: [3]f32,
+        translation: [3]f32,
+    };
+
+    while (true) {
+        const chunk = socket.reader().readUntilDelimiterOrEofAlloc(allocator, '\n', 4096) catch |err| {
+            std.debug.print("Failed to read JSON file: {any}", .{err});
+            return err;
+        };
+        if (chunk) |json_data| {
+            std.debug.print("Got JSON: {s}\n", .{json_data});
+            const view_update = try std.json.parseFromSlice(ViewUpdate, allocator, json_data, .{});
+            std.debug.print("Got view update: {?}\n", .{view_update});
+        }
+    }
+}
+
 pub fn main() !void {
     zglfw.init() catch {
         std.log.err("Failed to initialize GLFW library.", .{});
@@ -530,36 +554,16 @@ pub fn main() !void {
 
     zgui.getStyle().scaleAllSizes(scale_factor);
 
+    const client = try std.Thread.spawn(.{
+        .allocator = allocator,
+        .stack_size = 4096 * 1024,
+    }, clientJob, .{allocator});
+    _ = client;
+
     // There's a socket 12345 where blender is sending view data over. We should start a socket server and listen to it.
     // Then we should update the view matrix based on the data we get from the socket.
 
-    // Create a TCP listener on port 12345
-    const socket = try std.net.tcpConnectToHost(allocator, "127.0.0.1", 12348);
-
-    // Define a struct for the expected JSON object
-    const ViewUpdate = struct {
-        rotation: [3]f32,
-        translation: [3]f32,
-    };
-
     while (!window.shouldClose() and window.getKey(.escape) != .press) {
-
-        // // Create a TokenStream from the socket
-        // var token_stream = std.json.Reader(256, std.net.Stream.Reader).init(allocator, socket.reader());
-        // // Parse the JSON object from the token stream
-        // const view_update = try std.json.parseFromTokenSource(ViewUpdate, allocator, &token_stream, .{});
-        // std.debug.print("Got view update: {?}\n", .{view_update});
-
-        const chunk = socket.reader().readUntilDelimiterOrEofAlloc(allocator, '\n', 4096) catch |err| {
-            std.debug.print("Failed to read JSON file: {any}", .{err});
-            return err;
-        };
-        if (chunk) |json_data| {
-            std.debug.print("Got JSON: {s}\n", .{json_data});
-            const view_update = try std.json.parseFromSlice(ViewUpdate, allocator, json_data, .{});
-            std.debug.print("Got view update: {?}\n", .{view_update});
-        }
-
         zglfw.pollEvents();
         update(&demo);
         draw(&demo);
