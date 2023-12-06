@@ -343,12 +343,10 @@ fn draw(demo: *DemoState) void {
     const fb_width = gctx.swapchain_descriptor.width;
     const fb_height = gctx.swapchain_descriptor.height;
     const t = @as(f32, @floatCast(gctx.stats.time));
+    _ = t;
 
-    const cam_world_to_view = zm.lookAtLh(
-        zm.f32x4(3.0, 3.0, -3.0, 1.0),
-        zm.f32x4(0.0, 0.0, 0.0, 1.0),
-        zm.f32x4(0.0, 1.0, 0.0, 0.0),
-    );
+    const cam_world_to_view = zm.mul(zm.translationV(zm.loadArr3(blender_view.translation)), zm.matFromRollPitchYawV(zm.loadArr3(blender_view.rotation)));
+    std.debug.print("cam_world_to_view: {any}\n", .{cam_world_to_view});
     const cam_view_to_clip = zm.perspectiveFovLh(
         0.25 * math.pi,
         @as(f32, @floatFromInt(fb_width)) / @as(f32, @floatFromInt(fb_height)),
@@ -398,21 +396,9 @@ fn draw(demo: *DemoState) void {
 
             pass.setPipeline(pipeline);
 
-            // Draw triangle 1.
+            // Draw model.
             {
-                const object_to_world = zm.mul(zm.rotationY(t), zm.translation(-1.0, 0.0, 0.0));
-                const object_to_clip = zm.mul(object_to_world, cam_world_to_clip);
-
-                const mem = gctx.uniformsAllocate(zm.Mat, 1);
-                mem.slice[0] = zm.transpose(object_to_clip);
-
-                pass.setBindGroup(0, bind_group, &.{mem.offset});
-                pass.drawIndexed(demo.vert_count, 1, 0, 0, 0);
-            }
-
-            // Draw triangle 2.
-            {
-                const object_to_world = zm.mul(zm.rotationY(0.75 * t), zm.translation(1.0, 0.0, 0.0));
+                const object_to_world = zm.translation(0.0, 0.0, 0.0);
                 const object_to_clip = zm.mul(object_to_world, cam_world_to_clip);
 
                 const mem = gctx.uniformsAllocate(zm.Mat, 1);
@@ -479,16 +465,20 @@ fn createDepthTexture(gctx: *zgpu.GraphicsContext) struct {
     return .{ .texture = texture, .view = view };
 }
 
+// Define a struct for the expected JSON object
+const ViewUpdate = struct {
+    rotation: [3]f32,
+    translation: [3]f32,
+};
+
+// Some game state.
+
+var blender_view = ViewUpdate{ .rotation = .{ 0.0, 0.0, 0.0 }, .translation = .{ 0.0, 0.0, 0.0 } };
+
 pub fn clientJob(allocator: std.mem.Allocator) !void {
 
     // Create a TCP listener on port 12345
     const socket = try std.net.tcpConnectToHost(allocator, "127.0.0.1", 12348);
-
-    // Define a struct for the expected JSON object
-    const ViewUpdate = struct {
-        rotation: [3]f32,
-        translation: [3]f32,
-    };
 
     while (true) {
         const chunk = socket.reader().readUntilDelimiterOrEofAlloc(allocator, '\n', 4096) catch |err| {
@@ -496,9 +486,8 @@ pub fn clientJob(allocator: std.mem.Allocator) !void {
             return err;
         };
         if (chunk) |json_data| {
-            std.debug.print("Got JSON: {s}\n", .{json_data});
-            const view_update = try std.json.parseFromSlice(ViewUpdate, allocator, json_data, .{});
-            std.debug.print("Got view update: {?}\n", .{view_update});
+            blender_view = (try std.json.parseFromSlice(ViewUpdate, allocator, json_data, .{})).value;
+            std.debug.print("Got view update: {any}\n", .{blender_view});
         }
     }
 }
