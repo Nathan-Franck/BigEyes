@@ -69,7 +69,7 @@ for object in bpy.data.objects:
                 polygonRes.append(index)
             polygons.append(polygonRes)
         for vertex in mesh.vertices:
-            vertices.append([vertex.co.x, vertex.co.y, vertex.co.z, 1])
+            vertices.append([vertex.co.x, vertex.co.y, -vertex.co.z, 1])
         # Extract armature weighting
         vertexGroups = {}
         for vertexGroup in object.vertex_groups:
@@ -86,7 +86,7 @@ for object in bpy.data.objects:
                 shapeVerts = shapeKey.data.values()
                 verts = []
                 for vert in shapeVerts:
-                    verts.append([vert.co.x, vert.co.y, vert.co.z, 1])
+                    verts.append([vert.co.x, vert.co.y, -vert.co.z, 1])
                 shapeKeys.append({"name": shapeKey.name, "vertices": verts})
         meshes.append(
             {

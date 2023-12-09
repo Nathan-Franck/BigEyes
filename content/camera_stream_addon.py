@@ -36,7 +36,7 @@ def send_view():
         euler_rotation = rotation.to_euler()
         # Create a dictionary with view information
         view_data = {
-            "rotation": (euler_rotation.x, euler_rotation.y, euler_rotation.z),
+            "rotation": (-euler_rotation.x, -euler_rotation.y, -euler_rotation.z),
             "translation": (translation.x, translation.y, translation.z),
         }
 
