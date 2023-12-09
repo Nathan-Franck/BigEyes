@@ -7,6 +7,7 @@ bl_info = {
 import bpy
 import socket
 import json
+import threading
 
 server = None
 clients = []
@@ -17,7 +18,6 @@ previous_camera_coordinates = None
 
 # Function to send view information over the socket
 def send_view():
-    print("Sending view data")
     global previous_camera_coordinates
 
     view_matrix = None
@@ -42,6 +42,7 @@ def send_view():
 
     # Check if camera coordinates have changed
     if view_data != previous_camera_coordinates:
+        print("Sending view data...")
         # Convert the dictionary to a string and send it over the socket
         # data_str = str(view_data)
         # send as json
@@ -74,9 +75,19 @@ def accept_connection():
         pass
     return 0.1
 
+def try_register():
+    try:
+        bpy.app.timers.register(send_view, first_interval=0.01666)
+        bpy.app.timers.register(accept_connection, first_interval=0.1)
+        print("Camera stream addon has been registered")
+    except:
+        print("Failed to register timers, retrying...")
+        threading.Timer(1, try_register).start()
+
 
 # Register and unregister functions
 def register():
+    print("Registering camera stream addon")
     # Create a server socket
     global server
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -89,8 +100,7 @@ def register():
 
     server.setblocking(0)
 
-    bpy.app.timers.register(send_view, first_interval=0.01666)
-    bpy.app.timers.register(accept_connection, first_interval=0.1)
+    threading.Timer(1, try_register).start()
 
 
 def unregister():
