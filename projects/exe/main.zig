@@ -346,7 +346,6 @@ fn draw(demo: *DemoState) void {
     _ = t;
 
     const cam_world_to_view = zm.mul(zm.translationV(zm.loadArr3(blender_view.translation)), zm.matFromRollPitchYawV(zm.loadArr3(blender_view.rotation)));
-    std.debug.print("cam_world_to_view: {any}\n", .{cam_world_to_view});
     const cam_view_to_clip = zm.perspectiveFovLh(
         0.25 * math.pi,
         @as(f32, @floatFromInt(fb_width)) / @as(f32, @floatFromInt(fb_height)),
@@ -398,7 +397,7 @@ fn draw(demo: *DemoState) void {
 
             // Draw model.
             {
-                const object_to_world = zm.translation(0.0, 0.0, 0.0);
+                const object_to_world = zm.identity(); //zm.mul(zm.rotationY(0.75 * 0), zm.translation(1.0, 0.0, 0.0));
                 const object_to_clip = zm.mul(object_to_world, cam_world_to_clip);
 
                 const mem = gctx.uniformsAllocate(zm.Mat, 1);
@@ -473,28 +472,52 @@ const ViewUpdate = struct {
 
 // Some game state.
 
-var blender_view = ViewUpdate{ .rotation = .{ 0.0, 0.0, 0.0 }, .translation = .{ 0.0, 0.0, 0.0 } };
+var running = true;
+var blender_view = ViewUpdate{ .rotation = .{ 0.0, 0.0, 0.0 }, .translation = .{ 0.0, 0.0, -1.0 } };
 
 pub fn clientJob(allocator: std.mem.Allocator) !void {
-
-    // Create a TCP listener on port 12345
-    const socket = try std.net.tcpConnectToHost(allocator, "127.0.0.1", 12348);
-
-    while (true) {
-        const chunk = socket.reader().readUntilDelimiterOrEofAlloc(allocator, '\n', 4096) catch |err| {
-            std.debug.print("Failed to read JSON file: {any}", .{err});
-            return err;
+    const connection_polling_rate = 2;
+    while (running) {
+        const socket = std.net.tcpConnectToHost(allocator, "127.0.0.1", 12348) catch {
+            std.debug.print("Failed to connect to socket, retrying in {d} seconds\n", .{connection_polling_rate});
+            std.time.sleep(connection_polling_rate * std.time.ns_per_s);
+            continue;
         };
-        if (chunk) |json_data| {
-            blender_view = (try std.json.parseFromSlice(ViewUpdate, allocator, json_data, .{})).value;
-            std.debug.print("Got view update: {any}\n", .{blender_view});
+        defer socket.close();
+
+        std.debug.print("Connected to Blender session!\n", .{});
+
+        const log_accum_amount = 60;
+
+        var current_accum: u32 = 0;
+
+        session: while (running) {
+            const chunk = socket.reader().readUntilDelimiterOrEofAlloc(allocator, '\n', 4096) catch |err| {
+                std.debug.print("Failed to read JSON file: {any}\n", .{err});
+                break :session;
+            };
+
+            if (chunk) |json_data| {
+                defer allocator.free(json_data);
+
+                const json_result = try std.json.parseFromSlice(ViewUpdate, allocator, json_data, .{});
+                defer json_result.deinit();
+
+                blender_view = json_result.value;
+
+                current_accum += 1;
+                if (current_accum >= log_accum_amount) {
+                    std.debug.print("Got view update: {any} (and {d} others)\n", .{ blender_view, current_accum - 1 });
+                    current_accum = 0;
+                }
+            }
         }
     }
 }
 
 pub fn main() !void {
     zglfw.init() catch {
-        std.log.err("Failed to initialize GLFW library.", .{});
+        std.log.err("Failed to initialize GLFW library.\n", .{});
         return;
     };
     defer zglfw.terminate();
@@ -507,7 +530,7 @@ pub fn main() !void {
     }
 
     const window = zglfw.Window.create(1600, 1000, window_title, null) catch {
-        std.log.err("Failed to create demo window.", .{});
+        std.log.err("Failed to create demo window.\n", .{});
         return;
     };
     defer window.destroy();
@@ -519,7 +542,7 @@ pub fn main() !void {
     const allocator = gpa.allocator();
 
     var demo = init(allocator, window) catch {
-        std.log.err("Failed to initialize the demo.", .{});
+        std.log.err("Failed to initialize the demo.\n", .{});
         return;
     };
     defer deinit(allocator, &demo);
@@ -548,6 +571,7 @@ pub fn main() !void {
         .stack_size = 4096 * 1024,
     }, clientJob, .{allocator});
     _ = client;
+    defer running = false;
 
     // There's a socket 12345 where blender is sending view data over. We should start a socket server and listen to it.
     // Then we should update the view matrix based on the data we get from the socket.

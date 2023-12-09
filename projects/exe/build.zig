@@ -109,23 +109,15 @@ pub fn build(
     if (exe.optimize == .ReleaseFast)
         exe.strip = true;
 
-    // exe.single_threaded = true;
-
-    // const install_lib_artifact = b.addInstallArtifact(zglfw_pkg.zglfw_c_cpp, .{});
-    // const move_lib = b.addInstallBinFile(.{ .path = "zig-out/lib/zglfw.dll" }, "zglfw.dll");
-    // move_lib.step.dependOn(&install_lib_artifact.step);
-    // exe.step.dependOn(&move_lib.step);
-
     const install_artifact = b.addInstallArtifact(exe, .{});
-    // const run_cmd = b.addRunArtifact(exe);
-    // run_cmd.step.dependOn(b.getInstallStep());
-    // if (b.args) |args| {
-    //     run_cmd.addArgs(args);
-    // }
-    // const run_step = b.step("run", "Run the app");
-    // run_step.dependOn(&run_cmd.step);
+    const run_cmd = b.addRunArtifact(exe);
+    run_cmd.step.dependOn(&install_artifact.step);
+    if (b.args) |args| {
+        run_cmd.addArgs(args);
+    }
+    run_cmd.step.dependOn(&install_artifact.step);
 
-    return &install_artifact.step;
+    return &run_cmd.step;
 }
 
 inline fn thisDir() []const u8 {
