@@ -345,7 +345,7 @@ fn draw(demo: *DemoState) void {
     const t = @as(f32, @floatCast(gctx.stats.time));
     _ = t;
 
-    const cam_world_to_view = zm.mul(zm.translationV(zm.loadArr3(blender_view.translation)), zm.matFromRollPitchYawV(zm.loadArr3(blender_view.rotation)));
+    const cam_world_to_view = zm.mul(zm.matFromRollPitchYawV(zm.loadArr3(blender_view.rotation)), zm.translationV(zm.loadArr3(blender_view.translation)));
     const cam_view_to_clip = zm.perspectiveFovLh(
         0.25 * math.pi,
         @as(f32, @floatFromInt(fb_width)) / @as(f32, @floatFromInt(fb_height)),

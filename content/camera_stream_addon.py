@@ -8,13 +8,12 @@ import bpy
 import socket
 import json
 import threading
+import mathutils
 
 server = None
 clients = []
 
-# Global variable to store the previous camera coordinates
 previous_camera_coordinates = None
-
 
 # Function to send view information over the socket
 def send_view():
@@ -24,25 +23,25 @@ def send_view():
     for area in bpy.context.screen.areas:
         if area.type == "VIEW_3D":
             rv3d = area.spaces[0].region_3d
-            view_matrix = rv3d.view_matrix
+            view_matrix = rv3d.view_matrix.copy()
             break
 
     # Extract rotation and translation information from the view matrix
     rotation = view_matrix.to_quaternion()
     translation = view_matrix.translation
 
-    # Convert rotation to euler angles
-    euler_rotation = rotation.to_euler()
-
-    # Create a dictionary with view information
-    view_data = {
-        "rotation": (euler_rotation.x, euler_rotation.y, euler_rotation.z),
-        "translation": (translation.x, translation.y, translation.z),
-    }
-
     # Check if camera coordinates have changed
-    if view_data != previous_camera_coordinates:
+    if view_matrix != previous_camera_coordinates:
+        # Convert rotation to euler angles
+        euler_rotation = rotation.to_euler()
+        # Create a dictionary with view information
+        view_data = {
+            "rotation": (euler_rotation.x, euler_rotation.y, euler_rotation.z),
+            "translation": (translation.x, translation.y, translation.z),
+        }
+
         print("Sending view data...")
+        print("Position: " + str(view_data["translation"]))
         # Convert the dictionary to a string and send it over the socket
         # data_str = str(view_data)
         # send as json
@@ -50,13 +49,13 @@ def send_view():
         for client in clients:
             try:
                 print(f"Sending view data to {client}")
-                client.sendall(data_str.encode('utf-8'))
-                client.sendall(b'\n')
+                client.sendall(data_str.encode("utf-8"))
+                client.sendall(b"\n")
             except socket.error:
                 pass
 
         # Update the previous camera coordinates
-        previous_camera_coordinates = view_data
+        previous_camera_coordinates = view_matrix
 
     return 0.01666
 
@@ -74,6 +73,7 @@ def accept_connection():
     except socket.error:
         pass
     return 0.1
+
 
 def try_register():
     try:

@@ -1,4 +1,5 @@
 import bpy
+import mathutils
 
 # get out of edit mode
 bpy.ops.object.mode_set(mode="OBJECT")
@@ -9,43 +10,45 @@ nodes = []
 armatures = []
 for object in bpy.data.objects:
     print("Exporting " + object.name + " " + object.type)
+    matrix = object.matrix_local
     nodes.append(
         {
             "name": object.name,
             "type": object.type,
             "parent": object.parent.name if object.parent != None else None,
-            "position": [object.location.x, object.location.y, object.location.z],
-            "rotation": [
-                object.rotation_euler.x,
-                object.rotation_euler.y,
-                object.rotation_euler.z,
+            "position": [
+                matrix.to_translation().x,
+                matrix.to_translation().y,
+                matrix.to_translation().z,
             ],
-            "scale": [object.scale.x, object.scale.y, object.scale.z],
+            "rotation": [matrix.to_euler().x, matrix.to_euler().y, matrix.to_euler().z],
+            "scale": [matrix.to_scale().x, matrix.to_scale().y, matrix.to_scale().z],
         }
     )
     if object.type == "ARMATURE":
         armature = object.data
         bones = []
         for bone in armature.bones:
+            matrix = bone.matrix_local
             bones.append(
                 {
                     "name": bone.name,
                     "parent": bone.parent.name if bone.parent != None else None,
                     "position": [
-                        bone.matrix_local.to_translation().x,
-                        bone.matrix_local.to_translation().y
+                        matrix.to_translation().x,
+                        matrix.to_translation().y
                         + (bone.parent.length if bone.parent != None else 0),
-                        bone.matrix_local.to_translation().z,
+                        matrix.to_translation().z,
                     ],
                     "rotation": [
-                        bone.matrix_local.to_euler().x,
-                        bone.matrix_local.to_euler().y,
-                        bone.matrix_local.to_euler().z,
+                        matrix.to_euler().x,
+                        matrix.to_euler().y,
+                        matrix.to_euler().z,
                     ],
                     "scale": [
-                        bone.matrix_local.to_scale().x,
-                        bone.matrix_local.to_scale().y,
-                        bone.matrix_local.to_scale().z,
+                        matrix.to_scale().x,
+                        matrix.to_scale().y,
+                        matrix.to_scale().z,
                     ],
                 }
             )

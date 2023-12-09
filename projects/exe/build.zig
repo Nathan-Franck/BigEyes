@@ -25,6 +25,8 @@ const ExportMeshes = struct {
 
         var b = step.owner;
 
+        var export_count: u32 = 0;
+
         for (self.files) |file| {
             const full_path = try std.fmt.allocPrint(self.allocator, "content/{s}.blend", .{file});
 
@@ -54,6 +56,10 @@ const ExportMeshes = struct {
             std.debug.print("stdout: {s}\n", .{res.stdout});
             const ns = timer.read();
             std.debug.print("Process took {d} ms\n", .{@as(f64, @floatFromInt(ns)) / 1_000_000});
+            export_count += 1;
+        }
+        if (export_count > 0) {
+            std.debug.print("Exported {d} meshes\n", .{export_count});
         }
     }
 };
@@ -102,7 +108,7 @@ pub fn build(
         .install_subdir = "bin/" ++ content_dir,
     });
     exe.step.dependOn(&install_content_step.step);
-    exe.step.dependOn(&export_meshes.step);
+    install_content_step.step.dependOn(&export_meshes.step);
 
     // Windows hax
     exe.want_lto = false;
