@@ -47,15 +47,20 @@ const Vertex = struct {
     normal: [3]f32,
 };
 
+const Model = struct {
+    label: []const u8,
+    vert_count: u32,
+    vertex_buffer: zgpu.BufferHandle,
+    index_buffer: zgpu.BufferHandle,
+};
+
 const DemoState = struct {
     gctx: *zgpu.GraphicsContext,
 
     pipeline: zgpu.RenderPipelineHandle,
     bind_group: zgpu.BindGroupHandle,
 
-    vert_count: u32,
-    vertex_buffer: zgpu.BufferHandle,
-    index_buffer: zgpu.BufferHandle,
+    models: std.ArrayList(Model),
 
     depth_texture: zgpu.TextureHandle,
     depth_texture_view: zgpu.TextureViewHandle,
@@ -129,7 +134,7 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !DemoState {
     var arena = std.heap.ArenaAllocator.init(allocator);
     defer arena.deinit();
 
-    const mesh = mesh: {
+    const meshes = meshes: {
 
         // Load seperately a json file with the polygon data, should be called *.gltf.json
         const polygonJSON = json: {
@@ -181,73 +186,27 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !DemoState {
             };
         };
 
-        // pack into subdiv mesh for processing
-        const first = polygonJSON.value.meshes[0];
-
-        const firstRoundSubd = subdiv.Subdiv(true);
-        const secondRoundSubd = subdiv.Subdiv(false);
-
-        // Start a timer
-        const first_results = first_results: {
-            var timer = try std.time.Timer.start();
-
-            const first_round = try firstRoundSubd.cmcSubdiv(arena.allocator(), first.vertices, first.polygons);
-            const second_round = try secondRoundSubd.cmcSubdiv(arena.allocator(), first_round.points, first_round.quads);
-            const third_round = try secondRoundSubd.cmcSubdiv(arena.allocator(), second_round.points, second_round.quads);
-
-            const ns = timer.read();
-
-            std.debug.print("Subdiv took {d} ms\n", .{@as(f64, @floatFromInt(ns)) / 1_000_000});
-            break :first_results [_]subdiv.Mesh{ first_round, second_round, third_round };
-        };
-
-        // Second round with only points calculations (have to reuse the face calcs from first pass)
-        const second_results = second_results: {
-            var timer = try std.time.Timer.start();
-
-            const first_round = try firstRoundSubd.cmcSubdivOnlyPoints(arena.allocator(), first.vertices, first.polygons);
-            const second_round = try secondRoundSubd.cmcSubdivOnlyPoints(arena.allocator(), first_round, first_results[0].quads);
-            const third_round = try secondRoundSubd.cmcSubdivOnlyPoints(arena.allocator(), second_round, first_results[1].quads);
-
-            const ns = timer.read();
-
-            std.debug.print("Second round took {d} ms\n", .{@as(f64, @floatFromInt(ns)) / 1_000_000});
-            break :second_results third_round;
-        };
-
-        // Start a timer
-        const third_results = third_results: {
-            var timer = try std.time.Timer.start();
-
-            const first_round = try firstRoundSubd.cmcSubdiv(arena.allocator(), first.vertices, first.polygons);
-            const second_round = try secondRoundSubd.cmcSubdiv(arena.allocator(), first_round.points, first_round.quads);
-            const third_round = try secondRoundSubd.cmcSubdiv(arena.allocator(), second_round.points, second_round.quads);
-
-            const ns = timer.read();
-
-            std.debug.print("Subdiv took {d} ms\n", .{@as(f64, @floatFromInt(ns)) / 1_000_000});
-            break :third_results [_]subdiv.Mesh{ first_round, second_round, third_round };
-        };
-        _ = third_results;
-
-        // Second round with only points calculations (have to reuse the face calcs from first pass)
-        const fourth_results = fourth_results: {
-            var timer = try std.time.Timer.start();
-
-            const first_round = try firstRoundSubd.cmcSubdivOnlyPoints(arena.allocator(), first.vertices, first.polygons);
-            const second_round = try secondRoundSubd.cmcSubdivOnlyPoints(arena.allocator(), first_round, first_results[0].quads);
-            const third_round = try secondRoundSubd.cmcSubdivOnlyPoints(arena.allocator(), second_round, first_results[1].quads);
-
-            const ns = timer.read();
-
-            std.debug.print("Second round took {d} ms\n", .{@as(f64, @floatFromInt(ns)) / 1_000_000});
-            break :fourth_results third_round;
-        };
-        _ = fourth_results;
-
-        std.debug.print("Got {} points and {} faces\n", .{ second_results.len, first_results[2].quads.len });
-
-        break :mesh subdiv.Mesh{ .points = second_results, .quads = first_results[2].quads };
+        var meshes = std.ArrayList(
+            struct {
+                label: []const u8,
+                points: []const subdiv.Point,
+                quads: []const [4]u32,
+            },
+        ).init(arena.allocator());
+        for (polygonJSON.value.meshes) |mesh| {
+            var result = try subdiv.Subdiv(true).cmcSubdiv(arena.allocator(), mesh.vertices, mesh.polygons);
+            var subdiv_count: u32 = 1;
+            while (subdiv_count < 3) {
+                result = try subdiv.Subdiv(false).cmcSubdiv(arena.allocator(), result.points, result.quads);
+                subdiv_count += 1;
+            }
+            try meshes.append(.{
+                .label = mesh.name,
+                .points = result.points,
+                .quads = result.quads,
+            });
+        }
+        break :meshes meshes;
     };
 
     const hexColors = [_][3]f32{
@@ -259,56 +218,66 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !DemoState {
         .{ 0.0, 1.0, 1.0 },
     };
 
-    var vertex_data = vertex_data: {
-        var vertex_data = std.ArrayList(Vertex).init(arena.allocator());
-        var vertexToQuad = std.AutoHashMap(u32, std.ArrayList(*const [4]u32)).init(arena.allocator());
-        for (mesh.quads) |*quad| {
-            for (quad) |vertex| {
-                var quadsList = if (vertexToQuad.get(vertex)) |existing| existing else std.ArrayList(*const [4]u32).init(arena.allocator());
-                try quadsList.append(quad);
-                try vertexToQuad.put(vertex, quadsList);
-            }
-        }
-        for (mesh.points, 0..) |point, i| {
-            const normal = if (vertexToQuad.get(@intCast(i))) |quads| normal: {
-                var normal = subdiv.Point{ 0, 0, 0, 0 };
-                for (quads.items) |quad| {
-                    const quad_normal = zm.cross3(mesh.points[quad[0]] - mesh.points[quad[2]], mesh.points[quad[1]] - mesh.points[quad[2]]);
-                    normal += zm.normalize3(quad_normal) / @as(@Vector(4, f32), @splat(@floatFromInt(quads.items.len)));
+    var models = std.ArrayList(Model).init(allocator);
+    for (meshes.items) |mesh| {
+        var vertex_data = vertex_data: {
+            var vertex_data = std.ArrayList(Vertex).init(arena.allocator());
+            var vertexToQuad = std.AutoHashMap(u32, std.ArrayList(*const [4]u32)).init(arena.allocator());
+            for (mesh.quads) |*quad| {
+                for (quad) |vertex| {
+                    var quadsList = if (vertexToQuad.get(vertex)) |existing| existing else std.ArrayList(*const [4]u32).init(arena.allocator());
+                    try quadsList.append(quad);
+                    try vertexToQuad.put(vertex, quadsList);
                 }
-                break :normal normal;
-            } else subdiv.Point{ 0, 0, 0, 0 };
-            try vertex_data.append(Vertex{ .position = @as([4]f32, point)[0..3].*, .color = hexColors[i % hexColors.len], .normal = @as([4]f32, normal)[0..3].* });
-        }
-        break :vertex_data vertex_data.items;
-    };
+            }
+            for (mesh.points, 0..) |point, i| {
+                const normal = if (vertexToQuad.get(@intCast(i))) |quads| normal: {
+                    var normal = subdiv.Point{ 0, 0, 0, 0 };
+                    for (quads.items) |quad| {
+                        const quad_normal = zm.cross3(mesh.points[quad[0]] - mesh.points[quad[2]], mesh.points[quad[1]] - mesh.points[quad[2]]);
+                        normal += zm.normalize3(quad_normal) / @as(@Vector(4, f32), @splat(@floatFromInt(quads.items.len)));
+                    }
+                    break :normal normal;
+                } else subdiv.Point{ 0, 0, 0, 0 };
+                try vertex_data.append(Vertex{ .position = @as([4]f32, point)[0..3].*, .color = hexColors[i % hexColors.len], .normal = @as([4]f32, normal)[0..3].* });
+            }
+            break :vertex_data vertex_data.items;
+        };
 
-    var index_data = index_data: {
-        var index_data = std.ArrayList(u32).init(arena.allocator());
-        for (mesh.quads) |face| {
-            try index_data.append(face[1]);
-            try index_data.append(face[2]);
-            try index_data.append(face[0]);
-            try index_data.append(face[2]);
-            try index_data.append(face[0]);
-            try index_data.append(face[3]);
-        }
-        break :index_data index_data.items;
-    };
+        var index_data = index_data: {
+            var index_data = std.ArrayList(u32).init(arena.allocator());
+            for (mesh.quads) |face| {
+                try index_data.append(face[1]);
+                try index_data.append(face[2]);
+                try index_data.append(face[0]);
+                try index_data.append(face[2]);
+                try index_data.append(face[0]);
+                try index_data.append(face[3]);
+            }
+            break :index_data index_data.items;
+        };
 
-    // Create a vertex buffer.
-    const vertex_buffer = gctx.createBuffer(.{
-        .usage = .{ .copy_dst = true, .vertex = true },
-        .size = vertex_data.len * @sizeOf(Vertex),
-    });
-    gctx.queue.writeBuffer(gctx.lookupResource(vertex_buffer).?, 0, Vertex, vertex_data[0..]);
+        // Create a vertex buffer.
+        const vertex_buffer = gctx.createBuffer(.{
+            .usage = .{ .copy_dst = true, .vertex = true },
+            .size = vertex_data.len * @sizeOf(Vertex),
+        });
+        gctx.queue.writeBuffer(gctx.lookupResource(vertex_buffer).?, 0, Vertex, vertex_data[0..]);
 
-    // Create an index buffer.
-    const index_buffer = gctx.createBuffer(.{
-        .usage = .{ .copy_dst = true, .index = true },
-        .size = index_data.len * @sizeOf(u32),
-    });
-    gctx.queue.writeBuffer(gctx.lookupResource(index_buffer).?, 0, u32, index_data[0..]);
+        // Create an index buffer.
+        const index_buffer = gctx.createBuffer(.{
+            .usage = .{ .copy_dst = true, .index = true },
+            .size = index_data.len * @sizeOf(u32),
+        });
+        gctx.queue.writeBuffer(gctx.lookupResource(index_buffer).?, 0, u32, index_data[0..]);
+
+        try models.append(.{
+            .label = try allocator.dupe(u8, mesh.label),
+            .vert_count = @intCast(index_data.len),
+            .vertex_buffer = vertex_buffer,
+            .index_buffer = index_buffer,
+        });
+    }
 
     // Create a depth texture and its 'view'.
     const depth = createDepthTexture(gctx);
@@ -317,9 +286,7 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !DemoState {
         .gctx = gctx,
         .pipeline = pipeline,
         .bind_group = bind_group,
-        .vert_count = if (false) 6 else @intCast(index_data.len),
-        .vertex_buffer = vertex_buffer,
-        .index_buffer = index_buffer,
+        .models = models,
         .depth_texture = depth.texture,
         .depth_texture_view = depth.view,
     };
@@ -327,6 +294,7 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !DemoState {
 
 fn deinit(allocator: std.mem.Allocator, demo: *DemoState) void {
     demo.gctx.destroy(allocator);
+    demo.models.deinit();
     demo.* = undefined;
 }
 
@@ -337,6 +305,11 @@ fn update(demo: *DemoState) void {
     );
     zgui.showDemoWindow(null);
 }
+
+const Instance = struct {
+    object_to_world: zm.Mat,
+    mesh: subdiv.Mesh,
+};
 
 fn draw(demo: *DemoState) void {
     const gctx = demo.gctx;
@@ -362,8 +335,6 @@ fn draw(demo: *DemoState) void {
         defer encoder.release();
 
         pass: {
-            const vb_info = gctx.lookupResourceInfo(demo.vertex_buffer) orelse break :pass;
-            const ib_info = gctx.lookupResourceInfo(demo.index_buffer) orelse break :pass;
             const pipeline = gctx.lookupResource(demo.pipeline) orelse break :pass;
             const bind_group = gctx.lookupResource(demo.bind_group) orelse break :pass;
             const depth_view = gctx.lookupResource(demo.depth_texture_view) orelse break :pass;
@@ -390,13 +361,17 @@ fn draw(demo: *DemoState) void {
                 pass.release();
             }
 
-            pass.setVertexBuffer(0, vb_info.gpuobj.?, 0, vb_info.size);
-            pass.setIndexBuffer(ib_info.gpuobj.?, .uint32, 0, ib_info.size);
-
             pass.setPipeline(pipeline);
 
-            // Draw model.
-            {
+            for (demo.models.items) |model| {
+                std.debug.print("Drawing model: {s}\n", .{model.label});
+
+                const vb_info = gctx.lookupResourceInfo(model.vertex_buffer) orelse break :pass;
+                const ib_info = gctx.lookupResourceInfo(model.index_buffer) orelse break :pass;
+                pass.setVertexBuffer(0, vb_info.gpuobj.?, 0, vb_info.size);
+                pass.setIndexBuffer(ib_info.gpuobj.?, .uint32, 0, ib_info.size);
+
+                // Draw model.
                 const object_to_world = zm.identity(); //zm.mul(zm.rotationY(0.75 * 0), zm.translation(1.0, 0.0, 0.0));
                 const object_to_clip = zm.mul(object_to_world, cam_world_to_clip);
 
@@ -404,7 +379,7 @@ fn draw(demo: *DemoState) void {
                 mem.slice[0] = zm.transpose(object_to_clip);
 
                 pass.setBindGroup(0, bind_group, &.{mem.offset});
-                pass.drawIndexed(demo.vert_count, 1, 0, 0, 0);
+                pass.drawIndexed(model.vert_count, 1, 0, 0, 0);
             }
         }
         {
