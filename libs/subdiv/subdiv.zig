@@ -18,10 +18,11 @@ const PointEx = struct {
     n: u32,
 };
 
-pub fn Subdiv(comptime first_pass: bool) type {
-    const FaceType = if (first_pass) Face else Quad;
+var subdiv = Subdiv(true);
 
+pub fn Subdiv(comptime first_pass: bool) type {
     return struct {
+        const FaceType = if (first_pass) Face else Quad;
         fn getFacePoints(allocator: std.mem.Allocator, inputPoints: []const Point, inputFaces: []const FaceType) ![]Point {
             var facePoints = try ArrayList(Point).initCapacity(allocator, inputFaces.len);
             for (inputFaces) |face| {

@@ -76,16 +76,16 @@ pub fn build(
         .optimize = optimize,
     });
 
-    const zgui_pkg = @import("../../libs/zig-gamedev/libs/zgui/build.zig").package(b, exe.target, exe.optimize, .{ .options = .{ .backend = .glfw_wgpu } });
-    const zmath_pkg = @import("../../libs/zig-gamedev/libs/zmath/build.zig").package(b, exe.target, exe.optimize, .{});
-    const zglfw_pkg = @import("../../libs/zig-gamedev/libs/zglfw/build.zig").package(b, exe.target, exe.optimize, .{ .options = .{ .shared = false } });
-    const zpool_pkg = @import("../../libs/zig-gamedev/libs/zpool/build.zig").package(b, exe.target, exe.optimize, .{});
-    const zgpu_pkg = @import("../../libs/zig-gamedev/libs/zgpu/build.zig").package(b, exe.target, exe.optimize, .{ .deps = .{ .zglfw = zglfw_pkg.zglfw, .zpool = zpool_pkg.zpool } });
-    const zmesh_pkg = @import("../../libs/zig-gamedev/libs/zmesh/build.zig").package(b, exe.target, exe.optimize, .{});
+    const zgui_pkg = @import("zgui").package(b, target, optimize, .{ .options = .{ .backend = .glfw_wgpu } });
+    const zmath_pkg = @import("zmath").package(b, target, optimize, .{});
+    const zglfw_pkg = @import("zglfw").package(b, target, optimize, .{ .options = .{ .shared = false } });
+    const zpool_pkg = @import("zpool").package(b, target, optimize, .{});
+    const zgpu_pkg = @import("zgpu").package(b, target, optimize, .{ .deps = .{ .zglfw = zglfw_pkg, .zpool = zpool_pkg } });
+    const zmesh_pkg = @import("zmesh").package(b, target, optimize, .{});
 
     zgui_pkg.link(exe);
-    zgpu_pkg.link(exe);
     zglfw_pkg.link(exe);
+    zgpu_pkg.link(exe);
     zmath_pkg.link(exe);
     zmesh_pkg.link(exe);
 

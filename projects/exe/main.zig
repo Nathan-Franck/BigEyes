@@ -134,7 +134,7 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !DemoState {
     var arena = std.heap.ArenaAllocator.init(allocator);
     defer arena.deinit();
 
-    const meshes = meshes: {
+    const meshes = myMeshes: {
 
         // Load seperately a json file with the polygon data, should be called *.gltf.json
         const polygonJSON = json: {
@@ -206,7 +206,7 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !DemoState {
                 .quads = result.quads,
             });
         }
-        break :meshes meshes;
+        break :myMeshes meshes;
     };
 
     const hexColors = [_][3]f32{
@@ -221,7 +221,6 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !DemoState {
     var models = std.ArrayList(Model).init(allocator);
     for (meshes.items) |mesh| {
         var vertex_data = vertex_data: {
-            var vertex_data = std.ArrayList(Vertex).init(arena.allocator());
             var vertexToQuad = std.AutoHashMap(u32, std.ArrayList(*const [4]u32)).init(arena.allocator());
             for (mesh.quads) |*quad| {
                 for (quad) |vertex| {
@@ -230,6 +229,7 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !DemoState {
                     try vertexToQuad.put(vertex, quadsList);
                 }
             }
+            var vertex_data = std.ArrayList(Vertex).init(arena.allocator());
             for (mesh.points, 0..) |point, i| {
                 const normal = if (vertexToQuad.get(@intCast(i))) |quads| normal: {
                     var normal = subdiv.Point{ 0, 0, 0, 0 };
