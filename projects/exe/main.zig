@@ -134,7 +134,7 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !DemoState {
     var arena = std.heap.ArenaAllocator.init(allocator);
     defer arena.deinit();
 
-    const meshes = myMeshes: {
+    const meshes = meshes: {
 
         // Load seperately a json file with the polygon data, should be called *.gltf.json
         const polygonJSON = json: {
@@ -206,7 +206,7 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !DemoState {
                 .quads = result.quads,
             });
         }
-        break :myMeshes meshes;
+        break :meshes meshes;
     };
 
     const hexColors = [_][3]f32{
@@ -317,6 +317,8 @@ fn draw(demo: *DemoState) void {
     const fb_height = gctx.swapchain_descriptor.height;
     const t = @as(f32, @floatCast(gctx.stats.time));
     _ = t;
+
+    std.debug.print("Blender view: {any}\n", .{blender_view});
 
     const cam_world_to_view = zm.mul(zm.matFromRollPitchYawV(zm.loadArr3(blender_view.rotation)), zm.translationV(zm.loadArr3(blender_view.translation)));
     const cam_view_to_clip = zm.perspectiveFovLh(
