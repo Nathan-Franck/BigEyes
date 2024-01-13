@@ -303,7 +303,12 @@ fn update(demo: *DemoState) void {
         demo.gctx.swapchain_descriptor.width,
         demo.gctx.swapchain_descriptor.height,
     );
-    zgui.showDemoWindow(null);
+    // zgui.showDemoWindow(null);
+    // Render a menu that shows the current position of the Blender camera
+    _ = zgui.begin("Camera", .{});
+    zgui.text("Rotation {d}, {d}, {d}", .{ blender_view.rotation[0], blender_view.rotation[1], blender_view.rotation[2] });
+    zgui.text("Translation {d}, {d}, {d}", .{ blender_view.translation[0], blender_view.translation[1], blender_view.translation[2] });
+    zgui.end();
 }
 
 const Instance = struct {
