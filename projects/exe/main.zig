@@ -298,23 +298,60 @@ fn deinit(allocator: std.mem.Allocator, demo: *DemoState) void {
     demo.* = undefined;
 }
 
-fn zguiInspect(state: anytype) void {
+fn zguiInspect(state: anytype, allocator: std.mem.Allocator) !void {
     _ = zgui.begin("State Inspector", .{});
     defer zgui.end();
 
+    var arena = std.heap.ArenaAllocator.init(allocator);
+    defer arena.deinit();
+
     // TODO: Filter box at the top (parameter name or contents)
+    try zguiInspectRecurse(state, arena.allocator());
+}
+
+fn zguiInspectRecurse(state: anytype, allocator: std.mem.Allocator) !void {
     inline for (@typeInfo(@TypeOf(state)).Struct.fields) |field| {
-        zgui.text("{s} ({any}) = {any}", .{ field.name, field.type, @field(blender_view, field.name) });
+        const value = @field(state, field.name);
+        switch (@typeInfo(field.type)) {
+            .Struct => {
+                var orig_list = std.ArrayList(u8).init(allocator);
+                try orig_list.appendSlice(field.name);
+                const sentinel_slice = try orig_list.toOwnedSliceSentinel(0);
+                if (zgui.collapsingHeader(sentinel_slice, .{})) {
+                    try zguiInspectRecurse(value, allocator);
+                }
+            },
+            .Enum => {
+                if (zgui.collapsingHeader(field.name, .{})) {
+                    zgui.text("{s}", .{field.name});
+                    zgui.indent();
+                    defer zgui.unindent();
+                    inline for (@typeInfo(@TypeOf(value)).Enum.fields) |enum_field| {
+                        const enum_value = @intFromEnum(value);
+                        if (enum_value == enum_field.value) {
+                            zgui.text("{s}", .{enum_field.name});
+                        }
+                    }
+                }
+            },
+            else => {
+                zguiInspectField(field, value);
+            },
+        }
     }
 }
 
-fn update(demo: *DemoState) void {
+fn zguiInspectField(field: anytype, value: anytype) void {
+    zgui.text("{s} ({any}) = {any}", .{ field.name, field.type, value });
+}
+
+fn update(demo: *DemoState, allocator: std.mem.Allocator) !void {
     zgui.backend.newFrame(
         demo.gctx.swapchain_descriptor.width,
         demo.gctx.swapchain_descriptor.height,
     );
     // zgui.showDemoWindow(null);
-    zguiInspect(blender_view);
+    try zguiInspect(.{ .blender_view = blender_view }, allocator);
 }
 
 const Instance = struct {
@@ -562,7 +599,7 @@ pub fn main() !void {
 
     while (!window.shouldClose() and window.getKey(.escape) != .press) {
         zglfw.pollEvents();
-        update(&demo);
+        try update(&demo, allocator);
         draw(&demo);
     }
 }
