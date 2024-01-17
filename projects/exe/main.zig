@@ -298,17 +298,23 @@ fn deinit(allocator: std.mem.Allocator, demo: *DemoState) void {
     demo.* = undefined;
 }
 
+fn zguiInspect(state: anytype) void {
+    _ = zgui.begin("State Inspector", .{});
+    defer zgui.end();
+
+    // TODO: Filter box at the top (parameter name or contents)
+    inline for (@typeInfo(@TypeOf(state)).Struct.fields) |field| {
+        zgui.text("{s} ({any}) = {any}", .{ field.name, field.type, @field(blender_view, field.name) });
+    }
+}
+
 fn update(demo: *DemoState) void {
     zgui.backend.newFrame(
         demo.gctx.swapchain_descriptor.width,
         demo.gctx.swapchain_descriptor.height,
     );
     // zgui.showDemoWindow(null);
-    // Render a menu that shows the current position of the Blender camera
-    _ = zgui.begin("Camera", .{});
-    zgui.text("Rotation {d}, {d}, {d}", .{ blender_view.rotation[0], blender_view.rotation[1], blender_view.rotation[2] });
-    zgui.text("Translation {d}, {d}, {d}", .{ blender_view.translation[0], blender_view.translation[1], blender_view.translation[2] });
-    zgui.end();
+    zguiInspect(blender_view);
 }
 
 const Instance = struct {
@@ -322,8 +328,6 @@ fn draw(demo: *DemoState) void {
     const fb_height = gctx.swapchain_descriptor.height;
     const t = @as(f32, @floatCast(gctx.stats.time));
     _ = t;
-
-    std.debug.print("Blender view: {any}\n", .{blender_view});
 
     const cam_world_to_view = zm.mul(zm.matFromRollPitchYawV(zm.loadArr3(blender_view.rotation)), zm.translationV(zm.loadArr3(blender_view.translation)));
     const cam_view_to_clip = zm.perspectiveFovLh(
@@ -474,8 +478,7 @@ pub fn clientJob(allocator: std.mem.Allocator) !void {
         var current_accum: u32 = 0;
 
         session: while (running) {
-            const chunk = socket.reader().readUntilDelimiterOrEofAlloc(allocator, '\n', 4096) catch |err| {
-                std.debug.print("Failed to read JSON file: {any}\n", .{err});
+            const chunk = socket.reader().readUntilDelimiterOrEofAlloc(allocator, '\n', 4096) catch {
                 break :session;
             };
 
@@ -489,7 +492,6 @@ pub fn clientJob(allocator: std.mem.Allocator) !void {
 
                 current_accum += 1;
                 if (current_accum >= log_accum_amount) {
-                    std.debug.print("Got view update: {any} (and {d} others)\n", .{ blender_view, current_accum - 1 });
                     current_accum = 0;
                 }
             }
