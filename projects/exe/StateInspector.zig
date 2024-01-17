@@ -4,9 +4,14 @@ const zgui = @import("zgui");
 const Self = @This();
 
 allocator: std.mem.Allocator,
+filter_buffer: []u8,
 
-pub fn init(allocator: std.mem.Allocator) Self {
-    return .{ .allocator = allocator };
+pub fn init(allocator: std.mem.Allocator) !Self {
+    const filter_buffer = try allocator.alloc(u8, 256);
+    for (filter_buffer) |*c| {
+        c.* = 0;
+    }
+    return .{ .allocator = allocator, .filter_buffer = filter_buffer };
 }
 
 pub fn inspect(self: *Self, s: anytype) !void {
@@ -16,57 +21,131 @@ pub fn inspect(self: *Self, s: anytype) !void {
     var arena = std.heap.ArenaAllocator.init(self.allocator);
     defer arena.deinit();
 
-    const buf = try arena.allocator().alloc(u8, 256);
-    for (buf) |*c| {
-        c.* = 0;
-    }
-
     _ = zgui.inputText("Filter", .{
-        .buf = buf,
-        .flags = .{ .callback_edit = true },
+        .buf = self.filter_buffer,
+        .flags = .{ .callback_edit = true, .auto_select_all = true, .always_overwrite = true },
         .callback = struct {
             fn callback(data: *zgui.InputTextCallbackData) i32 {
                 std.debug.print("callback {s}\n", .{data.buf[0..@intCast(data.buf_text_len)]});
+                // std.debug.print("callback {s}\n", .{self.filter_buffer});
                 return 0;
             }
         }.callback,
     });
 
-    inline for (@typeInfo(@TypeOf(s)).Struct.fields) |field| {
-        const v = @field(s, field.name);
-        try inspectField(field, v, arena.allocator());
+    const visibilityStructure = buildFilterVisibilityStructure(.{ .type = @TypeOf(s), .name = "State" }, std.mem.trimRight(u8, self.filter_buffer, &.{0}));
+
+    if (visibilityStructure) |vs| {
+        inline for (@typeInfo(@TypeOf(s)).Struct.fields) |field| {
+            const v = @field(s, field.name);
+            const field_visibility = @field(vs, field.name);
+            try inspectField(field, v, field_visibility, arena.allocator());
+        }
     }
 }
 
-fn inspectField(info: anytype, value: anytype, allocator: std.mem.Allocator) !void {
-    switch (@typeInfo(@TypeOf(value))) {
+fn VisibilityStructure(comptime State: type) type {
+    switch (@typeInfo(State)) {
+        .Struct => |structInfo| {
+            var result_fields: []const std.builtin.Type.StructField = &.{};
+            inline for (structInfo.fields) |field| {
+                result_fields = result_fields ++ .{std.builtin.Type.StructField{
+                    .name = field.name,
+                    .type = VisibilityStructure(field.type),
+                    .default_value = field.default_value,
+                    .is_comptime = field.is_comptime,
+                    .alignment = field.alignment,
+                }};
+            }
+            return @Type(std.builtin.Type{ .Optional = .{ .child = @Type(std.builtin.Type{ .Struct = .{
+                .layout = .Auto,
+                .fields = result_fields,
+                .decls = &.{},
+                .is_tuple = structInfo.is_tuple,
+            } }) } });
+        },
+        .Array => {
+            return bool;
+        },
+        else => {
+            return bool;
+        },
+    }
+}
+
+fn buildFilterVisibilityStructure(info: anytype, search: []const u8) VisibilityStructure(info.type) {
+    const text_match = std.mem.startsWith(u8, info.name, search) or search.len == 0;
+    switch (@typeInfo(info.type)) {
+        .Struct => |structInfo| {
+            var visible = false;
+            var result: @typeInfo(VisibilityStructure(info.type)).Optional.child = undefined;
+            inline for (structInfo.fields) |field| {
+                const field_visibility = buildFilterVisibilityStructure(field, search);
+                switch (@typeInfo(@TypeOf(field_visibility))) {
+                    .Optional => {
+                        if (field_visibility) |_| {
+                            visible = true;
+                            std.debug.print("field {s} is visible\n", .{field.name});
+                        }
+                    },
+                    .Bool => {
+                        if (field_visibility) {
+                            visible = true;
+                            std.debug.print("field {s} is visible\n", .{field.name});
+                        }
+                    },
+                    else => {},
+                }
+                @field(result, field.name) = field_visibility;
+            }
+            if (visible or text_match) {
+                return result;
+            } else {
+                return null;
+            }
+        },
+        else => {
+            return text_match;
+        },
+    }
+}
+
+fn inspectField(info: anytype, value: anytype, visibilityStructure: anytype, allocator: std.mem.Allocator) !void {
+    switch (@typeInfo(info.type)) {
         .Struct => |structInfo| {
             var orig_list = std.ArrayList(u8).init(allocator);
             try orig_list.appendSlice(info.name);
             const sentinel_slice = try orig_list.toOwnedSliceSentinel(0);
-            if (zgui.collapsingHeader(sentinel_slice, .{})) {
-                zgui.indent(.{});
-                defer zgui.unindent(.{});
-                inline for (structInfo.fields) |field| {
-                    const v = @field(value, field.name);
-                    try inspectField(field, v, allocator);
+            if (visibilityStructure) |vs| {
+                if (zgui.collapsingHeader(sentinel_slice, .{})) {
+                    zgui.indent(.{});
+                    defer zgui.unindent(.{});
+                    inline for (structInfo.fields) |field| {
+                        const v = @field(value, field.name);
+                        const field_visibility = @field(vs, field.name);
+                        try inspectField(field, v, field_visibility, allocator);
+                    }
                 }
             }
         },
-        .Array => {
+        .Array => |arrayInfo| {
             var orig_list = std.ArrayList(u8).init(allocator);
             try orig_list.appendSlice(info.name);
             const sentinel_slice = try orig_list.toOwnedSliceSentinel(0);
-            if (zgui.collapsingHeader(sentinel_slice, .{})) {
-                zgui.indent(.{});
-                defer zgui.unindent(.{});
-                for (value) |element| {
-                    try inspectField(.{ .name = "item", .type = @TypeOf(element) }, element, allocator);
+            if (visibilityStructure) {
+                if (zgui.collapsingHeader(sentinel_slice, .{})) {
+                    zgui.indent(.{});
+                    defer zgui.unindent(.{});
+                    for (value) |element| {
+                        try inspectField(.{ .name = "item", .type = arrayInfo.child }, element, true, allocator);
+                    }
                 }
             }
         },
         else => {
-            zgui.text("{s} ({any}) = {any}", .{ info.name, info.type, value });
+            if (visibilityStructure) {
+                zgui.text("{s} ({any}) = {any}", .{ info.name, info.type, value });
+            }
         },
     }
 }

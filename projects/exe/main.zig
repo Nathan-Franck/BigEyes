@@ -525,7 +525,7 @@ pub fn main() !void {
 
     const allocator = gpa.allocator();
 
-    stateInspector = StateInspector.init(allocator);
+    stateInspector = try StateInspector.init(allocator);
 
     var demo = init(allocator, window) catch {
         std.log.err("Failed to initialize the demo.\n", .{});
