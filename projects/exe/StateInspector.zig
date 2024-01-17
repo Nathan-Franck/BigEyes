@@ -4,14 +4,14 @@ const zgui = @import("zgui");
 const Self = @This();
 
 allocator: std.mem.Allocator,
-filter_buffer: []u8,
+var filter_buffer: []u8 = undefined;
 
 pub fn init(allocator: std.mem.Allocator) !Self {
-    const filter_buffer = try allocator.alloc(u8, 256);
+    filter_buffer = try allocator.alloc(u8, 256);
     for (filter_buffer) |*c| {
         c.* = 0;
     }
-    return .{ .allocator = allocator, .filter_buffer = filter_buffer };
+    return .{ .allocator = allocator };
 }
 
 pub fn inspect(self: *Self, s: anytype) !void {
@@ -22,18 +22,24 @@ pub fn inspect(self: *Self, s: anytype) !void {
     defer arena.deinit();
 
     _ = zgui.inputText("Filter", .{
-        .buf = self.filter_buffer,
+        .buf = filter_buffer,
         .flags = .{ .callback_edit = true, .auto_select_all = true, .always_overwrite = true },
         .callback = struct {
             fn callback(data: *zgui.InputTextCallbackData) i32 {
-                std.debug.print("callback {s}\n", .{data.buf[0..@intCast(data.buf_text_len)]});
+                std.debug.print("callback {any}\n", .{data.buf[0..@intCast(data.buf_text_len)]});
                 // std.debug.print("callback {s}\n", .{self.filter_buffer});
+                for (filter_buffer) |*c| {
+                    c.* = 0;
+                }
+                std.mem.copyForwards(u8, filter_buffer, data.buf[0..@intCast(data.buf_text_len)]);
+                std.debug.print("result {any}\n", .{filter_buffer});
+
                 return 0;
             }
         }.callback,
     });
 
-    const visibilityStructure = buildFilterVisibilityStructure(.{ .type = @TypeOf(s), .name = "State" }, std.mem.trimRight(u8, self.filter_buffer, &.{0}));
+    const visibilityStructure = buildFilterVisibilityStructure(.{ .type = @TypeOf(s), .name = "State" }, std.mem.trimRight(u8, filter_buffer, &.{0}));
 
     if (visibilityStructure) |vs| {
         inline for (@typeInfo(@TypeOf(s)).Struct.fields) |field| {
@@ -85,13 +91,11 @@ fn buildFilterVisibilityStructure(info: anytype, search: []const u8) VisibilityS
                     .Optional => {
                         if (field_visibility) |_| {
                             visible = true;
-                            std.debug.print("field {s} is visible\n", .{field.name});
                         }
                     },
                     .Bool => {
                         if (field_visibility) {
                             visible = true;
-                            std.debug.print("field {s} is visible\n", .{field.name});
                         }
                     },
                     else => {},
