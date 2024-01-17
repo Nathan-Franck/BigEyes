@@ -46,7 +46,7 @@ pub fn inspect(self: *Self, s: anytype) !void {
     }
 }
 
-fn setFields(source: anytype, changes: anytype) @TypeOf(source) {
+fn withFields(source: anytype, changes: anytype) @TypeOf(source) {
     switch (@typeInfo(@TypeOf(source))) {
         .Struct => |structInfo| {
             var result: @TypeOf(source) = undefined;
@@ -65,25 +65,21 @@ fn setFields(source: anytype, changes: anytype) @TypeOf(source) {
 }
 
 fn VisibilityStructure(comptime State: type) type {
-    switch (@typeInfo(State)) {
-        .Struct => |structInfo| {
-            var result_fields: []const std.builtin.Type.StructField = &.{};
-            inline for (structInfo.fields) |field| {
-                result_fields = result_fields ++ .{setFields(field, .{
-                    .type = VisibilityStructure(field.type),
-                })};
-            }
-            return @Type(.{ .Optional = .{ .child = @Type(.{ .Struct = setFields(structInfo, .{
-                .fields = result_fields,
-            }) }) } });
-        },
-        .Array => {
-            return bool;
-        },
-        else => {
-            return bool;
-        },
-    }
+    return switch (@typeInfo(State)) {
+        .Struct => |structInfo| @Type(.{ .Optional = .{ .child = @Type(.{ .Struct = withFields(structInfo, .{
+            .fields = fields: {
+                var result: []const std.builtin.Type.StructField = &.{};
+                inline for (structInfo.fields) |field| {
+                    result = result ++ .{withFields(field, .{
+                        .type = VisibilityStructure(field.type),
+                    })};
+                }
+                break :fields result;
+            },
+        }) }) } }),
+        .Array => bool,
+        else => bool,
+    };
 }
 
 fn buildFilterVisibilityStructure(info: anytype, search: []const u8) VisibilityStructure(info.type) {
