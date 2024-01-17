@@ -298,60 +298,13 @@ fn deinit(allocator: std.mem.Allocator, demo: *DemoState) void {
     demo.* = undefined;
 }
 
-fn zguiInspect(state: anytype, allocator: std.mem.Allocator) !void {
-    _ = zgui.begin("State Inspector", .{});
-    defer zgui.end();
-
-    var arena = std.heap.ArenaAllocator.init(allocator);
-    defer arena.deinit();
-
-    // TODO: Filter box at the top (parameter name or contents)
-    try zguiInspectRecurse(state, arena.allocator());
-}
-
-fn zguiInspectRecurse(state: anytype, allocator: std.mem.Allocator) !void {
-    inline for (@typeInfo(@TypeOf(state)).Struct.fields) |field| {
-        const value = @field(state, field.name);
-        switch (@typeInfo(field.type)) {
-            .Struct => {
-                var orig_list = std.ArrayList(u8).init(allocator);
-                try orig_list.appendSlice(field.name);
-                const sentinel_slice = try orig_list.toOwnedSliceSentinel(0);
-                if (zgui.collapsingHeader(sentinel_slice, .{})) {
-                    try zguiInspectRecurse(value, allocator);
-                }
-            },
-            .Enum => {
-                if (zgui.collapsingHeader(field.name, .{})) {
-                    zgui.text("{s}", .{field.name});
-                    zgui.indent();
-                    defer zgui.unindent();
-                    inline for (@typeInfo(@TypeOf(value)).Enum.fields) |enum_field| {
-                        const enum_value = @intFromEnum(value);
-                        if (enum_value == enum_field.value) {
-                            zgui.text("{s}", .{enum_field.name});
-                        }
-                    }
-                }
-            },
-            else => {
-                zguiInspectField(field, value);
-            },
-        }
-    }
-}
-
-fn zguiInspectField(field: anytype, value: anytype) void {
-    zgui.text("{s} ({any}) = {any}", .{ field.name, field.type, value });
-}
-
 fn update(demo: *DemoState, allocator: std.mem.Allocator) !void {
     zgui.backend.newFrame(
         demo.gctx.swapchain_descriptor.width,
         demo.gctx.swapchain_descriptor.height,
     );
     // zgui.showDemoWindow(null);
-    try zguiInspect(.{ .blender_view = blender_view }, allocator);
+    try @import("./StateInspector.zig").inspect(state, allocator);
 }
 
 const Instance = struct {
@@ -366,7 +319,7 @@ fn draw(demo: *DemoState) void {
     const t = @as(f32, @floatCast(gctx.stats.time));
     _ = t;
 
-    const cam_world_to_view = zm.mul(zm.matFromRollPitchYawV(zm.loadArr3(blender_view.rotation)), zm.translationV(zm.loadArr3(blender_view.translation)));
+    const cam_world_to_view = zm.mul(zm.matFromRollPitchYawV(zm.loadArr3(state.blender_view.rotation)), zm.translationV(zm.loadArr3(state.blender_view.translation)));
     const cam_view_to_clip = zm.perspectiveFovLh(
         0.25 * math.pi,
         @as(f32, @floatFromInt(fb_width)) / @as(f32, @floatFromInt(fb_height)),
@@ -495,12 +448,18 @@ const ViewUpdate = struct {
 
 // Some game state.
 
-var running = true;
-var blender_view = ViewUpdate{ .rotation = .{ 0.0, 0.0, 0.0 }, .translation = .{ 0.0, 0.0, -1.0 } };
+const State = struct {
+    running: bool,
+    blender_view: ViewUpdate,
+};
+var state: State = .{
+    .running = true,
+    .blender_view = ViewUpdate{ .rotation = .{ 0.0, 0.0, 0.0 }, .translation = .{ 0.0, 0.0, -1.0 } },
+};
 
 pub fn clientJob(allocator: std.mem.Allocator) !void {
     const connection_polling_rate = 2;
-    while (running) {
+    while (state.running) {
         const socket = std.net.tcpConnectToHost(allocator, "127.0.0.1", 12348) catch {
             std.debug.print("Failed to connect to socket, retrying in {d} seconds\n", .{connection_polling_rate});
             std.time.sleep(connection_polling_rate * std.time.ns_per_s);
@@ -514,7 +473,7 @@ pub fn clientJob(allocator: std.mem.Allocator) !void {
 
         var current_accum: u32 = 0;
 
-        session: while (running) {
+        session: while (state.running) {
             const chunk = socket.reader().readUntilDelimiterOrEofAlloc(allocator, '\n', 4096) catch {
                 break :session;
             };
@@ -525,7 +484,7 @@ pub fn clientJob(allocator: std.mem.Allocator) !void {
                 const json_result = try std.json.parseFromSlice(ViewUpdate, allocator, json_data, .{});
                 defer json_result.deinit();
 
-                blender_view = json_result.value;
+                state.blender_view = json_result.value;
 
                 current_accum += 1;
                 if (current_accum >= log_accum_amount) {
@@ -592,7 +551,7 @@ pub fn main() !void {
         .stack_size = 4096 * 1024,
     }, clientJob, .{allocator});
     _ = client;
-    defer running = false;
+    defer state.running = false;
 
     // There's a socket 12345 where blender is sending view data over. We should start a socket server and listen to it.
     // Then we should update the view matrix based on the data we get from the socket.
