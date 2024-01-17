@@ -4,7 +4,6 @@ const zgui = @import("zgui");
 const Self = @This();
 
 allocator: std.mem.Allocator,
-filterBuffer: std.ArrayList(u8) = undefined,
 
 pub fn init(allocator: std.mem.Allocator) Self {
     return .{ .allocator = allocator };
@@ -17,11 +16,13 @@ pub fn inspect(self: *Self, s: anytype) !void {
     var arena = std.heap.ArenaAllocator.init(self.allocator);
     defer arena.deinit();
 
-    self.filterBuffer = std.ArrayList(u8).init(arena.allocator());
-    try self.filterBuffer.appendSlice(&([_]u8{0} ** 256));
+    const buf = try arena.allocator().alloc(u8, 256);
+    for (buf) |*c| {
+        c.* = 0;
+    }
 
     _ = zgui.inputText("Filter", .{
-        .buf = self.filterBuffer.items,
+        .buf = buf,
         .flags = .{ .callback_edit = true },
         .callback = struct {
             fn callback(data: *zgui.InputTextCallbackData) i32 {
