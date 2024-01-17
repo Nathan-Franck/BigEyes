@@ -26,14 +26,10 @@ pub fn inspect(self: *Self, s: anytype) !void {
         .flags = .{ .callback_edit = true, .auto_select_all = true, .always_overwrite = true },
         .callback = struct {
             fn callback(data: *zgui.InputTextCallbackData) i32 {
-                std.debug.print("callback {any}\n", .{data.buf[0..@intCast(data.buf_text_len)]});
-                // std.debug.print("callback {s}\n", .{self.filter_buffer});
                 for (filter_buffer) |*c| {
                     c.* = 0;
                 }
                 std.mem.copyForwards(u8, filter_buffer, data.buf[0..@intCast(data.buf_text_len)]);
-                std.debug.print("result {any}\n", .{filter_buffer});
-
                 return 0;
             }
         }.callback,
@@ -50,25 +46,36 @@ pub fn inspect(self: *Self, s: anytype) !void {
     }
 }
 
+fn setFields(source: anytype, changes: anytype) @TypeOf(source) {
+    switch (@typeInfo(@TypeOf(source))) {
+        .Struct => |structInfo| {
+            var result: @TypeOf(source) = undefined;
+            inline for (structInfo.fields) |field| {
+                @field(result, field.name) = if (@hasField(@TypeOf(changes), field.name))
+                    @field(changes, field.name)
+                else
+                    @field(source, field.name);
+            }
+            return result;
+        },
+        else => {
+            @compileError("Can't merge non-struct types");
+        },
+    }
+}
+
 fn VisibilityStructure(comptime State: type) type {
     switch (@typeInfo(State)) {
         .Struct => |structInfo| {
             var result_fields: []const std.builtin.Type.StructField = &.{};
             inline for (structInfo.fields) |field| {
-                result_fields = result_fields ++ .{std.builtin.Type.StructField{
-                    .name = field.name,
+                result_fields = result_fields ++ .{setFields(field, .{
                     .type = VisibilityStructure(field.type),
-                    .default_value = field.default_value,
-                    .is_comptime = field.is_comptime,
-                    .alignment = field.alignment,
-                }};
+                })};
             }
-            return @Type(std.builtin.Type{ .Optional = .{ .child = @Type(std.builtin.Type{ .Struct = .{
-                .layout = .Auto,
+            return @Type(.{ .Optional = .{ .child = @Type(.{ .Struct = setFields(structInfo, .{
                 .fields = result_fields,
-                .decls = &.{},
-                .is_tuple = structInfo.is_tuple,
-            } }) } });
+            }) }) } });
         },
         .Array => {
             return bool;
