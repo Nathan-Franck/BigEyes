@@ -299,12 +299,13 @@ fn deinit(allocator: std.mem.Allocator, demo: *DemoState) void {
 }
 
 fn update(demo: *DemoState, allocator: std.mem.Allocator) !void {
+    _ = allocator; // autofix
     zgui.backend.newFrame(
         demo.gctx.swapchain_descriptor.width,
         demo.gctx.swapchain_descriptor.height,
     );
     // zgui.showDemoWindow(null);
-    try @import("./StateInspector.zig").inspect(state, allocator);
+    try stateInspector.inspect(state);
 }
 
 const Instance = struct {
@@ -365,7 +366,7 @@ fn draw(demo: *DemoState) void {
             pass.setPipeline(pipeline);
 
             for (demo.models.items) |model| {
-                std.debug.print("Drawing model: {s}\n", .{model.label});
+                // std.debug.print("Drawing model: {s}\n", .{model.label});
 
                 const vb_info = gctx.lookupResourceInfo(model.vertex_buffer) orelse break :pass;
                 const ib_info = gctx.lookupResourceInfo(model.index_buffer) orelse break :pass;
@@ -457,6 +458,9 @@ var state: State = .{
     .blender_view = ViewUpdate{ .rotation = .{ 0.0, 0.0, 0.0 }, .translation = .{ 0.0, 0.0, -1.0 } },
 };
 
+const StateInspector = @import("./StateInspector.zig");
+var stateInspector: StateInspector = undefined;
+
 pub fn clientJob(allocator: std.mem.Allocator) !void {
     const connection_polling_rate = 2;
     while (state.running) {
@@ -520,6 +524,8 @@ pub fn main() !void {
     defer _ = gpa.deinit();
 
     const allocator = gpa.allocator();
+
+    stateInspector = StateInspector.init(allocator);
 
     var demo = init(allocator, window) catch {
         std.log.err("Failed to initialize the demo.\n", .{});

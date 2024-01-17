@@ -1,54 +1,71 @@
 const std = @import("std");
 const zgui = @import("zgui");
 
-pub fn inspect(s: anytype, allocator: std.mem.Allocator) !void {
+const Self = @This();
+
+allocator: std.mem.Allocator,
+filterBuffer: std.ArrayList(u8) = undefined,
+
+pub fn init(allocator: std.mem.Allocator) Self {
+    return .{ .allocator = allocator };
+}
+
+pub fn inspect(self: *Self, s: anytype) !void {
     _ = zgui.begin("State Inspector", .{});
     defer zgui.end();
 
-    var arena = std.heap.ArenaAllocator.init(allocator);
+    var arena = std.heap.ArenaAllocator.init(self.allocator);
     defer arena.deinit();
 
-    // TODO: Filter box at the top (parameter name or contents)
-    try inspectStruct(s, arena.allocator());
-}
+    self.filterBuffer = std.ArrayList(u8).init(arena.allocator());
+    try self.filterBuffer.appendSlice(&([_]u8{0} ** 256));
 
-fn inspectStruct(s: anytype, allocator: std.mem.Allocator) !void {
+    _ = zgui.inputText("Filter", .{
+        .buf = self.filterBuffer.items,
+        .flags = .{ .callback_edit = true },
+        .callback = struct {
+            fn callback(data: *zgui.InputTextCallbackData) i32 {
+                std.debug.print("callback {s}\n", .{data.buf[0..@intCast(data.buf_text_len)]});
+                return 0;
+            }
+        }.callback,
+    });
+
     inline for (@typeInfo(@TypeOf(s)).Struct.fields) |field| {
-        const value = @field(s, field.name);
-        try inspectField(field, value, allocator);
+        const v = @field(s, field.name);
+        try inspectField(field, v, arena.allocator());
     }
 }
 
-fn inspectArray(array: anytype, allocator: std.mem.Allocator) !void {
-    for (array) |value| {
-        try inspectField(.{ .name = "item", .type = @TypeOf(value) }, value, allocator);
-    }
-}
-
-fn inspectField(field: anytype, value: anytype, allocator: std.mem.Allocator) !void {
-    switch (@typeInfo(field.type)) {
-        .Struct => {
+fn inspectField(info: anytype, value: anytype, allocator: std.mem.Allocator) !void {
+    switch (@typeInfo(@TypeOf(value))) {
+        .Struct => |structInfo| {
             var orig_list = std.ArrayList(u8).init(allocator);
-            try orig_list.appendSlice(field.name);
+            try orig_list.appendSlice(info.name);
             const sentinel_slice = try orig_list.toOwnedSliceSentinel(0);
             if (zgui.collapsingHeader(sentinel_slice, .{})) {
                 zgui.indent(.{});
                 defer zgui.unindent(.{});
-                try inspectStruct(value, allocator);
+                inline for (structInfo.fields) |field| {
+                    const v = @field(value, field.name);
+                    try inspectField(field, v, allocator);
+                }
             }
         },
         .Array => {
             var orig_list = std.ArrayList(u8).init(allocator);
-            try orig_list.appendSlice(field.name);
+            try orig_list.appendSlice(info.name);
             const sentinel_slice = try orig_list.toOwnedSliceSentinel(0);
             if (zgui.collapsingHeader(sentinel_slice, .{})) {
                 zgui.indent(.{});
                 defer zgui.unindent(.{});
-                try inspectArray(value, allocator);
+                for (value) |element| {
+                    try inspectField(.{ .name = "item", .type = @TypeOf(element) }, element, allocator);
+                }
             }
         },
         else => {
-            zgui.text("{s} ({any}) = {any}", .{ field.name, field.type, value });
+            zgui.text("{s} ({any}) = {any}", .{ info.name, info.type, value });
         },
     }
 }
