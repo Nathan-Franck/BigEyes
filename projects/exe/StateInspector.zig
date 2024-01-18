@@ -46,15 +46,13 @@ pub fn inspect(self: *Self, s: anytype) !void {
     }
 }
 
-fn withFields(source: anytype, changes: anytype) @TypeOf(source) {
-    switch (@typeInfo(@TypeOf(source))) {
+fn withFields(source_struct: anytype, field_changes: anytype) @TypeOf(source_struct) {
+    switch (@typeInfo(@TypeOf(source_struct))) {
         .Struct => |structInfo| {
-            var result: @TypeOf(source) = undefined;
+            var result = source_struct;
             inline for (structInfo.fields) |field| {
-                @field(result, field.name) = if (@hasField(@TypeOf(changes), field.name))
-                    @field(changes, field.name)
-                else
-                    @field(source, field.name);
+                if (@hasField(@TypeOf(field_changes), field.name))
+                    @field(result, field.name) = @field(field_changes, field.name);
             }
             return result;
         },
@@ -86,30 +84,18 @@ fn buildFilterVisibilityStructure(info: anytype, search: []const u8) VisibilityS
     const text_match = std.mem.startsWith(u8, info.name, search) or search.len == 0;
     switch (@typeInfo(info.type)) {
         .Struct => |structInfo| {
-            var visible = false;
+            var any_field_visible = false;
             var result: @typeInfo(VisibilityStructure(info.type)).Optional.child = undefined;
             inline for (structInfo.fields) |field| {
                 const field_visibility = buildFilterVisibilityStructure(field, search);
-                switch (@typeInfo(@TypeOf(field_visibility))) {
-                    .Optional => {
-                        if (field_visibility) |_| {
-                            visible = true;
-                        }
-                    },
-                    .Bool => {
-                        if (field_visibility) {
-                            visible = true;
-                        }
-                    },
-                    else => {},
-                }
+                if (!any_field_visible) any_field_visible = switch (@typeInfo(@TypeOf(field_visibility))) {
+                    .Optional => field_visibility != null,
+                    .Bool => field_visibility,
+                    else => false,
+                };
                 @field(result, field.name) = field_visibility;
             }
-            if (visible or text_match) {
-                return result;
-            } else {
-                return null;
-            }
+            return if (any_field_visible or text_match) result else null;
         },
         else => {
             return text_match;
