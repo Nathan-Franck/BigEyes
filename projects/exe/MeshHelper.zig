@@ -5,25 +5,53 @@ pub const Point = zmath.Vec;
 pub const Face = []const u32;
 pub const Quad = [4]u32;
 
-pub fn calculateNormals(allocator: std.mem.Allocator, points: []const Point, quads: []const Quad) ![]const Point {
-    var vertexToQuad = std.AutoHashMap(u32, std.ArrayList(*const [4]u32)).init(allocator);
-    for (quads) |*quad| {
-        for (quad) |vertex| {
-            var quadsList = if (vertexToQuad.get(vertex)) |existing| existing else std.ArrayList(*const [4]u32).init(allocator);
-            try quadsList.append(quad);
-            try vertexToQuad.put(vertex, quadsList);
+pub fn calculateNormals(allocator: std.mem.Allocator, points: []const Point, polygons: []const Face) []const Point {
+    var vertexToPoly = std.AutoHashMap(u32, std.ArrayList([]const u32)).init(allocator);
+    for (polygons) |polygon| {
+        for (polygon) |vertex| {
+            var polysList = if (vertexToPoly.get(vertex)) |existing| existing else std.ArrayList([]const u32).init(allocator);
+            polysList.append(polygon) catch unreachable;
+            vertexToPoly.put(vertex, polysList) catch unreachable;
         }
     }
     var normals = std.ArrayList(Point).init(allocator);
     for (points, 0..) |_, i| {
-        try normals.append(if (vertexToQuad.get(@intCast(i))) |local_quads| normal: {
-            var normal = Point{ 0, 0, 0, 0 };
-            for (local_quads.items) |quad| {
-                const quad_normal = zmath.cross3(points[quad[0]] - points[quad[2]], points[quad[1]] - points[quad[2]]);
-                normal += zmath.normalize3(quad_normal) / @as(@Vector(4, f32), @splat(@floatFromInt(local_quads.items.len)));
+        normals.append(if (vertexToPoly.get(@intCast(i))) |local_polys| average_normal: {
+            var average_normal = Point{ 0, 0, 0, 0 };
+            for (local_polys.items) |poly| {
+                const poly_normal = if (poly.len == 3)
+                    zmath.cross3(points[poly[1]] - points[poly[0]], points[poly[2]] - points[poly[0]])
+                else if (poly.len == 4)
+                    zmath.cross3(points[poly[1]] - points[poly[0]], points[poly[2]] - points[poly[0]])
+                else
+                    average_normal;
+                average_normal += zmath.normalize3(poly_normal) / @as(@Vector(4, f32), @splat(@floatFromInt(local_polys.items.len)));
             }
-            break :normal normal;
-        } else Point{ 0, 0, 0, 0 });
+            break :average_normal average_normal;
+        } else Point{ 0, 0, 0, 0 }) catch unreachable;
     }
     return normals.items;
+}
+
+pub fn flipYZ(allocator: std.mem.Allocator, points: []const Point) []const Point {
+    var flipped = std.ArrayList(Point).init(allocator);
+    for (points) |point| {
+        flipped.append(Point{ point[0], -point[2], point[1], point[3] }) catch unreachable;
+    }
+    return flipped.items;
+}
+
+pub fn polygonToTris(allocator: std.mem.Allocator, polygons: []const []const u32) []u32 {
+    var indices = std.ArrayList(u32).init(allocator);
+    for (polygons) |polygon| {
+        if (polygon.len < 3) {
+            continue;
+        }
+        for (polygon[1..], 1..) |_, i| {
+            indices.append(polygon[0]) catch unreachable;
+            indices.append(polygon[i - 1]) catch unreachable;
+            indices.append(polygon[i]) catch unreachable;
+        }
+    }
+    return indices.items;
 }

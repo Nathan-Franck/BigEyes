@@ -139,7 +139,7 @@ fn inspectField(info: anytype, value: anytype, visibilityStructure: anytype, all
             if (visibilityStructure) {
                 zgui.text("{s} ({any}) = {any}", .{ info.name, info.type, value });
                 const text = try std.fmt.allocPrint(allocator, "{s}##{?}" ++ .{0}, .{ info.name, value });
-                _ = zgui.inputFloat(text[0 .. text.len - 1 :0], .{ .v = value });
+                _ = zgui.inputFloat(text[0 .. text.len - 1 :0], .{ .v = value, .step = 0.1 });
             }
         },
         .Bool => {

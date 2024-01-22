@@ -138,7 +138,7 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !DemoState {
 
         // Load seperately a json file with the polygon data, should be called *.gltf.json
         const polygonJSON = json: {
-            const json_data = std.fs.cwd().readFileAlloc(arena.allocator(), content_dir ++ "Cat.blend.json", 512 * 1024 * 1024) catch |err| {
+            const json_data = std.fs.cwd().readFileAlloc(arena.allocator(), content_dir ++ "RockLevel.blend.json", 512 * 1024 * 1024) catch |err| {
                 std.log.err("Failed to read JSON file: {}", .{err});
                 return err;
             };
@@ -186,65 +186,68 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !DemoState {
             };
         };
 
+        const hexColors = [_][3]f32{
+            .{ 1.0, 0.0, 0.0 },
+            .{ 0.0, 1.0, 0.0 },
+            .{ 0.0, 0.0, 1.0 },
+            .{ 1.0, 1.0, 0.0 },
+            .{ 1.0, 0.0, 1.0 },
+            .{ 0.0, 1.0, 1.0 },
+        };
+        const MeshHelper = @import("./MeshHelper.zig");
         var meshes = std.ArrayList(struct { label: []const u8, vertices: []Vertex, indices: []u32 }).init(allocator);
-        const doSubdivPass = true;
-        if (doSubdivPass) {
-            const hexColors = [_][3]f32{
-                .{ 1.0, 0.0, 0.0 },
-                .{ 0.0, 1.0, 0.0 },
-                .{ 0.0, 0.0, 1.0 },
-                .{ 1.0, 1.0, 0.0 },
-                .{ 1.0, 0.0, 1.0 },
-                .{ 0.0, 1.0, 1.0 },
-            };
-            for (polygonJSON.value.meshes) |mesh| {
-                var result = try subdiv.Subdiv(true).cmcSubdiv(arena.allocator(), mesh.vertices, mesh.polygons);
-                var subdiv_count: u32 = 1;
-                while (subdiv_count < 3) {
-                    result = try subdiv.Subdiv(false).cmcSubdiv(arena.allocator(), result.points, result.quads);
-                    subdiv_count += 1;
-                }
-                const vertices = vertices: {
-                    var vertices = std.ArrayList(Vertex).init(arena.allocator());
-                    const normals = try @import("./MeshHelper.zig").calculateNormals(arena.allocator(), result.points, result.quads);
-                    for (result.points, 0..) |point, i| {
-                        try vertices.append(Vertex{ .position = .{ point[0], point[2], point[1] }, .color = hexColors[i % hexColors.len], .normal = @as([4]f32, normals[i])[0..3].* });
+        const doSubdivPass = false;
+        for (polygonJSON.value.meshes) |mesh| {
+            const flipped_vertices = MeshHelper.flipYZ(arena.allocator(), mesh.vertices);
+            try meshes.append(mesh: {
+                if (!doSubdivPass) {
+                    break :mesh .{
+                        .label = mesh.name,
+                        .vertices = vertices: {
+                            const normals = MeshHelper.calculateNormals(arena.allocator(), mesh.vertices, mesh.polygons);
+                            var vertices = std.ArrayList(Vertex).init(arena.allocator());
+                            for (mesh.vertices, 0..) |point, i| {
+                                try vertices.append(Vertex{ .position = @as([4]f32, point)[0..3].*, .color = hexColors[i % hexColors.len], .normal = @as([4]f32, normals[i])[0..3].* });
+                            }
+                            break :vertices vertices.items;
+                        },
+                        .indices = MeshHelper.polygonToTris(arena.allocator(), mesh.polygons),
+                    };
+                } else {
+                    var result = try subdiv.Subdiv(true).cmcSubdiv(arena.allocator(), flipped_vertices, mesh.polygons);
+                    var subdiv_count: u32 = 1;
+                    while (subdiv_count < 3) {
+                        result = try subdiv.Subdiv(false).cmcSubdiv(arena.allocator(), result.points, result.quads);
+                        subdiv_count += 1;
                     }
-                    break :vertices vertices.items;
-                };
+                    const vertices = vertices: {
+                        const normals = MeshHelper.calculateNormals(arena.allocator(), result.points, result.quads);
+                        var vertices = std.ArrayList(Vertex).init(arena.allocator());
+                        for (result.points, 0..) |point, i| {
+                            try vertices.append(Vertex{ .position = @as([4]f32, point)[0..3].*, .color = hexColors[i % hexColors.len], .normal = @as([4]f32, normals[i])[0..3].* });
+                        }
+                        break :vertices vertices.items;
+                    };
 
-                const indices = indices: {
-                    var indices = std.ArrayList(u32).init(arena.allocator());
-                    for (result.quads) |face| {
-                        try indices.append(face[1]);
-                        try indices.append(face[2]);
-                        try indices.append(face[0]);
-                        try indices.append(face[2]);
-                        try indices.append(face[0]);
-                        try indices.append(face[3]);
-                    }
-                    break :indices indices.items;
-                };
-                try meshes.append(.{
-                    .label = mesh.name,
-                    .vertices = vertices,
-                    .indices = indices,
-                });
-            }
-        } else {
-            // TODO - break out transform of y/z into a pre-process, triangles from arbitrary polygons, etc.
-            for (polygonJSON.value.meshes) |mesh| {
-                var quads = std.ArrayList([4]u32).init(arena.allocator());
-                for (mesh.polygons) |polygon| {
-                    _ = polygon; // autofix
-
+                    const indices = indices: {
+                        var indices = std.ArrayList(u32).init(arena.allocator());
+                        for (result.quads) |face| {
+                            try indices.append(face[1]);
+                            try indices.append(face[2]);
+                            try indices.append(face[0]);
+                            try indices.append(face[2]);
+                            try indices.append(face[0]);
+                            try indices.append(face[3]);
+                        }
+                        break :indices indices.items;
+                    };
+                    break :mesh .{
+                        .label = mesh.name,
+                        .vertices = vertices,
+                        .indices = indices,
+                    };
                 }
-                try meshes.append(.{
-                    .label = mesh.name,
-                    .vertex_buffer = mesh.vertices,
-                    .index_buffer = quads.items,
-                });
-            }
+            });
         }
         break :meshes meshes;
     };
@@ -322,7 +325,7 @@ fn draw(demo: *DemoState) void {
         0.01,
         200.0,
     );
-    const cam_world_to_clip = zm.mul(cam_world_to_view, cam_view_to_clip);
+    const cam_world_to_clip = zm.mul(zm.inverse(cam_world_to_view), cam_view_to_clip);
 
     const back_buffer_view = gctx.swapchain.getCurrentTextureView();
     defer back_buffer_view.release();
