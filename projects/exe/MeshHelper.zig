@@ -36,7 +36,7 @@ pub fn calculateNormals(allocator: std.mem.Allocator, points: []const Point, pol
 pub fn flipYZ(allocator: std.mem.Allocator, points: []const Point) []const Point {
     var flipped = std.ArrayList(Point).init(allocator);
     for (points) |point| {
-        flipped.append(Point{ point[0], -point[2], point[1], point[3] }) catch unreachable;
+        flipped.append(Point{ -point[0], -point[2], -point[1], point[3] }) catch unreachable;
     }
     return flipped.items;
 }
@@ -52,6 +52,19 @@ pub fn polygonToTris(allocator: std.mem.Allocator, polygons: []const []const u32
             indices.append(polygon[i - 1]) catch unreachable;
             indices.append(polygon[i]) catch unreachable;
         }
+    }
+    return indices.items;
+}
+
+pub fn quadToTris(allocator: std.mem.Allocator, quads: []const Quad) []u32 {
+    var indices = std.ArrayList(u32).init(allocator);
+    for (quads) |face| {
+        try indices.append(face[1]);
+        try indices.append(face[2]);
+        try indices.append(face[0]);
+        try indices.append(face[2]);
+        try indices.append(face[0]);
+        try indices.append(face[3]);
     }
     return indices.items;
 }

@@ -196,17 +196,18 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !DemoState {
         };
         const MeshHelper = @import("./MeshHelper.zig");
         var meshes = std.ArrayList(struct { label: []const u8, vertices: []Vertex, indices: []u32 }).init(allocator);
-        const doSubdivPass = false;
+        const perform_subdiv_pass = false;
         for (polygonJSON.value.meshes) |mesh| {
+            // const flipped_vertices = mesh.vertices;
             const flipped_vertices = MeshHelper.flipYZ(arena.allocator(), mesh.vertices);
             try meshes.append(mesh: {
-                if (!doSubdivPass) {
+                if (!perform_subdiv_pass) {
                     break :mesh .{
                         .label = mesh.name,
                         .vertices = vertices: {
-                            const normals = MeshHelper.calculateNormals(arena.allocator(), mesh.vertices, mesh.polygons);
+                            const normals = MeshHelper.calculateNormals(arena.allocator(), flipped_vertices, mesh.polygons);
                             var vertices = std.ArrayList(Vertex).init(arena.allocator());
-                            for (mesh.vertices, 0..) |point, i| {
+                            for (flipped_vertices, 0..) |point, i| {
                                 try vertices.append(Vertex{ .position = @as([4]f32, point)[0..3].*, .color = hexColors[i % hexColors.len], .normal = @as([4]f32, normals[i])[0..3].* });
                             }
                             break :vertices vertices.items;
@@ -228,23 +229,10 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !DemoState {
                         }
                         break :vertices vertices.items;
                     };
-
-                    const indices = indices: {
-                        var indices = std.ArrayList(u32).init(arena.allocator());
-                        for (result.quads) |face| {
-                            try indices.append(face[1]);
-                            try indices.append(face[2]);
-                            try indices.append(face[0]);
-                            try indices.append(face[2]);
-                            try indices.append(face[0]);
-                            try indices.append(face[3]);
-                        }
-                        break :indices indices.items;
-                    };
                     break :mesh .{
                         .label = mesh.name,
                         .vertices = vertices,
-                        .indices = indices,
+                        .indices = MeshHelper.polygonToTris(arena.allocator(), result.quads),
                     };
                 }
             });
@@ -323,7 +311,7 @@ fn draw(demo: *DemoState) void {
         0.25 * math.pi,
         @as(f32, @floatFromInt(fb_width)) / @as(f32, @floatFromInt(fb_height)),
         0.01,
-        200.0,
+        1000.0,
     );
     const cam_world_to_clip = zm.mul(zm.inverse(cam_world_to_view), cam_view_to_clip);
 
