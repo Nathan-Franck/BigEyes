@@ -36,7 +36,7 @@ pub fn calculateNormals(allocator: std.mem.Allocator, points: []const Point, pol
 pub fn flipYZ(allocator: std.mem.Allocator, points: []const Point) []const Point {
     var flipped = std.ArrayList(Point).init(allocator);
     for (points) |point| {
-        flipped.append(Point{ -point[0], -point[2], -point[1], point[3] }) catch unreachable;
+        flipped.append(Point{ point[0], -point[2], point[1], point[3] }) catch unreachable;
     }
     return flipped.items;
 }

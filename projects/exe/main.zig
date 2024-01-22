@@ -36,7 +36,7 @@ const wgsl_fs =
 \\      @location(0) color: vec3<f32>,
 \\      @location(1) normal: vec3<f32>,
 \\  ) -> @location(0) vec4<f32> {
-\\      return vec4(normal, 1.0);
+\\      return vec4((normal + vec3(1.0, 1.0, 1.0)) / 2.0, 1.0);
 \\  }
 // zig fmt: on
 ;
@@ -306,14 +306,14 @@ fn draw(demo: *DemoState) void {
     const t = @as(f32, @floatCast(gctx.stats.time));
     _ = t;
 
-    const cam_world_to_view = zm.mul(zm.matFromRollPitchYawV(zm.loadArr3(state.blender_view.rotation)), zm.translationV(zm.loadArr3(state.blender_view.translation)));
+    const cam_world_to_view = zm.mul(zm.inverse(zm.matFromRollPitchYawV(zm.loadArr3(state.blender_view.rotation))), zm.inverse(zm.translationV(zm.loadArr3(state.blender_view.translation))));
     const cam_view_to_clip = zm.perspectiveFovLh(
         0.25 * math.pi,
         @as(f32, @floatFromInt(fb_width)) / @as(f32, @floatFromInt(fb_height)),
         0.01,
         1000.0,
     );
-    const cam_world_to_clip = zm.mul(zm.inverse(cam_world_to_view), cam_view_to_clip);
+    const cam_world_to_clip = zm.mul(cam_world_to_view, cam_view_to_clip);
 
     const back_buffer_view = gctx.swapchain.getCurrentTextureView();
     defer back_buffer_view.release();
