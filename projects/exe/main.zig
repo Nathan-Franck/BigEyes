@@ -4,7 +4,7 @@ const zglfw = @import("zglfw");
 const zgpu = @import("zgpu");
 const wgpu = zgpu.wgpu;
 const zgui = @import("zgui");
-const zm = @import("zmath");
+const zmath = @import("zmath");
 
 const subdiv = @import("subdiv");
 
@@ -123,12 +123,15 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !DemoState {
                 .target_count = color_targets.len,
                 .targets = &color_targets,
             },
+            // .multisample = wgpu.MultisampleState{
+            //     .count = 4,
+            // },
         };
         break :pipline gctx.createRenderPipeline(pipeline_layout, pipeline_descriptor);
     };
 
     const bind_group = gctx.createBindGroup(bind_group_layout, &[_]zgpu.BindGroupEntryInfo{
-        .{ .binding = 0, .buffer_handle = gctx.uniforms.buffer, .offset = 0, .size = @sizeOf(zm.Mat) },
+        .{ .binding = 0, .buffer_handle = gctx.uniforms.buffer, .offset = 0, .size = @sizeOf(zmath.Mat) },
     });
 
     var arena = std.heap.ArenaAllocator.init(allocator);
@@ -294,7 +297,7 @@ fn update(demo: *DemoState, allocator: std.mem.Allocator) !void {
 }
 
 const Instance = struct {
-    object_to_world: zm.Mat,
+    object_to_world: zmath.Mat,
     mesh: subdiv.Mesh,
 };
 
@@ -305,14 +308,14 @@ fn draw(demo: *DemoState) void {
     const t = @as(f32, @floatCast(gctx.stats.time));
     _ = t;
 
-    const cam_world_to_view = zm.mul(zm.inverse(zm.matFromRollPitchYawV(zm.loadArr3(state.blender_view.rotation))), zm.inverse(zm.translationV(zm.loadArr3(state.blender_view.translation))));
-    const cam_view_to_clip = zm.perspectiveFovLh(
+    const cam_world_to_view = zmath.mul(zmath.inverse(zmath.matFromRollPitchYawV(zmath.loadArr3(state.camera_view.rotation))), zmath.inverse(zmath.translationV(zmath.loadArr3(state.camera_view.translation))));
+    const cam_view_to_clip = zmath.perspectiveFovLh(
         0.25 * math.pi,
         @as(f32, @floatFromInt(fb_width)) / @as(f32, @floatFromInt(fb_height)),
-        0.01,
-        1000.0,
+        0.1,
+        500.0,
     );
-    const cam_world_to_clip = zm.mul(cam_world_to_view, cam_view_to_clip);
+    const cam_world_to_clip = zmath.mul(cam_world_to_view, cam_view_to_clip);
 
     const back_buffer_view = gctx.swapchain.getCurrentTextureView();
     defer back_buffer_view.release();
@@ -359,11 +362,11 @@ fn draw(demo: *DemoState) void {
                 pass.setIndexBuffer(ib_info.gpuobj.?, .uint32, 0, ib_info.size);
 
                 // Draw model.
-                const object_to_world = zm.identity(); //zm.mul(zm.rotationY(0.75 * 0), zm.translation(1.0, 0.0, 0.0));
-                const object_to_clip = zm.mul(object_to_world, cam_world_to_clip);
+                const object_to_world = zmath.identity(); //zmath.mul(zmath.rotationY(0.75 * 0), zmath.translation(1.0, 0.0, 0.0));
+                const object_to_clip = zmath.mul(object_to_world, cam_world_to_clip);
 
-                const mem = gctx.uniformsAllocate(zm.Mat, 1);
-                mem.slice[0] = zm.transpose(object_to_clip);
+                const mem = gctx.uniformsAllocate(zmath.Mat, 1);
+                mem.slice[0] = zmath.transpose(object_to_clip);
 
                 pass.setBindGroup(0, bind_group, &.{mem.offset});
                 pass.drawIndexed(model.vert_count, 1, 0, 0, 0);
@@ -420,7 +423,7 @@ fn createDepthTexture(gctx: *zgpu.GraphicsContext) struct {
         },
         .format = .depth32_float,
         .mip_level_count = 1,
-        .sample_count = 1,
+        // .sample_count = 4,
     });
     const view = gctx.createTextureView(texture, .{});
     return .{ .texture = texture, .view = view };
@@ -435,54 +438,14 @@ const ViewUpdate = struct {
 // Some game state.
 
 const State = struct {
-    running: bool,
-    blender_view: ViewUpdate,
+    camera_view: ViewUpdate,
 };
 var state: State = .{
-    .running = true,
-    .blender_view = ViewUpdate{ .rotation = .{ 0.0, 0.0, 0.0 }, .translation = .{ 0.0, 0.0, -1.0 } },
+    .camera_view = ViewUpdate{ .rotation = .{ 0.0, 0.0, 0.0 }, .translation = .{ 0.0, 0.0, -200.0 } },
 };
 
 const StateInspector = @import("./StateInspector.zig");
 var stateInspector: StateInspector = undefined;
-
-pub fn clientJob(allocator: std.mem.Allocator) !void {
-    const connection_polling_rate = 2;
-    while (state.running) {
-        const socket = std.net.tcpConnectToHost(allocator, "127.0.0.1", 12348) catch {
-            std.debug.print("Failed to connect to socket, retrying in {d} seconds\n", .{connection_polling_rate});
-            std.time.sleep(connection_polling_rate * std.time.ns_per_s);
-            continue;
-        };
-        defer socket.close();
-
-        std.debug.print("Connected to Blender session!\n", .{});
-
-        const log_accum_amount = 60;
-
-        var current_accum: u32 = 0;
-
-        session: while (state.running) {
-            const chunk = socket.reader().readUntilDelimiterOrEofAlloc(allocator, '\n', 4096) catch {
-                break :session;
-            };
-
-            if (chunk) |json_data| {
-                defer allocator.free(json_data);
-
-                const json_result = try std.json.parseFromSlice(ViewUpdate, allocator, json_data, .{});
-                defer json_result.deinit();
-
-                state.blender_view = json_result.value;
-
-                current_accum += 1;
-                if (current_accum >= log_accum_amount) {
-                    current_accum = 0;
-                }
-            }
-        }
-    }
-}
 
 pub fn main() !void {
     zglfw.init() catch {
@@ -504,6 +467,7 @@ pub fn main() !void {
     };
     defer window.destroy();
     window.setSizeLimits(400, 400, -1, -1);
+    // zglfw.windowHintTyped(.samples, 4); MSAA attempt
 
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();
@@ -536,16 +500,6 @@ pub fn main() !void {
     defer zgui.backend.deinit();
 
     zgui.getStyle().scaleAllSizes(scale_factor);
-
-    const client = try std.Thread.spawn(.{
-        .allocator = allocator,
-        .stack_size = 4096 * 1024,
-    }, clientJob, .{allocator});
-    _ = client;
-    defer state.running = false;
-
-    // There's a socket 12345 where blender is sending view data over. We should start a socket server and listen to it.
-    // Then we should update the view matrix based on the data we get from the socket.
 
     while (!window.shouldClose() and window.getKey(.escape) != .press) {
         zglfw.pollEvents();
