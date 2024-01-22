@@ -96,7 +96,7 @@ pub fn build(
         },
     }));
 
-    const export_meshes = ExportMeshes.create(b, &.{ "boss", "cube", "cat" });
+    const export_meshes = ExportMeshes.create(b, &.{ "boss", "cube", "cat", "RockLevel" });
 
     const exe_options = b.addOptions();
     exe.addOptions("build_options", exe_options);

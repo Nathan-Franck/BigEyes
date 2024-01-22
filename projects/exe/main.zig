@@ -138,7 +138,7 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !DemoState {
 
         // Load seperately a json file with the polygon data, should be called *.gltf.json
         const polygonJSON = json: {
-            const json_data = std.fs.cwd().readFileAlloc(arena.allocator(), content_dir ++ "cat.blend.json", 512 * 1024 * 1024) catch |err| {
+            const json_data = std.fs.cwd().readFileAlloc(arena.allocator(), content_dir ++ "Cat.blend.json", 512 * 1024 * 1024) catch |err| {
                 std.log.err("Failed to read JSON file: {}", .{err});
                 return err;
             };
@@ -186,94 +186,89 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !DemoState {
             };
         };
 
-        var meshes = std.ArrayList(
-            struct {
-                label: []const u8,
-                points: []const subdiv.Point,
-                quads: []const [4]u32,
-            },
-        ).init(arena.allocator());
-        for (polygonJSON.value.meshes) |mesh| {
-            var result = try subdiv.Subdiv(true).cmcSubdiv(arena.allocator(), mesh.vertices, mesh.polygons);
-            var subdiv_count: u32 = 1;
-            while (subdiv_count < 3) {
-                result = try subdiv.Subdiv(false).cmcSubdiv(arena.allocator(), result.points, result.quads);
-                subdiv_count += 1;
+        var meshes = std.ArrayList(struct { label: []const u8, vertices: []Vertex, indices: []u32 }).init(allocator);
+        const doSubdivPass = true;
+        if (doSubdivPass) {
+            const hexColors = [_][3]f32{
+                .{ 1.0, 0.0, 0.0 },
+                .{ 0.0, 1.0, 0.0 },
+                .{ 0.0, 0.0, 1.0 },
+                .{ 1.0, 1.0, 0.0 },
+                .{ 1.0, 0.0, 1.0 },
+                .{ 0.0, 1.0, 1.0 },
+            };
+            for (polygonJSON.value.meshes) |mesh| {
+                var result = try subdiv.Subdiv(true).cmcSubdiv(arena.allocator(), mesh.vertices, mesh.polygons);
+                var subdiv_count: u32 = 1;
+                while (subdiv_count < 3) {
+                    result = try subdiv.Subdiv(false).cmcSubdiv(arena.allocator(), result.points, result.quads);
+                    subdiv_count += 1;
+                }
+                const vertices = vertices: {
+                    var vertices = std.ArrayList(Vertex).init(arena.allocator());
+                    const normals = try @import("./MeshHelper.zig").calculateNormals(arena.allocator(), result.points, result.quads);
+                    for (result.points, 0..) |point, i| {
+                        try vertices.append(Vertex{ .position = .{ point[0], point[2], point[1] }, .color = hexColors[i % hexColors.len], .normal = @as([4]f32, normals[i])[0..3].* });
+                    }
+                    break :vertices vertices.items;
+                };
+
+                const indices = indices: {
+                    var indices = std.ArrayList(u32).init(arena.allocator());
+                    for (result.quads) |face| {
+                        try indices.append(face[1]);
+                        try indices.append(face[2]);
+                        try indices.append(face[0]);
+                        try indices.append(face[2]);
+                        try indices.append(face[0]);
+                        try indices.append(face[3]);
+                    }
+                    break :indices indices.items;
+                };
+                try meshes.append(.{
+                    .label = mesh.name,
+                    .vertices = vertices,
+                    .indices = indices,
+                });
             }
-            try meshes.append(.{
-                .label = mesh.name,
-                .points = result.points,
-                .quads = result.quads,
-            });
+        } else {
+            // TODO - break out transform of y/z into a pre-process, triangles from arbitrary polygons, etc.
+            for (polygonJSON.value.meshes) |mesh| {
+                var quads = std.ArrayList([4]u32).init(arena.allocator());
+                for (mesh.polygons) |polygon| {
+                    _ = polygon; // autofix
+
+                }
+                try meshes.append(.{
+                    .label = mesh.name,
+                    .vertex_buffer = mesh.vertices,
+                    .index_buffer = quads.items,
+                });
+            }
         }
         break :meshes meshes;
     };
 
-    const hexColors = [_][3]f32{
-        .{ 1.0, 0.0, 0.0 },
-        .{ 0.0, 1.0, 0.0 },
-        .{ 0.0, 0.0, 1.0 },
-        .{ 1.0, 1.0, 0.0 },
-        .{ 1.0, 0.0, 1.0 },
-        .{ 0.0, 1.0, 1.0 },
-    };
-
     var models = std.ArrayList(Model).init(allocator);
     for (meshes.items) |mesh| {
-        var vertex_data = vertex_data: {
-            var vertexToQuad = std.AutoHashMap(u32, std.ArrayList(*const [4]u32)).init(arena.allocator());
-            for (mesh.quads) |*quad| {
-                for (quad) |vertex| {
-                    var quadsList = if (vertexToQuad.get(vertex)) |existing| existing else std.ArrayList(*const [4]u32).init(arena.allocator());
-                    try quadsList.append(quad);
-                    try vertexToQuad.put(vertex, quadsList);
-                }
-            }
-            var vertex_data = std.ArrayList(Vertex).init(arena.allocator());
-            for (mesh.points, 0..) |point, i| {
-                const normal = if (vertexToQuad.get(@intCast(i))) |quads| normal: {
-                    var normal = subdiv.Point{ 0, 0, 0, 0 };
-                    for (quads.items) |quad| {
-                        const quad_normal = zm.cross3(mesh.points[quad[0]] - mesh.points[quad[2]], mesh.points[quad[1]] - mesh.points[quad[2]]);
-                        normal += zm.normalize3(quad_normal) / @as(@Vector(4, f32), @splat(@floatFromInt(quads.items.len)));
-                    }
-                    break :normal normal;
-                } else subdiv.Point{ 0, 0, 0, 0 };
-                try vertex_data.append(Vertex{ .position = @as([4]f32, point)[0..3].*, .color = hexColors[i % hexColors.len], .normal = @as([4]f32, normal)[0..3].* });
-            }
-            break :vertex_data vertex_data.items;
-        };
-
-        var index_data = index_data: {
-            var index_data = std.ArrayList(u32).init(arena.allocator());
-            for (mesh.quads) |face| {
-                try index_data.append(face[1]);
-                try index_data.append(face[2]);
-                try index_data.append(face[0]);
-                try index_data.append(face[2]);
-                try index_data.append(face[0]);
-                try index_data.append(face[3]);
-            }
-            break :index_data index_data.items;
-        };
 
         // Create a vertex buffer.
         const vertex_buffer = gctx.createBuffer(.{
             .usage = .{ .copy_dst = true, .vertex = true },
-            .size = vertex_data.len * @sizeOf(Vertex),
+            .size = mesh.vertices.len * @sizeOf(Vertex),
         });
-        gctx.queue.writeBuffer(gctx.lookupResource(vertex_buffer).?, 0, Vertex, vertex_data[0..]);
+        gctx.queue.writeBuffer(gctx.lookupResource(vertex_buffer).?, 0, Vertex, mesh.vertices[0..]);
 
         // Create an index buffer.
         const index_buffer = gctx.createBuffer(.{
             .usage = .{ .copy_dst = true, .index = true },
-            .size = index_data.len * @sizeOf(u32),
+            .size = mesh.indices.len * @sizeOf(u32),
         });
-        gctx.queue.writeBuffer(gctx.lookupResource(index_buffer).?, 0, u32, index_data[0..]);
+        gctx.queue.writeBuffer(gctx.lookupResource(index_buffer).?, 0, u32, mesh.indices[0..]);
 
         try models.append(.{
             .label = try allocator.dupe(u8, mesh.label),
-            .vert_count = @intCast(index_data.len),
+            .vert_count = @intCast(mesh.indices.len),
             .vertex_buffer = vertex_buffer,
             .index_buffer = index_buffer,
         });
@@ -305,7 +300,7 @@ fn update(demo: *DemoState, allocator: std.mem.Allocator) !void {
         demo.gctx.swapchain_descriptor.height,
     );
     // zgui.showDemoWindow(null);
-    try stateInspector.inspect(state);
+    try stateInspector.inspect(&state);
 }
 
 const Instance = struct {

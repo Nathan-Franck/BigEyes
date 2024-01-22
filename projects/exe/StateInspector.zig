@@ -35,11 +35,11 @@ pub fn inspect(self: *Self, s: anytype) !void {
         }.callback,
     });
 
-    const visibilityStructure = buildFilterVisibilityStructure(.{ .type = @TypeOf(s), .name = "State" }, std.mem.trimRight(u8, filter_buffer, &.{0}));
+    const visibilityStructure = buildFilterVisibilityStructure(.{ .type = @TypeOf(s.*), .name = "State" }, std.mem.trimRight(u8, filter_buffer, &.{0}));
 
     if (visibilityStructure) |vs| {
-        inline for (@typeInfo(@TypeOf(s)).Struct.fields) |field| {
-            const v = @field(s, field.name);
+        inline for (@typeInfo(@typeInfo(@TypeOf(s)).Pointer.child).Struct.fields) |field| {
+            const v = &@field(s, field.name);
             const field_visibility = @field(vs, field.name);
             try inspectField(field, v, field_visibility, arena.allocator());
         }
@@ -106,15 +106,15 @@ fn buildFilterVisibilityStructure(info: anytype, search: []const u8) VisibilityS
 fn inspectField(info: anytype, value: anytype, visibilityStructure: anytype, allocator: std.mem.Allocator) !void {
     switch (@typeInfo(info.type)) {
         .Struct => |structInfo| {
-            var orig_list = std.ArrayList(u8).init(allocator);
-            try orig_list.appendSlice(info.name);
-            const sentinel_slice = try orig_list.toOwnedSliceSentinel(0);
             if (visibilityStructure) |vs| {
+                var orig_list = std.ArrayList(u8).init(allocator);
+                try orig_list.appendSlice(info.name);
+                const sentinel_slice = try orig_list.toOwnedSliceSentinel(0);
                 if (zgui.collapsingHeader(sentinel_slice, .{})) {
                     zgui.indent(.{});
                     defer zgui.unindent(.{});
                     inline for (structInfo.fields) |field| {
-                        const v = @field(value, field.name);
+                        const v = &@field(value, field.name);
                         const field_visibility = @field(vs, field.name);
                         try inspectField(field, v, field_visibility, allocator);
                     }
@@ -122,22 +122,34 @@ fn inspectField(info: anytype, value: anytype, visibilityStructure: anytype, all
             }
         },
         .Array => |arrayInfo| {
-            var orig_list = std.ArrayList(u8).init(allocator);
-            try orig_list.appendSlice(info.name);
-            const sentinel_slice = try orig_list.toOwnedSliceSentinel(0);
             if (visibilityStructure) {
+                var orig_list = std.ArrayList(u8).init(allocator);
+                try orig_list.appendSlice(info.name);
+                const sentinel_slice = try orig_list.toOwnedSliceSentinel(0);
                 if (zgui.collapsingHeader(sentinel_slice, .{})) {
                     zgui.indent(.{});
                     defer zgui.unindent(.{});
-                    for (value) |element| {
-                        try inspectField(.{ .name = "item", .type = arrayInfo.child }, element, true, allocator);
+                    for (value, 0..) |_, i| {
+                        try inspectField(.{ .name = "item", .type = arrayInfo.child }, &value[i], true, allocator);
                     }
                 }
             }
         },
-        else => {
+        .Float => {
             if (visibilityStructure) {
                 zgui.text("{s} ({any}) = {any}", .{ info.name, info.type, value });
+                const text = try std.fmt.allocPrint(allocator, "{s}##{?}" ++ .{0}, .{ info.name, value });
+                _ = zgui.inputFloat(text[0 .. text.len - 1 :0], .{ .v = value });
+            }
+        },
+        .Bool => {
+            if (visibilityStructure) {
+                _ = zgui.checkbox(info.name ++ " (bool)", .{ .v = value });
+            }
+        },
+        else => {
+            if (visibilityStructure) {
+                zgui.text("{s} ({any}) = {any}", .{ info.name, info.type, value.* });
             }
         },
     }
