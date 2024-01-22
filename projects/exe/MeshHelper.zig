@@ -19,12 +19,10 @@ pub fn calculateNormals(allocator: std.mem.Allocator, points: []const Point, pol
         normals.append(if (vertexToPoly.get(@intCast(i))) |local_polys| average_normal: {
             var average_normal = Point{ 0, 0, 0, 0 };
             for (local_polys.items) |poly| {
-                const poly_normal = if (poly.len == 3)
-                    zmath.cross3(points[poly[1]] - points[poly[0]], points[poly[2]] - points[poly[0]])
-                else if (poly.len == 4)
-                    zmath.cross3(points[poly[1]] - points[poly[0]], points[poly[2]] - points[poly[0]])
-                else
-                    average_normal;
+                var poly_normal = Point{ 0, 0, 0, 0 };
+                for (poly[1..], 1..) |_, j| {
+                    poly_normal -= zmath.cross3(points[poly[j - 1]] - points[poly[0]], points[poly[j]] - points[poly[0]]);
+                }
                 average_normal += zmath.normalize3(poly_normal) / @as(@Vector(4, f32), @splat(@floatFromInt(local_polys.items.len)));
             }
             break :average_normal average_normal;

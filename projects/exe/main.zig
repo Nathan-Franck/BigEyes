@@ -198,7 +198,6 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !DemoState {
         var meshes = std.ArrayList(struct { label: []const u8, vertices: []Vertex, indices: []u32 }).init(allocator);
         const perform_subdiv_pass = false;
         for (polygonJSON.value.meshes) |mesh| {
-            // const flipped_vertices = mesh.vertices;
             const flipped_vertices = MeshHelper.flipYZ(arena.allocator(), mesh.vertices);
             try meshes.append(mesh: {
                 if (!perform_subdiv_pass) {
