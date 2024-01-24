@@ -123,16 +123,16 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !DemoState {
                 .target_count = color_targets.len,
                 .targets = &color_targets,
             },
-            // .multisample = wgpu.MultisampleState{
-            //     .count = 4,
-            // },
         };
         break :pipline gctx.createRenderPipeline(pipeline_layout, pipeline_descriptor);
     };
 
-    const bind_group = gctx.createBindGroup(bind_group_layout, &[_]zgpu.BindGroupEntryInfo{
-        .{ .binding = 0, .buffer_handle = gctx.uniforms.buffer, .offset = 0, .size = @sizeOf(zmath.Mat) },
-    });
+    const bind_group = gctx.createBindGroup(bind_group_layout, &[_]zgpu.BindGroupEntryInfo{.{
+        .binding = 0,
+        .buffer_handle = gctx.uniforms.buffer,
+        .offset = 0,
+        .size = @sizeOf(zmath.Mat),
+    }});
 
     var arena = std.heap.ArenaAllocator.init(allocator);
     defer arena.deinit();
@@ -141,7 +141,11 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !DemoState {
 
         // Load seperately a json file with the polygon data, should be called *.gltf.json
         const polygonJSON = json: {
-            const json_data = std.fs.cwd().readFileAlloc(arena.allocator(), content_dir ++ "RockLevel.blend.json", 512 * 1024 * 1024) catch |err| {
+            const json_data = std.fs.cwd().readFileAlloc(
+                arena.allocator(),
+                content_dir ++ "RockLevel.blend.json",
+                512 * 1024 * 1024,
+            ) catch |err| {
                 std.log.err("Failed to read JSON file: {}", .{err});
                 return err;
             };
@@ -210,7 +214,11 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !DemoState {
                             const normals = MeshHelper.calculateNormals(arena.allocator(), flipped_vertices, mesh.polygons);
                             var vertices = std.ArrayList(Vertex).init(arena.allocator());
                             for (flipped_vertices, 0..) |point, i| {
-                                try vertices.append(Vertex{ .position = @as([4]f32, point)[0..3].*, .color = hexColors[i % hexColors.len], .normal = @as([4]f32, normals[i])[0..3].* });
+                                try vertices.append(Vertex{
+                                    .position = @as([4]f32, point)[0..3].*,
+                                    .color = hexColors[i % hexColors.len],
+                                    .normal = @as([4]f32, normals[i])[0..3].*,
+                                });
                             }
                             break :vertices vertices.items;
                         },
@@ -227,7 +235,11 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !DemoState {
                         const normals = MeshHelper.calculateNormals(arena.allocator(), result.points, result.quads);
                         var vertices = std.ArrayList(Vertex).init(arena.allocator());
                         for (result.points, 0..) |point, i| {
-                            try vertices.append(Vertex{ .position = @as([4]f32, point)[0..3].*, .color = hexColors[i % hexColors.len], .normal = @as([4]f32, normals[i])[0..3].* });
+                            try vertices.append(Vertex{
+                                .position = @as([4]f32, point)[0..3].*,
+                                .color = hexColors[i % hexColors.len],
+                                .normal = @as([4]f32, normals[i])[0..3].*,
+                            });
                         }
                         break :vertices vertices.items;
                     };
@@ -308,7 +320,10 @@ fn draw(demo: *DemoState) void {
     const t = @as(f32, @floatCast(gctx.stats.time));
     _ = t;
 
-    const cam_world_to_view = zmath.mul(zmath.inverse(zmath.matFromRollPitchYawV(zmath.loadArr3(state.camera_view.rotation))), zmath.inverse(zmath.translationV(zmath.loadArr3(state.camera_view.translation))));
+    const cam_world_to_view = zmath.mul(
+        zmath.inverse(zmath.matFromRollPitchYawV(zmath.loadArr3(state.camera_view.rotation))),
+        zmath.inverse(zmath.translationV(zmath.loadArr3(state.camera_view.translation))),
+    );
     const cam_view_to_clip = zmath.perspectiveFovLh(
         0.25 * math.pi,
         @as(f32, @floatFromInt(fb_width)) / @as(f32, @floatFromInt(fb_height)),
@@ -423,7 +438,6 @@ fn createDepthTexture(gctx: *zgpu.GraphicsContext) struct {
         },
         .format = .depth32_float,
         .mip_level_count = 1,
-        // .sample_count = 4,
     });
     const view = gctx.createTextureView(texture, .{});
     return .{ .texture = texture, .view = view };
@@ -467,7 +481,6 @@ pub fn main() !void {
     };
     defer window.destroy();
     window.setSizeLimits(400, 400, -1, -1);
-    // zglfw.windowHintTyped(.samples, 4); MSAA attempt
 
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();

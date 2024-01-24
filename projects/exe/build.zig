@@ -4,13 +4,13 @@ const content_dir = "content/";
 const ExportMeshes = struct {
     allocator: std.mem.Allocator,
     files: []const []const u8,
-    step: std.build.Step,
+    step: std.Build.Step,
     pub fn create(b: *std.Build, files: []const []const u8) *ExportMeshes {
         const self = b.allocator.create(ExportMeshes) catch @panic("OOM");
         self.* = .{
             .allocator = b.allocator,
             .files = files,
-            .step = std.build.Step.init(.{
+            .step = std.Build.Step.init(.{
                 .id = .custom,
                 .name = "export_meshes",
                 .owner = b,
@@ -19,7 +19,7 @@ const ExportMeshes = struct {
         };
         return self;
     }
-    fn exportMeshes(step: *std.build.Step, prog_node: *std.Progress.Node) !void {
+    fn exportMeshes(step: *std.Build.Step, prog_node: *std.Progress.Node) !void {
         _ = prog_node;
         const self = @fieldParentPtr(ExportMeshes, "step", step);
 
@@ -66,7 +66,7 @@ const ExportMeshes = struct {
 
 pub fn build(
     b: *std.Build,
-    target: std.zig.CrossTarget,
+    target: std.Build.ResolvedTarget,
     optimize: std.builtin.OptimizeMode,
 ) !*std.Build.Step {
     const exe = b.addExecutable(.{
@@ -89,18 +89,20 @@ pub fn build(
     zmath_pkg.link(exe);
     zmesh_pkg.link(exe);
 
-    exe.addModule("subdiv", b.createModule(.{
-        .source_file = .{ .path = thisDir() ++ "/../../libs/subdiv/subdiv.zig" },
-        .dependencies = &.{
+    exe.root_module.addImport("subdiv", b.addModule("subdiv", .{
+        .root_source_file = .{ .path = thisDir() ++ "/../../libs/subdiv/subdiv.zig" },
+        .imports = &.{
             .{ .name = "zmath", .module = zmath_pkg.zmath },
         },
     }));
 
     const export_meshes = ExportMeshes.create(b, &.{ "boss", "cube", "cat", "RockLevel" });
 
-    const exe_options = b.addOptions();
-    exe.addOptions("build_options", exe_options);
-    exe_options.addOption([]const u8, "content_dir", content_dir);
+    exe.root_module.addImport("build_options", build_options: {
+        const step = b.addOptions();
+        step.addOption([]const u8, "content_dir", content_dir);
+        break :build_options step.createModule();
+    });
 
     const install_content_step = b.addInstallDirectory(.{
         .source_dir = .{ .path = thisDir() ++ "/../../" ++ content_dir },
@@ -112,8 +114,8 @@ pub fn build(
 
     // Windows hax
     exe.want_lto = false;
-    if (exe.optimize == .ReleaseFast)
-        exe.strip = true;
+    // if (exe.optimize == .ReleaseFast)
+    //     exe.strip = true;
 
     const install_artifact = b.addInstallArtifact(exe, .{});
     const run_cmd = b.addRunArtifact(exe);
