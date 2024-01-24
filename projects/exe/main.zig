@@ -204,14 +204,14 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !DemoState {
         const MeshHelper = @import("./MeshHelper.zig");
         var meshes = std.ArrayList(struct { label: []const u8, vertices: []Vertex, indices: []u32 }).init(allocator);
         const perform_subdiv_pass = false;
-        for (polygonJSON.value.meshes) |mesh| {
-            const flipped_vertices = MeshHelper.flipYZ(arena.allocator(), mesh.vertices);
+        for (polygonJSON.value.meshes) |input_data| {
+            const flipped_vertices = MeshHelper.flipYZ(arena.allocator(), input_data.vertices);
             try meshes.append(mesh: {
                 if (!perform_subdiv_pass) {
                     break :mesh .{
-                        .label = mesh.name,
+                        .label = input_data.name,
                         .vertices = vertices: {
-                            const normals = MeshHelper.calculateNormals(.Face, arena.allocator(), flipped_vertices, mesh.polygons);
+                            const normals = MeshHelper.calculateNormals(.Face, arena.allocator(), flipped_vertices, input_data.polygons);
                             var vertices = std.ArrayList(Vertex).init(arena.allocator());
                             for (flipped_vertices, 0..) |point, i| {
                                 try vertices.append(Vertex{
@@ -222,10 +222,10 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !DemoState {
                             }
                             break :vertices vertices.items;
                         },
-                        .indices = MeshHelper.polygonToTris(.Face, arena.allocator(), mesh.polygons),
+                        .indices = MeshHelper.polygonToTris(.Face, arena.allocator(), input_data.polygons),
                     };
                 } else {
-                    var result = try subdiv.init(.Face).cmcSubdiv(arena.allocator(), flipped_vertices, mesh.polygons);
+                    var result = try subdiv.init(.Face).cmcSubdiv(arena.allocator(), flipped_vertices, input_data.polygons);
                     var subdiv_count: u32 = 1;
                     while (subdiv_count < 3) {
                         result = try subdiv.init(.Quad).cmcSubdiv(arena.allocator(), result.points, result.quads);
@@ -244,7 +244,7 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !DemoState {
                         break :vertices vertices.items;
                     };
                     break :mesh .{
-                        .label = mesh.name,
+                        .label = input_data.name,
                         .vertices = vertices,
                         .indices = MeshHelper.polygonToTris(.Quad, arena.allocator(), result.quads),
                     };
