@@ -68,7 +68,7 @@ pub fn build(
     b: *std.Build,
     target: std.Build.ResolvedTarget,
     optimize: std.builtin.OptimizeMode,
-) !*std.Build.Step {
+) !void {
     const exe = b.addExecutable(.{
         .name = "triangle_wgpu",
         .root_source_file = .{ .path = thisDir() ++ "/main.zig" },
@@ -82,6 +82,12 @@ pub fn build(
     const zpool_pkg = @import("zpool").package(b, target, optimize, .{});
     const zgpu_pkg = @import("zgpu").package(b, target, optimize, .{ .deps = .{ .zglfw = zglfw_pkg, .zpool = zpool_pkg } });
     const zmesh_pkg = @import("zmesh").package(b, target, optimize, .{});
+    const subdiv = b.addModule("subdiv", .{
+        .root_source_file = .{ .path = thisDir() ++ "/../../libs/subdiv/subdiv.zig" },
+        .imports = &.{
+            .{ .name = "zmath", .module = zmath_pkg.zmath },
+        },
+    });
 
     zgui_pkg.link(exe);
     zglfw_pkg.link(exe);
@@ -89,28 +95,10 @@ pub fn build(
     zmath_pkg.link(exe);
     zmesh_pkg.link(exe);
 
-    exe.root_module.addImport("subdiv", b.addModule("subdiv", .{
-        .root_source_file = .{ .path = thisDir() ++ "/../../libs/subdiv/subdiv.zig" },
-        .imports = &.{
-            .{ .name = "zmath", .module = zmath_pkg.zmath },
-        },
-    }));
+    exe.root_module.addImport("subdiv", subdiv);
 
     const export_meshes = ExportMeshes.create(b, &.{ "boss", "cube", "cat", "RockLevel" });
-
-    exe.root_module.addImport("build_options", build_options: {
-        const step = b.addOptions();
-        step.addOption([]const u8, "content_dir", content_dir);
-        break :build_options step.createModule();
-    });
-
-    const install_content_step = b.addInstallDirectory(.{
-        .source_dir = .{ .path = thisDir() ++ "/../../" ++ content_dir },
-        .install_dir = .{ .custom = "" },
-        .install_subdir = "bin/" ++ content_dir,
-    });
-    exe.step.dependOn(&install_content_step.step);
-    install_content_step.step.dependOn(&export_meshes.step);
+    exe.step.dependOn(&export_meshes.step);
 
     // Windows hax
     exe.want_lto = false;
@@ -125,7 +113,19 @@ pub fn build(
     }
     run_cmd.step.dependOn(&install_artifact.step);
 
-    return &run_cmd.step;
+    const install_step = b.step("exe", "build an exe");
+    install_step.dependOn(&install_artifact.step);
+
+    const run_step = b.step("exe-run", "run the exe");
+    run_step.dependOn(&run_cmd.step);
+
+    const main_tests = b.addTest(.{ .root_source_file = .{ .path = thisDir() ++ "/tests.zig" } });
+    main_tests.root_module.addImport("subdiv", subdiv);
+    // main_tests.root_module.addImport("embedded_assets", embedded_assets);
+    zmath_pkg.link(main_tests);
+    const test_step = b.step("exe-test", "run tests");
+    test_step.dependOn(&main_tests.step);
+    b.default_step.dependOn(test_step);
 }
 
 inline fn thisDir() []const u8 {

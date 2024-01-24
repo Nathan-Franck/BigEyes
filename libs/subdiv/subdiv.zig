@@ -4,10 +4,6 @@ const ArrayList = std.ArrayList;
 
 pub const Point = zmath.Vec;
 pub const Face = []const u32;
-pub const PolyType = enum {
-    Face,
-    Quad,
-};
 pub const Quad = [4]u32;
 pub const Mesh = struct { points: []const Point, quads: []const Quad };
 const EdgesFace = struct {
@@ -22,9 +18,12 @@ const PointEx = struct {
     n: u32,
 };
 
-pub fn init(comptime poly_type: PolyType) type {
+pub fn Polygon(comptime poly_selection: enum {
+    Face,
+    Quad,
+}) type {
     return struct {
-        const Poly = switch (poly_type) {
+        const Poly = switch (poly_selection) {
             .Face => Face,
             .Quad => Quad,
         };
@@ -294,7 +293,7 @@ test "getFacePoints" {
         &[_]u32{ 0, 1, 2, 3 },
         &[_]u32{ 0, 1, 5, 4 },
     };
-    const result = try init(.Face).getFacePoints(
+    const result = try Polygon(.Face).getFacePoints(
         allocator,
         &points,
         &faces,
@@ -325,7 +324,7 @@ test "getEdgesFaces" {
         &[_]u32{ 0, 1, 2, 3 },
         &[_]u32{ 0, 1, 5, 4 },
     };
-    const result = try init(.Face).getEdgesFaces(
+    const result = try Polygon(.Face).getEdgesFaces(
         allocator,
         &points,
         &faces,
@@ -354,7 +353,7 @@ test "getPointsFaces" {
         &[_]u32{ 0, 1, 2, 3 },
         &[_]u32{ 0, 1, 5, 4 },
     };
-    const result = try init(.Face).getPointsFaces(
+    const result = try Polygon(.Face).getPointsFaces(
         allocator,
         &points,
         &faces,
@@ -377,7 +376,7 @@ test "cmcSubdiv" {
         &[_]u32{ 0, 1, 2, 3 },
         &[_]u32{ 0, 1, 5, 4 },
     };
-    const result = try init(.Face).cmcSubdiv(
+    const result = try Polygon(.Face).cmcSubdiv(
         allocator,
         &points,
         &faces,
