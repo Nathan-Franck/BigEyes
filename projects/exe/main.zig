@@ -5,10 +5,10 @@ const zgpu = @import("zgpu");
 const wgpu = zgpu.wgpu;
 const zgui = @import("zgui");
 const zmath = @import("zmath");
+const Vertex = @import("./MeshLoader.zig").Vertex;
 
 const subdiv = @import("subdiv");
 
-const content_dir = @import("build_options").content_dir;
 const window_title = "zig-gamedev: triangle (wgpu)";
 
 // zig fmt: off
@@ -40,12 +40,6 @@ const wgsl_fs =
 \\  }
 // zig fmt: on
 ;
-
-const Vertex = struct {
-    position: [3]f32,
-    color: [3]f32,
-    normal: [3]f32,
-};
 
 const Model = struct {
     label: []const u8,
@@ -137,122 +131,7 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !DemoState {
     var arena = std.heap.ArenaAllocator.init(allocator);
     defer arena.deinit();
 
-    const meshes = meshes: {
-
-        // Load seperately a json file with the polygon data, should be called *.gltf.json
-        const polygonJSON = json: {
-            const json_data = std.fs.cwd().readFileAlloc(
-                arena.allocator(),
-                content_dir ++ "RockLevel.blend.json",
-                512 * 1024 * 1024,
-            ) catch |err| {
-                std.log.err("Failed to read JSON file: {}", .{err});
-                return err;
-            };
-            const Config = struct {
-                actions: []const struct {
-                    name: []const u8,
-                    fcurves: []const struct {
-                        data_path: []const u8,
-                        array_index: u32,
-                        keyframes: []const [2]f32,
-                    },
-                },
-                nodes: []const struct {
-                    name: []const u8,
-                    type: []const u8,
-                    parent: ?[]const u8,
-                    position: [3]f32,
-                    rotation: [3]f32,
-                    scale: [3]f32,
-                },
-                armatures: []const struct {
-                    name: []const u8,
-                    bones: []const struct {
-                        name: []const u8,
-                        parent: ?[]const u8,
-                        position: [3]f32,
-                        rotation: [3]f32,
-                        scale: [3]f32,
-                    },
-                },
-                meshes: []const struct {
-                    name: []const u8,
-                    polygons: []const subdiv.Face,
-                    vertices: []const subdiv.Point,
-                    shapeKeys: []struct { name: []const u8, vertices: []const subdiv.Point },
-                    vertexGroups: []const struct {
-                        name: []const u8,
-                        vertices: []const struct { index: u32, weight: f32 },
-                    },
-                },
-            };
-            break :json std.json.parseFromSlice(Config, arena.allocator(), json_data, .{}) catch |err| {
-                std.log.err("Failed to parse JSON: {}", .{err});
-                return err;
-            };
-        };
-
-        const hexColors = [_][3]f32{
-            .{ 1.0, 0.0, 0.0 },
-            .{ 0.0, 1.0, 0.0 },
-            .{ 0.0, 0.0, 1.0 },
-            .{ 1.0, 1.0, 0.0 },
-            .{ 1.0, 0.0, 1.0 },
-            .{ 0.0, 1.0, 1.0 },
-        };
-        const MeshHelper = @import("./MeshHelper.zig");
-        var meshes = std.ArrayList(struct { label: []const u8, vertices: []Vertex, indices: []u32 }).init(allocator);
-        const perform_subdiv_pass = false;
-        for (polygonJSON.value.meshes) |input_data| {
-            const flipped_vertices = MeshHelper.flipYZ(arena.allocator(), input_data.vertices);
-            try meshes.append(mesh: {
-                if (!perform_subdiv_pass) {
-                    break :mesh .{
-                        .label = input_data.name,
-                        .vertices = vertices: {
-                            const normals = MeshHelper.calculateNormals(.Face, arena.allocator(), flipped_vertices, input_data.polygons);
-                            var vertices = std.ArrayList(Vertex).init(arena.allocator());
-                            for (flipped_vertices, 0..) |point, i| {
-                                try vertices.append(Vertex{
-                                    .position = @as([4]f32, point)[0..3].*,
-                                    .color = hexColors[i % hexColors.len],
-                                    .normal = @as([4]f32, normals[i])[0..3].*,
-                                });
-                            }
-                            break :vertices vertices.items;
-                        },
-                        .indices = MeshHelper.polygonToTris(.Face, arena.allocator(), input_data.polygons),
-                    };
-                } else {
-                    var result = try subdiv.init(.Face).cmcSubdiv(arena.allocator(), flipped_vertices, input_data.polygons);
-                    var subdiv_count: u32 = 1;
-                    while (subdiv_count < 3) {
-                        result = try subdiv.init(.Quad).cmcSubdiv(arena.allocator(), result.points, result.quads);
-                        subdiv_count += 1;
-                    }
-                    const vertices = vertices: {
-                        const normals = MeshHelper.calculateNormals(.Quad, arena.allocator(), result.points, result.quads);
-                        var vertices = std.ArrayList(Vertex).init(arena.allocator());
-                        for (result.points, 0..) |point, i| {
-                            try vertices.append(Vertex{
-                                .position = @as([4]f32, point)[0..3].*,
-                                .color = hexColors[i % hexColors.len],
-                                .normal = @as([4]f32, normals[i])[0..3].*,
-                            });
-                        }
-                        break :vertices vertices.items;
-                    };
-                    break :mesh .{
-                        .label = input_data.name,
-                        .vertices = vertices,
-                        .indices = MeshHelper.polygonToTris(.Quad, arena.allocator(), result.quads),
-                    };
-                }
-            });
-        }
-        break :meshes meshes;
-    };
+    const meshes = try @import("./MeshLoader.zig").getMeshes(arena.allocator());
 
     var models = std.ArrayList(Model).init(allocator);
     for (meshes.items) |mesh| {
@@ -503,7 +382,7 @@ pub fn main() !void {
     zgui.init(allocator);
     defer zgui.deinit();
 
-    _ = zgui.io.addFontFromFile(content_dir ++ "Roboto-Medium.ttf", math.floor(16.0 * scale_factor));
+    _ = zgui.io.addFontFromMemory(@embedFile("content/Roboto-Medium.ttf"), math.floor(16.0 * scale_factor));
 
     zgui.backend.init(
         window,
