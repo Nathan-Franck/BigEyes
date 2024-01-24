@@ -4,21 +4,65 @@ const zmath = @import("zmath");
 pub const Point = zmath.Vec;
 pub const Face = []const u32;
 pub const Quad = [4]u32;
-const PolyType = enum {
-    Quad,
-    Face,
-};
+const PolyType = TypePicker(.{ .Face = Face, .Quad = Quad });
+
+inline fn SelectionEnum(comptime types: anytype) blk: {
+    const input_fields = @typeInfo(@TypeOf(types)).Struct.fields;
+    var fields: []const std.builtin.Type.EnumField = &.{};
+    for (input_fields, 0..) |input_field, i| {
+        fields = fields ++ &[_]std.builtin.Type.EnumField{.{
+            .name = input_field.name,
+            .value = i,
+        }};
+    }
+    break :blk @Type(.{ .Enum = .{
+        .tag_type = u32,
+        .decls = &.{},
+        .is_exhaustive = true,
+        .fields = fields,
+    } });
+} {
+    const input_fields = @typeInfo(@TypeOf(types)).Struct.fields;
+    var fields: []const std.builtin.Type.EnumField = &.{};
+    inline for (input_fields, 0..) |input_field, i| {
+        fields = fields ++ &[_]std.builtin.Type.EnumField{.{
+            .name = input_field.name,
+            .value = i,
+        }};
+    }
+    return @Type(.{ .Enum = .{
+        .tag_type = u32,
+        .decls = &.{},
+        .is_exhaustive = true,
+        .fields = fields,
+    } });
+}
+
+pub fn TypePicker(types: anytype) struct {
+    Selection: type,
+    Type: fn (comptime selection: SelectionEnum(types)) type,
+} {
+    return .{
+        .Selection = SelectionEnum(types),
+        .Type = struct {
+            fn retrieveType(comptime selection: SelectionEnum(types)) type {
+                const input_fields = @typeInfo(@TypeOf(types)).Struct.fields;
+                return result: inline for (input_fields) |input_field| {
+                    if (input_field.name == @typeInfo(@TypeOf(selection)).EnumField.name)
+                        break :result input_field.type;
+                };
+            }
+        }.retrieveType,
+    };
+}
 
 pub fn calculateNormals(
-    comptime poly_type: PolyType,
+    comptime poly_selection: PolyType.Selection,
     allocator: std.mem.Allocator,
     points: []const Point,
-    polygons: []const switch (poly_type) {
-        .Quad => Quad,
-        .Face => Face,
-    },
+    polygons: []const PolyType.Type(poly_selection),
 ) []const Point {
-    const Poly = @typeInfo(@TypeOf(polygons)).Pointer.child;
+    const Poly = PolyType.Type(poly_selection);
     var vertexToPoly = std.AutoHashMap(u32, std.ArrayList(Poly)).init(allocator);
     for (polygons) |polygon| {
         for (polygon) |vertex| {
@@ -53,12 +97,9 @@ pub fn flipYZ(allocator: std.mem.Allocator, points: []const Point) []const Point
 }
 
 pub fn polygonToTris(
-    comptime poly_type: PolyType,
+    comptime poly_selection: PolyType.Selection,
     allocator: std.mem.Allocator,
-    polygons: []const switch (poly_type) {
-        .Quad => Quad,
-        .Face => Face,
-    },
+    polygons: []const PolyType.Type(poly_selection),
 ) []u32 {
     var indices = std.ArrayList(u32).init(allocator);
     for (polygons) |polygon| {
