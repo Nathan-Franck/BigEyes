@@ -211,7 +211,7 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !DemoState {
                     break :mesh .{
                         .label = mesh.name,
                         .vertices = vertices: {
-                            const normals = MeshHelper.calculateNormals(arena.allocator(), flipped_vertices, mesh.polygons);
+                            const normals = MeshHelper.calculateNormals(.Face, arena.allocator(), flipped_vertices, mesh.polygons);
                             var vertices = std.ArrayList(Vertex).init(arena.allocator());
                             for (flipped_vertices, 0..) |point, i| {
                                 try vertices.append(Vertex{
@@ -222,17 +222,17 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !DemoState {
                             }
                             break :vertices vertices.items;
                         },
-                        .indices = MeshHelper.polygonToTris(arena.allocator(), mesh.polygons),
+                        .indices = MeshHelper.polygonToTris(.Face, arena.allocator(), mesh.polygons),
                     };
                 } else {
-                    var result = try subdiv.Subdiv(true).cmcSubdiv(arena.allocator(), flipped_vertices, mesh.polygons);
+                    var result = try subdiv.init(.Face).cmcSubdiv(arena.allocator(), flipped_vertices, mesh.polygons);
                     var subdiv_count: u32 = 1;
                     while (subdiv_count < 3) {
-                        result = try subdiv.Subdiv(false).cmcSubdiv(arena.allocator(), result.points, result.quads);
+                        result = try subdiv.init(.Quad).cmcSubdiv(arena.allocator(), result.points, result.quads);
                         subdiv_count += 1;
                     }
                     const vertices = vertices: {
-                        const normals = MeshHelper.calculateNormals(arena.allocator(), result.points, result.quads);
+                        const normals = MeshHelper.calculateNormals(.Quad, arena.allocator(), result.points, result.quads);
                         var vertices = std.ArrayList(Vertex).init(arena.allocator());
                         for (result.points, 0..) |point, i| {
                             try vertices.append(Vertex{
@@ -246,7 +246,7 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !DemoState {
                     break :mesh .{
                         .label = mesh.name,
                         .vertices = vertices,
-                        .indices = MeshHelper.polygonToTris(arena.allocator(), result.quads),
+                        .indices = MeshHelper.polygonToTris(.Quad, arena.allocator(), result.quads),
                     };
                 }
             });

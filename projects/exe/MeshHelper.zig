@@ -4,12 +4,25 @@ const zmath = @import("zmath");
 pub const Point = zmath.Vec;
 pub const Face = []const u32;
 pub const Quad = [4]u32;
+const PolyType = enum {
+    Quad,
+    Face,
+};
 
-pub fn calculateNormals(allocator: std.mem.Allocator, points: []const Point, polygons: []const Face) []const Point {
-    var vertexToPoly = std.AutoHashMap(u32, std.ArrayList([]const u32)).init(allocator);
+pub fn calculateNormals(
+    comptime poly_type: PolyType,
+    allocator: std.mem.Allocator,
+    points: []const Point,
+    polygons: []const switch (poly_type) {
+        .Quad => Quad,
+        .Face => Face,
+    },
+) []const Point {
+    const Poly = @typeInfo(@TypeOf(polygons)).Pointer.child;
+    var vertexToPoly = std.AutoHashMap(u32, std.ArrayList(Poly)).init(allocator);
     for (polygons) |polygon| {
         for (polygon) |vertex| {
-            var polysList = if (vertexToPoly.get(vertex)) |existing| existing else std.ArrayList([]const u32).init(allocator);
+            var polysList = if (vertexToPoly.get(vertex)) |existing| existing else std.ArrayList(Poly).init(allocator);
             polysList.append(polygon) catch unreachable;
             vertexToPoly.put(vertex, polysList) catch unreachable;
         }
@@ -39,12 +52,16 @@ pub fn flipYZ(allocator: std.mem.Allocator, points: []const Point) []const Point
     return flipped.items;
 }
 
-pub fn polygonToTris(allocator: std.mem.Allocator, polygons: []const []const u32) []u32 {
+pub fn polygonToTris(
+    comptime poly_type: PolyType,
+    allocator: std.mem.Allocator,
+    polygons: []const switch (poly_type) {
+        .Quad => Quad,
+        .Face => Face,
+    },
+) []u32 {
     var indices = std.ArrayList(u32).init(allocator);
     for (polygons) |polygon| {
-        if (polygon.len < 3) {
-            continue;
-        }
         for (polygon[1..], 1..) |_, i| {
             indices.append(polygon[0]) catch unreachable;
             indices.append(polygon[i - 1]) catch unreachable;

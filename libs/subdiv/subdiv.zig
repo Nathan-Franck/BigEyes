@@ -4,6 +4,10 @@ const ArrayList = std.ArrayList;
 
 pub const Point = zmath.Vec;
 pub const Face = []const u32;
+pub const PolyType = enum {
+    Face,
+    Quad,
+};
 pub const Quad = [4]u32;
 pub const Mesh = struct { points: []const Point, quads: []const Quad };
 const EdgesFace = struct {
@@ -18,12 +22,13 @@ const PointEx = struct {
     n: u32,
 };
 
-var subdiv = Subdiv(true);
-
-pub fn Subdiv(comptime first_pass: bool) type {
+pub fn init(comptime poly_type: PolyType) type {
     return struct {
-        const FaceType = if (first_pass) Face else Quad;
-        fn getFacePoints(allocator: std.mem.Allocator, inputPoints: []const Point, inputFaces: []const FaceType) ![]Point {
+        const Poly = switch (poly_type) {
+            .Face => Face,
+            .Quad => Quad,
+        };
+        fn getFacePoints(allocator: std.mem.Allocator, inputPoints: []const Point, inputFaces: []const Poly) ![]Point {
             var facePoints = try ArrayList(Point).initCapacity(allocator, inputFaces.len);
             for (inputFaces) |face| {
                 var facePoint = Point{ 0, 0, 0, 1 };
@@ -40,7 +45,7 @@ pub fn Subdiv(comptime first_pass: bool) type {
             return (p1 + p2) / @as(Point, @splat(@as(f32, @floatCast(2))));
         }
 
-        fn getEdgesFaces(allocator: std.mem.Allocator, inputPoints: []const Point, inputFaces: []const FaceType) ![]const EdgesFace {
+        fn getEdgesFaces(allocator: std.mem.Allocator, inputPoints: []const Point, inputFaces: []const Poly) ![]const EdgesFace {
             var edges = try ArrayList([3]u32).initCapacity(allocator, inputFaces.len * 4);
             for (inputFaces, 0..) |face, faceNum| {
                 const numPoints = face.len;
@@ -117,7 +122,7 @@ pub fn Subdiv(comptime first_pass: bool) type {
             return edgePoints.items;
         }
 
-        fn getAvgFacePoints(allocator: std.mem.Allocator, inputPoints: []const Point, inputFaces: []const FaceType, facePoints: []const Point) ![]Point {
+        fn getAvgFacePoints(allocator: std.mem.Allocator, inputPoints: []const Point, inputFaces: []const Poly, facePoints: []const Point) ![]Point {
             var tempPoints = try ArrayList(PointEx).initCapacity(allocator, inputPoints.len);
             for (inputPoints) |_| {
                 try tempPoints.append(PointEx{ .p = Point{ 0, 0, 0, 1 }, .n = 0 });
@@ -156,7 +161,7 @@ pub fn Subdiv(comptime first_pass: bool) type {
             return avgMidEdges.items;
         }
 
-        fn getPointsFaces(allocator: std.mem.Allocator, inputPoints: []const Point, inputFaces: []const FaceType) ![]u32 {
+        fn getPointsFaces(allocator: std.mem.Allocator, inputPoints: []const Point, inputFaces: []const Poly) ![]u32 {
             var pointsFaces = try ArrayList(u32).initCapacity(allocator, inputPoints.len);
             for (inputPoints) |_| {
                 try pointsFaces.append(0);
@@ -169,7 +174,7 @@ pub fn Subdiv(comptime first_pass: bool) type {
             return pointsFaces.items;
         }
 
-        fn getNewPoints(allocator: std.mem.Allocator, inputPoints: []const Point, inputFaces: []const FaceType, facePoints: []const Point, edgesFaces: []const EdgesFace) ![]Point {
+        fn getNewPoints(allocator: std.mem.Allocator, inputPoints: []const Point, inputFaces: []const Poly, facePoints: []const Point, edgesFaces: []const EdgesFace) ![]Point {
             var arena = std.heap.ArenaAllocator.init(allocator);
             defer arena.deinit();
 
@@ -200,7 +205,7 @@ pub fn Subdiv(comptime first_pass: bool) type {
             return [_]u32{ pointNums[1], pointNums[0] };
         }
 
-        pub fn cmcSubdiv(allocator: std.mem.Allocator, inputPoints: []const Point, inputFaces: []const FaceType) !Mesh {
+        pub fn cmcSubdiv(allocator: std.mem.Allocator, inputPoints: []const Point, inputFaces: []const Poly) !Mesh {
             var arena = std.heap.ArenaAllocator.init(allocator);
             defer arena.deinit();
 
@@ -243,7 +248,7 @@ pub fn Subdiv(comptime first_pass: bool) type {
             return .{ .points = newPoints.items, .quads = newFaces.items };
         }
 
-        pub fn cmcSubdivOnlyPoints(allocator: std.mem.Allocator, inputPoints: []const Point, inputFaces: []const FaceType) ![]const Point {
+        pub fn cmcSubdivOnlyPoints(allocator: std.mem.Allocator, inputPoints: []const Point, inputFaces: []const Poly) ![]const Point {
             var arena = std.heap.ArenaAllocator.init(allocator);
             defer arena.deinit();
 
@@ -289,7 +294,7 @@ test "getFacePoints" {
         &[_]u32{ 0, 1, 2, 3 },
         &[_]u32{ 0, 1, 5, 4 },
     };
-    const result = try Subdiv(true).getFacePoints(
+    const result = try init(.Face).getFacePoints(
         allocator,
         &points,
         &faces,
@@ -320,7 +325,7 @@ test "getEdgesFaces" {
         &[_]u32{ 0, 1, 2, 3 },
         &[_]u32{ 0, 1, 5, 4 },
     };
-    const result = try Subdiv(true).getEdgesFaces(
+    const result = try init(.Face).getEdgesFaces(
         allocator,
         &points,
         &faces,
@@ -349,7 +354,7 @@ test "getPointsFaces" {
         &[_]u32{ 0, 1, 2, 3 },
         &[_]u32{ 0, 1, 5, 4 },
     };
-    const result = try Subdiv(true).getPointsFaces(
+    const result = try init(.Face).getPointsFaces(
         allocator,
         &points,
         &faces,
@@ -372,7 +377,7 @@ test "cmcSubdiv" {
         &[_]u32{ 0, 1, 2, 3 },
         &[_]u32{ 0, 1, 5, 4 },
     };
-    const result = try Subdiv(true).cmcSubdiv(
+    const result = try init(.Face).cmcSubdiv(
         allocator,
         &points,
         &faces,
