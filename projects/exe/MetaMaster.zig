@@ -1,9 +1,13 @@
 const std = @import("std");
 
-pub fn withFields(source_struct: anytype, field_changes: anytype) @TypeOf(source_struct) {
-    switch (@typeInfo(@TypeOf(source_struct))) {
+/// Merge two structs of data together.
+///
+/// eg. `merge(.{ .a = 0, .b = 2} .{ .a = 1 })` will return a type that is equivalent
+/// to `.{ .a = 1, .b = 2 }`.
+pub fn merge(source_data: anytype, field_changes: anytype) @TypeOf(source_data) {
+    switch (@typeInfo(@TypeOf(source_data))) {
         .Struct => |structInfo| {
-            var result = source_struct;
+            var result = source_data;
             inline for (structInfo.fields) |field| {
                 if (@hasField(@TypeOf(field_changes), field.name))
                     @field(result, field.name) = @field(field_changes, field.name);
@@ -16,10 +20,10 @@ pub fn withFields(source_struct: anytype, field_changes: anytype) @TypeOf(source
     }
 }
 
-test "withFields" {
+test "merge" {
     const Data = struct { a: u32, b: f32, c: bool };
-    const input_data = Data{ .a = 1, .b = 2.0, .c = true };
-    const output_data = withFields(input_data, .{ .a = 3 });
+    const input_data: Data = .{ .a = 1, .b = 2.0, .c = true };
+    const output_data = merge(input_data, .{ .a = 3 });
     try std.testing.expectEqual(output_data, Data{ .a = 3, .b = 2.0, .c = true });
 }
 
@@ -36,7 +40,7 @@ pub fn PickField(comptime t: type, comptime field_tag: anytype) type {
             break :found_field field;
         }
     };
-    return @Type(.{ .Struct = withFields(input_struct, .{
+    return @Type(.{ .Struct = merge(input_struct, .{
         .fields = &.{found_field},
     }) });
 }

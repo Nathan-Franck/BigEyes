@@ -1,6 +1,6 @@
 const std = @import("std");
 const zgui = @import("zgui");
-const mm = @import("./MetaMaster.zig");
+const meta = @import("./MetaMaster.zig");
 
 const Self = @This();
 
@@ -49,11 +49,11 @@ pub fn inspect(self: *Self, s: anytype) !void {
 
 fn VisibilityStructure(comptime State: type) type {
     return switch (@typeInfo(State)) {
-        .Struct => |structInfo| @Type(.{ .Optional = .{ .child = @Type(.{ .Struct = mm.withFields(structInfo, .{
+        .Struct => |structInfo| @Type(.{ .Optional = .{ .child = @Type(.{ .Struct = meta.merge(structInfo, .{
             .fields = fields: {
                 var result: []const std.builtin.Type.StructField = &.{};
                 inline for (structInfo.fields) |field| {
-                    result = result ++ .{mm.withFields(field, .{
+                    result = result ++ .{meta.merge(field, .{
                         .type = VisibilityStructure(field.type),
                     })};
                 }

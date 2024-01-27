@@ -1,9 +1,9 @@
 const std = @import("std");
 const zmath = @import("zmath");
-const mm = @import("./MetaMaster.zig");
+const meta = @import("./MetaMaster.zig");
 
 pub fn main() !void {
-    const thinger: mm.PickField(struct { first: u32, second: f32 }, .first) = .{ .first = 1 };
+    const thinger: meta.PickField(struct { first: u32, second: f32 }, .first) = .{ .first = 1 };
     std.debug.print("Hello, world! {?}\n", .{thinger.first});
 }
 
@@ -40,7 +40,7 @@ const Player = struct {
 
     fn randomInput(
         random: *std.rand.Random,
-    ) struct { player: mm.PickField(@This(), .input) } {
+    ) struct { player: meta.PickField(@This(), .input) } {
         return .{ .player = .{ .input = .{
             .jump = random.int() % 10 == 0,
             .left = random.int() % 2 == 0,
@@ -53,7 +53,7 @@ const Player = struct {
         player: @This(),
         time: Time,
         settings: Settings,
-    ) struct { player: mm.PickField(@This(), .physics) } {
+    ) struct { player: meta.PickField(@This(), .physics) } {
         const velocity = .{
             .x = player.physics.velocity.x + (player.input.right - player.input.left) * time.delta * settings.player_speed,
             .y = player.physics.velocity.y - time.delta * settings.gravity,
