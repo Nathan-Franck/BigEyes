@@ -1,5 +1,9 @@
 const std = @import("std");
 
+/// Map a struct of data to another struct, where the fields are the same name (assumed to be the
+/// same type). This will strip out any fields that are not present in the destination struct.
+///
+/// eg. `withFields(struct { a: u32 }, .{ .a = 5, .b = 6 })` will return a value of `.{ .a = 5 }`.
 pub fn withFields(source_struct: anytype, field_changes: anytype) @TypeOf(source_struct) {
     switch (@typeInfo(@TypeOf(source_struct))) {
         .Struct => |structInfo| {
@@ -16,6 +20,12 @@ pub fn withFields(source_struct: anytype, field_changes: anytype) @TypeOf(source
     }
 }
 
+/// Filter out all but one field from a struct.
+///
+/// eg. `PickField(struct { a: u32, b: f32 }, .my_field)` will return a type that is equivalent to
+/// `struct { a: f32 }`.
+///
+/// This is useful for communicating at comptime partial data changes from a function.
 pub fn PickField(comptime t: type, comptime field_tag: anytype) type {
     const input_struct = @typeInfo(t).Struct;
     const found_field = found_field: for (input_struct.fields) |field| {
