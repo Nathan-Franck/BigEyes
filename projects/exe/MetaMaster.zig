@@ -1,9 +1,5 @@
 const std = @import("std");
 
-/// Map a struct of data to another struct, where the fields are the same name (assumed to be the
-/// same type). This will strip out any fields that are not present in the destination struct.
-///
-/// eg. `withFields(struct { a: u32 }, .{ .a = 5, .b = 6 })` will return a value of `.{ .a = 5 }`.
 pub fn withFields(source_struct: anytype, field_changes: anytype) @TypeOf(source_struct) {
     switch (@typeInfo(@TypeOf(source_struct))) {
         .Struct => |structInfo| {
@@ -18,6 +14,13 @@ pub fn withFields(source_struct: anytype, field_changes: anytype) @TypeOf(source
             @compileError("Can't merge non-struct types");
         },
     }
+}
+
+test "withFields" {
+    const Data = struct { a: u32, b: f32, c: bool };
+    const input_data = Data{ .a = 1, .b = 2.0, .c = true };
+    const output_data = withFields(input_data, .{ .a = 3 });
+    try std.testing.expectEqual(output_data, Data{ .a = 3, .b = 2.0, .c = true });
 }
 
 /// Filter out all but one field from a struct.
@@ -36,4 +39,15 @@ pub fn PickField(comptime t: type, comptime field_tag: anytype) type {
     return @Type(.{ .Struct = withFields(input_struct, .{
         .fields = &.{found_field},
     }) });
+}
+
+test "PickField" {
+    const input_struct = struct { a: u32, b: f32 };
+    const output_struct = PickField(input_struct, .a);
+    const expected_struct = struct { a: u32 };
+    try std.testing.expectEqualSlices(
+        std.builtin.Type.StructField,
+        @typeInfo(output_struct).Struct.fields,
+        @typeInfo(expected_struct).Struct.fields,
+    );
 }
