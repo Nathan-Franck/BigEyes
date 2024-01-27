@@ -341,6 +341,8 @@ const StateInspector = @import("./StateInspector.zig");
 var stateInspector: StateInspector = undefined;
 
 pub fn main() !void {
+    std.debug.print("Hello, triangle!\n", .{});
+
     zglfw.init() catch {
         std.log.err("Failed to initialize GLFW library.\n", .{});
         return;

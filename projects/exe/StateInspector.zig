@@ -1,5 +1,6 @@
 const std = @import("std");
 const zgui = @import("zgui");
+const mm = @import("./MetaMaster.zig");
 
 const Self = @This();
 
@@ -46,29 +47,13 @@ pub fn inspect(self: *Self, s: anytype) !void {
     }
 }
 
-fn withFields(source_struct: anytype, field_changes: anytype) @TypeOf(source_struct) {
-    switch (@typeInfo(@TypeOf(source_struct))) {
-        .Struct => |structInfo| {
-            var result = source_struct;
-            inline for (structInfo.fields) |field| {
-                if (@hasField(@TypeOf(field_changes), field.name))
-                    @field(result, field.name) = @field(field_changes, field.name);
-            }
-            return result;
-        },
-        else => {
-            @compileError("Can't merge non-struct types");
-        },
-    }
-}
-
 fn VisibilityStructure(comptime State: type) type {
     return switch (@typeInfo(State)) {
-        .Struct => |structInfo| @Type(.{ .Optional = .{ .child = @Type(.{ .Struct = withFields(structInfo, .{
+        .Struct => |structInfo| @Type(.{ .Optional = .{ .child = @Type(.{ .Struct = mm.withFields(structInfo, .{
             .fields = fields: {
                 var result: []const std.builtin.Type.StructField = &.{};
                 inline for (structInfo.fields) |field| {
-                    result = result ++ .{withFields(field, .{
+                    result = result ++ .{mm.withFields(field, .{
                         .type = VisibilityStructure(field.type),
                     })};
                 }

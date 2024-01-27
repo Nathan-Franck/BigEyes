@@ -69,13 +69,7 @@ pub fn build(
     target: std.Build.ResolvedTarget,
     optimize: std.builtin.OptimizeMode,
 ) !void {
-    const exe = b.addExecutable(.{
-        .name = "triangle_wgpu",
-        .root_source_file = .{ .path = thisDir() ++ "/main.zig" },
-        .target = target,
-        .optimize = optimize,
-    });
-
+    const export_meshes = ExportMeshes.create(b, &.{ "boss", "cube", "cat", "RockLevel" });
     const zgui_pkg = @import("zgui").package(b, target, optimize, .{ .options = .{ .backend = .glfw_wgpu } });
     const zmath_pkg = @import("zmath").package(b, target, optimize, .{});
     const zglfw_pkg = @import("zglfw").package(b, target, optimize, .{ .options = .{ .shared = false } });
@@ -89,43 +83,66 @@ pub fn build(
         },
     });
 
-    zgui_pkg.link(exe);
-    zglfw_pkg.link(exe);
-    zgpu_pkg.link(exe);
-    zmath_pkg.link(exe);
-    zmesh_pkg.link(exe);
-
-    exe.root_module.addImport("subdiv", subdiv);
-
-    const export_meshes = ExportMeshes.create(b, &.{ "boss", "cube", "cat", "RockLevel" });
-    exe.step.dependOn(&export_meshes.step);
-
-    // Windows hax
-    exe.want_lto = false;
-    // if (exe.optimize == .ReleaseFast)
-    //     exe.strip = true;
-
-    const install_artifact = b.addInstallArtifact(exe, .{});
-    const run_cmd = b.addRunArtifact(exe);
-    run_cmd.step.dependOn(&install_artifact.step);
-    if (b.args) |args| {
-        run_cmd.addArgs(args);
+    // Tests (default)
+    {
+        const main_tests = b.addTest(.{ .root_source_file = .{ .path = thisDir() ++ "/tests.zig" } });
+        main_tests.root_module.addImport("subdiv", subdiv);
+        // main_tests.root_module.addImport("embedded_assets", embedded_assets);
+        zmath_pkg.link(main_tests);
+        const test_step = b.step("exe-test", "run tests");
+        test_step.dependOn(&main_tests.step);
+        b.default_step.dependOn(test_step);
     }
-    run_cmd.step.dependOn(&install_artifact.step);
 
-    const install_step = b.step("exe", "build an exe");
-    install_step.dependOn(&install_artifact.step);
+    // Wasm
+    {
+        var wasm = b.addSharedLibrary(.{
+            .target = b.resolveTargetQuery(.{ .cpu_arch = .wasm32, .os_tag = .freestanding, .abi = .none }),
+            .optimize = .ReleaseSmall,
+            .name = "wasm",
+            .root_source_file = .{ .path = thisDir() ++ "/wasm_entry.zig" },
+        });
+        wasm.rdynamic = true;
+        wasm.step.dependOn(&export_meshes.step);
+        const install_artifact = b.addInstallArtifact(wasm, .{});
+        const install_step = b.step("wasm", "build a wasm");
+        install_step.dependOn(&install_artifact.step);
+    }
 
-    const run_step = b.step("exe-run", "run the exe");
-    run_step.dependOn(&run_cmd.step);
+    // Exe
+    {
+        const exe = b.addExecutable(.{
+            .name = "triangle_wgpu",
+            .root_source_file = .{ .path = thisDir() ++ "/main.zig" },
+            .target = target,
+            .optimize = optimize,
+        });
+        zgui_pkg.link(exe);
+        zglfw_pkg.link(exe);
+        zgpu_pkg.link(exe);
+        zmath_pkg.link(exe);
+        zmesh_pkg.link(exe);
+        exe.root_module.addImport("subdiv", subdiv);
+        exe.step.dependOn(&export_meshes.step);
+        // Windows hax
+        exe.want_lto = false;
+        // if (exe.optimize == .ReleaseFast)
+        //     exe.strip = true;
 
-    const main_tests = b.addTest(.{ .root_source_file = .{ .path = thisDir() ++ "/tests.zig" } });
-    main_tests.root_module.addImport("subdiv", subdiv);
-    // main_tests.root_module.addImport("embedded_assets", embedded_assets);
-    zmath_pkg.link(main_tests);
-    const test_step = b.step("exe-test", "run tests");
-    test_step.dependOn(&main_tests.step);
-    b.default_step.dependOn(test_step);
+        const install_artifact = b.addInstallArtifact(exe, .{});
+        const run_cmd = b.addRunArtifact(exe);
+        run_cmd.step.dependOn(&install_artifact.step);
+        if (b.args) |args| {
+            run_cmd.addArgs(args);
+        }
+        run_cmd.step.dependOn(&install_artifact.step);
+
+        const install_step = b.step("exe", "build an exe");
+        install_step.dependOn(&install_artifact.step);
+
+        const run_step = b.step("exe-run", "run the exe");
+        run_step.dependOn(&run_cmd.step);
+    }
 }
 
 inline fn thisDir() []const u8 {
