@@ -55,3 +55,39 @@ test "PickField" {
         @typeInfo(expected_struct).Struct.fields,
     );
 }
+
+/// Filter out all but a set of fields from a struct.
+///
+/// eg. `Pick(struct { a: u32, b: f32, c: bool }, .{ .a, .c })` will return a type that is equivalent to
+/// `struct { a: u32, c: bool }`.
+///
+/// This is useful for communicating at comptime partial data changes from a function.
+pub fn Pick(comptime t: type, comptime field_tags: anytype) type {
+    const input_struct = @typeInfo(t).Struct;
+    var output_fields: []const std.builtin.Type.StructField = &.{};
+    inline for (input_struct.fields) |field| {
+        if (match: for (@typeInfo(@TypeOf(field_tags)).Struct.fields) |tag| {
+            if (std.mem.eql(u8, field.name, @tagName(@field(field_tags, tag.name)))) {
+                break :match true;
+            }
+        } else false) {
+            output_fields = output_fields ++ &[_]std.builtin.Type.StructField{field};
+        }
+    }
+    return @Type(.{ .Struct = merge(input_struct, .{
+        .fields = output_fields,
+    }) });
+}
+
+test "Pick" {
+    const allocator = std.testing.allocator;
+    _ = allocator; // autofix
+    const input_struct = struct { a: u32, b: f32, c: bool };
+    const output_struct = Pick(input_struct, .{ .a, .c });
+    const expected_struct = struct { a: u32, c: bool };
+    try std.testing.expectEqualSlices(
+        std.builtin.Type.StructField,
+        @typeInfo(output_struct).Struct.fields,
+        @typeInfo(expected_struct).Struct.fields,
+    );
+}
