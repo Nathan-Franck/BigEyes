@@ -120,7 +120,8 @@ pub fn build(
         // exe.initial_memory = std.wasm.page_size * number_of_pages;
         // exe.max_memory = std.wasm.page_size * number_of_pages;
 
-        exe.step.dependOn(&export_meshes.step);
+        // exe.step.dependOn(&export_meshes.step);
+
         const install_artifact = b.addInstallArtifact(exe, .{ .dest_dir = .{ .override = .{ .custom = "../web/bin" } } });
         const install_step = b.step("wasm", "build a wasm");
         install_step.dependOn(&install_artifact.step);

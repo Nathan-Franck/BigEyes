@@ -1,4 +1,3 @@
 {
     "zig.initialSetupDone": true,
-    "zig.zls.enableBuildOnSave": true,
 }
