@@ -13,15 +13,17 @@ pub fn build(b: *std.Build) !*std.Build.Step {
     });
     static_lib.rdynamic = true;
 
-    const zmath_pkg = @import("../../libs/zig-gamedev/libs/zmath/build.zig").package(b, static_lib.target, static_lib.optimize, .{});
-    zmath_pkg.link(static_lib);
+    const zmath_pkg = @import("zmath").package(b, static_lib.target, static_lib.optimize, .{});
 
-    static_lib.addModule("subdiv", b.createModule(.{
-        .source_file = .{ .path = thisDir() ++ "/../../libs/subdiv/subdiv.zig" },
-        .dependencies = &.{
+    const subdiv = b.addModule("subdiv", .{
+        .root_source_file = .{ .path = thisDir() ++ "/../../libs/subdiv/subdiv.zig" },
+        .imports = &.{
             .{ .name = "zmath", .module = zmath_pkg.zmath },
         },
-    }));
+    });
+
+    zmath_pkg.link(static_lib);
+    static_lib.addImport("subdiv", subdiv);
 
     var install = b.addInstallArtifact(static_lib, .{});
     return &install.step;

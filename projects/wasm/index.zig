@@ -3,7 +3,7 @@ const subdiv = @import("subdiv");
 
 export fn testSubdiv(inp: u32) u32 {
     _ = inp;
-    var allocator = std.heap.page_allocator;
+    const allocator = std.heap.page_allocator;
     var points = [_]subdiv.Point{
         subdiv.Point{ -1.0, 1.0, 1.0, 1.0 },
         subdiv.Point{ -1.0, -1.0, 1.0, 1.0 },
@@ -16,7 +16,7 @@ export fn testSubdiv(inp: u32) u32 {
         &[_]u32{ 0, 1, 2, 3 },
         &[_]u32{ 0, 1, 5, 4 },
     };
-    var result = subdiv.Subdiv(true).cmcSubdiv(
+    const result = subdiv.Subdiv(true).cmcSubdiv(
         allocator,
         &points,
         &faces,

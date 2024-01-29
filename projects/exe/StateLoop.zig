@@ -90,6 +90,17 @@ test "first" {
         },
         .time = 0,
         .delta_time = 0,
+        .player = .{
+            .input = .{
+                .jump = false,
+                .left = false,
+                .right = false,
+            },
+            .physics = .{
+                .velocity = .{ .x = 0, .y = 0 },
+                .position = .{ .x = 0, .y = 0 },
+            },
+        },
     };
 
     _ = my_game_loop;

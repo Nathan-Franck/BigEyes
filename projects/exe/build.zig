@@ -96,15 +96,32 @@ pub fn build(
 
     // Wasm
     {
-        var wasm = b.addSharedLibrary(.{
-            .target = b.resolveTargetQuery(.{ .cpu_arch = .wasm32, .os_tag = .freestanding, .abi = .none }),
+        var exe = b.addExecutable(.{
+            .target = b.resolveTargetQuery(.{ .cpu_arch = .wasm32, .os_tag = .freestanding }),
             .optimize = .ReleaseSmall,
-            .name = "wasm",
+            .name = "game",
             .root_source_file = .{ .path = thisDir() ++ "/wasm_entry.zig" },
         });
-        wasm.rdynamic = true;
-        wasm.step.dependOn(&export_meshes.step);
-        const install_artifact = b.addInstallArtifact(wasm, .{});
+        exe.root_module.addImport("subdiv", subdiv);
+        zmath_pkg.link(exe);
+
+        // Latest wasm hack - https://github.com/ringtailsoftware/zig-wasm-audio-framebuffer/blob/master/build.zig
+        exe.entry = .disabled;
+        exe.rdynamic = true;
+
+        // // <https://github.com/ziglang/zig/issues/8633>
+        // exe.global_base = 6560;
+        // exe.import_memory = true;
+        // exe.stack_size = std.wasm.page_size;
+
+        // // Number of pages reserved for heap memory.
+        // // This must match the number of pages used in script.js.
+        // const number_of_pages = 2;
+        // exe.initial_memory = std.wasm.page_size * number_of_pages;
+        // exe.max_memory = std.wasm.page_size * number_of_pages;
+
+        exe.step.dependOn(&export_meshes.step);
+        const install_artifact = b.addInstallArtifact(exe, .{ .dest_dir = .{ .override = .{ .custom = "../web/bin" } } });
         const install_step = b.step("wasm", "build a wasm");
         install_step.dependOn(&install_artifact.step);
     }

@@ -2,6 +2,8 @@ const std = @import("std");
 
 /// Merge two structs of data together.
 ///
+/// NOTE: This does not add any additional fields to those already present in the source data.
+///
 /// eg. `merge(.{ .a = 0, .b = 2} .{ .a = 1 })` will return a type that is equivalent
 /// to `.{ .a = 1, .b = 2 }`.
 pub fn merge(source_data: anytype, field_changes: anytype) @TypeOf(source_data) {
@@ -80,8 +82,6 @@ pub fn Pick(comptime t: type, comptime field_tags: anytype) type {
 }
 
 test "Pick" {
-    const allocator = std.testing.allocator;
-    _ = allocator; // autofix
     const input_struct = struct { a: u32, b: f32, c: bool };
     const output_struct = Pick(input_struct, .{ .a, .c });
     const expected_struct = struct { a: u32, c: bool };
