@@ -3,16 +3,7 @@
 <head>
     <meta charset="utf-8">
     <title>WebAssembly</title>
-    <script>
-        var $webgl = document.getElementById("canvas");
-    </script>
-    <script>
-        WebAssembly.instantiateStreaming(fetch("bin/game.wasm"), {}).then((results) => {
-            var testSubdiv = results.instance.exports.testSubdiv;
-            console.log(testSubdiv(4));
-            document.getElementById("result").innerHTML = testSubdiv(2);
-        });
-    </script>
+    <script type="module" src="bin/index.mjs"></script>
 </head>
 
 <body>

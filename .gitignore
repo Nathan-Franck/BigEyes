@@ -1,3 +1,4 @@
 zig-cache
 zig-out
 libs/zig-gamedev
+web/bin
