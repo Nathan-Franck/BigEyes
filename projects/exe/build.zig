@@ -76,17 +76,10 @@ pub fn build(
     const zpool_pkg = @import("zpool").package(b, target, optimize, .{});
     const zgpu_pkg = @import("zgpu").package(b, target, optimize, .{ .deps = .{ .zglfw = zglfw_pkg, .zpool = zpool_pkg } });
     const zmesh_pkg = @import("zmesh").package(b, target, optimize, .{});
-    const subdiv = b.addModule("subdiv", .{
-        .root_source_file = .{ .path = thisDir() ++ "/../../libs/subdiv/subdiv.zig" },
-        .imports = &.{
-            .{ .name = "zmath", .module = zmath_pkg.zmath },
-        },
-    });
 
     // Tests (default)
     {
         const main_tests = b.addTest(.{ .root_source_file = .{ .path = thisDir() ++ "/tests.zig" } });
-        main_tests.root_module.addImport("subdiv", subdiv);
         // main_tests.root_module.addImport("embedded_assets", embedded_assets);
         zmath_pkg.link(main_tests);
         const test_step = b.step("exe-test", "run tests");
@@ -102,7 +95,6 @@ pub fn build(
             .name = "game",
             .root_source_file = .{ .path = thisDir() ++ "/wasm_entry.zig" },
         });
-        exe.root_module.addImport("subdiv", subdiv);
         zmath_pkg.link(exe);
 
         // Latest wasm hack - https://github.com/ringtailsoftware/zig-wasm-audio-framebuffer/blob/master/build.zig
@@ -140,7 +132,6 @@ pub fn build(
         zgpu_pkg.link(exe);
         zmath_pkg.link(exe);
         zmesh_pkg.link(exe);
-        exe.root_module.addImport("subdiv", subdiv);
         exe.step.dependOn(&export_meshes.step);
         // Windows hax
         exe.want_lto = false;

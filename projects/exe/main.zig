@@ -7,7 +7,7 @@ const zgui = @import("zgui");
 const zmath = @import("zmath");
 const Vertex = @import("./MeshLoader.zig").Vertex;
 
-const subdiv = @import("subdiv");
+const subdiv = @import("./subdiv.zig");
 
 const window_title = "zig-gamedev: triangle (wgpu)";
 

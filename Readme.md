@@ -26,3 +26,6 @@ blender triangle_wgpu_content/cube.blend --background --python .\tools\custom-gl
 
 * Load the camera_stream_addon.py as a module in Blender
 * This allows the game scene to read the current blender camera state when previewing models in-engine! TODO - all kinds of state?
+
+### Zig->Typescript Node Types
+`zig run projects/exe/typeDefinitions.zig`

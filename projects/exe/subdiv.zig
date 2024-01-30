@@ -1,8 +1,7 @@
 const std = @import("std");
-const zmath = @import("zmath");
 const ArrayList = std.ArrayList;
 
-pub const Point = zmath.Vec;
+pub const Point = @Vector(4, f32);
 pub const Face = []const u32;
 pub const Quad = [4]u32;
 pub const Mesh = struct { points: []const Point, quads: []const Quad };
