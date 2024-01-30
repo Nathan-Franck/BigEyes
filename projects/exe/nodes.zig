@@ -3,8 +3,7 @@ const std = @import("std");
 
 pub const Nodes = struct {
     pub fn helloSlice(faces: []subdiv.Face) ![]subdiv.Face {
-        _ = faces; // autofix
-        return error.APIUnavailable;
+        return faces;
     }
 
     pub fn testSubdiv(faces: []subdiv.Face, points: []subdiv.Point) !subdiv.Mesh {

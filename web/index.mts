@@ -1,4 +1,5 @@
 import { helloThere } from "./anotherOne.mjs";
+import type { Nodes } from "./gen/nodes.d.ts";
 
 let onMessage: null | ((message: string) => void) = null;
 function messageFromWasm(sourcePtr: number, sourceLen: number) {
@@ -44,32 +45,34 @@ const { instance } = await WebAssembly.instantiateStreaming(fetch("bin/game.wasm
     },
 };
 
-onMessage = (message) => {
-    // save this to a file - https://developer.mozilla.org/en-US/docs/Web/API/FileSystem
-        
-};
-instance.exports.dumpNodeTypeInfo();
-onMessage = null;
+function callNode<T extends keyof Nodes>(name: T, ...args: Parameters<Nodes[T]>): ReturnType<Nodes[T]> {
+    const nameBuffer = encodeString(name);
+    const argsBuffer = encodeString(JSON.stringify(args));
+    let result: ReturnType<Nodes[T]> = null as any;
+    onMessage = (message) => {
+        result = JSON.parse(message);
+    };
+    instance.exports.callWithJson(
+        nameBuffer.ptr,
+        nameBuffer.length,
+        argsBuffer.ptr,
+        argsBuffer.length
+    );
+    onMessage = null;
+    return result;
+}
 
-var name = encodeString("testSubdiv");
-const faces = [
+console.log(callNode("helloSlice", [[1, 2, 3]]));
+console.log(callNode("testSubdiv", [
     [0, 1, 2, 3],
     [0, 1, 5, 4],
-];
-const points = [
+], [
     [-1.1, 1.0, 1.0, 1.0],
     [-1.0, -1.0, 1.0, 1.0],
     [1.0, -1.0, 1.0, 1.0],
     [1.0, 1.0, 1.0, 1.0],
     [-1.0, 1.0, -1.0, 1.0],
     [-1.0, -1.0, -1.0, 1.0],
-];
-var args = encodeString(JSON.stringify([faces, points]));
-instance.exports.callWithJson(
-    name.ptr,
-    name.length,
-    args.ptr,
-    args.length
-);
+]));
 
 helloThere();

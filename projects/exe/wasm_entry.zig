@@ -24,7 +24,6 @@ fn callWithJsonErr(name_ptr: [*]const u8, name_len: usize, args_ptr: [*]const u8
     const allocator = std.heap.page_allocator;
     const name: []const u8 = name_ptr[0..name_len];
     const args_string: []const u8 = args_ptr[0..args_len];
-    _ = args_string; // autofix
     const case = std.meta.stringToEnum(nodes.NodesEnum, name) orelse {
         dumpError(try std.fmt.allocPrint(allocator, "unknown function: {s}\n", .{name}));
         return;
@@ -32,10 +31,9 @@ fn callWithJsonErr(name_ptr: [*]const u8, name_len: usize, args_ptr: [*]const u8
     switch (case) {
         inline else => |fn_name| {
             const func = @field(nodes.Nodes, @tagName(fn_name));
-            _ = func; // autofix
-            // const args = try std.json.parseFromSlice(Args(func), allocator, args_string, .{});
-            // const result = try @call(.auto, func, args.value);
-            // dumpMessage(try std.json.stringifyAlloc(allocator, result, .{}));
+            const args = try std.json.parseFromSlice(nodes.Args(func), allocator, args_string, .{});
+            const result = try @call(.auto, func, args.value);
+            dumpMessage(try std.json.stringifyAlloc(allocator, result, .{}));
         },
     }
 }
