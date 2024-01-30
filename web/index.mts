@@ -30,7 +30,7 @@ const { instance } = await WebAssembly.instantiateStreaming(fetch("bin/game.wasm
 }) as any as {
     instance: {
         exports: {
-            callMyFunc: (name_ptr: number, name_len: number, args_ptr: number, args_len: number) => void, // TODO: Generate from zig file
+            callWithJson: (name_ptr: number, name_len: number, args_ptr: number, args_len: number) => void, // TODO: Generate from zig file
             allocUint8: (length:number) => number,
             memory: WebAssembly.Memory,
         },
@@ -38,8 +38,20 @@ const { instance } = await WebAssembly.instantiateStreaming(fetch("bin/game.wasm
 };
 
 var name = encodeString("testSubdiv");
-var args = encodeString("[2]");
-instance.exports.callMyFunc(
+const faces = [
+    [ 0, 1, 2, 3 ],
+    [ 0, 1, 5, 4 ],
+];
+const points = [
+    [ -1.1, 1.0, 1.0, 1.0 ],
+    [ -1.0, -1.0, 1.0, 1.0 ],
+    [ 1.0, -1.0, 1.0, 1.0 ],
+    [ 1.0, 1.0, 1.0, 1.0 ],
+    [ -1.0, 1.0, -1.0, 1.0 ],
+    [ -1.0, -1.0, -1.0, 1.0 ],
+];
+var args = encodeString(JSON.stringify([ faces, points ]));
+instance.exports.callWithJson(
     name.ptr,
     name.length,
     args.ptr,

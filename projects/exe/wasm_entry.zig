@@ -1,31 +1,17 @@
 const std = @import("std");
 const subdiv = @import("subdiv");
 
-extern fn messageFromWasm(source_pointer: [*]const u8, source_len: u32) void;
-
-extern fn errorFromWasm(source_pointer: [*]const u8, source_len: u32) void;
-
 const MyFuncs = struct {
-    pub fn testSubdiv(inp: u32) !subdiv.Mesh {
-        _ = inp;
-        const allocator = std.heap.page_allocator;
-        var points = [_]subdiv.Point{
-            subdiv.Point{ -1.1, 1.0, 1.0, 1.0 },
-            subdiv.Point{ -1.0, -1.0, 1.0, 1.0 },
-            subdiv.Point{ 1.0, -1.0, 1.0, 1.0 },
-            subdiv.Point{ 1.0, 1.0, 1.0, 1.0 },
-            subdiv.Point{ -1.0, 1.0, -1.0, 1.0 },
-            subdiv.Point{ -1.0, -1.0, -1.0, 1.0 },
-        };
+    pub fn helloSlice(faces: []subdiv.Face) ![]subdiv.Face {
+        return faces;
+    }
 
-        var faces = [_]subdiv.Face{
-            &[_]u32{ 0, 1, 2, 3 },
-            &[_]u32{ 0, 1, 5, 4 },
-        };
+    pub fn testSubdiv(faces: []subdiv.Face, points: []subdiv.Point) !subdiv.Mesh {
+        const allocator = std.heap.page_allocator;
         const result = try subdiv.Polygon(.Face).cmcSubdiv(
             allocator,
-            &points,
-            &faces,
+            points,
+            faces,
         );
         return result;
     }
@@ -47,13 +33,6 @@ const MyFuncs = struct {
         } });
     }
 };
-
-export fn allocUint8(length: u32) [*]const u8 {
-    const slice = std.heap.page_allocator.alloc(u8, length) catch
-        @panic("failed to allocate memory");
-    return slice.ptr;
-}
-
 fn Args(comptime func: anytype) type {
     const ParamInfo = @typeInfo(@TypeOf(func)).Fn.params;
     var fields: []const std.builtin.Type.StructField = &.{};
@@ -74,27 +53,42 @@ fn Args(comptime func: anytype) type {
     } });
 }
 
-export fn callMyFunc(name_ptr: [*]const u8, name_len: u32, args_ptr: [*]const u8, args_len: u32) void {
+export fn allocUint8(length: u32) [*]const u8 {
+    const slice = std.heap.page_allocator.alloc(u8, length) catch
+        @panic("failed to allocate memory");
+    return slice.ptr;
+}
+
+extern fn messageFromWasm(source_pointer: [*]const u8, source_len: u32) void;
+
+extern fn errorFromWasm(source_pointer: [*]const u8, source_len: u32) void;
+
+fn callWithJsonErr(name_ptr: [*]const u8, name_len: u32, args_ptr: [*]const u8, args_len: u32) !void {
     const allocator = std.heap.page_allocator;
     const name: []const u8 = name_ptr[0..name_len];
     const args_string: []const u8 = args_ptr[0..args_len];
     const FnEnum = MyFuncs.toEnum();
     const case = std.meta.stringToEnum(FnEnum, name) orelse {
-        const message = std.fmt.allocPrint(allocator, "unknown function: {s}\n", .{name}) catch @panic("std.fmt.allocPrint");
+        const message = try std.fmt.allocPrint(allocator, "unknown function: {s}\n", .{name});
         messageFromWasm(message.ptr, message.len);
         return;
     };
     switch (case) {
         inline else => |fn_name| {
             const func = @field(MyFuncs, @tagName(fn_name));
-            const args = std.json.parseFromSlice(Args(func), allocator, args_string, .{}) catch @panic("std.json.parse");
-            const result = @call(.auto, func, args.value) catch |err| {
-                const message = std.fmt.allocPrint(allocator, "error: {?}\n", .{err}) catch @panic("std.fmt.allocPrint");
-                errorFromWasm(message.ptr, message.len);
-                return;
-            };
-            const message = std.fmt.allocPrint(allocator, "Sick! {?} {?}\n", .{ fn_name, result }) catch @panic("std.fmt.allocPrint");
+            const args = try std.json.parseFromSlice(Args(func), allocator, args_string, .{});
+            const result = try @call(.auto, func, args.value);
+            const message = try std.json.stringifyAlloc(allocator, result, .{});
             messageFromWasm(message.ptr, message.len);
         },
     }
+}
+
+export fn callWithJson(name_ptr: [*]const u8, name_len: u32, args_ptr: [*]const u8, args_len: u32) void {
+    const allocator = std.heap.page_allocator;
+    callWithJsonErr(name_ptr, name_len, args_ptr, args_len) catch |err| {
+        const message = std.fmt.allocPrint(allocator, "error: {?}\n", .{err}) catch unreachable;
+        errorFromWasm(message.ptr, message.len);
+        return;
+    };
 }
