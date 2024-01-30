@@ -4,6 +4,10 @@ function messageFromWasm(sourcePtr: number, sourceLen: number) {
     const str = (new TextDecoder()).decode(new Uint8Array(instance.exports.memory.buffer, sourcePtr, sourceLen))
     console.log(str)
 }
+function errorFromWasm(sourcePtr: number, sourceLen: number) {
+    const str = (new TextDecoder()).decode(new Uint8Array(instance.exports.memory.buffer, sourcePtr, sourceLen))
+    console.error(str)
+}
 function encodeString(string: string) {
     const buffer = new TextEncoder().encode(string);
     const pointer = instance.exports.allocUint8(buffer.length + 1); // ask Zig to allocate memory
@@ -20,7 +24,8 @@ function encodeString(string: string) {
 const { instance } = await WebAssembly.instantiateStreaming(fetch("bin/game.wasm"), {
     env: {
         memory: new WebAssembly.Memory({ initial: 2 }),
-        messageFromWasm: messageFromWasm,
+        messageFromWasm,
+        errorFromWasm,
     },
 }) as any as {
     instance: {

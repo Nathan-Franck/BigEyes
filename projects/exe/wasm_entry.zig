@@ -3,8 +3,10 @@ const subdiv = @import("subdiv");
 
 extern fn messageFromWasm(source_pointer: [*]const u8, source_len: u32) void;
 
+extern fn errorFromWasm(source_pointer: [*]const u8, source_len: u32) void;
+
 const MyFuncs = struct {
-    pub fn testSubdiv(inp: u32) subdiv.Mesh {
+    pub fn testSubdiv(inp: u32) !subdiv.Mesh {
         _ = inp;
         const allocator = std.heap.page_allocator;
         var points = [_]subdiv.Point{
@@ -20,11 +22,11 @@ const MyFuncs = struct {
             &[_]u32{ 0, 1, 2, 3 },
             &[_]u32{ 0, 1, 5, 4 },
         };
-        const result = subdiv.Polygon(.Face).cmcSubdiv(
+        const result = try subdiv.Polygon(.Face).cmcSubdiv(
             allocator,
             &points,
             &faces,
-        ) catch @panic("subdiv.Subdiv.cmcSubdiv");
+        );
         return result;
     }
 
@@ -86,7 +88,11 @@ export fn callMyFunc(name_ptr: [*]const u8, name_len: u32, args_ptr: [*]const u8
         inline else => |fn_name| {
             const func = @field(MyFuncs, @tagName(fn_name));
             const args = std.json.parseFromSlice(Args(func), allocator, args_string, .{}) catch @panic("std.json.parse");
-            const result = @call(.auto, func, args.value);
+            const result = @call(.auto, func, args.value) catch |err| {
+                const message = std.fmt.allocPrint(allocator, "error: {?}\n", .{err}) catch @panic("std.fmt.allocPrint");
+                errorFromWasm(message.ptr, message.len);
+                return;
+            };
             const message = std.fmt.allocPrint(allocator, "Sick! {?} {?}\n", .{ fn_name, result }) catch @panic("std.fmt.allocPrint");
             messageFromWasm(message.ptr, message.len);
         },
