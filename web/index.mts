@@ -1,8 +1,12 @@
 import { helloThere } from "./anotherOne.mjs";
 
+let onMessage: null | ((message: string) => void) = null;
 function messageFromWasm(sourcePtr: number, sourceLen: number) {
     const str = (new TextDecoder()).decode(new Uint8Array(instance.exports.memory.buffer, sourcePtr, sourceLen))
-    console.log(str)
+    if (onMessage == null)
+        console.log(str)
+    else
+        onMessage(str)
 }
 
 function errorFromWasm(sourcePtr: number, sourceLen: number) {
@@ -34,28 +38,33 @@ const { instance } = await WebAssembly.instantiateStreaming(fetch("bin/game.wasm
         exports: {
             dumpNodeTypeInfo: () => void,
             callWithJson: (name_ptr: number, name_len: number, args_ptr: number, args_len: number) => void, // TODO: Generate from zig file
-            allocUint8: (length:number) => number,
+            allocUint8: (length: number) => number,
             memory: WebAssembly.Memory,
         },
     },
 };
 
+onMessage = (message) => {
+    // save this to a file - https://developer.mozilla.org/en-US/docs/Web/API/FileSystem
+        
+};
 instance.exports.dumpNodeTypeInfo();
+onMessage = null;
 
 var name = encodeString("testSubdiv");
 const faces = [
-    [ 0, 1, 2, 3 ],
-    [ 0, 1, 5, 4 ],
+    [0, 1, 2, 3],
+    [0, 1, 5, 4],
 ];
 const points = [
-    [ -1.1, 1.0, 1.0, 1.0 ],
-    [ -1.0, -1.0, 1.0, 1.0 ],
-    [ 1.0, -1.0, 1.0, 1.0 ],
-    [ 1.0, 1.0, 1.0, 1.0 ],
-    [ -1.0, 1.0, -1.0, 1.0 ],
-    [ -1.0, -1.0, -1.0, 1.0 ],
+    [-1.1, 1.0, 1.0, 1.0],
+    [-1.0, -1.0, 1.0, 1.0],
+    [1.0, -1.0, 1.0, 1.0],
+    [1.0, 1.0, 1.0, 1.0],
+    [-1.0, 1.0, -1.0, 1.0],
+    [-1.0, -1.0, -1.0, 1.0],
 ];
-var args = encodeString(JSON.stringify([ faces, points ]));
+var args = encodeString(JSON.stringify([faces, points]));
 instance.exports.callWithJson(
     name.ptr,
     name.length,

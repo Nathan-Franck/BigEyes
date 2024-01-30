@@ -15,6 +15,294 @@ pub const Nodes = struct {
         );
         return result;
     }
+
+    pub fn testSubdiv2(faces: []subdiv.Face, points: []subdiv.Point) !subdiv.Mesh {
+        _ = faces; // autofix
+        _ = points; // autofix
+        return error.APIUnavailable;
+    }
+
+    pub fn testSubdiv3(faces: []subdiv.Face, points: []subdiv.Point) !subdiv.Mesh {
+        _ = faces; // autofix
+        _ = points; // autofix
+        return error.APIUnavailable;
+    }
+
+    pub fn testSubdiv4(faces: []subdiv.Face, points: []subdiv.Point) !subdiv.Mesh {
+        _ = faces; // autofix
+        _ = points; // autofix
+        return error.APIUnavailable;
+    }
+
+    pub fn testSubdiv5(faces: []subdiv.Face, points: []subdiv.Point) !subdiv.Mesh {
+        _ = faces; // autofix
+        _ = points; // autofix
+        return error.APIUnavailable;
+    }
+
+    pub fn testSubdiv6(faces: []subdiv.Face, points: []subdiv.Point) !subdiv.Mesh {
+        _ = faces; // autofix
+        _ = points; // autofix
+        return error.APIUnavailable;
+    }
+
+    pub fn testSubdiv7(faces: []subdiv.Face, points: []subdiv.Point) !subdiv.Mesh {
+        _ = faces; // autofix
+        _ = points; // autofix
+        return error.APIUnavailable;
+    }
+
+    pub fn testSubdiv8(faces: []subdiv.Face, points: []subdiv.Point) !subdiv.Mesh {
+        _ = faces; // autofix
+        _ = points; // autofix
+        return error.APIUnavailable;
+    }
+
+    pub fn testSubdiv9(faces: []subdiv.Face, points: []subdiv.Point) !subdiv.Mesh {
+        _ = faces; // autofix
+        _ = points; // autofix
+        return error.APIUnavailable;
+    }
+
+    pub fn testSubdiv10(faces: []subdiv.Face, points: []subdiv.Point) !subdiv.Mesh {
+        _ = faces; // autofix
+        _ = points; // autofix
+        return error.APIUnavailable;
+    }
+
+    pub fn testSubdiv11(faces: []subdiv.Face, points: []subdiv.Point) !subdiv.Mesh {
+        _ = faces; // autofix
+        _ = points; // autofix
+        return error.APIUnavailable;
+    }
+
+    pub fn testSubdiv12(faces: []subdiv.Face, points: []subdiv.Point) !subdiv.Mesh {
+        _ = faces; // autofix
+        _ = points; // autofix
+        return error.APIUnavailable;
+    }
+
+    pub fn testSubdiv13(faces: []subdiv.Face, points: []subdiv.Point) !subdiv.Mesh {
+        _ = faces; // autofix
+        _ = points; // autofix
+        return error.APIUnavailable;
+    }
+
+    pub fn testSubdiv22(faces: []subdiv.Face, points: []subdiv.Point) !subdiv.Mesh {
+        _ = faces; // autofix
+        _ = points; // autofix
+        return error.APIUnavailable;
+    }
+
+    pub fn testSubdiv23(faces: []subdiv.Face, points: []subdiv.Point) !subdiv.Mesh {
+        _ = faces; // autofix
+        _ = points; // autofix
+        return error.APIUnavailable;
+    }
+
+    pub fn testSubdiv24(faces: []subdiv.Face, points: []subdiv.Point) !subdiv.Mesh {
+        _ = faces; // autofix
+        _ = points; // autofix
+        return error.APIUnavailable;
+    }
+
+    pub fn testSubdiv25(faces: []subdiv.Face, points: []subdiv.Point) !subdiv.Mesh {
+        _ = faces; // autofix
+        _ = points; // autofix
+        return error.APIUnavailable;
+    }
+
+    pub fn testSubdiv26(faces: []subdiv.Face, points: []subdiv.Point) !subdiv.Mesh {
+        _ = faces; // autofix
+        _ = points; // autofix
+        return error.APIUnavailable;
+    }
+
+    pub fn testSubdiv27(faces: []subdiv.Face, points: []subdiv.Point) !subdiv.Mesh {
+        _ = faces; // autofix
+        _ = points; // autofix
+        return error.APIUnavailable;
+    }
+
+    pub fn testSubdiv28(faces: []subdiv.Face, points: []subdiv.Point) !subdiv.Mesh {
+        _ = faces; // autofix
+        _ = points; // autofix
+        return error.APIUnavailable;
+    }
+
+    pub fn testSubdiv29(faces: []subdiv.Face, points: []subdiv.Point) !subdiv.Mesh {
+        _ = faces; // autofix
+        _ = points; // autofix
+        return error.APIUnavailable;
+    }
+
+    pub fn testSubdiv210(faces: []subdiv.Face, points: []subdiv.Point) !subdiv.Mesh {
+        _ = faces; // autofix
+        _ = points; // autofix
+        return error.APIUnavailable;
+    }
+
+    pub fn testSubdiv211(faces: []subdiv.Face, points: []subdiv.Point) !subdiv.Mesh {
+        _ = faces; // autofix
+        _ = points; // autofix
+        return error.APIUnavailable;
+    }
+
+    pub fn testSubdiv212(faces: []subdiv.Face, points: []subdiv.Point) !subdiv.Mesh {
+        _ = faces; // autofix
+        _ = points; // autofix
+        return error.APIUnavailable;
+    }
+
+    pub fn testSubdiv213(faces: []subdiv.Face, points: []subdiv.Point) !subdiv.Mesh {
+        _ = faces; // autofix
+        _ = points; // autofix
+        return error.APIUnavailable;
+    }
+
+    pub fn testSubdiv32(faces: []subdiv.Face, points: []subdiv.Point) !subdiv.Mesh {
+        _ = faces; // autofix
+        _ = points; // autofix
+        return error.APIUnavailable;
+    }
+
+    pub fn testSubdiv33(faces: []subdiv.Face, points: []subdiv.Point) !subdiv.Mesh {
+        _ = faces; // autofix
+        _ = points; // autofix
+        return error.APIUnavailable;
+    }
+
+    pub fn testSubdiv34(faces: []subdiv.Face, points: []subdiv.Point) !subdiv.Mesh {
+        _ = faces; // autofix
+        _ = points; // autofix
+        return error.APIUnavailable;
+    }
+
+    pub fn testSubdiv35(faces: []subdiv.Face, points: []subdiv.Point) !subdiv.Mesh {
+        _ = faces; // autofix
+        _ = points; // autofix
+        return error.APIUnavailable;
+    }
+
+    pub fn testSubdiv36(faces: []subdiv.Face, points: []subdiv.Point) !subdiv.Mesh {
+        _ = faces; // autofix
+        _ = points; // autofix
+        return error.APIUnavailable;
+    }
+
+    pub fn testSubdiv37(faces: []subdiv.Face, points: []subdiv.Point) !subdiv.Mesh {
+        _ = faces; // autofix
+        _ = points; // autofix
+        return error.APIUnavailable;
+    }
+
+    pub fn testSubdiv38(faces: []subdiv.Face, points: []subdiv.Point) !subdiv.Mesh {
+        _ = faces; // autofix
+        _ = points; // autofix
+        return error.APIUnavailable;
+    }
+
+    pub fn testSubdiv39(faces: []subdiv.Face, points: []subdiv.Point) !subdiv.Mesh {
+        _ = faces; // autofix
+        _ = points; // autofix
+        return error.APIUnavailable;
+    }
+
+    pub fn testSubdiv310(faces: []subdiv.Face, points: []subdiv.Point) !subdiv.Mesh {
+        _ = faces; // autofix
+        _ = points; // autofix
+        return error.APIUnavailable;
+    }
+
+    pub fn testSubdiv311(faces: []subdiv.Face, points: []subdiv.Point) !subdiv.Mesh {
+        _ = faces; // autofix
+        _ = points; // autofix
+        return error.APIUnavailable;
+    }
+
+    pub fn testSubdiv312(faces: []subdiv.Face, points: []subdiv.Point) !subdiv.Mesh {
+        _ = faces; // autofix
+        _ = points; // autofix
+        return error.APIUnavailable;
+    }
+
+    pub fn testSubdiv313(faces: []subdiv.Face, points: []subdiv.Point) !subdiv.Mesh {
+        _ = faces; // autofix
+        _ = points; // autofix
+        return error.APIUnavailable;
+    }
+
+    pub fn testSubdiv322(faces: []subdiv.Face, points: []subdiv.Point) !subdiv.Mesh {
+        _ = faces; // autofix
+        _ = points; // autofix
+        return error.APIUnavailable;
+    }
+
+    pub fn testSubdiv323(faces: []subdiv.Face, points: []subdiv.Point) !subdiv.Mesh {
+        _ = faces; // autofix
+        _ = points; // autofix
+        return error.APIUnavailable;
+    }
+
+    pub fn testSubdiv324(faces: []subdiv.Face, points: []subdiv.Point) !subdiv.Mesh {
+        _ = faces; // autofix
+        _ = points; // autofix
+        return error.APIUnavailable;
+    }
+
+    pub fn testSubdiv325(faces: []subdiv.Face, points: []subdiv.Point) !subdiv.Mesh {
+        _ = faces; // autofix
+        _ = points; // autofix
+        return error.APIUnavailable;
+    }
+
+    pub fn testSubdiv326(faces: []subdiv.Face, points: []subdiv.Point) !subdiv.Mesh {
+        _ = faces; // autofix
+        _ = points; // autofix
+        return error.APIUnavailable;
+    }
+
+    pub fn testSubdiv327(faces: []subdiv.Face, points: []subdiv.Point) !subdiv.Mesh {
+        _ = faces; // autofix
+        _ = points; // autofix
+        return error.APIUnavailable;
+    }
+
+    pub fn testSubdiv328(faces: []subdiv.Face, points: []subdiv.Point) !subdiv.Mesh {
+        _ = faces; // autofix
+        _ = points; // autofix
+        return error.APIUnavailable;
+    }
+
+    pub fn testSubdiv329(faces: []subdiv.Face, points: []subdiv.Point) !subdiv.Mesh {
+        _ = faces; // autofix
+        _ = points; // autofix
+        return error.APIUnavailable;
+    }
+
+    pub fn testSubdiv3210(faces: []subdiv.Face, points: []subdiv.Point) !subdiv.Mesh {
+        _ = faces; // autofix
+        _ = points; // autofix
+        return error.APIUnavailable;
+    }
+
+    pub fn testSubdiv3211(faces: []subdiv.Face, points: []subdiv.Point) !subdiv.Mesh {
+        _ = faces; // autofix
+        _ = points; // autofix
+        return error.APIUnavailable;
+    }
+
+    pub fn testSubdiv3212(faces: []subdiv.Face, points: []subdiv.Point) !subdiv.Mesh {
+        _ = faces; // autofix
+        _ = points; // autofix
+        return error.APIUnavailable;
+    }
+
+    pub fn testSubdiv3213(faces: []subdiv.Face, points: []subdiv.Point) !subdiv.Mesh {
+        _ = faces; // autofix
+        _ = points; // autofix
+        return error.APIUnavailable;
+    }
 };
 pub const NodesEnum = DeclsToEnum(Nodes);
 
@@ -76,16 +364,18 @@ fn callWithJsonErr(name_ptr: [*]const u8, name_len: u32, args_ptr: [*]const u8, 
     const allocator = std.heap.page_allocator;
     const name: []const u8 = name_ptr[0..name_len];
     const args_string: []const u8 = args_ptr[0..args_len];
+    _ = args_string; // autofix
     const case = std.meta.stringToEnum(NodesEnum, name) orelse {
-        dumpMessage(try std.fmt.allocPrint(allocator, "unknown function: {s}\n", .{name}));
+        dumpError(try std.fmt.allocPrint(allocator, "unknown function: {s}\n", .{name}));
         return;
     };
     switch (case) {
         inline else => |fn_name| {
             const func = @field(Nodes, @tagName(fn_name));
-            const args = try std.json.parseFromSlice(Args(func), allocator, args_string, .{});
-            const result = try @call(.auto, func, args.value);
-            dumpMessage(try std.json.stringifyAlloc(allocator, result, .{}));
+            _ = func; // autofix
+            // const args = try std.json.parseFromSlice(Args(func), allocator, args_string, .{});
+            // const result = try @call(.auto, func, args.value);
+            // dumpMessage(try std.json.stringifyAlloc(allocator, result, .{}));
         },
     }
 }
@@ -111,18 +401,21 @@ fn typescriptTypeOf(comptime from_type: anytype) []const u8 {
             }
             return std.fmt.comptimePrint("[ {s} ]", .{result});
         },
-        .ErrorUnion => |eu| typescriptTypeOf(eu.payload),
+        .ErrorUnion => |eu| typescriptTypeOf(eu.payload), // Ignore the existence of errors for now...
         .Pointer => |p| switch (p.size) {
-            .One => typescriptTypeOf(p.child) ++ " | null",
             .Many, .Slice => typescriptTypeOf(p.child) ++ "[]",
-            else => "any",
+            else => "unknown",
         },
         .Struct => |s| {
+            var decls: []const u8 = &.{};
+            for (s.decls, 0..) |decl, i| {
+                decls = decls ++ std.fmt.comptimePrint("{s}{s}: {s}", .{ if (i == 0) "" else ", ", decl.name, typescriptTypeOf(@TypeOf(@field(from_type, decl.name))) });
+            }
             var fields: []const u8 = &.{};
             for (s.fields, 0..) |field, i| {
                 fields = fields ++ std.fmt.comptimePrint("{s}{s}: {s}", .{ if (i == 0) "" else ", ", field.name, typescriptTypeOf(field.type) });
             }
-            return std.fmt.comptimePrint("{{ {s} }}", .{fields});
+            return std.fmt.comptimePrint("{{ {s}{s} }}", .{ if (decls.len > 0) decls ++ ", " else "", fields });
         },
         .Fn => |f| {
             var params: []const u8 = &.{};
@@ -138,8 +431,6 @@ fn typescriptTypeOf(comptime from_type: anytype) []const u8 {
 export fn dumpNodeTypeInfo() void {
     const allocator = std.heap.page_allocator;
     _ = allocator; // autofix
-    inline for (@typeInfo(NodesEnum).Enum.fields) |field| {
-        const node = @field(Nodes, field.name);
-        dumpMessage(comptime typescriptTypeOf(@TypeOf(node)));
-    }
+
+    dumpMessage(comptime typescriptTypeOf(Nodes));
 }
