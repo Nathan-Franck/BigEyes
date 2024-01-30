@@ -32,15 +32,13 @@ const { instance } = await WebAssembly.instantiateStreaming(fetch("bin/game.wasm
     },
 };
 
-instance.exports.memory.buffer
-
-var stringPtr = encodeString("testSubdiv");
-var anotherStringPtr = encodeString("{}");
+var name = encodeString("testSubdiv");
+var args = encodeString("[2]");
 instance.exports.callMyFunc(
-    stringPtr.ptr,
-    stringPtr.length,
-    anotherStringPtr.ptr,
-    anotherStringPtr.length
+    name.ptr,
+    name.length,
+    args.ptr,
+    args.length
 );
 
 helloThere();

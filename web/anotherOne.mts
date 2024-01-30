@@ -1,3 +1,3 @@
 export function helloThere() {
-    console.log("Hello!");
+    console.log("Hello from another module!");
 }

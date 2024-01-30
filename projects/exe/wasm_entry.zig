@@ -4,7 +4,7 @@ const subdiv = @import("subdiv");
 extern fn messageFromWasm(source_pointer: [*]const u8, source_len: u32) void;
 
 const MyFuncs = struct {
-    pub fn testSubdiv(inp: u32) void {
+    pub fn testSubdiv(inp: u32) subdiv.Mesh {
         _ = inp;
         const allocator = std.heap.page_allocator;
         var points = [_]subdiv.Point{
@@ -25,8 +25,7 @@ const MyFuncs = struct {
             &points,
             &faces,
         ) catch @panic("subdiv.Subdiv.cmcSubdiv");
-        const stringified_result = std.json.stringifyAlloc(allocator, result, .{}) catch @panic("std.json.stringifyAlloc");
-        messageFromWasm(stringified_result.ptr, stringified_result.len);
+        return result;
     }
 
     fn toEnum() type {
@@ -53,11 +52,30 @@ export fn allocUint8(length: u32) [*]const u8 {
     return slice.ptr;
 }
 
+fn Args(comptime func: anytype) type {
+    const ParamInfo = @typeInfo(@TypeOf(func)).Fn.params;
+    var fields: []const std.builtin.Type.StructField = &.{};
+    for (ParamInfo, 0..) |param_info, i| {
+        fields = fields ++ &[_]std.builtin.Type.StructField{.{
+            .name = std.fmt.comptimePrint("{d}", .{i}),
+            .type = param_info.type.?,
+            .default_value = null,
+            .is_comptime = false,
+            .alignment = @alignOf(param_info.type.?),
+        }};
+    }
+    return @Type(.{ .Struct = .{
+        .layout = .Auto,
+        .fields = fields,
+        .decls = &.{},
+        .is_tuple = true,
+    } });
+}
+
 export fn callMyFunc(name_ptr: [*]const u8, name_len: u32, args_ptr: [*]const u8, args_len: u32) void {
     const allocator = std.heap.page_allocator;
     const name: []const u8 = name_ptr[0..name_len];
     const args_string: []const u8 = args_ptr[0..args_len];
-    _ = args_string; // autofix
     const FnEnum = MyFuncs.toEnum();
     const case = std.meta.stringToEnum(FnEnum, name) orelse {
         const message = std.fmt.allocPrint(allocator, "unknown function: {s}\n", .{name}) catch @panic("std.fmt.allocPrint");
@@ -66,7 +84,10 @@ export fn callMyFunc(name_ptr: [*]const u8, name_len: u32, args_ptr: [*]const u8
     };
     switch (case) {
         inline else => |fn_name| {
-            const message = std.fmt.allocPrint(allocator, "Sick! {?}\n", .{fn_name}) catch @panic("std.fmt.allocPrint");
+            const func = @field(MyFuncs, @tagName(fn_name));
+            const args = std.json.parseFromSlice(Args(func), allocator, args_string, .{}) catch @panic("std.json.parse");
+            const result = @call(.auto, func, args.value);
+            const message = std.fmt.allocPrint(allocator, "Sick! {?} {?}\n", .{ fn_name, result }) catch @panic("std.fmt.allocPrint");
             messageFromWasm(message.ptr, message.len);
         },
     }
