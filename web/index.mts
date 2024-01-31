@@ -89,37 +89,48 @@ let nodesDirect: NodesDirect;
     nodesDirect = result;
 }
 
-type NodeGraph<Inputs, Nodes> = {
-    Inputs: Inputs,
-    Nodes: {
-        [name in keyof Nodes]: {
-            node: keyof NodesDirect,
-            stateInputs: "hi",
-        }
+type NodeGraph = {
+    inputs: Record<string, string>,
+    nodes: Record<string, {
+        node: string,
+        stateInputs: Record<string, string>,
+    }>,
+};
+
+const nodeGraph = {
+    inputs: {
+        faces: { Array: { Array: "number" } },
+        points: { Array: ["number", "number", "number", "number"] },
+    },
+    nodes: {
+        helloSlice: {
+            node: "helloSlice",
+            stateInputs: {
+                slice: "inputs.faces"
+            },
+        },
+        helloFace: {
+            node: "helloFace",
+            stateInputs: {
+                faces: "input.faces",
+            },
+        },
+        subdivideFaces: {
+            node: "subdivideFaces",
+            stateInputs: {
+                faces: "helloFace.faces",
+                points: "inputs.points",
+            },
+        },
+        outputs: [
+            "helloSlice.message",
+            "subdivideFaces.points",
+            "subdivideFaces.quads",
+        ],
     },
 };
 
-const nodeGraph = validateNodeGraph({
-    Inputs: {
-        dkdf: "number",
-    },
-    Nodes: {
-        helloSlice: {
-            node: "helloSlice",
-            stateInputs: "hi",
-        },
-        helloStructArray: {
-            node: "helloSlice",
-            stateInputs: "w",
-        },
-    },
-});
-
-function validateNodeGraph<Inputs, Nodes, const Graph extends NodeGraph<Inputs, Nodes>>(graph: Graph & NodeGraph<Inputs, Nodes>): Graph {
-    return graph;
-}
-
-console.log(nodesDirect.helloSlice([[1, 2, 3]], { saySomethingNice: true }));
+console.log(nodesDirect.helloSlice({ slice: [[1, 2, 3]] }, { saySomethingNice: true }));
 console.log(nodesDirect.subdivideFaces({
     faces: [
         [0, 1, 2, 3],

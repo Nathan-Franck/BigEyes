@@ -2,14 +2,13 @@ const subdiv = @import("./subdiv.zig");
 const std = @import("std");
 
 pub const Nodes = struct {
-    const StructArray = []struct { a: bool, b: []u8 };
-    pub fn helloStructArray(state: StructArray) !StructArray {
-        return state;
+    pub fn helloSlice(state: struct { slice: []subdiv.Face }, options: struct { saySomethingNice: bool }) !struct { message: []const u8 } {
+        _ = state; // autofix
+        return .{ .message = if (options.saySomethingNice) "hello beautiful!" else "goodbye, cruel world" };
     }
 
-    pub fn helloSlice(state: []subdiv.Face, options: struct { saySomethingNice: bool }) ![]const u8 {
-        _ = state; // autofix
-        return if (options.saySomethingNice) "hello beautiful!" else "goodbye, cruel world";
+    pub fn helloFace(state: struct { faces: []subdiv.Face }) !struct { faces: []subdiv.Face } {
+        return .{ .faces = state.faces };
     }
 
     pub fn subdivideFaces(state: struct { faces: []subdiv.Face, points: []subdiv.Point }) !subdiv.Mesh {
