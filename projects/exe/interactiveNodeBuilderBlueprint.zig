@@ -1,13 +1,16 @@
+pub const SystemSource = struct {
+    system_field: ?[]const u8 = null, // if null, assume system field is the same as input field.
+    input_field: []const u8,
+};
+
 pub const InputLink = union(enum) {
     node: struct {
         name: []const u8,
         output_field: ?[]const u8 = null, // if null, assume output field is the same as input field.
         input_field: []const u8,
     },
-    parameter: struct {
-        parameter_field: ?[]const u8 = null, // if null, assume parameter field is the same as input field.
-        input_field: []const u8,
-    },
+    external: SystemSource,
+    store: SystemSource,
 };
 
 pub const NodeGraphBlueprintEntry = struct {
@@ -16,66 +19,79 @@ pub const NodeGraphBlueprintEntry = struct {
     input_links: []const InputLink,
 };
 
-pub const NodeGraphReturn = struct {
+pub const SystemSink = struct {
     output_node: []const u8,
-    output_field: []const u8,
-    return_field: []const u8,
+    output_field: ?[]const u8 = null, // if null, assume output field is the same as system field.
+    system_field: []const u8,
 };
 
 pub const Blueprint = struct {
     nodes: []const NodeGraphBlueprintEntry,
-    returns: []const NodeGraphReturn,
+    store: []const SystemSink,
+    external: []const SystemSink,
 };
 
 pub const node_graph_blueprint: Blueprint = .{
     .nodes = .{
         .{
-            .function = "cameraControls",
+            .function = "graphLoader",
             .input_links = .{
-                .{ .parameter = .{ .input_field = "drag" } },
-                .{ .parameter = .{ .input_field = "drag_end" } },
-                .{ .parameter = .{ .input_field = "scroll" } },
-                .{ .parameter = .{ .input_field = "keyboard_modifiers" } },
+                .{ .external = .{ .input_field = "graph_update" } },
+                .{ .store = .{ .input_field = "blueprint" } },
             },
         },
         .{
             .function = "contextMenuInteraction",
             .input_links = .{
-                .{ .parameter = .{ .input_field = "node_right_click" } },
-                .{ .parameter = .{ .input_field = "right_click" } },
-                .{ .parameter = .{ .input_field = "context_click" } },
+                .{ .external = .{ .input_field = "mouse_event" } },
+                .{ .external = .{ .input_field = "node_event" } },
+                .{ .external = .{ .input_field = "context_event" } },
+                .{ .store = .{ .input_field = "context_menu" } },
             },
         },
         .{
             .function = "nodeInteraction",
             .input_links = .{
-                .{ .parameter = .{ .input_field = "drag" } },
-                .{ .parameter = .{ .input_field = "drag_end" } },
-                .{ .parameter = .{ .input_field = "node_drag" } },
-                .{ .parameter = .{ .input_field = "node_drag_end" } },
-                .{ .parameter = .{ .input_field = "node_clicked" } },
-                .{ .parameter = .{ .input_field = "keyboard_modifiers" } },
+                .{ .external = .{ .input_field = "keyboard_modifiers" } },
+                .{ .store = .{ .input_field = "active_node" } },
+                .{ .node = .{ .name = "graphLoader", .input_field = "blueprint" } },
+                .{ .node = .{ .name = "contextMenuInteraction", .output_field = "unused_mouse_event", .input_field = "mouse_event" } },
+                .{ .node = .{ .name = "contextMenuInteraction", .output_field = "unused_node_event", .input_field = "node_event" } },
             },
         },
         .{
-            .function = "graphLoader",
+            .function = "cameraControls",
             .input_links = .{
-                .{ .parameter = .{ .input_field = "graph_update" } },
+                .{ .external = .{ .input_field = "keyboard_modifiers" } },
+                .{ .store = .{ .input_field = "camera" } },
+                .{ .node = .{ .name = "nodeInteraction", .output_field = "unused_mouse_event", .input_field = "mouse_event" } },
+            },
+        },
+        .{
+            .function = "nodeFormatting",
+            .input_links = .{
+                .{ .node = .{ .name = "contextMenuInteraction", .input_field = "grouping_event" } },
+                .{ .node = .{ .name = "nodeInteraction", .input_field = "blueprint" } },
+            },
+        },
+        .{
+            .function = "dom_renderer",
+            .input_links = .{
+                .{ .store = .{ .system_field = "blueprint", .input_field = "previous_blueprint" } },
+                .{ .node = .{ .name = "nodeFormatting", .input_field = "current_blueprint" } },
+                .{ .node = .{ .name = "cameraControls", .input_field = "camera" } },
+                .{ .node = .{ .name = "contextMenuInteraction", .input_field = "context_menu" } },
             },
         },
     },
-    .returns = .{
-        // UI update.
-        .{
-            .output_node = "???",
-            .output_field = "???",
-            .return_field = "dom_update",
-        },
-        // Network update.
-        .{
-            .output_node = "???",
-            .output_field = "???",
-            .return_field = "blueprint_update",
-        },
+    .store = .{
+        .{ .output_node = "contextMenuInteraction", .system_field = "context_menu" },
+        .{ .output_node = "nodeInteraction", .system_field = "active_node" },
+        .{ .output_node = "cameraControls", .system_field = "camera" },
+        .{ .output_node = "nodeFormatting", .system_field = "blueprint" },
+    },
+    .external = .{
+        .{ .output_node = "dom_renderer", .system_field = "render_event" },
+        .{ .output_node = "???", .output_field = "???", .system_field = "blueprint_update" },
     },
 };
