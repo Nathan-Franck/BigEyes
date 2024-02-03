@@ -53,6 +53,14 @@ pub const BlueprintLoader = struct {
     }
 };
 
+pub fn EnumToStrings(comptime enum_t: type) []const []const u8 {
+    var options: []const []const u8 = &.{};
+    for (@typeInfo(enum_t).Enum.fields) |field| {
+        options = options ++ .{field.name};
+    }
+    return options;
+}
+
 pub const ContextMenuInteraction = struct {
     const Events = union(enum) {
         mouse_event: MouseEvent,
@@ -66,66 +74,40 @@ pub const ContextMenuInteraction = struct {
         context_menu: ContextState,
         unused_event: ?Events,
     } {
-        if (inputs.event) |event| switch (event) {
-            else => {},
-            .mouse_event => |mouse_event| switch (mouse_event) {
-                else => {},
-                .mouse_down => |evt| {
-                    switch (evt.button) {
-                        else => {},
-                        .left => return .{
-                            .unused_event = null,
-                            .context_menu = .{
-                                .open = false,
-                                .location = inputs.context_menu.location,
-                                .options = &.{},
-                            },
-                        },
-                        .right => return .{
-                            .unused_event = null,
-                            .context_menu = .{
-                                .open = true,
-                                .location = .{ .x = evt.x, .y = evt.y },
-                                .options = comptime options: {
-                                    var options: []const []const u8 = &.{};
-                                    for (@typeInfo(ContextMenuNodeOption).Enum.fields) |field| {
-                                        options = options ++ .{field.name};
-                                    }
-                                    break :options options;
-                                },
-                            },
-                        },
-                    }
-                },
-            },
-            .node_event => |node_event| switch (node_event) {
-                else => {},
-                .mouse_down => |evt| {
-                    switch (evt.button) {
-                        else => {},
-                        .right => return .{
-                            .unused_event = null,
-                            .context_menu = .{
-                                .open = true,
-                                .location = .{ .x = evt.x, .y = evt.y },
-                                .options = comptime options: {
-                                    var options: []const []const u8 = &.{};
-                                    for (@typeInfo(ContextMenuOption).Enum.fields) |field| {
-                                        options = options ++ .{field.name};
-                                    }
-                                    break :options options;
-                                },
-                            },
-                        },
-                    }
-                },
-            },
-        };
-
-        return .{
+        const default = .{
             .context_menu = inputs.context_menu,
             .unused_event = inputs.event,
         };
+        return if (inputs.event) |event| switch (event) {
+            else => default,
+            .node_event => |node_event| switch (node_event) {
+                else => default,
+                .mouse_down => |mouse_down| switch (mouse_down.button) {
+                    else => default,
+                    .right => .{ .unused_event = null, .context_menu = .{
+                        .open = true,
+                        .location = .{ .x = mouse_down.x, .y = mouse_down.y },
+                        .options = comptime EnumToStrings(ContextMenuNodeOption),
+                    } },
+                },
+            },
+            .mouse_event => |mouse_event| switch (mouse_event) {
+                else => default,
+                .mouse_down => |mouse_down| switch (mouse_down.button) {
+                    else => default,
+                    .left => .{ .unused_event = null, .context_menu = .{
+                        .open = false,
+                        .location = inputs.context_menu.location,
+                        .options = &.{},
+                    } },
+                    .right => .{ .unused_event = null, .context_menu = .{
+                        .open = true,
+                        .location = .{ .x = mouse_down.x, .y = mouse_down.y },
+                        .options = comptime EnumToStrings(ContextMenuOption),
+                    } },
+                },
+            },
+        } else default;
     }
 };
 
