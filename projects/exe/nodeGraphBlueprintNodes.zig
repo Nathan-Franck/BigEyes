@@ -41,14 +41,13 @@ pub const ContextState = struct {
 };
 
 pub const BlueprintLoader = struct {
-    fn process(inputs: struct {
-        recieved_blueprint: ?Blueprint,
-        existing_blueprint: Blueprint,
-    }) struct { blueprint: Blueprint } {
-        if (inputs.recieved_blueprint) |update| {
+    recieved_blueprint: ?Blueprint,
+    existing_blueprint: Blueprint,
+    fn process(self: @This()) struct { blueprint: Blueprint } {
+        if (self.recieved_blueprint) |update| {
             return update;
         } else {
-            return inputs.existing_blueprint;
+            return self.existing_blueprint;
         }
     }
 };
@@ -67,18 +66,17 @@ pub const ContextMenuInteraction = struct {
         node_event: NodeEvent,
         context_event: ContextEvent,
     };
-    fn process(inputs: struct {
-        context_menu: ContextState,
-        event: ?Events,
-    }) struct {
+    context_menu: ContextState,
+    event: ?Events,
+    fn process(self: @This()) struct {
         context_menu: ContextState,
         unused_event: ?Events,
     } {
         const default = .{
-            .context_menu = inputs.context_menu,
-            .unused_event = inputs.event,
+            .context_menu = self.context_menu,
+            .unused_event = self.event,
         };
-        return if (inputs.event) |event| switch (event) {
+        return if (self.event) |event| switch (event) {
             else => default,
             .node_event => |node_event| switch (node_event) {
                 else => default,
@@ -97,7 +95,7 @@ pub const ContextMenuInteraction = struct {
                     else => default,
                     .left => .{ .unused_event = null, .context_menu = .{
                         .open = false,
-                        .location = inputs.context_menu.location,
+                        .location = self.context_menu.location,
                         .options = &.{},
                     } },
                     .right => .{ .unused_event = null, .context_menu = .{
@@ -114,10 +112,10 @@ pub const ContextMenuInteraction = struct {
 const std = @import("std");
 
 test "basic" {
-    const result = ContextMenuInteraction.process(.{
+    const result = ContextMenuInteraction{
         .event = .{ .node_event = .{ .mouse_down = .{ .x = 0, .y = 0, .button = MouseButton.right, .node_name = "test" } } },
         .context_menu = .{ .open = false, .location = .{ .x = 0, .y = 0 }, .options = &.{} },
-    });
+    }.process();
     try std.testing.expectEqual(result.context_menu.open, true);
     std.debug.print("\n{s}\n", .{result.context_menu.options});
 }
