@@ -6,17 +6,16 @@ pub const MouseButton = enum {
     right,
 };
 
-pub const MouseEvent = union(enum) {
+pub const ExternalMouseEvent = union(enum) {
     mouse_down: struct { x: f32, y: f32, button: MouseButton },
     mouse_up: struct { x: f32, y: f32, button: MouseButton },
     mouse_move: struct { x: f32, y: f32 },
     mouse_wheel: struct { x: f32, y: f32, z: f32 },
 };
 
-pub const NodeEvent = union(enum) {
-    mouse_down: struct { x: f32, y: f32, button: MouseButton, node_name: []const u8 },
-    mouse_up: struct { x: f32, y: f32, button: MouseButton, node_name: []const u8 },
-    mouse_move: struct { x: f32, y: f32, node_name: []const u8 },
+pub const ExternalNodeEvent = struct {
+    mouse_event: ExternalMouseEvent,
+    node_name: []const u8,
 };
 
 pub const ContextMenuNodeOption = enum {
@@ -30,7 +29,22 @@ pub const ContextMenuOption = enum {
     paste,
 };
 
-pub const ContextEvent = union(enum) {
+// TODO: Implement group formatting / grouping, more necessary when I have a tonne of nodes.
+// pub const GroupFormatting = enum {
+//     horizontal,
+//     vertical,
+// };
+
+pub const NodeEvent = union(enum) {
+    create: struct { x: f32, y: f32, node_name: []const u8, node_type: []const u8 },
+    delete: struct { node_name: []const u8 },
+    duplicate: struct { node_name: []const u8 },
+    copy: struct { node_name: []const u8 },
+    paste: struct { x: f32, y: f32 },
+    // group: struct { node_names: []const []const u8, formatting: GroupFormatting },
+};
+
+pub const ExternalContextEvent = union(enum) {
     option_selected: []const u8,
 };
 
@@ -52,9 +66,10 @@ pub const BlueprintLoader = struct {
     }
 };
 
-pub fn EnumToStrings(comptime enum_t: type) []const []const u8 {
+/// Required to run at comptime from the callsite.
+pub fn FieldNamesToStrings(comptime with_fields: type) []const []const u8 {
     var options: []const []const u8 = &.{};
-    for (@typeInfo(enum_t).Enum.fields) |field| {
+    for (std.meta.fields(with_fields)) |field| {
         options = options ++ .{field.name};
     }
     return options;
@@ -62,9 +77,9 @@ pub fn EnumToStrings(comptime enum_t: type) []const []const u8 {
 
 pub const ContextMenuInteraction = struct {
     const Events = union(enum) {
-        mouse_event: MouseEvent,
-        node_event: NodeEvent,
-        context_event: ContextEvent,
+        mouse_event: ExternalMouseEvent,
+        node_event: ExternalNodeEvent,
+        context_event: ExternalContextEvent,
     };
     context_menu: ContextState,
     event: ?Events,
@@ -76,16 +91,22 @@ pub const ContextMenuInteraction = struct {
             .context_menu = self.context_menu,
             .unused_event = self.event,
         };
-        return if (self.event) |event| switch (event) {
-            else => default,
-            .node_event => |node_event| switch (node_event) {
+        return if (inputs.event) |event| switch (event) {
+            .context_event => |context_event| switch (context_event) {
+                .option_selected => .{ .unused_event = null, .context_menu = .{
+                    .open = false,
+                    .location = inputs.context_menu.location,
+                    .options = inputs.context_menu.options,
+                } },
+            },
+            .node_event => |node_event| switch (node_event.mouse_event) {
                 else => default,
                 .mouse_down => |mouse_down| switch (mouse_down.button) {
                     else => default,
                     .right => .{ .unused_event = null, .context_menu = .{
                         .open = true,
                         .location = .{ .x = mouse_down.x, .y = mouse_down.y },
-                        .options = comptime EnumToStrings(ContextMenuNodeOption),
+                        .options = comptime FieldNamesToStrings(ContextMenuNodeOption),
                     } },
                 },
             },
@@ -101,7 +122,7 @@ pub const ContextMenuInteraction = struct {
                     .right => .{ .unused_event = null, .context_menu = .{
                         .open = true,
                         .location = .{ .x = mouse_down.x, .y = mouse_down.y },
-                        .options = comptime EnumToStrings(ContextMenuOption),
+                        .options = comptime FieldNamesToStrings(ContextMenuOption),
                     } },
                 },
             },
@@ -112,8 +133,7 @@ pub const ContextMenuInteraction = struct {
 const std = @import("std");
 
 test "basic" {
-    const result = ContextMenuInteraction{
-        .event = .{ .node_event = .{ .mouse_down = .{ .x = 0, .y = 0, .button = MouseButton.right, .node_name = "test" } } },
+
         .context_menu = .{ .open = false, .location = .{ .x = 0, .y = 0 }, .options = &.{} },
     }.process();
     try std.testing.expectEqual(result.context_menu.open, true);
