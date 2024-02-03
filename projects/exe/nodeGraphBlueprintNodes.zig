@@ -8,10 +8,15 @@ pub const MouseButton = enum {
     right,
 };
 
+pub const GraphLocation = struct {
+    x: f32,
+    y: f32,
+};
+
 pub const ExternalMouseEvent = union(enum) {
-    mouse_down: struct { x: f32, y: f32, button: MouseButton },
-    mouse_up: struct { x: f32, y: f32, button: MouseButton },
-    mouse_move: struct { x: f32, y: f32 },
+    mouse_down: struct { location: GraphLocation, button: MouseButton },
+    mouse_up: struct { location: GraphLocation, button: MouseButton },
+    mouse_move: GraphLocation,
     mouse_wheel: struct { x: f32, y: f32, z: f32 },
 };
 
@@ -38,11 +43,11 @@ pub const ContextMenuOption = enum {
 // };
 
 pub const NodeEvent = union(enum) {
-    create: struct { x: f32, y: f32, node_name: []const u8, node_type: []const u8 },
+    create: struct { graphLocation: GraphLocation, node_name: []const u8, node_type: []const u8 },
     delete: struct { node_name: []const u8 },
     duplicate: struct { node_name: []const u8 },
     copy: struct { node_name: []const u8 },
-    paste: struct { x: f32, y: f32 },
+    paste: GraphLocation,
     // group: struct { node_names: []const []const u8, formatting: GroupFormatting },
 };
 
@@ -52,8 +57,9 @@ pub const ExternalContextEvent = union(enum) {
 
 pub const ContextState = struct {
     open: bool,
-    location: struct { x: f32, y: f32 },
-    options: []const []const u8,
+    selected_node: ?[]const u8 = null,
+    location: GraphLocation,
+    options: []const []const u8 = &.{},
 };
 
 pub const BlueprintLoader = struct {
@@ -109,29 +115,35 @@ pub const ContextMenuInteraction = struct {
     event: ?Events,
     fn process(self: @This()) struct {
         context_menu: ContextState,
-        unused_event: ?Events,
-        node_event: ?NodeEvent,
+        unused_event: ?Events = null,
+        node_event: ?NodeEvent = null,
     } {
         const default = .{
             .context_menu = self.context_menu,
             .unused_event = self.event,
-            .node_event = null,
         };
         return if (self.event) |event| switch (event) {
             .context_event => |context_event| switch (context_event) {
                 .option_selected => .{
-                    .unused_event = null,
                     .context_menu = apply(self.context_menu).withFields(.{ .open = false }),
-                    .node_event = null,
+                    .node_event = if (std.meta.stringToEnum(ContextMenuOption, context_event.option_selected)) |option| switch (option) {
+                        .paste => .{ .paste = self.context_menu.location },
+                        .@"new..." => unreachable, // TODO: Implement new node creation.
+                    } else if (self.context_menu.selected_node) |selected_node| if (std.meta.stringToEnum(ContextMenuNodeOption, context_event.option_selected)) |option| switch (option) {
+                        .delete => .{ .delete = .{ .node_name = selected_node } },
+                        .duplicate => .{ .duplicate = .{ .node_name = selected_node } },
+                        .copy => .{ .copy = .{ .node_name = selected_node } },
+                    } else null else null,
                 },
             },
             .node_event => |node_event| switch (node_event.mouse_event) {
                 else => default,
                 .mouse_down => |mouse_down| switch (mouse_down.button) {
                     else => default,
-                    .right => .{ .unused_event = null, .node_event = null, .context_menu = .{
+                    .right => .{ .context_menu = .{
                         .open = true,
-                        .location = .{ .x = mouse_down.x, .y = mouse_down.y },
+                        .selected_node = node_event.node_name,
+                        .location = mouse_down.location,
                         .options = comptime FieldNamesToStrings(ContextMenuNodeOption),
                     } },
                 },
@@ -140,14 +152,10 @@ pub const ContextMenuInteraction = struct {
                 else => default,
                 .mouse_down => |mouse_down| switch (mouse_down.button) {
                     else => default,
-                    .left => .{
-                        .node_event = null,
-                        .unused_event = null,
-                        .context_menu = apply(self.context_menu).withFields(.{ .open = false }),
-                    },
-                    .right => .{ .unused_event = null, .node_event = null, .context_menu = .{
+                    .left => .{ .context_menu = apply(self.context_menu).withFields(.{ .open = false }) },
+                    .right => .{ .context_menu = .{
                         .open = true,
-                        .location = .{ .x = mouse_down.x, .y = mouse_down.y },
+                        .location = mouse_down.location,
                         .options = comptime FieldNamesToStrings(ContextMenuOption),
                     } },
                 },
@@ -156,12 +164,21 @@ pub const ContextMenuInteraction = struct {
     }
 };
 
+pub fn myFn(this: u32) u32 {
+    _ = this; // autofix
+    unreachable;
+}
+
 test "basic" {
     const node: ContextMenuInteraction = .{
-        .event = .{ .node_event = .{ .node_name = "test", .mouse_event = .{ .mouse_down = .{ .x = 0, .y = 0, .button = MouseButton.right } } } },
+        .event = .{ .node_event = .{
+            .node_name = "test",
+            .mouse_event = .{ .mouse_down = .{ .location = .{ .x = 0, .y = 0 }, .button = MouseButton.right } },
+        } },
         .context_menu = .{ .open = false, .location = .{ .x = 0, .y = 0 }, .options = &.{} },
     };
     const output = node.process();
     try std.testing.expectEqual(output.context_menu.open, true);
     std.debug.print("\n{s}\n", .{output.context_menu.options});
+    std.debug.print("\n{any}\n", .{@TypeOf(myFn)});
 }
