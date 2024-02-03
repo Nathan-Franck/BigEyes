@@ -68,25 +68,25 @@ pub const BlueprintLoader = struct {
     }
 };
 
-pub fn Take(source_data: anytype) type {
-    return struct {
-        source_data: source_data,
-        pub fn with(self: @This(), field_changes: anytype) @TypeOf(source_data) {
-            switch (@typeInfo(@TypeOf(self.source_data))) {
-                .Struct => |structInfo| {
-                    var result = self.source_data;
-                    inline for (structInfo.fields) |field| {
-                        if (@hasField(@TypeOf(field_changes), field.name))
-                            @field(result, field.name) = @field(field_changes, field.name);
-                    }
-                    return result;
-                },
-                else => {
-                    @compileError("Can't merge non-struct types");
-                },
-            }
+pub fn apply(source_data: anytype) struct {
+    source_data: @TypeOf(source_data),
+    pub fn withFields(self: @This(), field_changes: anytype) @TypeOf(source_data) {
+        switch (@typeInfo(@TypeOf(self.source_data))) {
+            .Struct => |structInfo| {
+                var result = self.source_data;
+                inline for (structInfo.fields) |field| {
+                    if (@hasField(@TypeOf(field_changes), field.name))
+                        @field(result, field.name) = @field(field_changes, field.name);
+                }
+                return result;
+            },
+            else => {
+                @compileError("Can't merge non-struct types");
+            },
         }
-    };
+    }
+} {
+    return .{ .source_data = source_data };
 }
 
 /// Takes any type that has fields and returns a list of the field names as strings.
@@ -110,24 +110,26 @@ pub const ContextMenuInteraction = struct {
     fn process(self: @This()) struct {
         context_menu: ContextState,
         unused_event: ?Events,
+        node_event: ?NodeEvent,
     } {
         const default = .{
             .context_menu = self.context_menu,
             .unused_event = self.event,
+            .node_event = null,
         };
         return if (self.event) |event| switch (event) {
             .context_event => |context_event| switch (context_event) {
-                .option_selected => .{ .unused_event = null, .context_menu = .{
-                    .open = false,
-                    .location = self.context_menu.location,
-                    .options = self.context_menu.options,
-                } },
+                .option_selected => .{
+                    .unused_event = null,
+                    .context_menu = apply(self.context_menu).withFields(.{ .open = false }),
+                    .node_event = null,
+                },
             },
             .node_event => |node_event| switch (node_event.mouse_event) {
                 else => default,
                 .mouse_down => |mouse_down| switch (mouse_down.button) {
                     else => default,
-                    .right => .{ .unused_event = null, .context_menu = .{
+                    .right => .{ .unused_event = null, .node_event = null, .context_menu = .{
                         .open = true,
                         .location = .{ .x = mouse_down.x, .y = mouse_down.y },
                         .options = comptime FieldNamesToStrings(ContextMenuNodeOption),
@@ -138,12 +140,12 @@ pub const ContextMenuInteraction = struct {
                 else => default,
                 .mouse_down => |mouse_down| switch (mouse_down.button) {
                     else => default,
-                    .left => .{ .unused_event = null, .context_menu = .{
-                        .open = false,
-                        .location = self.context_menu.location,
-                        .options = self.context_menu.options,
-                    } },
-                    .right => .{ .unused_event = null, .context_menu = .{
+                    .left => .{
+                        .node_event = null,
+                        .unused_event = null,
+                        .context_menu = apply(self.context_menu).withFields(.{ .open = false }),
+                    },
+                    .right => .{ .unused_event = null, .node_event = null, .context_menu = .{
                         .open = true,
                         .location = .{ .x = mouse_down.x, .y = mouse_down.y },
                         .options = comptime FieldNamesToStrings(ContextMenuOption),
