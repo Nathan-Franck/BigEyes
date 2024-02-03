@@ -125,19 +125,6 @@ pub const ContextMenuInteraction = struct {
             .unused_event = self.event,
         };
         return if (self.event) |event| switch (event) {
-            .context_event => |context_event| switch (context_event) {
-                .option_selected => .{
-                    .context_menu = apply(self.context_menu).withFields(.{ .open = false }),
-                    .node_event = if (std.meta.stringToEnum(ContextMenuOption, context_event.option_selected)) |option| switch (option) {
-                        .paste => .{ .paste = self.context_menu.location },
-                        .@"new..." => unreachable, // TODO: Implement new node creation.
-                    } else if (self.context_menu.selected_node) |selected_node| if (std.meta.stringToEnum(ContextMenuNodeOption, context_event.option_selected)) |option| switch (option) {
-                        .delete => .{ .delete = .{ .node_name = selected_node } },
-                        .duplicate => .{ .duplicate = .{ .node_name = selected_node } },
-                        .copy => .{ .copy = .{ .node_name = selected_node } },
-                    } else null else null,
-                },
-            },
             .node_event => |node_event| switch (node_event.mouse_event) {
                 else => default,
                 .mouse_down => |mouse_down| switch (mouse_down.button) {
@@ -162,13 +149,30 @@ pub const ContextMenuInteraction = struct {
                     } },
                 },
             },
+            .context_event => |context_event| switch (context_event) {
+                .option_selected => result: {
+                    const menu_option_selected = std.meta.stringToEnum(ContextMenuOption, context_event.option_selected);
+                    const menu_node_option_selected = std.meta.stringToEnum(ContextMenuNodeOption, context_event.option_selected);
+                    break :result .{
+                        .context_menu = apply(self.context_menu).withFields(.{ .open = false }),
+                        .node_event = if (menu_option_selected) |option| switch (option) {
+                            .paste => .{ .paste = self.context_menu.location },
+                            .@"new..." => unreachable, // TODO: Implement new node creation.
+                        } else if (menu_node_option_selected) |option| if (self.context_menu.selected_node) |selected_node| switch (option) {
+                            .delete => .{ .delete = .{ .node_name = selected_node } },
+                            .duplicate => .{ .duplicate = .{ .node_name = selected_node } },
+                            .copy => .{ .copy = .{ .node_name = selected_node } },
+                        } else null else null,
+                    };
+                },
+            },
         } else default;
     }
 };
 
 pub fn myFn(this: u32) u32 {
     _ = this; // autofix
-    unreachable;
+    unreachable; // Cool! We can stub out functions with unreachable.
 }
 
 test "basic" {
