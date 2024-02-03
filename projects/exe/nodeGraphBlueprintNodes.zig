@@ -106,17 +106,19 @@ pub fn FieldNamesToStrings(comptime with_fields: type) []const []const u8 {
 }
 
 pub const ContextMenuInteraction = struct {
-    const Events = union(enum) {
+    context_menu: ContextState,
+    event: union(enum) {
         mouse_event: ExternalMouseEvent,
-        node_event: ExternalNodeEvent,
+        external_node_event: ExternalNodeEvent,
         context_event: ExternalContextEvent,
     };
-    context_menu: ContextState,
-    event: ?Events,
     fn process(self: @This()) struct {
         context_menu: ContextState,
-        unused_event: ?Events = null,
-        node_event: ?NodeEvent = null,
+        unused_event: union(enum) {
+            mouse_event: ExternalMouseEvent,
+            external_node_event: ExternalNodeEvent,
+            node_event: NodeEvent,
+        }
     } {
         const default = .{
             .context_menu = self.context_menu,
