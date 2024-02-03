@@ -1,3 +1,5 @@
+const std = @import("std");
+
 pub const Blueprint = @import("./interactiveNodeBuilderBlueprint.zig").Blueprint;
 
 pub const MouseButton = enum {
@@ -66,7 +68,29 @@ pub const BlueprintLoader = struct {
     }
 };
 
-/// Required to run at comptime from the callsite.
+pub fn Take(source_data: anytype) type {
+    return struct {
+        source_data: source_data,
+        pub fn with(self: @This(), field_changes: anytype) @TypeOf(source_data) {
+            switch (@typeInfo(@TypeOf(self.source_data))) {
+                .Struct => |structInfo| {
+                    var result = self.source_data;
+                    inline for (structInfo.fields) |field| {
+                        if (@hasField(@TypeOf(field_changes), field.name))
+                            @field(result, field.name) = @field(field_changes, field.name);
+                    }
+                    return result;
+                },
+                else => {
+                    @compileError("Can't merge non-struct types");
+                },
+            }
+        }
+    };
+}
+
+/// Takes any type that has fields and returns a list of the field names as strings.
+/// NOTE: Required to run at comptime from the callsite.
 pub fn FieldNamesToStrings(comptime with_fields: type) []const []const u8 {
     var options: []const []const u8 = &.{};
     for (std.meta.fields(with_fields)) |field| {
@@ -91,12 +115,12 @@ pub const ContextMenuInteraction = struct {
             .context_menu = self.context_menu,
             .unused_event = self.event,
         };
-        return if (inputs.event) |event| switch (event) {
+        return if (self.event) |event| switch (event) {
             .context_event => |context_event| switch (context_event) {
                 .option_selected => .{ .unused_event = null, .context_menu = .{
                     .open = false,
-                    .location = inputs.context_menu.location,
-                    .options = inputs.context_menu.options,
+                    .location = self.context_menu.location,
+                    .options = self.context_menu.options,
                 } },
             },
             .node_event => |node_event| switch (node_event.mouse_event) {
@@ -117,7 +141,7 @@ pub const ContextMenuInteraction = struct {
                     .left => .{ .unused_event = null, .context_menu = .{
                         .open = false,
                         .location = self.context_menu.location,
-                        .options = &.{},
+                        .options = self.context_menu.options,
                     } },
                     .right => .{ .unused_event = null, .context_menu = .{
                         .open = true,
@@ -130,12 +154,12 @@ pub const ContextMenuInteraction = struct {
     }
 };
 
-const std = @import("std");
-
 test "basic" {
-
+    const node: ContextMenuInteraction = .{
+        .event = .{ .node_event = .{ .node_name = "test", .mouse_event = .{ .mouse_down = .{ .x = 0, .y = 0, .button = MouseButton.right } } } },
         .context_menu = .{ .open = false, .location = .{ .x = 0, .y = 0 }, .options = &.{} },
-    }.process();
-    try std.testing.expectEqual(result.context_menu.open, true);
-    std.debug.print("\n{s}\n", .{result.context_menu.options});
+    };
+    const output = node.process();
+    try std.testing.expectEqual(output.context_menu.open, true);
+    std.debug.print("\n{s}\n", .{output.context_menu.options});
 }
