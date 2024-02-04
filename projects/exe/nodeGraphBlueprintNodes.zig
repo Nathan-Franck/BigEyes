@@ -94,10 +94,6 @@ pub fn NodeInputEventType(node_process_function: anytype) type {
     return event_field_info.type;
 }
 
-pub fn nodeEventTransform(node_process_function: anytype, source_event: anytype) NodeOutputEventType(node_process_function) {
-    return eventTransform(NodeOutputEventType(node_process_function), source_event);
-}
-
 pub fn eventTransform(target_event_type: type, source_event: anytype) target_event_type {
     const source_info = @typeInfo(@TypeOf(source_event));
     if (source_info != .Optional) {
@@ -129,7 +125,7 @@ pub fn eventTransform(target_event_type: type, source_event: anytype) target_eve
                     } else if (equal_names and !equal_types) {
                         @compileError(std.fmt.comptimePrint("source and target field types do not match: {any} {any}", .{ target_field.type, source_field.type }));
                     } else if (equal_types and !equal_names) {
-                        @compileError(std.fmt.comptimePrint("source and target field names do not match: {s} {s} {any}", .{ target_field.name, source_field.name, std.mem.eql(u8, source_field.name, target_field.name) }));
+                        @compileError("source and target field names do not match: " ++ target_field.name ++ " " ++ source_field.name);
                     }
                 }
             }
@@ -176,7 +172,7 @@ fn ContextMenuInteraction(input: struct {
 } {
     const default = .{
         .context_menu = input.context_menu,
-        .event = nodeEventTransform(ContextMenuInteraction, input.event),
+        .event = eventTransform(NodeOutputEventType(ContextMenuInteraction), input.event),
     };
     return if (input.event) |event| switch (event) {
         .external_node_event => |node_event| switch (node_event.mouse_event) {
@@ -288,11 +284,11 @@ test "glueing two nodes together" {
         } },
         .context_menu = .{ .open = false, .location = .{ .x = 0, .y = 0 }, .options = &.{} },
     });
-    const output = NodeInteraction(.{
+    const second_output = NodeInteraction(.{
         .event = eventTransform(NodeInputEventType(NodeInteraction), first_output.event),
         .interaction_state = .{ .node_selection = &.{}, .wiggle = null },
         .blueprint = .{ .nodes = &.{}, .store = &.{}, .output = &.{} },
         .keyboard_modifiers = .{ .shift = false, .control = false, .alt = false, .super = false },
     });
-    try std.testing.expectEqualStrings(output.interaction_state.node_selection[0], "test");
+    try std.testing.expectEqualStrings(second_output.interaction_state.node_selection[0], "test");
 }
