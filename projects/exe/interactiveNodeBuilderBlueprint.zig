@@ -51,7 +51,7 @@ pub const node_graph_blueprint: Blueprint = .{
             .function = "NodeInteraction",
             .input_links = .{
                 .{ .input = .{ .input_field = "keyboard_modifiers" } },
-                .{ .store = .{ .input_field = "active_node" } },
+                .{ .store = .{ .input_field = "interaction_state" } },
                 .{ .node = .{ .input_field = "blueprint", .from = "graphLoader" } },
                 .{ .node = .{ .input_field = "event", .output_field = "unused_event", .from = "contextMenuInteraction" } },
             },

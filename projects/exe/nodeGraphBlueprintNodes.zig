@@ -85,6 +85,15 @@ pub fn NodeOutputEventType(node_process_function: anytype) type {
     return event_field_info.type;
 }
 
+pub fn NodeInputEventType(node_process_function: anytype) type {
+    const node_process_function_info = @typeInfo(@TypeOf(node_process_function));
+    if (node_process_function_info != .Fn) {
+        @compileError("node_process_function must be a function, found '" ++ @typeName(node_process_function) ++ "'");
+    }
+    const event_field_info = std.meta.fieldInfo(node_process_function_info.Fn.params[0].type.?, .event);
+    return event_field_info.type;
+}
+
 pub fn nodeEventTransform(node_process_function: anytype, source_event: anytype) NodeOutputEventType(node_process_function) {
     return eventTransform(NodeOutputEventType(node_process_function), source_event);
 }
@@ -214,6 +223,42 @@ fn ContextMenuInteraction(input: struct {
     } else default;
 }
 
+pub const KeyboardModifiers = struct {
+    shift: bool,
+    control: bool,
+    alt: bool,
+    super: bool,
+};
+
+pub const InteractionState = struct {
+    wiggle: ?struct {
+        node: []const u8,
+        location: GraphLocation,
+    },
+    node_selection: []const []const u8,
+};
+
+fn NodeInteraction(input: struct {
+    keyboard_modifiers: KeyboardModifiers,
+    interaction_state: InteractionState,
+    blueprint: Blueprint,
+    event: ?union(enum) {
+        mouse_event: ExternalMouseEvent,
+        external_node_event: ExternalNodeEvent,
+        node_event: NodeEvent,
+    },
+}) struct {
+    interaction_state: InteractionState,
+    blueprint: Blueprint,
+    event: ?union(enum) {
+        mouse_event: ExternalMouseEvent,
+        external_node_event: ExternalNodeEvent,
+    } = null,
+} {
+    _ = input; // autofix
+    unreachable;
+}
+
 test "basic" {
     const output = ContextMenuInteraction(.{
         .event = .{ .external_node_event = .{
@@ -233,4 +278,21 @@ test "basic2" {
         .context_menu = .{ .open = true, .location = .{ .x = 0, .y = 0 }, .options = &.{}, .selected_node = "test" },
     });
     try std.testing.expectEqual(output.context_menu.open, false);
+}
+
+test "glueing two nodes together" {
+    const first_output = ContextMenuInteraction(.{
+        .event = .{ .external_node_event = .{
+            .node_name = "test",
+            .mouse_event = .{ .mouse_down = .{ .location = .{ .x = 0, .y = 0 }, .button = MouseButton.right } },
+        } },
+        .context_menu = .{ .open = false, .location = .{ .x = 0, .y = 0 }, .options = &.{} },
+    });
+    const output = NodeInteraction(.{
+        .event = eventTransform(NodeInputEventType(NodeInteraction), first_output.event),
+        .interaction_state = .{ .node_selection = &.{}, .wiggle = null },
+        .blueprint = .{ .nodes = &.{}, .store = &.{}, .output = &.{} },
+        .keyboard_modifiers = .{ .shift = false, .control = false, .alt = false, .super = false },
+    });
+    try std.testing.expectEqualStrings(output.interaction_state.node_selection[0], "test");
 }
