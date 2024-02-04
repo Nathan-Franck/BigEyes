@@ -74,23 +74,18 @@ pub const BlueprintLoader = struct {
     }
 };
 
-pub fn copy(source_data: anytype) struct {
-    source_data: @TypeOf(source_data),
-    pub fn withFields(self: @This(), field_changes: anytype) @TypeOf(source_data) {
-        switch (@typeInfo(@TypeOf(self.source_data))) {
-            else => @compileError("Can't merge non-struct types"),
-            .Struct => |struct_info| {
-                var result = self.source_data;
-                inline for (struct_info.fields) |field| {
-                    if (@hasField(@TypeOf(field_changes), field.name))
-                        @field(result, field.name) = @field(field_changes, field.name);
-                }
-                return result;
-            },
-        }
+pub fn copyWith(source_data: anytype, field_changes: anytype) @TypeOf(source_data) {
+    switch (@typeInfo(@TypeOf(source_data))) {
+        else => @compileError("Can't merge non-struct types"),
+        .Struct => |struct_info| {
+            var result = source_data;
+            inline for (struct_info.fields) |field| {
+                if (@hasField(@TypeOf(field_changes), field.name))
+                    @field(result, field.name) = @field(field_changes, field.name);
+            }
+            return result;
+        },
     }
-} {
-    return .{ .source_data = source_data };
 }
 
 pub fn NodeOutputEventType(node_process_function: anytype) type {
@@ -192,7 +187,7 @@ pub const ContextMenuInteraction = struct {
                 else => default,
                 .mouse_down => |mouse_down| switch (mouse_down.button) {
                     else => default,
-                    .left => .{ .context_menu = copy(self.context_menu).withFields(.{ .open = false }) },
+                    .left => .{ .context_menu = copyWith(self.context_menu, .{ .open = false }) },
                     .right => .{ .context_menu = .{
                         .open = true,
                         .location = mouse_down.location,
@@ -205,7 +200,7 @@ pub const ContextMenuInteraction = struct {
                     const menu_option_selected = std.meta.stringToEnum(ContextMenuOption, context_event.option_selected);
                     const menu_node_option_selected = std.meta.stringToEnum(ContextMenuNodeOption, context_event.option_selected);
                     break :result .{
-                        .context_menu = copy(self.context_menu).withFields(.{ .open = false }),
+                        .context_menu = copyWith(self.context_menu, .{ .open = false }),
                         .event = if (menu_option_selected) |option| switch (option) {
                             .paste => .{ .node_event = .{ .paste = self.context_menu.location } },
                             .@"new..." => unreachable, // TODO: Implement new node creation.
