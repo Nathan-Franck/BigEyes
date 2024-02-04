@@ -62,18 +62,6 @@ pub const ContextState = struct {
     options: []const []const u8 = &.{},
 };
 
-pub const BlueprintLoader = struct {
-    recieved_blueprint: ?Blueprint,
-    existing_blueprint: Blueprint,
-    fn process(self: @This()) struct { blueprint: Blueprint } {
-        if (self.recieved_blueprint) |update| {
-            return update;
-        } else {
-            return self.existing_blueprint;
-        }
-    }
-};
-
 pub fn copyWith(source_data: anytype, field_changes: anytype) @TypeOf(source_data) {
     switch (@typeInfo(@TypeOf(source_data))) {
         else => @compileError("Can't merge non-struct types"),
@@ -151,98 +139,98 @@ pub fn fieldNamesToStrings(comptime with_fields: type) []const []const u8 {
     return options;
 }
 
-pub const ContextMenuInteraction = struct {
+fn BlueprintLoader(input: struct {
+    recieved_blueprint: ?Blueprint,
+    existing_blueprint: Blueprint,
+}) struct { blueprint: Blueprint } {
+    if (input.recieved_blueprint) |update| {
+        return update;
+    } else {
+        return input.existing_blueprint;
+    }
+}
+
+fn ContextMenuInteraction(input: struct {
     context_menu: ContextState,
     event: ?union(enum) {
         mouse_event: ExternalMouseEvent,
         external_node_event: ExternalNodeEvent,
         context_event: ExternalContextEvent,
     },
-    fn process(self: @This()) struct {
-        context_menu: ContextState,
-        event: ?union(enum) {
-            mouse_event: ExternalMouseEvent,
-            external_node_event: ExternalNodeEvent,
-            node_event: NodeEvent,
-        } = null,
-    } {
-        const default = .{
-            .context_menu = self.context_menu,
-            .event = nodeEventTransform(process, self.event),
-        };
-        return if (self.event) |event| switch (event) {
-            .external_node_event => |node_event| switch (node_event.mouse_event) {
+}) struct {
+    context_menu: ContextState,
+    event: ?union(enum) {
+        mouse_event: ExternalMouseEvent,
+        external_node_event: ExternalNodeEvent,
+        node_event: NodeEvent,
+    } = null,
+} {
+    const default = .{
+        .context_menu = input.context_menu,
+        .event = nodeEventTransform(ContextMenuInteraction, input.event),
+    };
+    return if (input.event) |event| switch (event) {
+        .external_node_event => |node_event| switch (node_event.mouse_event) {
+            else => default,
+            .mouse_down => |mouse_down| switch (mouse_down.button) {
                 else => default,
-                .mouse_down => |mouse_down| switch (mouse_down.button) {
-                    else => default,
-                    .right => .{ .context_menu = .{
-                        .open = true,
-                        .selected_node = node_event.node_name,
-                        .location = mouse_down.location,
-                        .options = comptime fieldNamesToStrings(ContextMenuNodeOption),
-                    } },
-                },
+                .right => .{ .context_menu = .{
+                    .open = true,
+                    .selected_node = node_event.node_name,
+                    .location = mouse_down.location,
+                    .options = comptime fieldNamesToStrings(ContextMenuNodeOption),
+                } },
             },
-            .mouse_event => |mouse_event| switch (mouse_event) {
+        },
+        .mouse_event => |mouse_event| switch (mouse_event) {
+            else => default,
+            .mouse_down => |mouse_down| switch (mouse_down.button) {
                 else => default,
-                .mouse_down => |mouse_down| switch (mouse_down.button) {
-                    else => default,
-                    .left => .{ .context_menu = copyWith(self.context_menu, .{ .open = false }) },
-                    .right => .{ .context_menu = .{
-                        .open = true,
-                        .location = mouse_down.location,
-                        .options = comptime fieldNamesToStrings(ContextMenuOption),
-                    } },
-                },
+                .left => .{ .context_menu = copyWith(input.context_menu, .{ .open = false }) },
+                .right => .{ .context_menu = .{
+                    .open = true,
+                    .location = mouse_down.location,
+                    .options = comptime fieldNamesToStrings(ContextMenuOption),
+                } },
             },
-            .context_event => |context_event| switch (context_event) {
-                .option_selected => result: {
-                    const menu_option_selected = std.meta.stringToEnum(ContextMenuOption, context_event.option_selected);
-                    const menu_node_option_selected = std.meta.stringToEnum(ContextMenuNodeOption, context_event.option_selected);
-                    break :result .{
-                        .context_menu = copyWith(self.context_menu, .{ .open = false }),
-                        .event = if (menu_option_selected) |option| switch (option) {
-                            .paste => .{ .node_event = .{ .paste = self.context_menu.location } },
-                            .@"new..." => unreachable, // TODO: Implement new node creation.
-                        } else if (menu_node_option_selected) |option| if (self.context_menu.selected_node) |selected_node| switch (option) {
-                            .delete => blk: {
-                                break :blk .{ .node_event = .{ .delete = .{ .node_name = selected_node } } };
-                            },
-                            .duplicate => .{ .node_event = .{ .duplicate = .{ .node_name = selected_node } } },
-                            .copy => .{ .node_event = .{ .copy = .{ .node_name = selected_node } } },
-                        } else unreachable else unreachable, // TODO: Do I want this to crash or fail gracefully? Maybe float some error event up that an error message system can present the user?
-                    };
-                },
+        },
+        .context_event => |context_event| switch (context_event) {
+            .option_selected => result: {
+                const menu_option_selected = std.meta.stringToEnum(ContextMenuOption, context_event.option_selected);
+                const menu_node_option_selected = std.meta.stringToEnum(ContextMenuNodeOption, context_event.option_selected);
+                break :result .{
+                    .context_menu = copyWith(input.context_menu, .{ .open = false }),
+                    .event = if (menu_option_selected) |option| switch (option) {
+                        .paste => .{ .node_event = .{ .paste = input.context_menu.location } },
+                        .@"new..." => unreachable, // TODO: Implement new node creation.
+                    } else if (menu_node_option_selected) |option| if (input.context_menu.selected_node) |selected_node| switch (option) {
+                        .delete => .{ .node_event = .{ .delete = .{ .node_name = selected_node } } },
+                        .duplicate => .{ .node_event = .{ .duplicate = .{ .node_name = selected_node } } },
+                        .copy => .{ .node_event = .{ .copy = .{ .node_name = selected_node } } },
+                    } else unreachable else unreachable, // TODO: Do I want this to crash or fail gracefully? Maybe float some error event up that an error message system can present the user?
+                };
             },
-        } else default;
-    }
-};
-
-pub fn myFn(this: u32) u32 {
-    _ = this; // autofix
-    unreachable; // Cool! We can stub out functions with unreachable.
+        },
+    } else default;
 }
 
 test "basic" {
-    const node: ContextMenuInteraction = .{
+    const output = ContextMenuInteraction(.{
         .event = .{ .external_node_event = .{
             .node_name = "test",
             .mouse_event = .{ .mouse_down = .{ .location = .{ .x = 0, .y = 0 }, .button = MouseButton.right } },
         } },
         .context_menu = .{ .open = false, .location = .{ .x = 0, .y = 0 }, .options = &.{} },
-    };
-    const output = node.process();
+    });
     try std.testing.expectEqual(output.context_menu.open, true);
 }
 
 test "basic2" {
-    const node: ContextMenuInteraction = .{
+    const output = ContextMenuInteraction(.{
         .event = .{ .context_event = .{
             .option_selected = "delete",
         } },
         .context_menu = .{ .open = true, .location = .{ .x = 0, .y = 0 }, .options = &.{}, .selected_node = "test" },
-    };
-    const output = node.process();
-
+    });
     try std.testing.expectEqual(output.context_menu.open, false);
 }
