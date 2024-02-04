@@ -78,16 +78,14 @@ pub fn apply(source_data: anytype) struct {
     source_data: @TypeOf(source_data),
     pub fn withFields(self: @This(), field_changes: anytype) @TypeOf(source_data) {
         switch (@typeInfo(@TypeOf(self.source_data))) {
-            .Struct => |structInfo| {
+            else => @compileError("Can't merge non-struct types"),
+            .Struct => |struct_info| {
                 var result = self.source_data;
-                inline for (structInfo.fields) |field| {
+                inline for (struct_info.fields) |field| {
                     if (@hasField(@TypeOf(field_changes), field.name))
                         @field(result, field.name) = @field(field_changes, field.name);
                 }
                 return result;
-            },
-            else => {
-                @compileError("Can't merge non-struct types");
             },
         }
     }
@@ -95,9 +93,62 @@ pub fn apply(source_data: anytype) struct {
     return .{ .source_data = source_data };
 }
 
+pub fn NodeOutputEventType(node_process_function: anytype) type {
+    const node_process_function_info = @typeInfo(@TypeOf(node_process_function));
+    if (node_process_function_info != .Fn) {
+        @compileError("node_process_function must be a function, found '" ++ @typeName(node_process_function) ++ "'");
+    }
+    const event_field_info = std.meta.fieldInfo(node_process_function_info.Fn.return_type.?, .event);
+    return event_field_info.type;
+}
+
+pub fn nodeEventTransform(node_process_function: anytype, source_event: anytype) NodeOutputEventType(node_process_function) {
+    return eventTransform(NodeOutputEventType(node_process_function), source_event);
+}
+
+pub fn eventTransform(target_event_type: type, source_event: anytype) target_event_type {
+    const source_info = @typeInfo(@TypeOf(source_event));
+    if (source_info != .Optional) {
+        @compileError("source_event must be an optional union type (?union(enum){}), found '" ++ @typeName(source_event) ++ "'");
+    }
+    const source_optional_info = @typeInfo(source_info.Optional.child);
+    if (source_optional_info != .Union) {
+        @compileError("source_event must be an optional union type (?union(enum){}), found '" ++ @typeName(source_event) ++ "'");
+    }
+    const target_info = @typeInfo(target_event_type);
+    if (target_info != .Optional) {
+        @compileError("target_event_type must be an optional union type (?union(enum){}), found '" ++ @typeName(target_event_type) ++ "'");
+    }
+    const target_optional_info = @typeInfo(target_info.Optional.child);
+    if (target_optional_info != .Union) {
+        @compileError("target_event_type must be an optional union type (?union(enum){}), found '" ++ @typeName(target_event_type) ++ "'");
+    }
+    if (source_event) |source_not_null| {
+        const field_index = @intFromEnum(source_not_null);
+        inline for (source_optional_info.Union.fields, 0..) |source_field, i| {
+            if (i == field_index) {
+                const source = @field(source_not_null, source_field.name);
+                inline for (target_optional_info.Union.fields, 0..) |target_field, j| {
+                    _ = j; // autofix
+                    const equal_names = comptime std.mem.eql(u8, source_field.name, target_field.name);
+                    const equal_types = source_field.type == target_field.type;
+                    if (equal_names and equal_types) {
+                        return @unionInit(target_info.Optional.child, target_field.name, source);
+                    } else if (equal_names and !equal_types) {
+                        @compileError(std.fmt.comptimePrint("source and target field types do not match: {any} {any}", .{ target_field.type, source_field.type }));
+                    } else if (equal_types and !equal_names) {
+                        @compileError(std.fmt.comptimePrint("source and target field names do not match: {s} {s} {any}", .{ target_field.name, source_field.name, std.mem.eql(u8, source_field.name, target_field.name) }));
+                    }
+                }
+            }
+        }
+    }
+    return null;
+}
+
 /// Takes any type that has fields and returns a list of the field names as strings.
 /// NOTE: Required to run at comptime from the callsite.
-pub fn FieldNamesToStrings(comptime with_fields: type) []const []const u8 {
+pub fn fieldNamesToStrings(comptime with_fields: type) []const []const u8 {
     var options: []const []const u8 = &.{};
     for (std.meta.fields(with_fields)) |field| {
         options = options ++ .{field.name};
@@ -107,25 +158,25 @@ pub fn FieldNamesToStrings(comptime with_fields: type) []const []const u8 {
 
 pub const ContextMenuInteraction = struct {
     context_menu: ContextState,
-    event: union(enum) {
+    event: ?union(enum) {
         mouse_event: ExternalMouseEvent,
         external_node_event: ExternalNodeEvent,
         context_event: ExternalContextEvent,
-    };
+    },
     fn process(self: @This()) struct {
         context_menu: ContextState,
-        unused_event: union(enum) {
+        event: ?union(enum) {
             mouse_event: ExternalMouseEvent,
             external_node_event: ExternalNodeEvent,
             node_event: NodeEvent,
-        }
+        } = null,
     } {
         const default = .{
             .context_menu = self.context_menu,
-            .unused_event = self.event,
+            .event = nodeEventTransform(process, self.event),
         };
         return if (self.event) |event| switch (event) {
-            .node_event => |node_event| switch (node_event.mouse_event) {
+            .external_node_event => |node_event| switch (node_event.mouse_event) {
                 else => default,
                 .mouse_down => |mouse_down| switch (mouse_down.button) {
                     else => default,
@@ -133,7 +184,7 @@ pub const ContextMenuInteraction = struct {
                         .open = true,
                         .selected_node = node_event.node_name,
                         .location = mouse_down.location,
-                        .options = comptime FieldNamesToStrings(ContextMenuNodeOption),
+                        .options = comptime fieldNamesToStrings(ContextMenuNodeOption),
                     } },
                 },
             },
@@ -145,7 +196,7 @@ pub const ContextMenuInteraction = struct {
                     .right => .{ .context_menu = .{
                         .open = true,
                         .location = mouse_down.location,
-                        .options = comptime FieldNamesToStrings(ContextMenuOption),
+                        .options = comptime fieldNamesToStrings(ContextMenuOption),
                     } },
                 },
             },
@@ -155,14 +206,16 @@ pub const ContextMenuInteraction = struct {
                     const menu_node_option_selected = std.meta.stringToEnum(ContextMenuNodeOption, context_event.option_selected);
                     break :result .{
                         .context_menu = apply(self.context_menu).withFields(.{ .open = false }),
-                        .node_event = if (menu_option_selected) |option| switch (option) {
-                            .paste => .{ .paste = self.context_menu.location },
+                        .event = if (menu_option_selected) |option| switch (option) {
+                            .paste => .{ .node_event = .{ .paste = self.context_menu.location } },
                             .@"new..." => unreachable, // TODO: Implement new node creation.
                         } else if (menu_node_option_selected) |option| if (self.context_menu.selected_node) |selected_node| switch (option) {
-                            .delete => .{ .delete = .{ .node_name = selected_node } },
-                            .duplicate => .{ .duplicate = .{ .node_name = selected_node } },
-                            .copy => .{ .copy = .{ .node_name = selected_node } },
-                        } else null else null,
+                            .delete => blk: {
+                                break :blk .{ .node_event = .{ .delete = .{ .node_name = selected_node } } };
+                            },
+                            .duplicate => .{ .node_event = .{ .duplicate = .{ .node_name = selected_node } } },
+                            .copy => .{ .node_event = .{ .copy = .{ .node_name = selected_node } } },
+                        } else unreachable else unreachable, // TODO: Do I want this to crash or fail gracefully? Maybe float some error event up that an error message system can present the user?
                     };
                 },
             },
@@ -177,7 +230,7 @@ pub fn myFn(this: u32) u32 {
 
 test "basic" {
     const node: ContextMenuInteraction = .{
-        .event = .{ .node_event = .{
+        .event = .{ .external_node_event = .{
             .node_name = "test",
             .mouse_event = .{ .mouse_down = .{ .location = .{ .x = 0, .y = 0 }, .button = MouseButton.right } },
         } },
@@ -185,6 +238,16 @@ test "basic" {
     };
     const output = node.process();
     try std.testing.expectEqual(output.context_menu.open, true);
-    std.debug.print("\n{s}\n", .{output.context_menu.options});
-    std.debug.print("\n{any}\n", .{@TypeOf(myFn)});
+}
+
+test "basic2" {
+    const node: ContextMenuInteraction = .{
+        .event = .{ .context_event = .{
+            .option_selected = "delete",
+        } },
+        .context_menu = .{ .open = true, .location = .{ .x = 0, .y = 0 }, .options = &.{}, .selected_node = "test" },
+    };
+    const output = node.process();
+
+    try std.testing.expectEqual(output.context_menu.open, false);
 }
