@@ -74,7 +74,7 @@ pub const BlueprintLoader = struct {
     }
 };
 
-pub fn apply(source_data: anytype) struct {
+pub fn copy(source_data: anytype) struct {
     source_data: @TypeOf(source_data),
     pub fn withFields(self: @This(), field_changes: anytype) @TypeOf(source_data) {
         switch (@typeInfo(@TypeOf(self.source_data))) {
@@ -192,7 +192,7 @@ pub const ContextMenuInteraction = struct {
                 else => default,
                 .mouse_down => |mouse_down| switch (mouse_down.button) {
                     else => default,
-                    .left => .{ .context_menu = apply(self.context_menu).withFields(.{ .open = false }) },
+                    .left => .{ .context_menu = copy(self.context_menu).withFields(.{ .open = false }) },
                     .right => .{ .context_menu = .{
                         .open = true,
                         .location = mouse_down.location,
@@ -205,7 +205,7 @@ pub const ContextMenuInteraction = struct {
                     const menu_option_selected = std.meta.stringToEnum(ContextMenuOption, context_event.option_selected);
                     const menu_node_option_selected = std.meta.stringToEnum(ContextMenuNodeOption, context_event.option_selected);
                     break :result .{
-                        .context_menu = apply(self.context_menu).withFields(.{ .open = false }),
+                        .context_menu = copy(self.context_menu).withFields(.{ .open = false }),
                         .event = if (menu_option_selected) |option| switch (option) {
                             .paste => .{ .node_event = .{ .paste = self.context_menu.location } },
                             .@"new..." => unreachable, // TODO: Implement new node creation.
