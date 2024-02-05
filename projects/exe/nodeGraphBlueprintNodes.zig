@@ -318,12 +318,16 @@ fn NodeInteraction(
                 else => default,
                 .delete => .{
                     .interaction_state = input.interaction_state,
-                    .blueprint = copyWith(input.blueprint, .{ .nodes = try copySlice(allocator, input.blueprint.nodes, struct {
-                        target_node: []const u8,
-                        fn filter(self: @This(), item: anytype) bool {
-                            return !std.mem.eql(u8, if (item.name) |name| name else item.function, self.target_node);
-                        }
-                    }{ .target_node = node_event.delete.node_name }) }),
+                    .blueprint = copyWith(input.blueprint, .{ .nodes = nodes: {
+                        var selection = std.ArrayList(NodeGraphBlueprintEntry).init(allocator);
+                        for (input.blueprint.nodes) |node| if (!std.meta.eql(
+                            if (node.name) |name| name else node.function,
+                            node_event.delete.node_name,
+                        )) {
+                            try selection.append(node);
+                        };
+                        break :nodes selection.items;
+                    } }),
                 },
             },
         } else default;
