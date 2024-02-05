@@ -277,10 +277,16 @@ fn NodeInteraction(
                 .mouse_down => .{
                     .blueprint = input.blueprint,
                     .interaction_state = copyWith(input.interaction_state, .{
-                        .node_selection = if (for (input.interaction_state.node_selection, 0..) |item, index| if (std.mem.eql(u8, item, node_event.node_name)) break index else continue else null) |index|
-                            try std.mem.concat(allocator, []const u8, &.{ input.interaction_state.node_selection[0..index], input.interaction_state.node_selection[index + 1 ..] })
-                        else
-                            try std.mem.concat(allocator, []const u8, &.{ input.interaction_state.node_selection, &.{node_event.node_name} }),
+                        .node_selection = if (for (input.interaction_state.node_selection, 0..) |item, index| (if (std.meta.eql(
+                            item,
+                            node_event.node_name,
+                        )) break index) else null) |index| try std.mem.concat(allocator, []const u8, &.{
+                            input.interaction_state.node_selection[0..index],
+                            input.interaction_state.node_selection[index + 1 ..],
+                        }) else try std.mem.concat(allocator, []const u8, &.{
+                            input.interaction_state.node_selection,
+                            &.{node_event.node_name},
+                        }),
                     }),
                 },
             },
@@ -292,7 +298,9 @@ fn NodeInteraction(
                 else => default,
                 .mouse_down => .{
                     .blueprint = input.blueprint,
-                    .interaction_state = copyWith(input.interaction_state, .{ .node_selection = try std.mem.concat(allocator, []const u8, &.{&.{node_event.node_name}}) }),
+                    .interaction_state = copyWith(input.interaction_state, .{
+                        .node_selection = try std.mem.concat(allocator, []const u8, &.{&.{node_event.node_name}}),
+                    }),
                 },
             },
             .node_event => |node_event| switch (node_event) {
@@ -300,13 +308,13 @@ fn NodeInteraction(
                 .delete => .{
                     .interaction_state = input.interaction_state,
                     .blueprint = copyWith(input.blueprint, .{
-                        .nodes = for (input.blueprint.nodes, 0..) |node, index| if (std.meta.eql(
+                        .nodes = for (input.blueprint.nodes, 0..) |node, index| (if (std.meta.eql(
                             if (node.name) |name| name else node.function,
                             node_event.delete.node_name,
                         )) break try std.mem.concat(allocator, NodeGraphBlueprintEntry, &.{
                             input.blueprint.nodes[0..index],
                             input.blueprint.nodes[index + 1 ..],
-                        }) else continue else input.blueprint.nodes,
+                        })) else input.blueprint.nodes,
                     }),
                 },
             },
