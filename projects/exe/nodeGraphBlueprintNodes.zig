@@ -322,6 +322,21 @@ fn NodeInteraction(
     }
 }
 
+test "map expression" {
+    var allocator = std.heap.page_allocator;
+    const start_data = try std.mem.concat(allocator, i32, &.{&.{ 1, 2, 3, 4 }});
+    const result_data = if (allocator.alloc(struct { my_number: i32 }, start_data.len)) |result| for (result, 0..) |*item, index| {
+        item.* = .{ .my_number = start_data[index] };
+    } else result else |err| return err;
+    const alterantive_result_data = result: {
+        var result = std.ArrayList(struct { my_number: i32 }).init(allocator);
+        for (start_data) |item| try result.append(.{ .my_number = item });
+        break :result result.items;
+    };
+    try std.testing.expectEqual(result_data[0].my_number, 1);
+    try std.testing.expectEqual(alterantive_result_data[1].my_number, 2);
+}
+
 test "delete node from context menu" {
     const allocator = std.heap.page_allocator;
     const first_output = ContextMenuInteraction(.{
