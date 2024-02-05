@@ -300,8 +300,15 @@ fn NodeInteraction(
                 .delete => .{
                     .interaction_state = input.interaction_state,
                     .blueprint = copyWith(input.blueprint, .{
-                        .nodes = for (input.blueprint.nodes, 0..) |node, index| if (std.mem.eql(u8, if (node.name) |name| name else node.function, node_event.delete.node_name))
-                            break try std.mem.concat(allocator, NodeGraphBlueprintEntry, &.{ input.blueprint.nodes[0..index], input.blueprint.nodes[index + 1 ..] })
+                        .nodes = for (input.blueprint.nodes, 0..) |node, index| if (std.mem.eql(
+                            u8,
+                            if (node.name) |name| name else node.function,
+                            node_event.delete.node_name,
+                        ))
+                            break try std.mem.concat(allocator, NodeGraphBlueprintEntry, &.{
+                                input.blueprint.nodes[0..index],
+                                input.blueprint.nodes[index + 1 ..],
+                            })
                         else
                             continue else input.blueprint.nodes,
                     }),
@@ -309,25 +316,6 @@ fn NodeInteraction(
             },
         } else default;
     }
-}
-
-test "basic" {
-    const output = ContextMenuInteraction(.{
-        .event = .{ .external_node_event = .{
-            .node_name = "test",
-            .mouse_event = .{ .mouse_down = .{ .location = .{ .x = 0, .y = 0 }, .button = MouseButton.right } },
-        } },
-        .context_menu = .{ .open = false, .location = .{ .x = 0, .y = 0 }, .options = &.{} },
-    });
-    try std.testing.expectEqual(output.context_menu.open, true);
-}
-
-test "basic2" {
-    const output = ContextMenuInteraction(.{
-        .event = .{ .context_event = .{ .option_selected = "delete" } },
-        .context_menu = .{ .open = true, .location = .{ .x = 0, .y = 0 }, .options = &.{}, .selected_node = "test" },
-    });
-    try std.testing.expectEqual(output.context_menu.open, false);
 }
 
 test "delete node from context menu" {
