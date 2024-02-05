@@ -232,6 +232,10 @@ pub const InteractionState = struct {
         location: GraphLocation,
     },
     node_selection: []const []const u8,
+    box_selection: ?struct {
+        start: GraphLocation,
+        end: GraphLocation,
+    },
 };
 
 fn NodeInteraction(allocator: std.mem.Allocator, input: struct {
