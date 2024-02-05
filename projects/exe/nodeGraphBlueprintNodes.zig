@@ -308,13 +308,20 @@ fn NodeInteraction(
                 .delete => .{
                     .interaction_state = input.interaction_state,
                     .blueprint = copyWith(input.blueprint, .{
-                        .nodes = for (input.blueprint.nodes, 0..) |node, index| (if (std.meta.eql(
-                            if (node.name) |name| name else node.function,
-                            node_event.delete.node_name,
-                        )) break try std.mem.concat(allocator, NodeGraphBlueprintEntry, &.{
-                            input.blueprint.nodes[0..index],
-                            input.blueprint.nodes[index + 1 ..],
-                        })) else input.blueprint.nodes,
+                        .nodes = filter: {
+                            const to_filter = if (input.interaction_state.node_selection.len > 0)
+                                input.interaction_state.node_selection
+                            else
+                                &.{node_event.delete.node_name};
+                            var result = std.ArrayList(NodeGraphBlueprintEntry).init(allocator);
+                            for (input.blueprint.nodes) |node|
+                                if (for (to_filter) |to_filter_item| (if (std.meta.eql(
+                                    if (node.name) |name| name else node.function,
+                                    to_filter_item,
+                                )) break null) else node) |unfiltered_node|
+                                    try result.append(unfiltered_node);
+                            break :filter result.items;
+                        },
                     }),
                 },
             },
@@ -325,16 +332,43 @@ fn NodeInteraction(
 test "map expression" {
     var allocator = std.heap.page_allocator;
     const start_data = try std.mem.concat(allocator, i32, &.{&.{ 1, 2, 3, 4 }});
+
+    // Whole thing is a giant expression, which is fun, but also a bit of a mess.
     const result_data = if (allocator.alloc(struct { my_number: i32 }, start_data.len)) |result| for (result, 0..) |*item, index| {
         item.* = .{ .my_number = start_data[index] };
     } else result else |err| return err;
-    const alterantive_result_data = result: {
+
+    // Use a labeled block, we can label this one as a 'map' which helps with readability.
+    const result_data2 = map: {
+        const result = try allocator.alloc(struct { my_number: i32 }, start_data.len);
+        for (result, 0..) |*item, index| item.* = .{ .my_number = start_data[index] };
+        break :map result;
+    };
+
+    // Simpler(?), but less efficient (?), use a std.ArrayList to append items to.
+    const result_data3 = map: {
         var result = std.ArrayList(struct { my_number: i32 }).init(allocator);
         for (start_data) |item| try result.append(.{ .my_number = item });
-        break :result result.items;
+        break :map result.items;
     };
+
     try std.testing.expectEqual(result_data[0].my_number, 1);
-    try std.testing.expectEqual(alterantive_result_data[1].my_number, 2);
+    try std.testing.expectEqual(result_data2[2].my_number, 3);
+    try std.testing.expectEqual(result_data3.len, 4);
+}
+
+test "filter expression" {
+    const allocator = std.heap.page_allocator;
+    const start_data = try std.mem.concat(allocator, i32, &.{&.{ 1, 2, 3, 4 }});
+
+    // Can't make a giant expression, just use an ArrayList in a nicely labeled block for maximum readability.
+    const result_data = filter: {
+        var result = std.ArrayList(i32).init(allocator);
+        for (start_data) |item| if (@mod(item, 2) == 0) try result.append(item);
+        break :filter result.items;
+    };
+
+    try std.testing.expectEqual(result_data.len, 2);
 }
 
 test "delete node from context menu" {
@@ -363,6 +397,38 @@ test "delete node from context menu" {
         .keyboard_modifiers = .{ .shift = false, .control = false, .alt = false, .super = false },
     });
     try std.testing.expectEqual(second_output.blueprint.nodes.len, 0);
+}
+
+test "delete node from context menu with a current selection" {
+    const allocator = std.heap.page_allocator;
+    const first_output = ContextMenuInteraction(.{
+        .event = .{ .context_event = .{ .option_selected = "delete" } },
+        .context_menu = .{
+            .open = false,
+            .location = .{ .x = 0, .y = 0 },
+            .options = &.{},
+            .selected_node = "test",
+        },
+    });
+    const second_output = try NodeInteraction(allocator, .{
+        .event = eventTransform(NodeInputEventType(NodeInteraction), first_output.event),
+        .interaction_state = .{
+            .node_selection = &.{ "test", "something_else" },
+            .wiggle = null,
+            .box_selection = null,
+        },
+        .blueprint = .{
+            .nodes = &.{
+                .{ .name = "test", .function = "test", .input_links = &.{} },
+                .{ .name = "something_else", .function = "test", .input_links = &.{} },
+                .{ .name = "another", .function = "test", .input_links = &.{} },
+            },
+            .store = &.{},
+            .output = &.{},
+        },
+        .keyboard_modifiers = .{ .shift = false, .control = false, .alt = false, .super = false },
+    });
+    try std.testing.expectEqual(second_output.blueprint.nodes.len, 1);
 }
 
 test "select node" {
