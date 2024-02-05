@@ -274,21 +274,18 @@ fn NodeInteraction(
             else => default,
             .external_node_event => |node_event| switch (node_event.mouse_event) {
                 else => default,
-                .mouse_down => .{
-                    .blueprint = input.blueprint,
-                    .interaction_state = copyWith(input.interaction_state, .{
-                        .node_selection = if (for (input.interaction_state.node_selection, 0..) |item, index| (if (std.meta.eql(
-                            item,
-                            node_event.node_name,
-                        )) break index) else null) |index| try std.mem.concat(allocator, []const u8, &.{
-                            input.interaction_state.node_selection[0..index],
-                            input.interaction_state.node_selection[index + 1 ..],
-                        }) else try std.mem.concat(allocator, []const u8, &.{
-                            input.interaction_state.node_selection,
-                            &.{node_event.node_name},
-                        }),
+                .mouse_down => .{ .blueprint = input.blueprint, .interaction_state = copyWith(input.interaction_state, .{
+                    .node_selection = if (for (input.interaction_state.node_selection, 0..) |item, index| (if (std.meta.eql(
+                        item,
+                        node_event.node_name,
+                    )) break index) else null) |index| try std.mem.concat(allocator, []const u8, &.{
+                        input.interaction_state.node_selection[0..index],
+                        input.interaction_state.node_selection[index + 1 ..],
+                    }) else try std.mem.concat(allocator, []const u8, &.{
+                        input.interaction_state.node_selection,
+                        &.{node_event.node_name},
                     }),
-                },
+                }) },
             },
         } else default;
     } else {
@@ -296,36 +293,30 @@ fn NodeInteraction(
             else => default,
             .external_node_event => |node_event| switch (node_event.mouse_event) {
                 else => default,
-                .mouse_down => .{
-                    .blueprint = input.blueprint,
-                    .interaction_state = copyWith(input.interaction_state, .{
-                        .node_selection = try std.mem.concat(allocator, []const u8, &.{&.{node_event.node_name}}),
-                    }),
-                },
+                .mouse_down => .{ .blueprint = input.blueprint, .interaction_state = copyWith(input.interaction_state, .{
+                    .node_selection = try std.mem.concat(allocator, []const u8, &.{&.{node_event.node_name}}),
+                }) },
             },
             .node_event => |node_event| switch (node_event) {
                 else => default,
-                .delete => .{
-                    .interaction_state = input.interaction_state,
-                    .blueprint = copyWith(input.blueprint, .{
-                        .nodes = filter: {
-                            const to_filter = if (input.interaction_state.node_selection.len > 0)
-                                input.interaction_state.node_selection
-                            else
-                                &.{node_event.delete.node_name};
-                            var result = std.ArrayList(NodeGraphBlueprintEntry).init(allocator);
-                            for (input.blueprint.nodes) |node|
-                                if (unfiltered: {
-                                    for (to_filter) |to_filter_item|
-                                        if (std.meta.eql(if (node.name) |name| name else node.function, to_filter_item))
-                                            break :unfiltered null;
-                                    break :unfiltered node;
-                                }) |unfiltered_node|
-                                    try result.append(unfiltered_node);
-                            break :filter result.items;
-                        },
-                    }),
-                },
+                .delete => .{ .interaction_state = input.interaction_state, .blueprint = copyWith(input.blueprint, .{
+                    .nodes = filter: {
+                        const to_filter = if (input.interaction_state.node_selection.len > 0)
+                            input.interaction_state.node_selection
+                        else
+                            &.{node_event.delete.node_name};
+                        var result = std.ArrayList(NodeGraphBlueprintEntry).init(allocator);
+                        for (input.blueprint.nodes) |node|
+                            if (unfiltered: {
+                                for (to_filter) |item|
+                                    if (std.meta.eql(if (node.name) |name| name else node.function, item))
+                                        break :unfiltered null;
+                                break :unfiltered node;
+                            }) |unfiltered_node|
+                                try result.append(unfiltered_node);
+                        break :filter result.items;
+                    },
+                }) },
             },
         } else default;
     }
