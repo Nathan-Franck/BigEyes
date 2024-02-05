@@ -300,17 +300,13 @@ fn NodeInteraction(
                 .delete => .{
                     .interaction_state = input.interaction_state,
                     .blueprint = copyWith(input.blueprint, .{
-                        .nodes = for (input.blueprint.nodes, 0..) |node, index| if (std.mem.eql(
-                            u8,
+                        .nodes = for (input.blueprint.nodes, 0..) |node, index| if (std.meta.eql(
                             if (node.name) |name| name else node.function,
                             node_event.delete.node_name,
-                        ))
-                            break try std.mem.concat(allocator, NodeGraphBlueprintEntry, &.{
-                                input.blueprint.nodes[0..index],
-                                input.blueprint.nodes[index + 1 ..],
-                            })
-                        else
-                            continue else input.blueprint.nodes,
+                        )) break try std.mem.concat(allocator, NodeGraphBlueprintEntry, &.{
+                            input.blueprint.nodes[0..index],
+                            input.blueprint.nodes[index + 1 ..],
+                        }) else continue else input.blueprint.nodes,
                     }),
                 },
             },
