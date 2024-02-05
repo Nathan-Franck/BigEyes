@@ -283,6 +283,81 @@ fn NodeInteraction(allocator: std.mem.Allocator, input: struct {
                 },
             },
         } else default;
+    } else {
+        if (input.event) |event| switch (event) {
+            else => default,
+            .external_node_event => |node_event| switch (node_event.mouse_event) {
+                else => default,
+                .mouse_down => |mouse_down| .{
+                    .blueprint = input.blueprint,
+                    .interaction_state = .{
+                        .node_selection = node_selection: {
+                            var selection = std.ArrayList([]const u8).init(allocator);
+                            selection.append(node_event.node_name);
+                            break :node_selection selection.items;
+                        }
+                    },
+                },
+            },
+            .node_event => |node_event| switch (node_event) {
+                else => default,
+                .delete => .{
+                    .blueprint = .{
+                        .nodes = nodes: {
+                            var new_nodes = std.ArrayList([]Node).init(allocator);
+                            for (input.blueprint.nodes) |node| if (node.name != node_event.delete.node_name) {
+                                new_nodes.append(node);
+                            }
+                            break :nodes new_nodes.items;
+                        },
+                        .connections = input.blueprint.connections,
+                    },
+                },
+                .duplicate => .{
+                    .blueprint = input.blueprint,
+                    .interaction_state = .{
+                        .node_selection = node_selection: {
+                            var selection = std.ArrayList([]const u8).init(allocator);
+                            for (input.interaction_state.node_selection) |node| {
+                                selection.append(node);
+                                if (node == node_event.duplicate.node_name) {
+                                    selection.append(node_event.duplicate.duplicate_name);
+                                }
+                            }
+                            break :node_selection selection.items;
+                        }
+                    },
+                },
+                .copy => .{
+                    .blueprint = input.blueprint,
+                    .interaction_state = .{
+                        .node_selection = node_selection: {
+                            var selection = std.ArrayList([]const u8).init(allocator);
+                            for (input.interaction_state.node_selection) |node| {
+                                selection.append(node);
+                                if (node == node_event.copy.node_name) {
+                                    selection.append(node_event.copy.copy_name);
+                                }
+                            }
+                            break :node_selection selection.items;
+                        }
+                    },
+                },
+                .paste => .{
+                    .blueprint = input.blueprint,
+                    .interaction_state = .{
+                        .node_selection = node_selection: {
+                            var selection = std.ArrayList([]const u8).init(allocator);
+                            for (input.interaction_state.node_selection) |node| {
+                                selection.append(node);
+                            }
+                            selection.append(node_event.paste);
+                            break :node_selection selection.items;
+                        }
+                    },
+                },
+            },
+        } else default;
     }
 }
 
