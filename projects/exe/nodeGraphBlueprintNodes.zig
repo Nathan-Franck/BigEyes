@@ -244,31 +244,6 @@ pub const InteractionState = struct {
     },
 };
 
-fn copyWithToggle(allocator: std.mem.Allocator, strings: []const []const u8, to_toggle: []const u8) ![]const []const u8 {
-    var selection = std.ArrayList([]const u8).init(allocator);
-    for (strings) |node| if (!std.mem.eql(u8, node, to_toggle)) {
-        try selection.append(node);
-    };
-    if (selection.items.len == strings.len) {
-        try selection.append(to_toggle);
-    }
-    return selection.items;
-}
-
-fn single(allocator: std.mem.Allocator, string: []const u8) ![]const []const u8 {
-    var selection = std.ArrayList([]const u8).init(allocator);
-    try selection.append(string);
-    return selection.items;
-}
-
-fn copySlice(allocator: std.mem.Allocator, slice: anytype, transforms: anytype) !@TypeOf(slice) {
-    var selection = std.ArrayList(@typeInfo(@TypeOf(slice)).Pointer.child).init(allocator);
-    for (slice) |item| if (!@hasDecl(@TypeOf(transforms), "filter") or transforms.filter(item)) {
-        try selection.append(item);
-    };
-    return selection.items;
-}
-
 fn NodeInteraction(
     allocator: std.mem.Allocator,
     input: struct {
@@ -299,9 +274,15 @@ fn NodeInteraction(
             else => default,
             .external_node_event => |node_event| switch (node_event.mouse_event) {
                 else => default,
-                .mouse_down => .{ .blueprint = input.blueprint, .interaction_state = copyWith(input.interaction_state, .{
-                    .node_selection = try copyWithToggle(allocator, input.interaction_state.node_selection, node_event.node_name),
-                }) },
+                .mouse_down => .{
+                    .blueprint = input.blueprint,
+                    .interaction_state = copyWith(input.interaction_state, .{
+                        .node_selection = if (for (input.interaction_state.node_selection, 0..) |item, index| if (std.mem.eql(u8, item, node_event.node_name)) break index else continue else null) |index|
+                            try std.mem.concat(allocator, []const u8, &.{ input.interaction_state.node_selection[0..index], input.interaction_state.node_selection[index + 1 ..] })
+                        else
+                            try std.mem.concat(allocator, []const u8, &.{ input.interaction_state.node_selection, &.{node_event.node_name} }),
+                    }),
+                },
             },
         } else default;
     } else {
@@ -311,23 +292,19 @@ fn NodeInteraction(
                 else => default,
                 .mouse_down => .{
                     .blueprint = input.blueprint,
-                    .interaction_state = copyWith(input.interaction_state, .{ .node_selection = try single(allocator, node_event.node_name) }),
+                    .interaction_state = copyWith(input.interaction_state, .{ .node_selection = try std.mem.concat(allocator, []const u8, &.{&.{node_event.node_name}}) }),
                 },
             },
             .node_event => |node_event| switch (node_event) {
                 else => default,
                 .delete => .{
                     .interaction_state = input.interaction_state,
-                    .blueprint = copyWith(input.blueprint, .{ .nodes = nodes: {
-                        var selection = std.ArrayList(NodeGraphBlueprintEntry).init(allocator);
-                        for (input.blueprint.nodes) |node| if (!std.meta.eql(
-                            if (node.name) |name| name else node.function,
-                            node_event.delete.node_name,
-                        )) {
-                            try selection.append(node);
-                        };
-                        break :nodes selection.items;
-                    } }),
+                    .blueprint = copyWith(input.blueprint, .{
+                        .nodes = for (input.blueprint.nodes, 0..) |node, index| if (std.mem.eql(u8, if (node.name) |name| name else node.function, node_event.delete.node_name))
+                            break try std.mem.concat(allocator, NodeGraphBlueprintEntry, &.{ input.blueprint.nodes[0..index], input.blueprint.nodes[index + 1 ..] })
+                        else
+                            continue else input.blueprint.nodes,
+                    }),
                 },
             },
         } else default;
@@ -397,6 +374,7 @@ test "select node" {
         .keyboard_modifiers = .{ .shift = true, .control = false, .alt = false, .super = false },
     });
     try std.testing.expectEqual(second_output.interaction_state.node_selection.len, 2);
+    try std.testing.expectEqual(second_output.interaction_state.node_selection[0], "something_else");
 }
 
 test "deselect node" {
@@ -407,9 +385,10 @@ test "deselect node" {
     });
     const second_output = try NodeInteraction(allocator, .{
         .event = eventTransform(NodeInputEventType(NodeInteraction), first_output.event),
-        .interaction_state = .{ .node_selection = &.{"test"}, .wiggle = null, .box_selection = null },
+        .interaction_state = .{ .node_selection = &.{ "test", "something_else" }, .wiggle = null, .box_selection = null },
         .blueprint = .{ .nodes = &.{.{ .name = "test", .function = "test", .input_links = &.{} }}, .store = &.{}, .output = &.{} },
         .keyboard_modifiers = .{ .shift = true, .control = false, .alt = false, .super = false },
     });
-    try std.testing.expectEqual(second_output.interaction_state.node_selection.len, 0);
+    try std.testing.expectEqual(second_output.interaction_state.node_selection.len, 1);
+    try std.testing.expectEqual(second_output.interaction_state.node_selection[0], "something_else");
 }
