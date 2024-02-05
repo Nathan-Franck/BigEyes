@@ -315,10 +315,12 @@ fn NodeInteraction(
                                 &.{node_event.delete.node_name};
                             var result = std.ArrayList(NodeGraphBlueprintEntry).init(allocator);
                             for (input.blueprint.nodes) |node|
-                                if (for (to_filter) |to_filter_item| (if (std.meta.eql(
-                                    if (node.name) |name| name else node.function,
-                                    to_filter_item,
-                                )) break null) else node) |unfiltered_node|
+                                if (unfiltered: {
+                                    for (to_filter) |to_filter_item|
+                                        if (std.meta.eql(if (node.name) |name| name else node.function, to_filter_item))
+                                            break :unfiltered null;
+                                    break :unfiltered node;
+                                }) |unfiltered_node|
                                     try result.append(unfiltered_node);
                             break :filter result.items;
                         },
