@@ -233,25 +233,41 @@ pub const KeyboardModifiers = struct {
 };
 
 pub const InteractionState = struct {
-    wiggle: ?struct {
-        node: []const u8,
-        location: GraphLocation,
-    },
     node_selection: []const []const u8,
     box_selection: ?struct {
         start: GraphLocation,
         end: GraphLocation,
     },
+    wiggle: ?struct {
+        node: []const u8,
+        location: GraphLocation,
+    },
 };
 
-const Thinger = struct {
-    interaction_state: InteractionState,
-    blueprint: Blueprint,
-    event: ?union(enum) {
-        mouse_event: ExternalMouseEvent,
-        external_node_event: ExternalNodeEvent,
-    } = null,
-};
+fn copyWithToggle(allocator: std.mem.Allocator, strings: []const []const u8, to_toggle: []const u8) ![]const []const u8 {
+    var selection = std.ArrayList([]const u8).init(allocator);
+    for (strings) |node| if (!std.mem.eql(u8, node, to_toggle)) {
+        try selection.append(node);
+    };
+    if (selection.items.len == strings.len) {
+        try selection.append(to_toggle);
+    }
+    return selection.items;
+}
+
+fn single(allocator: std.mem.Allocator, string: []const u8) ![]const []const u8 {
+    var selection = std.ArrayList([]const u8).init(allocator);
+    try selection.append(string);
+    return selection.items;
+}
+
+fn copySlice(allocator: std.mem.Allocator, slice: anytype, transforms: anytype) !@TypeOf(slice) {
+    var selection = std.ArrayList(@typeInfo(@TypeOf(slice)).Pointer.child).init(allocator);
+    for (slice) |item| if (!@hasDecl(@TypeOf(transforms), "filter") or transforms.filter(item)) {
+        try selection.append(item);
+    };
+    return selection.items;
+}
 
 fn NodeInteraction(
     allocator: std.mem.Allocator,
@@ -265,51 +281,53 @@ fn NodeInteraction(
             node_event: NodeEvent,
         },
     },
-) !Thinger {
-    const default = Thinger{
+) !struct {
+    interaction_state: InteractionState,
+    blueprint: Blueprint,
+    event: ?union(enum) {
+        mouse_event: ExternalMouseEvent,
+        external_node_event: ExternalNodeEvent,
+    } = null,
+} {
+    const default = .{
         .interaction_state = input.interaction_state,
         .blueprint = input.blueprint,
         .event = eventTransform(NodeOutputEventType(NodeInteraction), input.event),
     };
-    return if (input.keyboard_modifiers.shift) if (input.event) |event| switch (event) {
-        else => default,
-        .external_node_event => |node_event| switch (node_event.mouse_event) {
+    if (input.keyboard_modifiers.shift) {
+        return if (input.event) |event| switch (event) {
             else => default,
-            .mouse_down => Thinger{ .blueprint = input.blueprint, .interaction_state = copyWith(input.interaction_state, .{ .node_selection = node_selection: {
-                var selection = std.ArrayList([]const u8).init(allocator);
-                for (input.interaction_state.node_selection) |node| {
-                    if (std.mem.eql(u8, node, node_event.node_name)) {
-                        continue;
-                    }
-                    try selection.append(node);
-                }
-                if (selection.items.len == input.interaction_state.node_selection.len) {
-                    try selection.append(node_event.node_name);
-                }
-                break :node_selection selection.items;
-            } }) },
-        },
-    } else default else if (input.event) |event| switch (event) {
-        else => default,
-        .external_node_event => |node_event| switch (node_event.mouse_event) {
+            .external_node_event => |node_event| switch (node_event.mouse_event) {
+                else => default,
+                .mouse_down => .{ .blueprint = input.blueprint, .interaction_state = copyWith(input.interaction_state, .{
+                    .node_selection = try copyWithToggle(allocator, input.interaction_state.node_selection, node_event.node_name),
+                }) },
+            },
+        } else default;
+    } else {
+        return if (input.event) |event| switch (event) {
             else => default,
-            .mouse_down => .{ .blueprint = input.blueprint, .interaction_state = copyWith(input.interaction_state, .{ .node_selection = node_selection: {
-                var selection = std.ArrayList([]const u8).init(allocator);
-                try selection.append(node_event.node_name);
-                break :node_selection selection.items;
-            } }) },
-        },
-        .node_event => |node_event| switch (node_event) {
-            else => default,
-            .delete => .{ .interaction_state = input.interaction_state, .blueprint = copyWith(input.blueprint, .{ .nodes = nodes: {
-                var new_nodes = std.ArrayList(NodeGraphBlueprintEntry).init(allocator);
-                for (input.blueprint.nodes) |node| if (!std.mem.eql(u8, if (node.name) |node_name| node_name else node.function, node_event.delete.node_name)) {
-                    try new_nodes.append(node);
-                };
-                break :nodes new_nodes.items;
-            } }) },
-        },
-    } else default;
+            .external_node_event => |node_event| switch (node_event.mouse_event) {
+                else => default,
+                .mouse_down => .{
+                    .blueprint = input.blueprint,
+                    .interaction_state = copyWith(input.interaction_state, .{ .node_selection = try single(allocator, node_event.node_name) }),
+                },
+            },
+            .node_event => |node_event| switch (node_event) {
+                else => default,
+                .delete => .{
+                    .interaction_state = input.interaction_state,
+                    .blueprint = copyWith(input.blueprint, .{ .nodes = try copySlice(allocator, input.blueprint.nodes, struct {
+                        target_node: []const u8,
+                        fn filter(self: @This(), item: anytype) bool {
+                            return !std.mem.eql(u8, if (item.name) |name| name else item.function, self.target_node);
+                        }
+                    }{ .target_node = node_event.delete.node_name }) }),
+                },
+            },
+        } else default;
+    }
 }
 
 test "basic" {
