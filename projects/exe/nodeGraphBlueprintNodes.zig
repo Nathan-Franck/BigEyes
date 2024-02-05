@@ -1,4 +1,5 @@
 const std = @import("std");
+const NodeGraphBlueprintEntry = @import("./interactiveNodeBuilderBlueprint.zig").NodeGraphBlueprintEntry;
 
 pub const Blueprint = @import("./interactiveNodeBuilderBlueprint.zig").Blueprint;
 
@@ -81,7 +82,11 @@ pub fn NodeOutputEventType(node_process_function: anytype) type {
     if (node_process_function_info != .Fn) {
         @compileError("node_process_function must be a function, found '" ++ @typeName(node_process_function) ++ "'");
     }
-    const event_field_info = std.meta.fieldInfo(node_process_function_info.Fn.return_type.?, .event);
+    var return_type = node_process_function_info.Fn.return_type.?;
+    if (@typeInfo(return_type) == .ErrorUnion) {
+        return_type = @typeInfo(return_type).ErrorUnion.payload;
+    }
+    const event_field_info = std.meta.fieldInfo(return_type, .event);
     return event_field_info.type;
 }
 
@@ -90,7 +95,8 @@ pub fn NodeInputEventType(node_process_function: anytype) type {
     if (node_process_function_info != .Fn) {
         @compileError("node_process_function must be a function, found '" ++ @typeName(node_process_function) ++ "'");
     }
-    const event_field_info = std.meta.fieldInfo(node_process_function_info.Fn.params[0].type.?, .event);
+    const params = node_process_function_info.Fn.params;
+    const event_field_info = std.meta.fieldInfo(params[params.len - 1].type.?, .event);
     return event_field_info.type;
 }
 
@@ -238,131 +244,72 @@ pub const InteractionState = struct {
     },
 };
 
-fn NodeInteraction(allocator: std.mem.Allocator, input: struct {
-    keyboard_modifiers: KeyboardModifiers,
-    interaction_state: InteractionState,
-    blueprint: Blueprint,
-    event: ?union(enum) {
-        mouse_event: ExternalMouseEvent,
-        external_node_event: ExternalNodeEvent,
-        node_event: NodeEvent,
-    },
-},) struct {
+const Thinger = struct {
     interaction_state: InteractionState,
     blueprint: Blueprint,
     event: ?union(enum) {
         mouse_event: ExternalMouseEvent,
         external_node_event: ExternalNodeEvent,
     } = null,
-} {
-    _ = input; // autofix
+};
 
-    const default = .{
+fn NodeInteraction(
+    allocator: std.mem.Allocator,
+    input: struct {
+        keyboard_modifiers: KeyboardModifiers,
+        interaction_state: InteractionState,
+        blueprint: Blueprint,
+        event: ?union(enum) {
+            mouse_event: ExternalMouseEvent,
+            external_node_event: ExternalNodeEvent,
+            node_event: NodeEvent,
+        },
+    },
+) !Thinger {
+    const default = Thinger{
         .interaction_state = input.interaction_state,
         .blueprint = input.blueprint,
+        .event = eventTransform(NodeOutputEventType(NodeInteraction), input.event),
     };
-
-    return if (keyboard_modifiers.shift) {
-        if (input.event) |event| switch (event) {
+    return if (input.keyboard_modifiers.shift) if (input.event) |event| switch (event) {
+        else => default,
+        .external_node_event => |node_event| switch (node_event.mouse_event) {
             else => default,
-            .external_node_event => |node_event| switch (node_event.mouse_event) {
-                else => default,
-                .mouse_down => |mouse_down| .{
-                    .blueprint = input.blueprint,
-                    .interaction_state = .{
-                        .node_selection = node_selection: {
-                            var selection = std.ArrayList([]const u8).init(allocator);
-                            for (input.interaction_state.node_selection) |node| {
-                                if (node == node_event.node_name) {
-                                    continue;
-                                }
-                                selection.append(node);
-                            }
-                            if (selection.len() == input.interaction_state.node_selection.len()) {
-                                selection.append(node_event.node_name);
-                            }
-                            break :node_selection selection.items;
-                        }
-                    },
-                },
-            },
-        } else default;
-    } else {
-        if (input.event) |event| switch (event) {
+            .mouse_down => Thinger{ .blueprint = input.blueprint, .interaction_state = copyWith(input.interaction_state, .{ .node_selection = node_selection: {
+                var selection = std.ArrayList([]const u8).init(allocator);
+                for (input.interaction_state.node_selection) |node| {
+                    if (std.mem.eql(u8, node, node_event.node_name)) {
+                        continue;
+                    }
+                    try selection.append(node);
+                }
+                if (selection.items.len == input.interaction_state.node_selection.len) {
+                    try selection.append(node_event.node_name);
+                }
+                break :node_selection selection.items;
+            } }) },
+        },
+    } else default else if (input.event) |event| switch (event) {
+        else => default,
+        .external_node_event => |node_event| switch (node_event.mouse_event) {
             else => default,
-            .external_node_event => |node_event| switch (node_event.mouse_event) {
-                else => default,
-                .mouse_down => |mouse_down| .{
-                    .blueprint = input.blueprint,
-                    .interaction_state = .{
-                        .node_selection = node_selection: {
-                            var selection = std.ArrayList([]const u8).init(allocator);
-                            selection.append(node_event.node_name);
-                            break :node_selection selection.items;
-                        }
-                    },
-                },
-            },
-            .node_event => |node_event| switch (node_event) {
-                else => default,
-                .delete => .{
-                    .blueprint = .{
-                        .nodes = nodes: {
-                            var new_nodes = std.ArrayList([]Node).init(allocator);
-                            for (input.blueprint.nodes) |node| if (node.name != node_event.delete.node_name) {
-                                new_nodes.append(node);
-                            }
-                            break :nodes new_nodes.items;
-                        },
-                        .connections = input.blueprint.connections,
-                    },
-                },
-                .duplicate => .{
-                    .blueprint = input.blueprint,
-                    .interaction_state = .{
-                        .node_selection = node_selection: {
-                            var selection = std.ArrayList([]const u8).init(allocator);
-                            for (input.interaction_state.node_selection) |node| {
-                                selection.append(node);
-                                if (node == node_event.duplicate.node_name) {
-                                    selection.append(node_event.duplicate.duplicate_name);
-                                }
-                            }
-                            break :node_selection selection.items;
-                        }
-                    },
-                },
-                .copy => .{
-                    .blueprint = input.blueprint,
-                    .interaction_state = .{
-                        .node_selection = node_selection: {
-                            var selection = std.ArrayList([]const u8).init(allocator);
-                            for (input.interaction_state.node_selection) |node| {
-                                selection.append(node);
-                                if (node == node_event.copy.node_name) {
-                                    selection.append(node_event.copy.copy_name);
-                                }
-                            }
-                            break :node_selection selection.items;
-                        }
-                    },
-                },
-                .paste => .{
-                    .blueprint = input.blueprint,
-                    .interaction_state = .{
-                        .node_selection = node_selection: {
-                            var selection = std.ArrayList([]const u8).init(allocator);
-                            for (input.interaction_state.node_selection) |node| {
-                                selection.append(node);
-                            }
-                            selection.append(node_event.paste);
-                            break :node_selection selection.items;
-                        }
-                    },
-                },
-            },
-        } else default;
-    }
+            .mouse_down => .{ .blueprint = input.blueprint, .interaction_state = copyWith(input.interaction_state, .{ .node_selection = node_selection: {
+                var selection = std.ArrayList([]const u8).init(allocator);
+                try selection.append(node_event.node_name);
+                break :node_selection selection.items;
+            } }) },
+        },
+        .node_event => |node_event| switch (node_event) {
+            else => default,
+            .delete => .{ .interaction_state = input.interaction_state, .blueprint = copyWith(input.blueprint, .{ .nodes = nodes: {
+                var new_nodes = std.ArrayList(NodeGraphBlueprintEntry).init(allocator);
+                for (input.blueprint.nodes) |node| if (!std.mem.eql(u8, if (node.name) |node_name| node_name else node.function, node_event.delete.node_name)) {
+                    try new_nodes.append(node);
+                };
+                break :nodes new_nodes.items;
+            } }) },
+        },
+    } else default;
 }
 
 test "basic" {
@@ -370,7 +317,7 @@ test "basic" {
         .event = .{ .external_node_event = .{
             .node_name = "test",
             .mouse_event = .{ .mouse_down = .{ .location = .{ .x = 0, .y = 0 }, .button = MouseButton.right } },
-         } },
+        } },
         .context_menu = .{ .open = false, .location = .{ .x = 0, .y = 0 }, .options = &.{} },
     });
     try std.testing.expectEqual(output.context_menu.open, true);
@@ -378,27 +325,69 @@ test "basic" {
 
 test "basic2" {
     const output = ContextMenuInteraction(.{
-        .event = .{ .context_event = .{
-            .option_selected = "delete",
-        } },
+        .event = .{ .context_event = .{ .option_selected = "delete" } },
         .context_menu = .{ .open = true, .location = .{ .x = 0, .y = 0 }, .options = &.{}, .selected_node = "test" },
     });
     try std.testing.expectEqual(output.context_menu.open, false);
 }
 
-test "glueing two nodes together" {
+test "delete node from context menu" {
+    const allocator = std.heap.page_allocator;
     const first_output = ContextMenuInteraction(.{
-        .event = .{ .external_node_event = .{
-            .node_name = "test",
-            .mouse_event = .{ .mouse_down = .{ .location = .{ .x = 0, .y = 0 }, .button = MouseButton.right } },
-        } },
-        .context_menu = .{ .open = false, .location = .{ .x = 0, .y = 0 }, .options = &.{} },
+        .event = .{ .context_event = .{ .option_selected = "delete" } },
+        .context_menu = .{
+            .open = false,
+            .location = .{ .x = 0, .y = 0 },
+            .options = &.{},
+            .selected_node = "test",
+        },
     });
-    const second_output = NodeInteraction(.{
+    const second_output = try NodeInteraction(allocator, .{
         .event = eventTransform(NodeInputEventType(NodeInteraction), first_output.event),
-        .interaction_state = .{ .node_selection = &.{}, .wiggle = null },
-        .blueprint = .{ .nodes = &.{}, .store = &.{}, .output = &.{} },
+        .interaction_state = .{
+            .node_selection = &.{"test"},
+            .wiggle = null,
+            .box_selection = null,
+        },
+        .blueprint = .{
+            .nodes = &.{.{ .name = "test", .function = "test", .input_links = &.{} }},
+            .store = &.{},
+            .output = &.{},
+        },
         .keyboard_modifiers = .{ .shift = false, .control = false, .alt = false, .super = false },
     });
-    try std.testing.expectEqualStrings(second_output.interaction_state.node_selection[0], "test");
+    try std.testing.expectEqual(second_output.blueprint.nodes.len, 0);
+}
+
+test "select node" {
+    const allocator = std.heap.page_allocator;
+    const first_output = ContextMenuInteraction(.{
+        .event = .{ .external_node_event = .{ .node_name = "test", .mouse_event = .{ .mouse_down = .{ .location = .{ .x = 0, .y = 0 }, .button = MouseButton.left } } } },
+        .context_menu = .{ .open = false, .location = .{ .x = 0, .y = 0 }, .options = &.{}, .selected_node = "test" },
+    });
+    const second_output = try NodeInteraction(allocator, .{
+        .event = eventTransform(NodeInputEventType(NodeInteraction), first_output.event),
+        .interaction_state = .{ .node_selection = &.{"something_else"}, .wiggle = null, .box_selection = null },
+        .blueprint = .{ .nodes = &.{
+            .{ .name = "test", .function = "test", .input_links = &.{} },
+            .{ .name = "something_else", .function = "test", .input_links = &.{} },
+        }, .store = &.{}, .output = &.{} },
+        .keyboard_modifiers = .{ .shift = true, .control = false, .alt = false, .super = false },
+    });
+    try std.testing.expectEqual(second_output.interaction_state.node_selection.len, 2);
+}
+
+test "deselect node" {
+    const allocator = std.heap.page_allocator;
+    const first_output = ContextMenuInteraction(.{
+        .event = .{ .external_node_event = .{ .node_name = "test", .mouse_event = .{ .mouse_down = .{ .location = .{ .x = 0, .y = 0 }, .button = MouseButton.left } } } },
+        .context_menu = .{ .open = false, .location = .{ .x = 0, .y = 0 }, .options = &.{}, .selected_node = "test" },
+    });
+    const second_output = try NodeInteraction(allocator, .{
+        .event = eventTransform(NodeInputEventType(NodeInteraction), first_output.event),
+        .interaction_state = .{ .node_selection = &.{"test"}, .wiggle = null, .box_selection = null },
+        .blueprint = .{ .nodes = &.{.{ .name = "test", .function = "test", .input_links = &.{} }}, .store = &.{}, .output = &.{} },
+        .keyboard_modifiers = .{ .shift = true, .control = false, .alt = false, .super = false },
+    });
+    try std.testing.expectEqual(second_output.interaction_state.node_selection.len, 0);
 }
