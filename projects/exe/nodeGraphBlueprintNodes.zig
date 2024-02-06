@@ -122,8 +122,7 @@ pub fn eventTransform(target_event_type: type, source_event: anytype) target_eve
         inline for (source_optional_info.Union.fields, 0..) |source_field, i| {
             if (i == field_index) {
                 const source = @field(source_not_null, source_field.name);
-                inline for (target_optional_info.Union.fields, 0..) |target_field, j| {
-                    _ = j; // autofix
+                inline for (target_optional_info.Union.fields) |target_field| {
                     const equal_names = comptime std.mem.eql(u8, source_field.name, target_field.name);
                     const equal_types = source_field.type == target_field.type;
                     if (equal_names and equal_types) {
@@ -265,12 +264,12 @@ fn NodeInteraction(
         external_node_event: ExternalNodeEvent,
     } = null,
 } {
+    const selection = input.interaction_state.node_selection;
     const default = .{
         .interaction_state = input.interaction_state,
         .blueprint = input.blueprint,
         .event = eventTransform(NodeOutputEventType(NodeInteraction), input.event),
     };
-    const selection = input.interaction_state.node_selection;
     return if (input.event) |event|
         if (input.keyboard_modifiers.shift)
             switch (event) {
@@ -300,7 +299,7 @@ fn NodeInteraction(
                 }) },
             },
             .node_event => |node_event| switch (node_event) {
-                .create => unreachable,
+                .create => unreachable, // TODO: Implement new node creation.
                 .copy => |copy| .{ .blueprint = input.blueprint, .interaction_state = copyWith(input.interaction_state, .{
                     .clipboard = try selectionToNodes(allocator, input.blueprint.nodes, if (selection.len > 0) selection else &.{copy.node_name}),
                 }) },
@@ -335,7 +334,11 @@ fn NodeInteraction(
         default;
 }
 
-fn selectionToNodes(allocator: std.mem.Allocator, all_nodes: []const NodeGraphBlueprintEntry, selection: []const []const u8) ![]const NodeGraphBlueprintEntry {
+fn selectionToNodes(
+    allocator: std.mem.Allocator,
+    all_nodes: []const NodeGraphBlueprintEntry,
+    selection: []const []const u8,
+) ![]const NodeGraphBlueprintEntry {
     const result = try allocator.alloc(NodeGraphBlueprintEntry, selection.len);
     for (result, 0..) |*item, index| {
         const existing_node = for (all_nodes) |node| {
@@ -347,7 +350,11 @@ fn selectionToNodes(allocator: std.mem.Allocator, all_nodes: []const NodeGraphBl
     return result;
 }
 
-fn pasteNodesUnique(allocator: std.mem.Allocator, existing_nodes: []const NodeGraphBlueprintEntry, new_nodes: []const NodeGraphBlueprintEntry) ![]const NodeGraphBlueprintEntry {
+fn pasteNodesUnique(
+    allocator: std.mem.Allocator,
+    existing_nodes: []const NodeGraphBlueprintEntry,
+    new_nodes: []const NodeGraphBlueprintEntry,
+) ![]const NodeGraphBlueprintEntry {
     const unique_nodes = try allocator.alloc(NodeGraphBlueprintEntry, new_nodes.len);
     for (unique_nodes, 0..) |*unique_node, index| {
         const new_node = new_nodes[index];
