@@ -237,11 +237,12 @@ pub const InteractionState = struct {
     box_selection: ?struct {
         start: GraphLocation,
         end: GraphLocation,
-    },
+    } = null,
     wiggle: ?struct {
         node: []const u8,
         location: GraphLocation,
-    },
+    } = null,
+    clipboard: ?[]const NodeGraphBlueprintEntry = null,
 };
 
 fn NodeInteraction(
@@ -298,13 +299,11 @@ fn NodeInteraction(
                 }) },
             },
             .node_event => |node_event| switch (node_event) {
-                else => default,
-                .delete => .{ .interaction_state = input.interaction_state, .blueprint = copyWith(input.blueprint, .{
+                .create => unreachable,
+                .delete => |delete| .{ .interaction_state = input.interaction_state, .blueprint = copyWith(input.blueprint, .{
                     .nodes = filter: {
-                        const to_remove = if (input.interaction_state.node_selection.len > 0)
-                            input.interaction_state.node_selection
-                        else
-                            &.{node_event.delete.node_name};
+                        const selection = input.interaction_state.node_selection;
+                        const to_remove = if (selection.len > 0) selection else &.{delete.node_name};
                         var result = std.ArrayList(NodeGraphBlueprintEntry).init(allocator);
                         for (input.blueprint.nodes) |node|
                             if (selection: {
@@ -317,9 +316,64 @@ fn NodeInteraction(
                         break :filter result.items;
                     },
                 }) },
+                .duplicate => |duplicate| .{ .interaction_state = input.interaction_state, .blueprint = copyWith(input.blueprint, .{
+                    .nodes = concat: {
+                        const selection = input.interaction_state.node_selection;
+                        const to_duplicate = if (selection.len > 0) selection else &.{duplicate.node_name};
+                        const new_nodes = try selectionToNodes(allocator, input.blueprint.nodes, to_duplicate);
+                        break :concat try pasteNodesUnique(allocator, input.blueprint.nodes, new_nodes);
+                    },
+                }) },
+                .copy => |copy| .{ .blueprint = input.blueprint, .interaction_state = copyWith(input.interaction_state, .{ .clipboard = blk: {
+                    const selection = input.interaction_state.node_selection;
+                    const to_duplicate = if (selection.len > 0) selection else &.{copy.node_name};
+                    break :blk try selectionToNodes(allocator, input.blueprint.nodes, to_duplicate);
+                } }) },
+                .paste => if (input.interaction_state.clipboard) |clipboard| .{ .interaction_state = input.interaction_state, .blueprint = copyWith(input.blueprint, .{
+                    .nodes = try pasteNodesUnique(allocator, input.blueprint.nodes, clipboard),
+                }) } else default,
             },
         } else default;
     }
+}
+
+fn selectionToNodes(allocator: std.mem.Allocator, all_nodes: []const NodeGraphBlueprintEntry, selection: []const []const u8) ![]const NodeGraphBlueprintEntry {
+    const result = try allocator.alloc(NodeGraphBlueprintEntry, selection.len);
+    for (result, 0..) |*item, index| {
+        const existing_node = for (all_nodes) |node| {
+            if (std.meta.eql(selection[index], if (node.name) |name| name else node.function))
+                break node;
+        } else unreachable;
+        item.* = existing_node;
+    }
+    return result;
+}
+
+fn pasteNodesUnique(allocator: std.mem.Allocator, existing_nodes: []const NodeGraphBlueprintEntry, new_nodes: []const NodeGraphBlueprintEntry) ![]const NodeGraphBlueprintEntry {
+    const unique_nodes = try allocator.alloc(NodeGraphBlueprintEntry, new_nodes.len);
+    for (unique_nodes, 0..) |*unique_node, index| {
+        const new_node = new_nodes[index];
+        const existing_name = if (new_node.name) |name| blk: {
+            var split_iter = std.mem.split(u8, name, "#");
+            break :blk split_iter.first();
+        } else new_node.function;
+        var counter: u32 = 1;
+        var name_candidate = existing_name;
+        while (not_unique: {
+            for (existing_nodes) |node| {
+                if (std.mem.eql(u8, if (node.name) |name| name else node.function, name_candidate))
+                    break :not_unique true;
+            } else for (unique_nodes[0..index]) |node| {
+                if (std.mem.eql(u8, node.name.?, name_candidate))
+                    break :not_unique true;
+            } else break :not_unique false;
+        }) {
+            name_candidate = try std.fmt.allocPrint(allocator, "{s}#{d}", .{ existing_name, counter });
+            counter += 1;
+        }
+        unique_node.*.name = name_candidate;
+    }
+    return try std.mem.concat(allocator, NodeGraphBlueprintEntry, &.{ existing_nodes, unique_nodes });
 }
 
 test "map expression" {
@@ -457,4 +511,24 @@ test "deselect node" {
     });
     try std.testing.expectEqual(second_output.interaction_state.node_selection.len, 1);
     try std.testing.expectEqual(second_output.interaction_state.node_selection[0], "something_else");
+}
+
+test "duplicate node" {
+    const allocator = std.heap.page_allocator;
+    const first_output = ContextMenuInteraction(.{
+        .event = .{ .context_event = .{ .option_selected = "duplicate" } },
+        .context_menu = .{ .open = false, .location = .{ .x = 0, .y = 0 }, .options = &.{}, .selected_node = "test" },
+    });
+    const second_output = try NodeInteraction(allocator, .{
+        .event = eventTransform(NodeInputEventType(NodeInteraction), first_output.event),
+        .interaction_state = .{ .node_selection = &.{ "test#1", "test#2" }, .wiggle = null, .box_selection = null },
+        .blueprint = .{ .nodes = &.{
+            .{ .name = "test#1", .function = "test", .input_links = &.{} },
+            .{ .name = "test#2", .function = "test", .input_links = &.{} },
+        }, .store = &.{}, .output = &.{} },
+        .keyboard_modifiers = .{ .shift = false, .control = false, .alt = false, .super = false },
+    });
+    try std.testing.expectEqual(second_output.blueprint.nodes.len, 4);
+    try std.testing.expectEqualStrings(second_output.blueprint.nodes[2].name.?, "test");
+    try std.testing.expectEqualStrings(second_output.blueprint.nodes[3].name.?, "test#3");
 }
