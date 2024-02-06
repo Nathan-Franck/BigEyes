@@ -270,20 +270,21 @@ fn NodeInteraction(
         .blueprint = input.blueprint,
         .event = eventTransform(NodeOutputEventType(NodeInteraction), input.event),
     };
+    const selection = input.interaction_state.node_selection;
     if (input.keyboard_modifiers.shift) {
         return if (input.event) |event| switch (event) {
             else => default,
             .external_node_event => |node_event| switch (node_event.mouse_event) {
                 else => default,
                 .mouse_down => .{ .blueprint = input.blueprint, .interaction_state = copyWith(input.interaction_state, .{
-                    .node_selection = if (for (input.interaction_state.node_selection, 0..) |item, index| (if (std.meta.eql(
+                    .node_selection = if (for (selection, 0..) |item, index| (if (std.meta.eql(
                         item,
                         node_event.node_name,
                     )) break index) else null) |index| try std.mem.concat(allocator, []const u8, &.{
-                        input.interaction_state.node_selection[0..index],
-                        input.interaction_state.node_selection[index + 1 ..],
+                        selection[0..index],
+                        selection[index + 1 ..],
                     }) else try std.mem.concat(allocator, []const u8, &.{
-                        input.interaction_state.node_selection,
+                        selection,
                         &.{node_event.node_name},
                     }),
                 }) },
@@ -300,9 +301,21 @@ fn NodeInteraction(
             },
             .node_event => |node_event| switch (node_event) {
                 .create => unreachable,
+                .copy => |copy| .{ .blueprint = input.blueprint, .interaction_state = copyWith(input.interaction_state, .{
+                    .clipboard = try selectionToNodes(allocator, input.blueprint.nodes, if (selection.len > 0) selection else &.{copy.node_name}),
+                }) },
+                .paste => if (input.interaction_state.clipboard) |clipboard| .{ .interaction_state = input.interaction_state, .blueprint = copyWith(input.blueprint, .{
+                    .nodes = try pasteNodesUnique(allocator, input.blueprint.nodes, clipboard),
+                }) } else default,
+                .duplicate => |duplicate| .{ .interaction_state = input.interaction_state, .blueprint = copyWith(input.blueprint, .{
+                    .nodes = concat: {
+                        const to_duplicate = if (selection.len > 0) selection else &.{duplicate.node_name};
+                        const new_nodes = try selectionToNodes(allocator, input.blueprint.nodes, to_duplicate);
+                        break :concat try pasteNodesUnique(allocator, input.blueprint.nodes, new_nodes);
+                    },
+                }) },
                 .delete => |delete| .{ .interaction_state = input.interaction_state, .blueprint = copyWith(input.blueprint, .{
                     .nodes = filter: {
-                        const selection = input.interaction_state.node_selection;
                         const to_remove = if (selection.len > 0) selection else &.{delete.node_name};
                         var result = std.ArrayList(NodeGraphBlueprintEntry).init(allocator);
                         for (input.blueprint.nodes) |node|
@@ -316,22 +329,6 @@ fn NodeInteraction(
                         break :filter result.items;
                     },
                 }) },
-                .duplicate => |duplicate| .{ .interaction_state = input.interaction_state, .blueprint = copyWith(input.blueprint, .{
-                    .nodes = concat: {
-                        const selection = input.interaction_state.node_selection;
-                        const to_duplicate = if (selection.len > 0) selection else &.{duplicate.node_name};
-                        const new_nodes = try selectionToNodes(allocator, input.blueprint.nodes, to_duplicate);
-                        break :concat try pasteNodesUnique(allocator, input.blueprint.nodes, new_nodes);
-                    },
-                }) },
-                .copy => |copy| .{ .blueprint = input.blueprint, .interaction_state = copyWith(input.interaction_state, .{ .clipboard = blk: {
-                    const selection = input.interaction_state.node_selection;
-                    const to_duplicate = if (selection.len > 0) selection else &.{copy.node_name};
-                    break :blk try selectionToNodes(allocator, input.blueprint.nodes, to_duplicate);
-                } }) },
-                .paste => if (input.interaction_state.clipboard) |clipboard| .{ .interaction_state = input.interaction_state, .blueprint = copyWith(input.blueprint, .{
-                    .nodes = try pasteNodesUnique(allocator, input.blueprint.nodes, clipboard),
-                }) } else default,
             },
         } else default;
     }
@@ -353,9 +350,9 @@ fn pasteNodesUnique(allocator: std.mem.Allocator, existing_nodes: []const NodeGr
     const unique_nodes = try allocator.alloc(NodeGraphBlueprintEntry, new_nodes.len);
     for (unique_nodes, 0..) |*unique_node, index| {
         const new_node = new_nodes[index];
-        const existing_name = if (new_node.name) |name| blk: {
+        const existing_name = if (new_node.name) |name| base_name: {
             var split_iter = std.mem.split(u8, name, "#");
-            break :blk split_iter.first();
+            break :base_name split_iter.first();
         } else new_node.function;
         var counter: u32 = 1;
         var name_candidate = existing_name;
