@@ -301,19 +301,19 @@ fn NodeInteraction(
                 else => default,
                 .delete => .{ .interaction_state = input.interaction_state, .blueprint = copyWith(input.blueprint, .{
                     .nodes = filter: {
-                        const to_filter = if (input.interaction_state.node_selection.len > 0)
+                        const to_remove = if (input.interaction_state.node_selection.len > 0)
                             input.interaction_state.node_selection
                         else
                             &.{node_event.delete.node_name};
                         var result = std.ArrayList(NodeGraphBlueprintEntry).init(allocator);
                         for (input.blueprint.nodes) |node|
-                            if (unfiltered: {
-                                for (to_filter) |item|
-                                    if (std.meta.eql(if (node.name) |name| name else node.function, item))
-                                        break :unfiltered null;
-                                break :unfiltered node;
-                            }) |unfiltered_node|
-                                try result.append(unfiltered_node);
+                            if (selection: {
+                                for (to_remove) |item|
+                                    if (std.meta.eql(item, if (node.name) |name| name else node.function))
+                                        break :selection null;
+                                break :selection node;
+                            }) |selected|
+                                try result.append(selected);
                         break :filter result.items;
                     },
                 }) },
