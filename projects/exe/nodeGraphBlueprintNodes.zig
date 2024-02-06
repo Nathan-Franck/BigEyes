@@ -271,27 +271,27 @@ fn NodeInteraction(
         .event = eventTransform(NodeOutputEventType(NodeInteraction), input.event),
     };
     const selection = input.interaction_state.node_selection;
-    if (input.keyboard_modifiers.shift) {
-        return if (input.event) |event| switch (event) {
-            else => default,
-            .external_node_event => |node_event| switch (node_event.mouse_event) {
+    return if (input.event) |event|
+        if (input.keyboard_modifiers.shift)
+            switch (event) {
                 else => default,
-                .mouse_down => .{ .blueprint = input.blueprint, .interaction_state = copyWith(input.interaction_state, .{
-                    .node_selection = if (for (selection, 0..) |item, index| (if (std.meta.eql(
-                        item,
-                        node_event.node_name,
-                    )) break index) else null) |index| try std.mem.concat(allocator, []const u8, &.{
-                        selection[0..index],
-                        selection[index + 1 ..],
-                    }) else try std.mem.concat(allocator, []const u8, &.{
-                        selection,
-                        &.{node_event.node_name},
-                    }),
-                }) },
-            },
-        } else default;
-    } else {
-        return if (input.event) |event| switch (event) {
+                .external_node_event => |node_event| switch (node_event.mouse_event) {
+                    else => default,
+                    .mouse_down => .{ .blueprint = input.blueprint, .interaction_state = copyWith(input.interaction_state, .{
+                        .node_selection = if (for (selection, 0..) |item, index| (if (std.meta.eql(
+                            item,
+                            node_event.node_name,
+                        )) break index) else null) |index| try std.mem.concat(allocator, []const u8, &.{
+                            selection[0..index],
+                            selection[index + 1 ..],
+                        }) else try std.mem.concat(allocator, []const u8, &.{
+                            selection,
+                            &.{node_event.node_name},
+                        }),
+                    }) },
+                },
+            }
+        else switch (event) {
             else => default,
             .external_node_event => |node_event| switch (node_event.mouse_event) {
                 else => default,
@@ -330,8 +330,9 @@ fn NodeInteraction(
                     },
                 }) },
             },
-        } else default;
-    }
+        }
+    else
+        default;
 }
 
 fn selectionToNodes(allocator: std.mem.Allocator, all_nodes: []const NodeGraphBlueprintEntry, selection: []const []const u8) ![]const NodeGraphBlueprintEntry {
