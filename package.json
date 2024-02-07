@@ -1,8 +1,8 @@
 {
-    "scripts": {
-        "watch web folder": "tsc --project web/tsconfig.json --watch",
-        "build webgl": "zig build-lib webgl.zig -target wasm32-freestanding -dynamic -OReleaseSmall",
-        "build gl-entry": "zig build gl-entry && .\\zig-out\\bin\\snake.exe",
-        "build webgpu-entry": "zig build exe && .\\zig-out\\bin\\triangle_wgpu.exe"
-    }
+  "scripts": {
+    "watch web folder": "tsc --project web/tsconfig.json --watch",
+    "build webgl": "zig build-lib webgl.zig -target wasm32-freestanding -dynamic -OReleaseSmall",
+    "build gl-entry": "zig build gl-entry && .\\zig-out\\bin\\snake.exe",
+    "build webgpu-entry": "zig build exe && .\\zig-out\\bin\\triangle_wgpu.exe"
+  }
 }
