@@ -217,7 +217,8 @@ fn ContextMenuInteraction(input: struct {
                         .delete => .{ .node_event = .{ .delete = .{ .node_name = selected_node } } },
                         .duplicate => .{ .node_event = .{ .duplicate = .{ .node_name = selected_node } } },
                         .copy => .{ .node_event = .{ .copy = .{ .node_name = selected_node } } },
-                    } else unreachable else unreachable, // TODO: Do I want this to crash or fail gracefully? Maybe float some error event up that an error message system can present the user?
+                    } else unreachable else unreachable, // TODO: Do I want this to crash or fail gracefully?
+                    // Maybe float some error event up that an error message system can present the user?
                 };
             },
         },
