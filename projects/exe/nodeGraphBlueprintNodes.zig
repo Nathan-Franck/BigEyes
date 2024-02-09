@@ -169,11 +169,7 @@ fn ContextMenuInteraction(input: struct {
     },
 }) struct {
     context_menu: ContextState,
-    event: ?union(enum) {
-        mouse_event: ExternalMouseEvent,
-        external_node_event: ExternalNodeEvent,
-        node_event: NodeEvent,
-    } = null,
+    event: ?union(enum) { mouse_event: ExternalMouseEvent, external_node_event: ExternalNodeEvent, node_event: NodeEvent } = null,
 } {
     const default = .{
         .context_menu = input.context_menu,
@@ -217,8 +213,7 @@ fn ContextMenuInteraction(input: struct {
                         .delete => .{ .node_event = .{ .delete = .{ .node_name = selected_node } } },
                         .duplicate => .{ .node_event = .{ .duplicate = .{ .node_name = selected_node } } },
                         .copy => .{ .node_event = .{ .copy = .{ .node_name = selected_node } } },
-                    } else unreachable else unreachable, // TODO: Do I want this to crash or fail gracefully?
-                    // Maybe float some error event up that an error message system can present the user?
+                    } else unreachable else unreachable, // TODO: Do I want this to crash or fail gracefully? Maybe float some error event up that an error message system can present the user?
                 };
             },
         },
@@ -512,7 +507,11 @@ test "deselect node" {
     const second_output = try NodeInteraction(allocator, .{
         .event = eventTransform(NodeInputEventType(NodeInteraction), first_output.event),
         .interaction_state = .{ .node_selection = &.{ "test", "something_else" }, .wiggle = null, .box_selection = null },
-        .blueprint = .{ .nodes = &.{.{ .name = "test", .function = "test", .input_links = &.{} }}, .store = &.{}, .output = &.{} },
+        .blueprint = .{
+            .nodes = &.{.{ .name = "test", .function = "test", .input_links = &.{} }},
+            .store = &.{},
+            .output = &.{},
+        },
         .keyboard_modifiers = .{ .shift = true, .control = false, .alt = false, .super = false },
     });
     try std.testing.expectEqual(second_output.interaction_state.node_selection.len, 1);

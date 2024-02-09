@@ -30,7 +30,7 @@ const ExportMeshes = struct {
         for (self.files) |file| {
             const full_path = try std.fmt.allocPrint(self.allocator, "content/{s}.blend", .{file});
 
-            var man = b.cache.obtain();
+            var man = b.graph.cache.obtain();
             defer man.deinit();
             _ = try man.addFile(full_path, null);
             if (try step.cacheHit(&man)) {
