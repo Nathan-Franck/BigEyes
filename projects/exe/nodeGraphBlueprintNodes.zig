@@ -535,5 +535,6 @@ test "duplicate node" {
     });
     try std.testing.expectEqual(second_output.blueprint.nodes.len, 4);
     try std.testing.expectEqualStrings(second_output.blueprint.nodes[2].name.?, "test");
+    std.debug.print("Hello there! {d:.5}", .{123.123456});
     try std.testing.expectEqualStrings(second_output.blueprint.nodes[3].name.?, "test#3");
 }
