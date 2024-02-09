@@ -69,7 +69,7 @@ pub fn build(
     target: std.Build.ResolvedTarget,
     optimize: std.builtin.OptimizeMode,
 ) !void {
-    const export_meshes = ExportMeshes.create(b, &.{ "boss", "cube", "cat", "RockLevel" });
+    const export_meshes = ExportMeshes.create(b, &.{ "boss", "cube", "Cat", "RockLevel" });
     const zgui_pkg = @import("zgui").package(b, target, optimize, .{ .options = .{ .backend = .glfw_wgpu } });
     const zmath_pkg = @import("zmath").package(b, target, optimize, .{});
     const zglfw_pkg = @import("zglfw").package(b, target, optimize, .{ .options = .{ .shared = false } });

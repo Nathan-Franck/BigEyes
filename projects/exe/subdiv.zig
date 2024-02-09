@@ -6,10 +6,8 @@ pub const Face = []const u32;
 pub const Quad = [4]u32;
 pub const Mesh = struct { points: []const Point, quads: []const Quad };
 const EdgesFace = struct {
-    point1: u32,
-    point2: u32,
-    face1: u32,
-    face2: u32,
+    points: struct { u32, u32 },
+    faces: struct { u32, u32 },
     centerPoint: Point,
 };
 const PointEx = struct {
@@ -95,10 +93,8 @@ pub fn Polygon(comptime poly_selection: enum {
                 const p1 = inputPoints[me[0]];
                 const p2 = inputPoints[me[1]];
                 try edgesCenters.append(EdgesFace{
-                    .point1 = me[0],
-                    .point2 = me[1],
-                    .face1 = me[2],
-                    .face2 = me[3],
+                    .points = .{ me[0], me[1] },
+                    .faces = .{ me[2], me[3] },
                     .centerPoint = centerPoint(p1, p2),
                 });
             }
@@ -109,11 +105,11 @@ pub fn Polygon(comptime poly_selection: enum {
             var edgePoints = try ArrayList(Point).initCapacity(allocator, edgesFaces.len);
             for (edgesFaces) |edge| {
                 const cp = edge.centerPoint;
-                const fp1 = facePoints[edge.face1];
-                const fp2 = if (edge.face2 == std.math.maxInt(u32))
+                const fp1 = facePoints[edge.faces[0]];
+                const fp2 = if (edge.faces[1] == std.math.maxInt(u32))
                     fp1
                 else
-                    facePoints[edge.face2];
+                    facePoints[edge.faces[1]];
                 const cfp = centerPoint(fp1, fp2);
                 try edgePoints.append(centerPoint(cp, cfp));
             }
@@ -146,7 +142,7 @@ pub fn Polygon(comptime poly_selection: enum {
                 try tempPoints.append(PointEx{ .p = Point{ 0, 0, 0, 1 }, .n = 0 });
             }
             for (edgesFaces) |edge| {
-                for ([_]u32{ edge.point1, edge.point2 }) |pointNum| {
+                for ([_]u32{ edge.points[0], edge.points[1] }) |pointNum| {
                     const tp = tempPoints.items[pointNum].p;
                     tempPoints.items[pointNum].p = tp + edge.centerPoint;
                     tempPoints.items[pointNum].n += 1;
@@ -222,8 +218,7 @@ pub fn Polygon(comptime poly_selection: enum {
             }
             var edgePointNums = std.AutoHashMap([2]u32, u32).init(allocator);
             for (edgesFaces, 0..) |edgeFace, edgeNum| {
-                const point1 = edgeFace.point1;
-                const point2 = edgeFace.point2;
+                const point1, const point2 = edgeFace.points;
                 const edgePoint = edgePoints[edgeNum];
                 try newPoints.append(edgePoint);
                 try edgePointNums.put(switchNums([2]u32{ point1, point2 }), @as(u32, @intCast(nextPointNum)));
