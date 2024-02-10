@@ -37,5 +37,9 @@
     .dawn_x86_64_macos = .{
         .url = "https://github.com/michal-z/webgpu_dawn-x86_64-macos/archive/901716b10b31ce3e0d3fe479326b41e91d59c661.tar.gz",
         .hash = "1220b1f02f2f7edd98a078c64e3100907d90311d94880a3cc5927e1ac009d002667a",
+    }, 
+    .@"zig-webui" = .{
+        .url = "https://github.com/webui-dev/zig-webui/archive/main.tar.gz",
+        .hash = "1220d35153014872bc8531e57bc3eedec4044e563e8f6798031f8b1c25678f31cf24",
     },
 } }

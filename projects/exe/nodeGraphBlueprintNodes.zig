@@ -1,7 +1,7 @@
 const std = @import("std");
 const NodeGraphBlueprintEntry = @import("./interactiveNodeBuilderBlueprint.zig").NodeGraphBlueprintEntry;
-
 pub const Blueprint = @import("./interactiveNodeBuilderBlueprint.zig").Blueprint;
+const utils = @import("./nodeUtils.zig");
 
 pub const MouseButton = enum {
     left,
@@ -63,106 +63,6 @@ pub const ContextState = struct {
     options: []const []const u8 = &.{},
 };
 
-pub fn copyWith(source_data: anytype, field_changes: anytype) @TypeOf(source_data) {
-    switch (@typeInfo(@TypeOf(source_data))) {
-        else => @compileError("Can't merge non-struct types"),
-        .Struct => |struct_info| {
-            var result = source_data;
-            comptime var unused_field_changes: []const []const u8 = &.{};
-            inline for (@typeInfo(@TypeOf(field_changes)).Struct.fields) |unused_field| {
-                unused_field_changes = unused_field_changes ++ &[_][]const u8{unused_field.name};
-            }
-            inline for (struct_info.fields) |field| {
-                if (@hasField(@TypeOf(field_changes), field.name))
-                    @field(result, field.name) = @field(field_changes, field.name);
-                comptime var next_unused_field_changes: []const []const u8 = &.{};
-                inline for (unused_field_changes) |unused_field| {
-                    comptime if (!std.mem.eql(u8, unused_field, field.name)) {
-                        next_unused_field_changes = next_unused_field_changes ++ &[_][]const u8{unused_field};
-                    };
-                }
-                unused_field_changes = next_unused_field_changes;
-            }
-            if (unused_field_changes.len > 0) {
-                @compileError(std.fmt.comptimePrint("Unused fields found: {s}", .{unused_field_changes}));
-            }
-            return result;
-        },
-    }
-}
-
-pub fn NodeOutputEventType(node_process_function: anytype) type {
-    const node_process_function_info = @typeInfo(@TypeOf(node_process_function));
-    if (node_process_function_info != .Fn) {
-        @compileError("node_process_function must be a function, found '" ++ @typeName(node_process_function) ++ "'");
-    }
-    var return_type = node_process_function_info.Fn.return_type.?;
-    if (@typeInfo(return_type) == .ErrorUnion) {
-        return_type = @typeInfo(return_type).ErrorUnion.payload;
-    }
-    const event_field_info = std.meta.fieldInfo(return_type, .event);
-    return event_field_info.type;
-}
-
-pub fn NodeInputEventType(node_process_function: anytype) type {
-    const node_process_function_info = @typeInfo(@TypeOf(node_process_function));
-    if (node_process_function_info != .Fn) {
-        @compileError("node_process_function must be a function, found '" ++ @typeName(node_process_function) ++ "'");
-    }
-    const params = node_process_function_info.Fn.params;
-    const event_field_info = std.meta.fieldInfo(params[params.len - 1].type.?, .event);
-    return event_field_info.type;
-}
-
-pub fn eventTransform(target_event_type: type, source_event: anytype) target_event_type {
-    const source_info = @typeInfo(@TypeOf(source_event));
-    if (source_info != .Optional) {
-        @compileError("source_event must be an optional union type (?union(enum){}), found '" ++ @typeName(source_event) ++ "'");
-    }
-    const source_optional_info = @typeInfo(source_info.Optional.child);
-    if (source_optional_info != .Union) {
-        @compileError("source_event must be an optional union type (?union(enum){}), found '" ++ @typeName(source_event) ++ "'");
-    }
-    const target_info = @typeInfo(target_event_type);
-    if (target_info != .Optional) {
-        @compileError("target_event_type must be an optional union type (?union(enum){}), found '" ++ @typeName(target_event_type) ++ "'");
-    }
-    const target_optional_info = @typeInfo(target_info.Optional.child);
-    if (target_optional_info != .Union) {
-        @compileError("target_event_type must be an optional union type (?union(enum){}), found '" ++ @typeName(target_event_type) ++ "'");
-    }
-    if (source_event) |source_not_null| {
-        const field_index = @intFromEnum(source_not_null);
-        inline for (source_optional_info.Union.fields, 0..) |source_field, i| {
-            if (i == field_index) {
-                const source = @field(source_not_null, source_field.name);
-                inline for (target_optional_info.Union.fields) |target_field| {
-                    const equal_names = comptime std.mem.eql(u8, source_field.name, target_field.name);
-                    const equal_types = source_field.type == target_field.type;
-                    if (equal_names and equal_types) {
-                        return @unionInit(target_info.Optional.child, target_field.name, source);
-                    } else if (equal_names and !equal_types) {
-                        @compileError(std.fmt.comptimePrint("source and target field types do not match: {any} {any}", .{ target_field.type, source_field.type }));
-                    } else if (equal_types and !equal_names) {
-                        @compileError("source and target field names do not match: " ++ target_field.name ++ " " ++ source_field.name);
-                    }
-                }
-            }
-        }
-    }
-    return null;
-}
-
-/// Takes any type that has fields and returns a list of the field names as strings.
-/// NOTE: Required to run at comptime from the callsite.
-pub fn fieldNamesToStrings(comptime with_fields: type) []const []const u8 {
-    var options: []const []const u8 = &.{};
-    for (std.meta.fields(with_fields)) |field| {
-        options = options ++ .{field.name};
-    }
-    return options;
-}
-
 fn BlueprintLoader(input: struct {
     recieved_blueprint: ?Blueprint,
     existing_blueprint: Blueprint,
@@ -187,7 +87,7 @@ fn ContextMenuInteraction(input: struct {
 } {
     const default = .{
         .context_menu = input.context_menu,
-        .event = eventTransform(NodeOutputEventType(ContextMenuInteraction), input.event),
+        .event = utils.eventTransform(utils.NodeOutputEventType(ContextMenuInteraction), input.event),
     };
     return if (input.event) |event| switch (event) {
         .external_node_event => |node_event| switch (node_event.mouse_event) {
@@ -198,7 +98,7 @@ fn ContextMenuInteraction(input: struct {
                     .open = true,
                     .selected_node = node_event.node_name,
                     .location = mouse_down.location,
-                    .options = comptime fieldNamesToStrings(ContextMenuNodeOption),
+                    .options = comptime utils.fieldNamesToStrings(ContextMenuNodeOption),
                 } },
             },
         },
@@ -206,11 +106,11 @@ fn ContextMenuInteraction(input: struct {
             else => default,
             .mouse_down => |mouse_down| switch (mouse_down.button) {
                 else => default,
-                .left => .{ .context_menu = copyWith(input.context_menu, .{ .open = false }) },
+                .left => .{ .context_menu = utils.copyWith(input.context_menu, .{ .open = false }) },
                 .right => .{ .context_menu = .{
                     .open = true,
                     .location = mouse_down.location,
-                    .options = comptime fieldNamesToStrings(ContextMenuOption),
+                    .options = comptime utils.fieldNamesToStrings(ContextMenuOption),
                 } },
             },
         },
@@ -219,7 +119,7 @@ fn ContextMenuInteraction(input: struct {
                 const menu_option_selected = std.meta.stringToEnum(ContextMenuOption, context_event.option_selected);
                 const menu_node_option_selected = std.meta.stringToEnum(ContextMenuNodeOption, context_event.option_selected);
                 break :result .{
-                    .context_menu = copyWith(input.context_menu, .{ .open = false }),
+                    .context_menu = utils.copyWith(input.context_menu, .{ .open = false }),
                     .event = if (menu_option_selected) |option| switch (option) {
                         .paste => .{ .node_event = .{ .paste = input.context_menu.location } },
                         .@"new..." => unreachable, // TODO: Implement new node creation.
@@ -278,7 +178,7 @@ fn NodeInteraction(
     const default = .{
         .interaction_state = input.interaction_state,
         .blueprint = input.blueprint,
-        .event = eventTransform(NodeOutputEventType(NodeInteraction), input.event),
+        .event = utils.eventTransform(utils.NodeOutputEventType(NodeInteraction), input.event),
     };
     return if (input.event) |event|
         if (input.keyboard_modifiers.shift)
@@ -286,7 +186,7 @@ fn NodeInteraction(
                 else => default,
                 .external_node_event => |node_event| switch (node_event.mouse_event) {
                     else => default,
-                    .mouse_down => .{ .blueprint = input.blueprint, .interaction_state = copyWith(input.interaction_state, .{
+                    .mouse_down => .{ .blueprint = input.blueprint, .interaction_state = utils.copyWith(input.interaction_state, .{
                         .node_selection = if (for (selection, 0..) |item, index| (if (std.meta.eql(
                             item,
                             node_event.node_name,
@@ -304,26 +204,26 @@ fn NodeInteraction(
             else => default,
             .external_node_event => |node_event| switch (node_event.mouse_event) {
                 else => default,
-                .mouse_down => .{ .blueprint = input.blueprint, .interaction_state = copyWith(input.interaction_state, .{
+                .mouse_down => .{ .blueprint = input.blueprint, .interaction_state = utils.copyWith(input.interaction_state, .{
                     .node_selection = try std.mem.concat(allocator, []const u8, &.{&.{node_event.node_name}}),
                 }) },
             },
             .node_event => |node_event| switch (node_event) {
                 .create => unreachable, // TODO: Implement new node creation.
-                .copy => |copy| .{ .blueprint = input.blueprint, .interaction_state = copyWith(input.interaction_state, .{
+                .copy => |copy| .{ .blueprint = input.blueprint, .interaction_state = utils.copyWith(input.interaction_state, .{
                     .clipboard = try selectionToNodes(allocator, input.blueprint.nodes, if (selection.len > 0) selection else &.{copy.node_name}),
                 }) },
-                .paste => if (input.interaction_state.clipboard) |clipboard| .{ .interaction_state = input.interaction_state, .blueprint = copyWith(input.blueprint, .{
+                .paste => if (input.interaction_state.clipboard) |clipboard| .{ .interaction_state = input.interaction_state, .blueprint = utils.copyWith(input.blueprint, .{
                     .nodes = try pasteNodesUnique(allocator, input.blueprint.nodes, clipboard),
                 }) } else default,
-                .duplicate => |duplicate| .{ .interaction_state = input.interaction_state, .blueprint = copyWith(input.blueprint, .{
+                .duplicate => |duplicate| .{ .interaction_state = input.interaction_state, .blueprint = utils.copyWith(input.blueprint, .{
                     .nodes = concat: {
                         const to_duplicate = if (selection.len > 0) selection else &.{duplicate.node_name};
                         const new_nodes = try selectionToNodes(allocator, input.blueprint.nodes, to_duplicate);
                         break :concat try pasteNodesUnique(allocator, input.blueprint.nodes, new_nodes);
                     },
                 }) },
-                .delete => |delete| .{ .interaction_state = input.interaction_state, .blueprint = copyWith(input.blueprint, .{
+                .delete => |delete| .{ .interaction_state = input.interaction_state, .blueprint = utils.copyWith(input.blueprint, .{
                     .nodes = filter: {
                         const to_remove = if (selection.len > 0) selection else &.{delete.node_name};
                         var result = std.ArrayList(NodeGraphBlueprintEntry).init(allocator);
@@ -445,7 +345,7 @@ test "delete node from context menu" {
         },
     });
     const second_output = try NodeInteraction(allocator, .{
-        .event = eventTransform(NodeInputEventType(NodeInteraction), first_output.event),
+        .event = utils.eventTransform(utils.NodeInputEventType(NodeInteraction), first_output.event),
         .interaction_state = .{
             .node_selection = &.{"test"},
             .wiggle = null,
@@ -473,7 +373,7 @@ test "delete node from context menu with a current selection" {
         },
     });
     const second_output = try NodeInteraction(allocator, .{
-        .event = eventTransform(NodeInputEventType(NodeInteraction), first_output.event),
+        .event = utils.eventTransform(utils.NodeInputEventType(NodeInteraction), first_output.event),
         .interaction_state = .{
             .node_selection = &.{ "test", "something_else" },
             .wiggle = null,
@@ -500,7 +400,7 @@ test "select node" {
         .context_menu = .{ .open = false, .location = .{ .x = 0, .y = 0 }, .options = &.{}, .selected_node = "test" },
     });
     const second_output = try NodeInteraction(allocator, .{
-        .event = eventTransform(NodeInputEventType(NodeInteraction), first_output.event),
+        .event = utils.eventTransform(utils.NodeInputEventType(NodeInteraction), first_output.event),
         .interaction_state = .{ .node_selection = &.{"something_else"}, .wiggle = null, .box_selection = null },
         .blueprint = .{ .nodes = &.{
             .{ .name = "test", .function = "test", .input_links = &.{} },
@@ -519,7 +419,7 @@ test "deselect node" {
         .context_menu = .{ .open = false, .location = .{ .x = 0, .y = 0 }, .options = &.{}, .selected_node = "test" },
     });
     const second_output = try NodeInteraction(allocator, .{
-        .event = eventTransform(NodeInputEventType(NodeInteraction), first_output.event),
+        .event = utils.eventTransform(utils.NodeInputEventType(NodeInteraction), first_output.event),
         .interaction_state = .{ .node_selection = &.{ "test", "something_else" }, .wiggle = null, .box_selection = null },
         .blueprint = .{
             .nodes = &.{.{ .name = "test", .function = "test", .input_links = &.{} }},
@@ -539,7 +439,7 @@ test "duplicate node" {
         .context_menu = .{ .open = false, .location = .{ .x = 0, .y = 0 }, .options = &.{}, .selected_node = "test" },
     });
     const second_output = try NodeInteraction(allocator, .{
-        .event = eventTransform(NodeInputEventType(NodeInteraction), first_output.event),
+        .event = utils.eventTransform(utils.NodeInputEventType(NodeInteraction), first_output.event),
         .interaction_state = .{ .node_selection = &.{ "test#1", "test#2" }, .wiggle = null, .box_selection = null },
         .blueprint = .{ .nodes = &.{
             .{ .name = "test#1", .function = "test", .input_links = &.{} },

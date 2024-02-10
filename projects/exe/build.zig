@@ -80,7 +80,7 @@ pub fn build(
     // Tests (default)
     {
         // const main_tests = b.addTest(.{ .root_source_file = .{ .path = thisDir() ++ "/tests.zig" } });
-        const main_tests = b.addTest(.{ .root_source_file = .{ .path = thisDir() ++ "/nodeGraphBlueprintNodes.zig" } });
+        const main_tests = b.addTest(.{ .root_source_file = .{ .path = thisDir() ++ "/GraphRuntime.zig" } });
         // main_tests.root_module.addImport("embedded_assets", embedded_assets);
         zmath_pkg.link(main_tests);
         const run_unit_tests = b.addRunArtifact(main_tests);

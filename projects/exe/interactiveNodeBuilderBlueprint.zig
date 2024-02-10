@@ -32,24 +32,24 @@ pub const Blueprint = struct {
 };
 
 pub const node_graph_blueprint: Blueprint = .{
-    .nodes = .{
+    .nodes = &.{
         .{
             .function = "BlueprintLoader",
-            .input_links = .{
+            .input_links = &.{
                 .{ .input = .{ .input_field = "recieved_blueprint" } },
                 .{ .store = .{ .system_field = "blueprint", .input_field = "existing_blueprint" } },
             },
         },
         .{
             .function = "ContextMenuInteraction",
-            .input_links = .{
+            .input_links = &.{
                 .{ .input = .{ .input_field = "event" } },
                 .{ .store = .{ .input_field = "context_menu" } },
             },
         },
         .{
             .function = "NodeInteraction",
-            .input_links = .{
+            .input_links = &.{
                 .{ .input = .{ .input_field = "keyboard_modifiers" } },
                 .{ .store = .{ .input_field = "interaction_state" } },
                 .{ .node = .{ .input_field = "blueprint", .from = "graphLoader" } },
@@ -58,7 +58,7 @@ pub const node_graph_blueprint: Blueprint = .{
         },
         .{
             .function = "CameraControls",
-            .input_links = .{
+            .input_links = &.{
                 .{ .input = .{ .input_field = "keyboard_modifiers" } },
                 .{ .store = .{ .input_field = "camera" } },
                 .{ .node = .{ .input_field = "event", .output_field = "unused_event", .from = "NodeInteraction" } },
@@ -66,14 +66,14 @@ pub const node_graph_blueprint: Blueprint = .{
         },
         .{
             .function = "NodeFormatting",
-            .input_links = .{
+            .input_links = &.{
                 .{ .node = .{ .input_field = "grouping_event", .from = "ContextMenuInteraction" } },
                 .{ .node = .{ .input_field = "blueprint", .from = "NodeInteraction" } },
             },
         },
         .{
             .function = "DomRenderer",
-            .input_links = .{
+            .input_links = &.{
                 .{ .store = .{ .input_field = "previous_blueprint", .system_field = "blueprint" } },
                 .{ .node = .{ .input_field = "current_blueprint", .from = "NodeFormatting" } },
                 .{ .node = .{ .input_field = "camera", .from = "CameraControls" } },
@@ -81,13 +81,13 @@ pub const node_graph_blueprint: Blueprint = .{
             },
         },
     },
-    .store = .{
+    .store = &.{
         .{ .system_field = "context_menu", .output_node = "ContextMenuInteraction" },
         .{ .system_field = "active_node", .output_node = "NodeInteraction" },
         .{ .system_field = "camera", .output_node = "CameraControls" },
         .{ .system_field = "blueprint", .output_node = "NodeFormatting" },
     },
-    .output = .{
+    .output = &.{
         .{ .system_field = "render_event", .output_node = "dom_renderer" },
     },
 };
