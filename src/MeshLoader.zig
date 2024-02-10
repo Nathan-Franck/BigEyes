@@ -25,7 +25,7 @@ const hexColors = [_][3]f32{
 };
 
 pub fn getMeshes(allocator: std.mem.Allocator) !std.ArrayList(Mesh) {
-    const json_data = @embedFile("./content/cat.blend.json");
+    const json_data = @embedFile("content/Cat.blend.json");
     const mesh_input_data = std.json.parseFromSlice(MeshSpec, allocator, json_data, .{}) catch |err| {
         std.log.err("Failed to parse JSON: {}", .{err});
         return err;

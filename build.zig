@@ -1,5 +1,5 @@
 const std = @import("std");
-const content_dir = "content/";
+const content_dir = "src/content/";
 
 const ExportMeshes = struct {
     allocator: std.mem.Allocator,

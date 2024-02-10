@@ -2,7 +2,7 @@ const std = @import("std");
 
 test "json load" {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    var allocator = gpa.allocator();
+    const allocator = gpa.allocator();
     const polygonJSON = json: {
         const json_data = std.fs.cwd().readFileAlloc(allocator, "content/cube.blend.json", 512 * 1024 * 1024) catch |err| {
             std.log.err("Failed to read JSON file: {}", .{err});
