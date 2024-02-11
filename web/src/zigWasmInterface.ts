@@ -1,5 +1,4 @@
-import { helloThere } from "./anotherOne.mjs";
-import type { Nodes } from "./gen/nodes.d.ts";
+import type { Nodes } from "../gen/nodes.d.ts";
 
 let onMessage: null | ((message: string) => void) = null;
 function messageFromWasm(sourcePtr: number, sourceLen: number) {
@@ -74,5 +73,3 @@ console.log(callNode("testSubdiv", [
     [-1.0, 1.0, -1.0, 1.0],
     [-1.0, -1.0, -1.0, 1.0],
 ]));
-
-helloThere();
