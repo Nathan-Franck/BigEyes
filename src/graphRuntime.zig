@@ -4,26 +4,23 @@ const node_graph_blueprint = @import("./interactiveNodeBuilderBlueprint.zig").no
 const NodeDefinitions = @import("./nodeGraphBlueprintNodes.zig");
 const std = @import("std");
 
-// const tester = struct {
-//     fn nodeA(input: struct { this: u32, that: u32 }) struct { result: u32 } {
-//         return .{ .result = input.this + input.that };
-//     }
-
-//     fn nodeB(input: struct { this: u32, that: u32 }) struct { result: u32 } {
-//         return .{ .result = input.this + input.that };
-//     }
-// };
-
-// const TesterBlueprint = Blueprint{
-//     .nodes = &.{
-//         .{ .name = "what" },
-//     },
-// };
-
 fn Build(graph: Blueprint, node_definitions: anytype) void {
     _ = node_definitions;
     for (graph.nodes) |node| {
         std.debug.print("Node: {s}\n", .{node.uniqueID()});
+        for (node.input_links) |link| {
+            switch (link) {
+                .input => |input| {
+                    std.debug.print("  Input: {s}\n", .{input.input_field});
+                },
+                .store => |store| {
+                    std.debug.print("  Store: {s}\n", .{store.input_field});
+                },
+                .node => |input_node| {
+                    std.debug.print("  Node: {s}\n", .{input_node.input_field});
+                },
+            }
+        }
     }
 }
 
