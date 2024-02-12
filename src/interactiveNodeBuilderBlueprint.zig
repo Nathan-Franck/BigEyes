@@ -17,6 +17,13 @@ pub const NodeGraphBlueprintEntry = struct {
     name: ?[]const u8 = null, // if null, assume name is function name.
     function: []const u8,
     input_links: []const InputLink,
+
+    pub fn uniqueID(self: @This()) []const u8 {
+        if (self.name) |name| {
+            return name;
+        }
+        return self.function;
+    }
 };
 
 pub const SystemSink = struct {

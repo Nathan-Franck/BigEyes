@@ -63,6 +63,26 @@ pub const ContextState = struct {
     options: []const []const u8 = &.{},
 };
 
+pub const KeyboardModifiers = struct {
+    shift: bool,
+    control: bool,
+    alt: bool,
+    super: bool,
+};
+
+pub const InteractionState = struct {
+    node_selection: []const []const u8,
+    box_selection: ?struct {
+        start: GraphLocation,
+        end: GraphLocation,
+    } = null,
+    wiggle: ?struct {
+        node: []const u8,
+        location: GraphLocation,
+    } = null,
+    clipboard: ?[]const NodeGraphBlueprintEntry = null,
+};
+
 fn BlueprintLoader(input: struct {
     recieved_blueprint: ?Blueprint,
     existing_blueprint: Blueprint,
@@ -133,26 +153,6 @@ fn ContextMenuInteraction(input: struct {
         },
     } else default;
 }
-
-pub const KeyboardModifiers = struct {
-    shift: bool,
-    control: bool,
-    alt: bool,
-    super: bool,
-};
-
-pub const InteractionState = struct {
-    node_selection: []const []const u8,
-    box_selection: ?struct {
-        start: GraphLocation,
-        end: GraphLocation,
-    } = null,
-    wiggle: ?struct {
-        node: []const u8,
-        location: GraphLocation,
-    } = null,
-    clipboard: ?[]const NodeGraphBlueprintEntry = null,
-};
 
 fn NodeInteraction(
     allocator: std.mem.Allocator,
@@ -230,7 +230,7 @@ fn NodeInteraction(
                         for (input.blueprint.nodes) |node|
                             if (selection: {
                                 for (to_remove) |item|
-                                    if (std.meta.eql(item, if (node.name) |name| name else node.function))
+                                    if (std.meta.eql(item, node.uniqueID()))
                                         break :selection null;
                                 break :selection node;
                             }) |selected|
@@ -252,7 +252,7 @@ fn selectionToNodes(
     const result = try allocator.alloc(NodeGraphBlueprintEntry, selection.len);
     for (result, 0..) |*item, index| {
         const existing_node = for (all_nodes) |node| {
-            if (std.meta.eql(selection[index], if (node.name) |name| name else node.function))
+            if (std.meta.eql(selection[index], node.uniqueID()))
                 break node;
         } else unreachable;
         item.* = existing_node;
@@ -276,7 +276,7 @@ fn pasteNodesUnique(
         var name_candidate = existing_name;
         while (not_unique: {
             for (existing_nodes) |node| {
-                if (std.mem.eql(u8, if (node.name) |name| name else node.function, name_candidate))
+                if (std.mem.eql(u8, node.uniqueID(), name_candidate))
                     break :not_unique true;
             } else for (unique_nodes[0..index]) |node| {
                 if (std.mem.eql(u8, node.name.?, name_candidate))

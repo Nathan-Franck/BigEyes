@@ -3,7 +3,8 @@ const std = @import("std");
 
 pub const Nodes = struct {
     pub fn helloSlice(faces: []subdiv.Face) ![]subdiv.Face {
-        return faces;
+        const allocator = std.heap.page_allocator;
+        return std.mem.concat(allocator, subdiv.Face, &.{ faces, &.{&.{ 4, 5, 6 }} });
     }
 
     pub fn testSubdiv(faces: []subdiv.Face, points: []subdiv.Point) !subdiv.Mesh {
