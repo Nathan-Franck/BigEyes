@@ -9,16 +9,23 @@ pub const MouseButton = enum {
     right,
 };
 
-pub const GraphLocation = struct {
-    x: f32,
-    y: f32,
-};
-
 pub const ExternalMouseEvent = union(enum) {
     mouse_down: struct { location: GraphLocation, button: MouseButton },
     mouse_up: struct { location: GraphLocation, button: MouseButton },
     mouse_move: GraphLocation,
     mouse_wheel: struct { x: f32, y: f32, z: f32 },
+};
+
+pub const KeyboardModifiers = struct {
+    shift: bool,
+    control: bool,
+    alt: bool,
+    super: bool,
+};
+
+pub const GraphLocation = struct {
+    x: f32,
+    y: f32,
 };
 
 pub const ExternalNodeEvent = struct {
@@ -63,13 +70,6 @@ pub const ContextState = struct {
     options: []const []const u8 = &.{},
 };
 
-pub const KeyboardModifiers = struct {
-    shift: bool,
-    control: bool,
-    alt: bool,
-    super: bool,
-};
-
 pub const InteractionState = struct {
     node_selection: []const []const u8,
     box_selection: ?struct {
@@ -92,6 +92,53 @@ fn BlueprintLoader(input: struct {
     } else {
         return input.existing_blueprint;
     }
+}
+
+fn selectionToNodes(
+    allocator: std.mem.Allocator,
+    all_nodes: []const NodeGraphBlueprintEntry,
+    selection: []const []const u8,
+) ![]const NodeGraphBlueprintEntry {
+    const result = try allocator.alloc(NodeGraphBlueprintEntry, selection.len);
+    for (result, 0..) |*item, index| {
+        const existing_node = for (all_nodes) |node| {
+            if (std.meta.eql(selection[index], node.uniqueID()))
+                break node;
+        } else unreachable;
+        item.* = existing_node;
+    }
+    return result;
+}
+
+fn pasteNodesUnique(
+    allocator: std.mem.Allocator,
+    existing_nodes: []const NodeGraphBlueprintEntry,
+    new_nodes: []const NodeGraphBlueprintEntry,
+) ![]const NodeGraphBlueprintEntry {
+    const unique_nodes = try allocator.alloc(NodeGraphBlueprintEntry, new_nodes.len);
+    for (unique_nodes, 0..) |*unique_node, index| {
+        const new_node = new_nodes[index];
+        const existing_name = if (new_node.name) |name| base_name: {
+            var split_iter = std.mem.split(u8, name, "#");
+            break :base_name split_iter.first();
+        } else new_node.function;
+        var counter: u32 = 1;
+        var name_candidate = existing_name;
+        while (not_unique: {
+            for (existing_nodes) |node| {
+                if (std.mem.eql(u8, node.uniqueID(), name_candidate))
+                    break :not_unique true;
+            } else for (unique_nodes[0..index]) |node| {
+                if (std.mem.eql(u8, node.name.?, name_candidate))
+                    break :not_unique true;
+            } else break :not_unique false;
+        }) {
+            name_candidate = try std.fmt.allocPrint(allocator, "{s}#{d}", .{ existing_name, counter });
+            counter += 1;
+        }
+        unique_node.*.name = name_candidate;
+    }
+    return try std.mem.concat(allocator, NodeGraphBlueprintEntry, &.{ existing_nodes, unique_nodes });
 }
 
 fn ContextMenuInteraction(input: struct {
@@ -244,53 +291,6 @@ fn NodeInteraction(
         default;
 }
 
-fn selectionToNodes(
-    allocator: std.mem.Allocator,
-    all_nodes: []const NodeGraphBlueprintEntry,
-    selection: []const []const u8,
-) ![]const NodeGraphBlueprintEntry {
-    const result = try allocator.alloc(NodeGraphBlueprintEntry, selection.len);
-    for (result, 0..) |*item, index| {
-        const existing_node = for (all_nodes) |node| {
-            if (std.meta.eql(selection[index], node.uniqueID()))
-                break node;
-        } else unreachable;
-        item.* = existing_node;
-    }
-    return result;
-}
-
-fn pasteNodesUnique(
-    allocator: std.mem.Allocator,
-    existing_nodes: []const NodeGraphBlueprintEntry,
-    new_nodes: []const NodeGraphBlueprintEntry,
-) ![]const NodeGraphBlueprintEntry {
-    const unique_nodes = try allocator.alloc(NodeGraphBlueprintEntry, new_nodes.len);
-    for (unique_nodes, 0..) |*unique_node, index| {
-        const new_node = new_nodes[index];
-        const existing_name = if (new_node.name) |name| base_name: {
-            var split_iter = std.mem.split(u8, name, "#");
-            break :base_name split_iter.first();
-        } else new_node.function;
-        var counter: u32 = 1;
-        var name_candidate = existing_name;
-        while (not_unique: {
-            for (existing_nodes) |node| {
-                if (std.mem.eql(u8, node.uniqueID(), name_candidate))
-                    break :not_unique true;
-            } else for (unique_nodes[0..index]) |node| {
-                if (std.mem.eql(u8, node.name.?, name_candidate))
-                    break :not_unique true;
-            } else break :not_unique false;
-        }) {
-            name_candidate = try std.fmt.allocPrint(allocator, "{s}#{d}", .{ existing_name, counter });
-            counter += 1;
-        }
-        unique_node.*.name = name_candidate;
-    }
-    return try std.mem.concat(allocator, NodeGraphBlueprintEntry, &.{ existing_nodes, unique_nodes });
-}
-
 test "map expression" {
     var allocator = std.heap.page_allocator;
     const start_data = try std.mem.concat(allocator, i32, &.{&.{ 1, 2, 3, 4 }});
@@ -415,7 +415,10 @@ test "select node" {
 test "deselect node" {
     const allocator = std.heap.page_allocator;
     const first_output = ContextMenuInteraction(.{
-        .event = .{ .external_node_event = .{ .node_name = "test", .mouse_event = .{ .mouse_down = .{ .location = .{ .x = 0, .y = 0 }, .button = MouseButton.left } } } },
+        .event = .{ .external_node_event = .{ .node_name = "test", .mouse_event = .{ .mouse_down = .{
+            .location = .{ .x = 0, .y = 0 },
+            .button = MouseButton.left,
+        } } } },
         .context_menu = .{ .open = false, .location = .{ .x = 0, .y = 0 }, .options = &.{}, .selected_node = "test" },
     });
     const second_output = try NodeInteraction(allocator, .{
