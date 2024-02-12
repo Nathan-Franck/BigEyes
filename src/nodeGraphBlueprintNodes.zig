@@ -51,7 +51,7 @@ pub const ContextMenuOption = enum {
 // };
 
 pub const NodeEvent = union(enum) {
-    create: struct { graphLocation: GraphLocation, node_name: []const u8, node_type: []const u8 },
+    create: struct { graph_location: GraphLocation, node_name: []const u8, node_type: []const u8 },
     delete: struct { node_name: []const u8 },
     duplicate: struct { node_name: []const u8 },
     copy: struct { node_name: []const u8 },
