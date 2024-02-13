@@ -8,9 +8,9 @@ const std = @import("std");
 /// to `.{ .a = 1, .b = 2 }`.
 pub fn merge(source_data: anytype, field_changes: anytype) @TypeOf(source_data) {
     switch (@typeInfo(@TypeOf(source_data))) {
-        .Struct => |structInfo| {
+        .Struct => |struct_info| {
             var result = source_data;
-            inline for (structInfo.fields) |field| {
+            inline for (struct_info.fields) |field| {
                 if (@hasField(@TypeOf(field_changes), field.name))
                     @field(result, field.name) = @field(field_changes, field.name);
             }

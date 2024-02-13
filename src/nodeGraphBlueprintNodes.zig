@@ -83,17 +83,6 @@ pub const InteractionState = struct {
     clipboard: ?[]const NodeGraphBlueprintEntry = null,
 };
 
-fn BlueprintLoader(input: struct {
-    recieved_blueprint: ?Blueprint,
-    existing_blueprint: Blueprint,
-}) struct { blueprint: Blueprint } {
-    if (input.recieved_blueprint) |update| {
-        return update;
-    } else {
-        return input.existing_blueprint;
-    }
-}
-
 fn selectionToNodes(
     allocator: std.mem.Allocator,
     all_nodes: []const NodeGraphBlueprintEntry,
@@ -141,7 +130,19 @@ fn pasteNodesUnique(
     return try std.mem.concat(allocator, NodeGraphBlueprintEntry, &.{ existing_nodes, unique_nodes });
 }
 
-fn ContextMenuInteraction(input: struct {
+const BlueprintLoaderInputs = struct {
+    recieved_blueprint: ?Blueprint,
+    existing_blueprint: Blueprint,
+};
+pub fn BlueprintLoader(input: BlueprintLoaderInputs) struct { blueprint: Blueprint } {
+    if (input.recieved_blueprint) |update| {
+        return update;
+    } else {
+        return input.existing_blueprint;
+    }
+}
+
+pub fn ContextMenuInteraction(input: struct {
     context_menu: ContextState,
     event: ?union(enum) {
         mouse_event: ExternalMouseEvent,
@@ -201,7 +202,7 @@ fn ContextMenuInteraction(input: struct {
     } else default;
 }
 
-fn NodeInteraction(
+pub fn NodeInteraction(
     allocator: std.mem.Allocator,
     input: struct {
         keyboard_modifiers: KeyboardModifiers,
@@ -289,6 +290,21 @@ fn NodeInteraction(
         }
     else
         default;
+}
+
+const Camera = struct {}; // TODO: implement camera controls
+
+pub fn CameraControls(input: struct {
+    keyboard_modifiers: KeyboardModifiers,
+    camera: Camera,
+    event: ?union(enum) {
+        mouse_event: ExternalMouseEvent,
+    },
+}) struct {
+    camera: Camera,
+} {
+    _ = input;
+    unreachable; // TODO: Implement camera controls
 }
 
 test "map expression" {
