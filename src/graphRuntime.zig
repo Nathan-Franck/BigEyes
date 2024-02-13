@@ -1,4 +1,3 @@
-// Takes the graph blueprint and the node function definitions, building a runtime graph
 const Blueprint = @import("./interactiveNodeBuilderBlueprint.zig").Blueprint;
 const node_graph_blueprint = @import("./interactiveNodeBuilderBlueprint.zig").node_graph_blueprint;
 const NodeDefinitions = @import("./nodeGraphBlueprintNodes.zig");
@@ -10,10 +9,10 @@ const Input = struct {
 };
 
 fn Build(comptime graph: Blueprint, comptime node_definitions: anytype) void {
-    const inputs = gather_system_inputs: {
-        comptime var system_inputs: []const Input = &.{};
-        inline for (graph.nodes) |node| {
-            inline for (node.input_links) |link| {
+    const SystemInputs = build_type: {
+        comptime var system_input_fields: []const std.builtin.Type.StructField = &.{};
+        inline for (graph.nodes) |node|
+            inline for (node.input_links) |link|
                 switch (link) {
                     else => {},
                     .input => |input| {
@@ -22,18 +21,27 @@ fn Build(comptime graph: Blueprint, comptime node_definitions: anytype) void {
                         const field_type = comptime for (@typeInfo(node_params[node_params.len - 1].type.?).Struct.fields) |field|
                             if (std.mem.eql(u8, field.name, field_name)) break field.type else continue
                         else
-                            unreachable;
-                        system_inputs = comptime system_inputs ++ for (system_inputs) |system_input|
+                            unreachable; // TODO: Provide a useful compiler error about how blueprint and node defn's disagree.
+                        system_input_fields = comptime system_input_fields ++ for (system_input_fields) |system_input|
                             if (std.mem.eql(u8, system_input.name, input.input_field)) break .{} else continue
                         else
-                            .{.{ .name = field_name, .type = field_type }};
+                            .{.{
+                                .name = field_name[0.. :0],
+                                .type = field_type,
+                                .default_value = null,
+                                .is_comptime = false,
+                                .alignment = @alignOf(field_type),
+                            }};
                     },
-                }
-            }
-        }
-        break :gather_system_inputs system_inputs;
+                };
+        break :build_type @Type(.{ .Struct = .{
+            .layout = .Auto,
+            .fields = system_input_fields,
+            .decls = &.{},
+            .is_tuple = false,
+        } });
     };
-    @compileLog("inputs: {}", inputs);
+    @compileLog("inputs: {}", @import("./typeDefinitions.zig").typescriptTypeOf(SystemInputs, .{}));
 }
 
 test "Build" {

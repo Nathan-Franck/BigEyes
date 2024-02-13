@@ -1,55 +1,62 @@
 const std = @import("std");
 
-fn typescriptTypeOf(comptime from_type: anytype, options: struct { first: bool = false }) []const u8 {
+pub inline fn typescriptTypeOf(comptime from_type: anytype, comptime options: struct { first: bool = false }) []const u8 {
     return comptime switch (@typeInfo(from_type)) {
         .Int => "number",
         .Float => "number",
-        .Array => |a| typescriptTypeOf(a.child, .{}) ++ "[]",
-        .Vector => |v| {
-            const chlid = typescriptTypeOf(v.child, .{});
+        .Optional => |optional_info| typescriptTypeOf(optional_info.child, .{}) ++ " | undefined",
+        .Array => |array_info| typescriptTypeOf(array_info.child, .{}) ++ "[]",
+        .Vector => |vector_info| {
+            const chlid = typescriptTypeOf(vector_info.child, .{});
             var result: []const u8 = &.{};
-            for (0..v.len) |i| {
+            for (0..vector_info.len) |i| {
                 result = result ++ std.fmt.comptimePrint("{s}{s}", .{ if (i == 0) "" else ", ", chlid });
             }
             return std.fmt.comptimePrint("[{s}]", .{result});
         },
         .ErrorUnion => |eu| typescriptTypeOf(eu.payload, .{}), // Ignore the existence of errors for now...
-        .Pointer => |p| switch (p.size) {
-            .Many, .Slice => typescriptTypeOf(p.child, .{}) ++ "[]",
+        .Pointer => |pointer| switch (pointer.size) {
+            .Many, .Slice => typescriptTypeOf(pointer.child, .{}) ++ "[]",
             else => "unknown",
         },
-        .Struct => |s| {
-            var decls: []const u8 = &.{};
-            for (s.decls, 0..) |decl, i| {
-                decls = decls ++ std.fmt.comptimePrint("{s}{s}{s}: {s}", .{
-                    if (i == 0) "" else ", ",
-                    if (options.first) "\n\t" else "",
-                    decl.name,
-                    typescriptTypeOf(@TypeOf(@field(from_type, decl.name)), .{}),
-                });
-            }
+        .Struct => |struct_info| {
+            const decls: []const u8 = &.{};
+            // for (struct_info.decls, 0..) |decl, i| {
+            //     decls = decls ++ std.fmt.comptimePrint("{s}{s}{s}: {s}", .{
+            //         if (i == 0) "" else ", ",
+            //         if (options.first) "\n\t" else "",
+            //         decl.name,
+            //         typescriptTypeOf(@TypeOf(@field(from_type, decl.name)), .{}),
+            //     });
+            // }
             var fields: []const u8 = &.{};
-            for (s.fields, 0..) |field, i| {
-                fields = fields ++ std.fmt.comptimePrint("{s}{s}{s}: {s}", .{
+            for (struct_info.fields, 0..) |field, i| {
+                const field_type, const is_optional = switch (@typeInfo(field.type)) {
+                    else => .{ field.type, false },
+                    .Optional => |field_optional_info| .{ field_optional_info.child, true },
+                };
+                fields = fields ++ std.fmt.comptimePrint("{s}{s}{s}{s}: {s}", .{
                     if (i == 0) "" else ", ",
                     if (options.first) "\n\t" else "",
                     field.name,
-                    typescriptTypeOf(field.type, .{}),
+                    if (is_optional) "?" else "",
+                    typescriptTypeOf(field_type, .{}),
                 });
             }
-            return std.fmt.comptimePrint("{{{s}{s}{s}{s}}}", .{
+            const result = std.fmt.comptimePrint("{{{s}{s}{s}{s}}}", .{
                 if (options.first) "" else " ",
                 if (decls.len > 0) decls ++ ", " else "",
                 fields,
                 if (options.first) "\n" else " ",
             });
+            return result;
         },
-        .Fn => |f| {
+        .Fn => |function_info| {
             var params: []const u8 = &.{};
-            for (f.params, 0..) |param, i| {
+            for (function_info.params, 0..) |param, i| {
                 params = params ++ std.fmt.comptimePrint("{s}arg{d}: {s}", .{ if (i == 0) "" else ", ", i, typescriptTypeOf(param.type.?, .{}) });
             }
-            return std.fmt.comptimePrint("({s}) => {s}", .{ params, typescriptTypeOf(f.return_type.?, .{}) });
+            return std.fmt.comptimePrint("({s}) => {s}", .{ params, typescriptTypeOf(function_info.return_type.?, .{}) });
         },
         else => "unknown",
     };
