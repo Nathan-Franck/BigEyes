@@ -19,6 +19,17 @@ pub inline fn typescriptTypeOf(comptime from_type: anytype, comptime options: st
             .Many, .Slice => typescriptTypeOf(pointer.child, .{}) ++ "[]",
             else => "unknown",
         },
+        .Union => |union_info| {
+            var result: []const u8 = &.{};
+            for (union_info.fields, 0..) |field, i| {
+                result = result ++ std.fmt.comptimePrint("{s}{{ {s}: {s} }}", .{
+                    if (i == 0) "" else " | ",
+                    field.name,
+                    typescriptTypeOf(field.type, .{}),
+                });
+            }
+            return result;
+        },
         .Struct => |struct_info| {
             const decls: []const u8 = &.{};
             // for (struct_info.decls, 0..) |decl, i| {

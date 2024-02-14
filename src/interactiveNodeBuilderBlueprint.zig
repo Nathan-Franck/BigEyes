@@ -98,3 +98,18 @@ pub const node_graph_blueprint: Blueprint = .{
         .{ .system_field = "render_event", .output_node = "dom_renderer" },
     },
 };
+
+test "InputLink to Json" {
+    const std = @import("std");
+    const allocator = std.heap.page_allocator;
+    const inputLink: InputLink = .{
+        .node = .{
+            .from = "test",
+            .output_field = "output",
+            .input_field = "input",
+        },
+    };
+    const json = try std.json.stringifyAlloc(allocator, inputLink, .{});
+    std.debug.print("json: {s}\n", .{json});
+    // expect(json).toBe(`{"node":{"from":"test","output_field":"output","input_field":"input"}}`);
+}
