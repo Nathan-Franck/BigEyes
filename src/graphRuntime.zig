@@ -8,7 +8,7 @@ const Input = struct {
     type: type,
 };
 
-fn Build(comptime graph: Blueprint, comptime node_definitions: anytype) void {
+fn Build(comptime graph: Blueprint, comptime node_definitions: anytype) type {
     const SystemInputs = build_type: {
         comptime var system_input_fields: []const std.builtin.Type.StructField = &.{};
         inline for (graph.nodes) |node|
@@ -16,7 +16,7 @@ fn Build(comptime graph: Blueprint, comptime node_definitions: anytype) void {
                 switch (link) {
                     else => {},
                     .input => |input| {
-                        const field_name = if (input.system_field) |system_field| system_field else input.input_field;
+                        const field_name = input.uniqueID();
                         const node_params = @typeInfo(@TypeOf(@field(node_definitions, node.uniqueID()))).Fn.params;
                         const field_type = comptime for (@typeInfo(node_params[node_params.len - 1].type.?).Struct.fields) |field|
                             if (std.mem.eql(u8, field.name, field_name)) break field.type else continue
@@ -41,7 +41,43 @@ fn Build(comptime graph: Blueprint, comptime node_definitions: anytype) void {
             .is_tuple = false,
         } });
     };
+    const SystemOutputs = build_type: {
+        comptime var system_output_fields: []const std.builtin.Type.StructField = &.{};
+        inline for (graph.output) |output_defn| {
+            const name = output_defn.uniqueID();
+            const node_id = output_defn.output_node;
+            const node = comptime for (graph.nodes) |node|
+                if (std.mem.eql(u8, node.uniqueID(), node_id)) break node else continue
+            else
+                @compileError("Node not found " ++ node_id);
+            const node_outputs = @typeInfo(@TypeOf(@field(node_definitions, node.uniqueID()))).Fn.return_type.?;
+            const field_type = comptime for (@typeInfo(node_outputs).Struct.fields) |field|
+                if (std.mem.eql(u8, field.name, output_defn.system_field)) break field.type else continue
+            else
+                unreachable; // TODO: Provide a useful compiler error about how blueprint and node defn's disagree.
+            system_output_fields = comptime system_output_fields ++ .{.{
+                .name = name[0.. :0],
+                .type = field_type,
+                .default_value = null,
+                .is_comptime = false,
+                .alignment = @alignOf(field_type),
+            }};
+        }
+        break :build_type @Type(.{ .Struct = .{
+            .layout = .Auto,
+            .fields = system_output_fields,
+            .decls = &.{},
+            .is_tuple = false,
+        } });
+    };
     @compileLog("inputs: {}", @import("./typeDefinitions.zig").typescriptTypeOf(SystemInputs, .{}));
+    @compileLog("outputs: {}", @import("./typeDefinitions.zig").typescriptTypeOf(SystemOutputs, .{}));
+    return struct {
+        fn update(inputs: SystemInputs) SystemOutputs {
+            _ = inputs;
+            unreachable; // TODO: implement the magic function!
+        }
+    };
 }
 
 test "Build" {

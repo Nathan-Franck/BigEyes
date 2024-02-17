@@ -307,6 +307,20 @@ pub fn CameraControls(input: struct {
     unreachable; // TODO: Implement camera controls
 }
 
+const RenderEvent = struct {}; // TODO: implement render event
+
+pub fn DomRenderer(input: struct {
+    previous_blueprint: Blueprint,
+    current_blueprint: Blueprint,
+    camera: Camera,
+    context_menu: ContextState,
+}) struct {
+    render_event: ?RenderEvent,
+} {
+    _ = input;
+    unreachable; // TODO: Implement dom renderer
+}
+
 test "map expression" {
     var allocator = std.heap.page_allocator;
     const start_data = try std.mem.concat(allocator, i32, &.{&.{ 1, 2, 3, 4 }});

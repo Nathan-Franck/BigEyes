@@ -1,6 +1,13 @@
 pub const SystemSource = struct {
     system_field: ?[]const u8 = null, // if null, assume system field is the same as input field.
     input_field: []const u8,
+
+    pub inline fn uniqueID(self: @This()) []const u8 {
+        if (self.system_field) |system_field| {
+            return system_field;
+        }
+        return self.input_field;
+    }
 };
 
 pub const InputLink = union(enum) {
@@ -18,7 +25,7 @@ pub const NodeGraphBlueprintEntry = struct {
     function: []const u8,
     input_links: []const InputLink,
 
-    pub fn uniqueID(self: @This()) []const u8 {
+    pub inline fn uniqueID(self: @This()) []const u8 {
         if (self.name) |name| {
             return name;
         }
@@ -30,6 +37,13 @@ pub const SystemSink = struct {
     output_node: []const u8,
     output_field: ?[]const u8 = null, // if null, assume output field is the same as system field.
     system_field: []const u8,
+
+    pub inline fn uniqueID(self: @This()) []const u8 {
+        if (self.output_field) |output_field| {
+            return output_field;
+        }
+        return self.system_field;
+    }
 };
 
 pub const Blueprint = struct {
@@ -95,7 +109,7 @@ pub const node_graph_blueprint: Blueprint = .{
         .{ .system_field = "blueprint", .output_node = "NodeFormatting" },
     },
     .output = &.{
-        .{ .system_field = "render_event", .output_node = "dom_renderer" },
+        .{ .system_field = "render_event", .output_node = "DomRenderer" },
     },
 };
 
