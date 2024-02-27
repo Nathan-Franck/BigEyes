@@ -70,12 +70,51 @@ fn Build(comptime graph: Blueprint, comptime node_definitions: anytype) type {
             .is_tuple = false,
         } });
     };
-    @compileLog("inputs: {}", @import("./typeDefinitions.zig").typescriptTypeOf(SystemInputs, .{}));
-    @compileLog("outputs: {}", @import("./typeDefinitions.zig").typescriptTypeOf(SystemOutputs, .{}));
+    const node_orders = build_type: {
+        var node_orders = [_]u8{0} ** graph.nodes.len;
+        var next_nodes: []const struct { unique_id: []const u8, order: u8 } = &.{};
+        gather_initial_nodes: inline for (graph.nodes) |node| {
+            inline for (node.input_links) |link| switch (link) {
+                else => {},
+                .input => {
+                    next_nodes = comptime next_nodes ++ .{.{ .unique_id = node.uniqueID(), .order = 0 }};
+                    continue :gather_initial_nodes;
+                },
+            };
+        }
+        inline while (next_nodes.len > 0) {
+            const current_nodes = next_nodes;
+            next_nodes = &.{};
+            inline for (current_nodes) |current_node| {
+                const node_index = for (graph.nodes, 0..) |node, index|
+                    if (std.mem.eql(u8, node.uniqueID(), current_node.unique_id)) break index else continue
+                else
+                    unreachable;
+                node_orders[node_index] = @max(node_orders[node_index], current_node.order);
+                inline for (graph.nodes) |node|
+                    if (std.mem.eql(u8, node.uniqueID(), current_node.unique_id))
+                        inline for (graph.nodes) |next_node| {
+                            if (is_output_node: for (next_node.input_links) |input_link| switch (input_link) {
+                                else => continue,
+                                .node => |input_node| if (std.mem.eql(u8, input_node.from, current_node.unique_id)) break :is_output_node true else continue,
+                            } else break :is_output_node false)
+                                next_nodes = comptime next_nodes ++ .{.{
+                                    .unique_id = next_node.uniqueID(),
+                                    .order = current_node.order + 1,
+                                }};
+                        };
+            }
+        }
+        break :build_type node_orders;
+    };
+    @compileLog(std.fmt.comptimePrint("node_orders: {any}", .{node_orders}));
+    // _ = node_orders;
+    // @compileLog("inputs: {}", @import("./typeDefinitions.zig").typescriptTypeOf(SystemInputs, .{}));
+    // @compileLog("outputs: {}", @import("./typeDefinitions.zig").typescriptTypeOf(SystemOutputs, .{}));
     return struct {
         fn update(inputs: SystemInputs) SystemOutputs {
             _ = inputs;
-            unreachable; // TODO: implement the magic function!
+            @panic("TODO: Implement");
         }
     };
 }
