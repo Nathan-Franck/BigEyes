@@ -108,7 +108,6 @@ fn Build(comptime graph: Blueprint, comptime node_definitions: anytype) type {
         break :build_type node_orders;
     };
     @compileLog(std.fmt.comptimePrint("node_orders: {any}", .{node_orders}));
-    // _ = node_orders;
     // @compileLog("inputs: {}", @import("./typeDefinitions.zig").typescriptTypeOf(SystemInputs, .{}));
     // @compileLog("outputs: {}", @import("./typeDefinitions.zig").typescriptTypeOf(SystemOutputs, .{}));
     return struct {
