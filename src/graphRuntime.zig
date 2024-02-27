@@ -1,7 +1,7 @@
-const Blueprint = @import("./interactiveNodeBuilderBlueprint.zig").Blueprint;
-const node_graph_blueprint = @import("./interactiveNodeBuilderBlueprint.zig").node_graph_blueprint;
-const NodeDefinitions = @import("./nodeGraphBlueprintNodes.zig");
 const std = @import("std");
+const Blueprint = @import("./interactiveNodeBuilderBlueprint.zig").Blueprint;
+const NodeDefinitions = @import("./nodeGraphBlueprintNodes.zig");
+const node_graph_blueprint = @import("./interactiveNodeBuilderBlueprint.zig").node_graph_blueprint;
 
 const Input = struct {
     name: []const u8,
@@ -70,7 +70,7 @@ fn Build(comptime graph: Blueprint, comptime node_definitions: anytype) type {
             .is_tuple = false,
         } });
     };
-    const node_orders = build_type: {
+    const node_orders = pre_calculate: {
         var node_orders = [_]u8{0} ** graph.nodes.len;
         var next_nodes: []const struct { unique_id: []const u8, order: u8 } = &.{};
         gather_initial_nodes: inline for (graph.nodes) |node| {
@@ -105,7 +105,7 @@ fn Build(comptime graph: Blueprint, comptime node_definitions: anytype) type {
                         };
             }
         }
-        break :build_type node_orders;
+        break :pre_calculate node_orders;
     };
     @compileLog(std.fmt.comptimePrint("node_orders: {any}", .{node_orders}));
     // @compileLog("inputs: {}", @import("./typeDefinitions.zig").typescriptTypeOf(SystemInputs, .{}));
