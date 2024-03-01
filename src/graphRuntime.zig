@@ -70,14 +70,15 @@ fn Build(comptime graph: Blueprint, comptime node_definitions: anytype) type {
             .is_tuple = false,
         } });
     };
-    const node_orders = pre_calculate: {
-        var node_orders = [_]u8{0} ** graph.nodes.len;
-        var next_nodes: []const struct { unique_id: []const u8, order: u8 } = &.{};
+    var max_node_priority: u16 = 0;
+    const node_priorities = pre_calculate: {
+        var node_priorities = [_]u16{0} ** graph.nodes.len;
+        var next_nodes: []const struct { unique_id: []const u8, priority: u16 } = &.{};
         gather_initial_nodes: inline for (graph.nodes) |node| {
             inline for (node.input_links) |link| switch (link) {
                 else => {},
                 .input => {
-                    next_nodes = comptime next_nodes ++ .{.{ .unique_id = node.uniqueID(), .order = 0 }};
+                    next_nodes = comptime next_nodes ++ .{.{ .unique_id = node.uniqueID(), .priority = 0 }};
                     continue :gather_initial_nodes;
                 },
             };
@@ -90,7 +91,7 @@ fn Build(comptime graph: Blueprint, comptime node_definitions: anytype) type {
                     if (std.mem.eql(u8, node.uniqueID(), current_node.unique_id)) break index else continue
                 else
                     unreachable;
-                node_orders[node_index] = @max(node_orders[node_index], current_node.order);
+                node_priorities[node_index] = @max(node_priorities[node_index], current_node.priority);
                 inline for (graph.nodes) |node|
                     if (std.mem.eql(u8, node.uniqueID(), current_node.unique_id))
                         inline for (graph.nodes) |next_node| {
@@ -100,16 +101,26 @@ fn Build(comptime graph: Blueprint, comptime node_definitions: anytype) type {
                             } else break :is_output_node false)
                                 next_nodes = comptime next_nodes ++ .{.{
                                     .unique_id = next_node.uniqueID(),
-                                    .order = current_node.order + 1,
+                                    .priority = current_node.priority + 1,
                                 }};
+                            max_node_priority = @max(max_node_priority, current_node.priority + 1);
                         };
             }
         }
-        break :pre_calculate node_orders;
+        break :pre_calculate node_priorities;
     };
-    @compileLog(std.fmt.comptimePrint("node_orders: {any}", .{node_orders}));
-    // @compileLog("inputs: {}", @import("./typeDefinitions.zig").typescriptTypeOf(SystemInputs, .{}));
-    // @compileLog("outputs: {}", @import("./typeDefinitions.zig").typescriptTypeOf(SystemOutputs, .{}));
+    comptime var node_order: []const u16 = &.{};
+    inline for (0..max_node_priority) |priority| {
+        inline for (graph.nodes, 0..) |node, node_index| {
+            if (node_priorities[node_index] == priority) {
+                @compileLog(std.fmt.comptimePrint("node: {any}", .{node.uniqueID()}));
+                node_order = comptime node_order ++ .{node_index};
+            }
+        }
+    }
+    @compileLog(std.fmt.comptimePrint("node_orders: {any}", .{node_order}));
+    @compileLog("inputs: {}", @import("./typeDefinitions.zig").typescriptTypeOf(SystemInputs, .{}));
+    @compileLog("outputs: {}", @import("./typeDefinitions.zig").typescriptTypeOf(SystemOutputs, .{}));
     return struct {
         fn update(inputs: SystemInputs) SystemOutputs {
             _ = inputs;
