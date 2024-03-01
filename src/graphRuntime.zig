@@ -70,8 +70,8 @@ fn Build(comptime graph: Blueprint, comptime node_definitions: anytype) type {
             .is_tuple = false,
         } });
     };
-    var max_node_priority: u16 = 0;
-    const node_priorities = pre_calculate: {
+    const node_order = precalculate: {
+        var max_node_priority: u16 = 0;
         var node_priorities = [_]u16{0} ** graph.nodes.len;
         var next_nodes: []const struct { unique_id: []const u8, priority: u16 } = &.{};
         gather_initial_nodes: inline for (graph.nodes) |node| {
@@ -107,24 +107,23 @@ fn Build(comptime graph: Blueprint, comptime node_definitions: anytype) type {
                         };
             }
         }
-        break :pre_calculate node_priorities;
-    };
-    comptime var node_order: []const u16 = &.{};
-    inline for (0..max_node_priority) |priority| {
-        inline for (graph.nodes, 0..) |node, node_index| {
-            if (node_priorities[node_index] == priority) {
-                @compileLog(std.fmt.comptimePrint("node: {any}", .{node.uniqueID()}));
-                node_order = comptime node_order ++ .{node_index};
+        comptime var node_order: []const u16 = &.{};
+        inline for (0..max_node_priority) |current_priority| {
+            inline for (node_priorities, 0..) |node_priority, node_index| {
+                if (node_priority == current_priority)
+                    node_order = comptime node_order ++ .{node_index};
             }
         }
-    }
+        break :precalculate node_order;
+    };
     @compileLog(std.fmt.comptimePrint("node_orders: {any}", .{node_order}));
     @compileLog("inputs: {}", @import("./typeDefinitions.zig").typescriptTypeOf(SystemInputs, .{}));
     @compileLog("outputs: {}", @import("./typeDefinitions.zig").typescriptTypeOf(SystemOutputs, .{}));
     return struct {
         fn update(inputs: SystemInputs) SystemOutputs {
             _ = inputs;
-            @panic("TODO: Implement");
+            // Run all the nodes in order, caching the results for the next nodes' inputs.
+
         }
     };
 }
