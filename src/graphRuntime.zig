@@ -8,7 +8,7 @@ const Input = struct {
     type: type,
 };
 
-fn Build(comptime graph: Blueprint, comptime node_definitions: anytype) type {
+fn Build(allocator: std.mem.Allocator, comptime graph: Blueprint, comptime node_definitions: anytype) type {
     const SystemInputs = build_type: {
         comptime var system_input_fields: []const std.builtin.Type.StructField = &.{};
         inline for (graph.nodes) |node|
@@ -70,6 +70,67 @@ fn Build(comptime graph: Blueprint, comptime node_definitions: anytype) type {
             .is_tuple = false,
         } });
     };
+    const SystemStore = build_type: {
+        // EXAMPLE OF HOW TO BUILD A STORE in the blueprint
+        // .store = &.{
+        //     .{ .system_field = "context_menu", .output_node = "ContextMenuInteraction" },
+        //     .{ .system_field = "active_node", .output_node = "NodeInteraction" },
+        //     .{ .system_field = "camera", .output_node = "CameraControls" },
+        //     .{ .system_field = "blueprint", .output_node = "NodeFormatting" },
+        // },
+        const store_fields = graph.store;
+        comptime var system_store_fields: []const std.builtin.Type.StructField = &.{};
+        inline for (store_fields) |store_field| {
+            const name = store_field.system_field;
+            const node_id = store_field.output_node;
+            const node = comptime for (graph.nodes) |node|
+                if (std.mem.eql(u8, node.uniqueID(), node_id)) break node else continue
+            else
+                @compileError("Node not found " ++ node_id);
+            const node_outputs = @typeInfo(@TypeOf(@field(node_definitions, node.uniqueID()))).Fn.return_type.?;
+            const field_type = comptime for (switch (@typeInfo(node_outputs)) {
+                .ErrorUnion => |error_union| @typeInfo(error_union.payload).Struct.fields,
+                .Struct => |the_struct| the_struct.fields,
+                else => @compileError("Invalid output type, expected struct or error union with a struct"),
+            }) |field|
+                if (std.mem.eql(u8, field.name, store_field.system_field)) break field.type else continue
+            else
+                @compileError("Field not found " ++ store_field.system_field ++ " in " ++ node_id);
+            system_store_fields = comptime system_store_fields ++ .{.{
+                .name = name[0.. :0],
+                .type = field_type,
+                .default_value = null,
+                .is_comptime = false,
+                .alignment = @alignOf(field_type),
+            }};
+        }
+        break :build_type @Type(.{ .Struct = .{
+            .layout = .Auto,
+            .fields = system_store_fields,
+            .decls = &.{},
+            .is_tuple = false,
+        } });
+    };
+    const NodeOutputs = build_type: {
+        comptime var node_output_fields: []const std.builtin.Type.StructField = &.{};
+        inline for (graph.nodes) |node| {
+            const node_defn = @field(node_definitions, node.uniqueID());
+            const node_outputs = @typeInfo(@TypeOf(node_defn)).Fn.return_type.?;
+            node_output_fields = comptime node_output_fields ++ .{.{
+                .name = node.uniqueID()[0.. :0],
+                .type = node_outputs,
+                .default_value = null,
+                .is_comptime = false,
+                .alignment = @alignOf(node_outputs),
+            }};
+        }
+        break :build_type @Type(.{ .Struct = .{
+            .layout = .Auto,
+            .fields = node_output_fields,
+            .decls = &.{},
+            .is_tuple = false,
+        } });
+    };
     const node_order = precalculate: {
         var max_node_priority: u16 = 0;
         var node_priorities = [_]u16{0} ** graph.nodes.len;
@@ -116,19 +177,45 @@ fn Build(comptime graph: Blueprint, comptime node_definitions: anytype) type {
         }
         break :precalculate node_order;
     };
-    @compileLog(std.fmt.comptimePrint("node_orders: {any}", .{node_order}));
-    @compileLog("inputs: {}", @import("./typeDefinitions.zig").typescriptTypeOf(SystemInputs, .{}));
-    @compileLog("outputs: {}", @import("./typeDefinitions.zig").typescriptTypeOf(SystemOutputs, .{}));
+    const nodes = NodeDefinitions{ .allocator = allocator };
     return struct {
+        store: SystemStore,
         fn update(inputs: SystemInputs) SystemOutputs {
-            _ = inputs;
-            // Run all the nodes in order, caching the results for the next nodes' inputs.
-
+            var node_outputs: NodeOutputs = undefined;
+            inline for (node_order) |node_index| {
+                const node = graph.nodes[node_index];
+                const node_defn = @field(node_definitions, node.uniqueID());
+                const node_params = @typeInfo(@TypeOf(node_defn)).Fn.params;
+                const NodeInputs = node_params[node_params.len - 1].type.?;
+                var node_inputs: NodeInputs = undefined;
+                inline for (node.input_links) |link| {
+                    switch (link) {
+                        else => {},
+                        .input => |input| {
+                            @field(node_inputs, input.uniqueID()) = @field(inputs, input.input_field);
+                        },
+                        .node => |node_blueprint| {
+                            const node_output = @field(node_outputs, node_blueprint.from);
+                            @field(node_inputs, node_blueprint.uniqueID()) = node_output;
+                        },
+                        .store => |store| {
+                            @field(node_inputs, store.uniqueID()) = @field(inputs.store, store.system_field);
+                        },
+                    }
+                }
+                const node_output = @call(.auto, @field(nodes, node.name), node_inputs);
+                @field(node_outputs, node.uniqueID()) = node_output;
+            }
         }
     };
 }
 
 test "Build" {
-    const result = Build(node_graph_blueprint, NodeDefinitions);
-    _ = result;
+    const allocator = std.heap.page_allocator;
+    const result = Build(allocator, node_graph_blueprint, NodeDefinitions);
+    _ = result.update(.{
+        .event = null,
+        .recieved_blueprint = null,
+        .keyboard_modifiers = .{ .shift = false, .alt = false, .control = false, .super = false },
+    });
 }

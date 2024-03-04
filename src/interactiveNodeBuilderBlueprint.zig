@@ -15,6 +15,13 @@ pub const InputLink = union(enum) {
         from: []const u8,
         output_field: ?[]const u8 = null, // if null, assume output field is the same as input field.
         input_field: []const u8,
+
+        pub inline fn uniqueID(self: @This()) []const u8 {
+            if (self.output_field) |name| {
+                return name;
+            }
+            return self.input_field;
+        }
     },
     input: SystemSource,
     store: SystemSource,
@@ -96,7 +103,7 @@ pub const node_graph_blueprint: Blueprint = .{
             .function = "DomRenderer",
             .input_links = &.{
                 .{ .store = .{ .input_field = "previous_blueprint", .system_field = "blueprint" } },
-                .{ .node = .{ .input_field = "current_blueprint", .from = "NodeFormatting" } },
+                .{ .node = .{ .input_field = "current_blueprint", .output_field = "blueprint", .from = "NodeFormatting" } },
                 .{ .node = .{ .input_field = "camera", .from = "CameraControls" } },
                 .{ .node = .{ .input_field = "context_menu", .from = "ContextMenuInteraction" } },
             },
@@ -104,7 +111,7 @@ pub const node_graph_blueprint: Blueprint = .{
     },
     .store = &.{
         .{ .system_field = "context_menu", .output_node = "ContextMenuInteraction" },
-        .{ .system_field = "active_node", .output_node = "NodeInteraction" },
+        // .{ .system_field = "active_node", .output_node = "NodeInteraction" },
         .{ .system_field = "camera", .output_node = "CameraControls" },
         .{ .system_field = "blueprint", .output_node = "NodeFormatting" },
     },

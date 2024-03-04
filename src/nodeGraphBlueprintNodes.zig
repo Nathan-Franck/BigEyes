@@ -3,6 +3,8 @@ const NodeGraphBlueprintEntry = @import("./interactiveNodeBuilderBlueprint.zig")
 pub const Blueprint = @import("./interactiveNodeBuilderBlueprint.zig").Blueprint;
 const utils = @import("./nodeUtils.zig");
 
+allocator: std.mem.Allocator,
+
 pub const MouseButton = enum {
     left,
     middle,
@@ -202,19 +204,16 @@ pub fn ContextMenuInteraction(input: struct {
     } else default;
 }
 
-pub fn NodeInteraction(
-    allocator: std.mem.Allocator,
-    input: struct {
-        keyboard_modifiers: KeyboardModifiers,
-        interaction_state: InteractionState,
-        blueprint: Blueprint,
-        event: ?union(enum) {
-            mouse_event: ExternalMouseEvent,
-            external_node_event: ExternalNodeEvent,
-            node_event: NodeEvent,
-        },
+pub fn NodeInteraction(self: @This(), input: struct {
+    keyboard_modifiers: KeyboardModifiers,
+    interaction_state: InteractionState,
+    blueprint: Blueprint,
+    event: ?union(enum) {
+        mouse_event: ExternalMouseEvent,
+        external_node_event: ExternalNodeEvent,
+        node_event: NodeEvent,
     },
-) !struct {
+}) !struct {
     interaction_state: InteractionState,
     blueprint: Blueprint,
     event: ?union(enum) {
@@ -238,10 +237,10 @@ pub fn NodeInteraction(
                         .node_selection = if (for (selection, 0..) |item, index| (if (std.meta.eql(
                             item,
                             node_event.node_name,
-                        )) break index) else null) |index| try std.mem.concat(allocator, []const u8, &.{
+                        )) break index) else null) |index| try std.mem.concat(self.allocator, []const u8, &.{
                             selection[0..index],
                             selection[index + 1 ..],
-                        }) else try std.mem.concat(allocator, []const u8, &.{
+                        }) else try std.mem.concat(self.allocator, []const u8, &.{
                             selection,
                             &.{node_event.node_name},
                         }),
@@ -253,28 +252,28 @@ pub fn NodeInteraction(
             .external_node_event => |node_event| switch (node_event.mouse_event) {
                 else => default,
                 .mouse_down => .{ .blueprint = input.blueprint, .interaction_state = utils.copyWith(input.interaction_state, .{
-                    .node_selection = try std.mem.concat(allocator, []const u8, &.{&.{node_event.node_name}}),
+                    .node_selection = try std.mem.concat(self.allocator, []const u8, &.{&.{node_event.node_name}}),
                 }) },
             },
             .node_event => |node_event| switch (node_event) {
                 .create => unreachable, // TODO: Implement new node creation.
                 .copy => |copy| .{ .blueprint = input.blueprint, .interaction_state = utils.copyWith(input.interaction_state, .{
-                    .clipboard = try selectionToNodes(allocator, input.blueprint.nodes, if (selection.len > 0) selection else &.{copy.node_name}),
+                    .clipboard = try selectionToNodes(self.allocator, input.blueprint.nodes, if (selection.len > 0) selection else &.{copy.node_name}),
                 }) },
                 .paste => if (input.interaction_state.clipboard) |clipboard| .{ .interaction_state = input.interaction_state, .blueprint = utils.copyWith(input.blueprint, .{
-                    .nodes = try pasteNodesUnique(allocator, input.blueprint.nodes, clipboard),
+                    .nodes = try pasteNodesUnique(self.allocator, input.blueprint.nodes, clipboard),
                 }) } else default,
                 .duplicate => |duplicate| .{ .interaction_state = input.interaction_state, .blueprint = utils.copyWith(input.blueprint, .{
                     .nodes = concat: {
                         const to_duplicate = if (selection.len > 0) selection else &.{duplicate.node_name};
-                        const new_nodes = try selectionToNodes(allocator, input.blueprint.nodes, to_duplicate);
-                        break :concat try pasteNodesUnique(allocator, input.blueprint.nodes, new_nodes);
+                        const new_nodes = try selectionToNodes(self.allocator, input.blueprint.nodes, to_duplicate);
+                        break :concat try pasteNodesUnique(self.allocator, input.blueprint.nodes, new_nodes);
                     },
                 }) },
                 .delete => |delete| .{ .interaction_state = input.interaction_state, .blueprint = utils.copyWith(input.blueprint, .{
                     .nodes = filter: {
                         const to_remove = if (selection.len > 0) selection else &.{delete.node_name};
-                        var result = std.ArrayList(NodeGraphBlueprintEntry).init(allocator);
+                        var result = std.ArrayList(NodeGraphBlueprintEntry).init(self.allocator);
                         for (input.blueprint.nodes) |node|
                             if (selection: {
                                 for (to_remove) |item|
@@ -290,6 +289,16 @@ pub fn NodeInteraction(
         }
     else
         default;
+}
+
+pub fn NodeFormatting(input: struct {
+    grouping_event: ?GroupingEvent,
+    blueprint: Blueprint,
+}) struct {
+    blueprint: Blueprint,
+} {
+    _ = input;
+    unreachable; // TODO: Implement node formatting
 }
 
 const Camera = struct {}; // TODO: implement camera controls
