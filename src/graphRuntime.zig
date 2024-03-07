@@ -8,6 +8,35 @@ const Input = struct {
     type: type,
 };
 
+inline fn IsEventType(the_type: type) bool {
+    return switch (@typeInfo(the_type)) {
+        else => false,
+        .Optional => |optional| switch (@typeInfo(optional.child)) {
+            else => false,
+            .Union => true,
+        },
+    };
+}
+
+fn AttemptEventCast(InputType: type, OutputType: type, value: InputType) OutputType {
+    return if (!IsEventType(InputType))
+        value
+    else if (value) |non_null_value| blk: {
+        const active_tag_index = @intFromEnum(non_null_value);
+        inline for (@typeInfo(@typeInfo(InputType).Optional.child).Union.fields, 0..) |field_candidate, field_index| {
+            if (active_tag_index == field_index) {
+                const OutputNonNull = @typeInfo(OutputType).Optional.child;
+                inline for (@typeInfo(OutputNonNull).Union.fields) |output_field| {
+                    if (field_candidate.type == output_field.type) {
+                        break :blk @unionInit(OutputNonNull, output_field.name, @field(non_null_value, field_candidate.name));
+                    }
+                }
+            }
+        }
+        break :blk null;
+    } else null;
+}
+
 fn NodeGraph(allocator: std.mem.Allocator, comptime graph: Blueprint, comptime node_definitions: anytype) type {
     const SystemInputs = build_type: {
         comptime var system_input_fields: []const std.builtin.Type.StructField = &.{};
@@ -71,13 +100,6 @@ fn NodeGraph(allocator: std.mem.Allocator, comptime graph: Blueprint, comptime n
         } });
     };
     const SystemStore = build_type: {
-        // EXAMPLE OF HOW TO BUILD A STORE in the blueprint
-        // .store = &.{
-        //     .{ .system_field = "context_menu", .output_node = "ContextMenuInteraction" },
-        //     .{ .system_field = "active_node", .output_node = "NodeInteraction" },
-        //     .{ .system_field = "camera", .output_node = "CameraControls" },
-        //     .{ .system_field = "blueprint", .output_node = "NodeFormatting" },
-        // },
         const store_fields = graph.store;
         comptime var system_store_fields: []const std.builtin.Type.StructField = &.{};
         inline for (store_fields) |store_field| {
@@ -116,12 +138,16 @@ fn NodeGraph(allocator: std.mem.Allocator, comptime graph: Blueprint, comptime n
         inline for (graph.nodes) |node| {
             const node_defn = @field(node_definitions, node.uniqueID());
             const node_outputs = @typeInfo(@TypeOf(node_defn)).Fn.return_type.?;
+            const non_error_outputs = switch (@typeInfo(node_outputs)) {
+                else => node_outputs,
+                .ErrorUnion => |error_union| error_union.payload,
+            };
             node_output_fields = comptime node_output_fields ++ .{.{
                 .name = node.uniqueID()[0.. :0],
-                .type = node_outputs,
+                .type = non_error_outputs,
                 .default_value = null,
                 .is_comptime = false,
-                .alignment = @alignOf(node_outputs),
+                .alignment = @alignOf(non_error_outputs),
             }};
         }
         break :build_type @Type(.{ .Struct = .{
@@ -170,7 +196,6 @@ fn NodeGraph(allocator: std.mem.Allocator, comptime graph: Blueprint, comptime n
             }
         }
         comptime var node_order: []const u16 = &.{};
-        @compileLog(max_node_priority);
         @setEvalBranchQuota(9000);
         inline for (0..max_node_priority) |current_priority| {
             inline for (node_priorities, 0..) |node_priority, node_index| {
@@ -181,10 +206,10 @@ fn NodeGraph(allocator: std.mem.Allocator, comptime graph: Blueprint, comptime n
         break :precalculate node_order;
     };
     const nodes = node_definitions{ .allocator = allocator };
-    return struct {
+    const Graph = struct {
         store: SystemStore,
-        fn update(self: @This(), inputs: SystemInputs) SystemOutputs {
-            var node_outputs: NodeOutputs = undefined;
+        fn update(self: @This(), inputs: SystemInputs) !SystemOutputs {
+            var nodes_outputs: NodeOutputs = undefined;
             inline for (node_order) |node_index| {
                 const node = graph.nodes[node_index];
                 const node_defn = @field(node_definitions, node.uniqueID());
@@ -197,8 +222,11 @@ fn NodeGraph(allocator: std.mem.Allocator, comptime graph: Blueprint, comptime n
                             @field(node_inputs, input.input_field) = @field(inputs, input.uniqueID());
                         },
                         .node => |node_blueprint| {
-                            const node_output = @field(node_outputs, node_blueprint.from);
-                            @field(node_inputs, node_blueprint.input_field) = @field(node_output, node_blueprint.uniqueID());
+                            const node_outputs = @field(nodes_outputs, node_blueprint.from);
+                            const node_output = @field(node_outputs, node_blueprint.uniqueID());
+                            const InputType = @TypeOf(node_output);
+                            const OutputType = @TypeOf(@field(node_inputs, node_blueprint.input_field));
+                            @field(node_inputs, node_blueprint.input_field) = AttemptEventCast(InputType, OutputType, node_output);
                         },
                         .store => |store| {
                             @field(node_inputs, store.input_field) = @field(self.store, store.uniqueID());
@@ -206,22 +234,23 @@ fn NodeGraph(allocator: std.mem.Allocator, comptime graph: Blueprint, comptime n
                     }
                 }
                 const node_output = if (@typeInfo(@TypeOf(@field(node_definitions, node.function))).Fn.params.len == 2)
-                    @call(.auto, @field(nodes, node.function), .{ nodes, node_inputs })
+                    @call(.auto, @field(node_definitions, node.function), .{ nodes, node_inputs })
                 else
                     @call(.auto, @field(node_definitions, node.function), .{node_inputs});
 
-                @field(node_outputs, node.uniqueID()) = node_output;
+                @field(nodes_outputs, node.uniqueID()) = switch (@typeInfo(@TypeOf(node_output))) {
+                    else => node_output,
+                    .ErrorUnion => try node_output,
+                };
             }
+            unreachable;
         }
     };
+    return Graph;
 }
 
 test "Build" {
     const allocator = std.heap.page_allocator;
-    // const defn_test = NodeDefinitions{ .allocator = allocator };
-    // @compileLog(std.fmt.comptimePrint("{s}", .{@typeInfo(NodeDefinitions).Struct.decls[12].name}));
-    const qwer = NodeDefinitions.BlueprintLoader;
-    _ = qwer;
     const MyNodeGraph = NodeGraph(allocator, node_graph_blueprint, NodeDefinitions);
     const result = MyNodeGraph{ .store = .{
         .blueprint = node_graph_blueprint,
@@ -229,7 +258,7 @@ test "Build" {
         .context_menu = .{ .open = false, .location = .{ .x = 0, .y = 0 } },
         .interaction_state = .{ .node_selection = &.{} },
     } };
-    _ = result.update(.{
+    _ = try result.update(.{
         .event = null,
         .recieved_blueprint = null,
         .keyboard_modifiers = .{ .shift = false, .alt = false, .control = false, .super = false },

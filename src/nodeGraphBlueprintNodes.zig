@@ -143,9 +143,9 @@ const BlueprintLoaderInputs = struct {
 };
 pub fn BlueprintLoader(input: BlueprintLoaderInputs) struct { blueprint: Blueprint } {
     if (input.recieved_blueprint) |update| {
-        return update;
+        return .{ .blueprint = update };
     } else {
-        return input.existing_blueprint;
+        return .{ .blueprint = input.existing_blueprint };
     }
 }
 
@@ -162,6 +162,7 @@ pub fn ContextMenuInteraction(input: struct {
         mouse_event: ExternalMouseEvent,
         external_node_event: ExternalNodeEvent,
         node_event: NodeEvent,
+        grouping_event: GroupingEvent,
     } = null,
 } {
     const default = .{
@@ -301,7 +302,7 @@ pub fn NodeInteraction(self: @This(), input: struct {
 }
 
 pub fn NodeFormatting(input: struct {
-    grouping_event: ?GroupingEvent,
+    event: ?union { grouping_event: GroupingEvent },
     blueprint: Blueprint,
 }) struct {
     blueprint: Blueprint,
@@ -383,6 +384,7 @@ test "filter expression" {
 
 test "delete node from context menu" {
     const allocator = std.heap.page_allocator;
+    const instance = @This(){ .allocator = allocator };
     const first_output = ContextMenuInteraction(.{
         .event = .{ .context_event = .{ .option_selected = "delete" } },
         .context_menu = .{
@@ -392,7 +394,7 @@ test "delete node from context menu" {
             .selected_node = "test",
         },
     });
-    const second_output = try NodeInteraction(allocator, .{
+    const second_output = try instance.NodeInteraction(.{
         .event = utils.eventTransform(utils.NodeInputEventType(NodeInteraction), first_output.event),
         .interaction_state = .{
             .node_selection = &.{"test"},
@@ -411,6 +413,7 @@ test "delete node from context menu" {
 
 test "delete node from context menu with a current selection" {
     const allocator = std.heap.page_allocator;
+    const instance = @This(){ .allocator = allocator };
     const first_output = ContextMenuInteraction(.{
         .event = .{ .context_event = .{ .option_selected = "delete" } },
         .context_menu = .{
@@ -420,7 +423,7 @@ test "delete node from context menu with a current selection" {
             .selected_node = "test",
         },
     });
-    const second_output = try NodeInteraction(allocator, .{
+    const second_output = try instance.NodeInteraction(.{
         .event = utils.eventTransform(utils.NodeInputEventType(NodeInteraction), first_output.event),
         .interaction_state = .{
             .node_selection = &.{ "test", "something_else" },
@@ -443,11 +446,12 @@ test "delete node from context menu with a current selection" {
 
 test "select node" {
     const allocator = std.heap.page_allocator;
+    const instance = @This(){ .allocator = allocator };
     const first_output = ContextMenuInteraction(.{
         .event = .{ .external_node_event = .{ .node_name = "test", .mouse_event = .{ .mouse_down = .{ .location = .{ .x = 0, .y = 0 }, .button = MouseButton.left } } } },
         .context_menu = .{ .open = false, .location = .{ .x = 0, .y = 0 }, .options = &.{}, .selected_node = "test" },
     });
-    const second_output = try NodeInteraction(allocator, .{
+    const second_output = try instance.NodeInteraction(.{
         .event = utils.eventTransform(utils.NodeInputEventType(NodeInteraction), first_output.event),
         .interaction_state = .{ .node_selection = &.{"something_else"}, .wiggle = null, .box_selection = null },
         .blueprint = .{ .nodes = &.{
@@ -462,6 +466,7 @@ test "select node" {
 
 test "deselect node" {
     const allocator = std.heap.page_allocator;
+    const instance = @This(){ .allocator = allocator };
     const first_output = ContextMenuInteraction(.{
         .event = .{ .external_node_event = .{ .node_name = "test", .mouse_event = .{ .mouse_down = .{
             .location = .{ .x = 0, .y = 0 },
@@ -469,7 +474,7 @@ test "deselect node" {
         } } } },
         .context_menu = .{ .open = false, .location = .{ .x = 0, .y = 0 }, .options = &.{}, .selected_node = "test" },
     });
-    const second_output = try NodeInteraction(allocator, .{
+    const second_output = try instance.NodeInteraction(.{
         .event = utils.eventTransform(utils.NodeInputEventType(NodeInteraction), first_output.event),
         .interaction_state = .{ .node_selection = &.{ "test", "something_else" }, .wiggle = null, .box_selection = null },
         .blueprint = .{
@@ -485,11 +490,12 @@ test "deselect node" {
 
 test "duplicate node" {
     const allocator = std.heap.page_allocator;
+    const instance = @This(){ .allocator = allocator };
     const first_output = ContextMenuInteraction(.{
         .event = .{ .context_event = .{ .option_selected = "duplicate" } },
         .context_menu = .{ .open = false, .location = .{ .x = 0, .y = 0 }, .options = &.{}, .selected_node = "test" },
     });
-    const second_output = try NodeInteraction(allocator, .{
+    const second_output = try instance.NodeInteraction(.{
         .event = utils.eventTransform(utils.NodeInputEventType(NodeInteraction), first_output.event),
         .interaction_state = .{ .node_selection = &.{ "test#1", "test#2" }, .wiggle = null, .box_selection = null },
         .blueprint = .{ .nodes = &.{

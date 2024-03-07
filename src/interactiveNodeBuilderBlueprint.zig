@@ -95,7 +95,7 @@ pub const node_graph_blueprint: Blueprint = .{
         .{
             .function = "NodeFormatting",
             .input_links = &.{
-                .{ .node = .{ .input_field = "grouping_event", .from = "ContextMenuInteraction" } },
+                .{ .node = .{ .input_field = "event", .from = "ContextMenuInteraction" } },
                 .{ .node = .{ .input_field = "blueprint", .from = "NodeInteraction" } },
             },
         },
