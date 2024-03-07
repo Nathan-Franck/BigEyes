@@ -80,8 +80,8 @@ pub const node_graph_blueprint: Blueprint = .{
             .input_links = &.{
                 .{ .input = .{ .input_field = "keyboard_modifiers" } },
                 .{ .store = .{ .input_field = "interaction_state" } },
-                .{ .node = .{ .input_field = "blueprint", .from = "graphLoader" } },
-                .{ .node = .{ .input_field = "event", .output_field = "unused_event", .from = "contextMenuInteraction" } },
+                .{ .node = .{ .input_field = "blueprint", .from = "BlueprintLoader" } },
+                .{ .node = .{ .input_field = "event", .output_field = "event", .from = "ContextMenuInteraction" } },
             },
         },
         .{
@@ -89,7 +89,7 @@ pub const node_graph_blueprint: Blueprint = .{
             .input_links = &.{
                 .{ .input = .{ .input_field = "keyboard_modifiers" } },
                 .{ .store = .{ .input_field = "camera" } },
-                .{ .node = .{ .input_field = "event", .output_field = "unused_event", .from = "NodeInteraction" } },
+                .{ .node = .{ .input_field = "event", .output_field = "event", .from = "NodeInteraction" } },
             },
         },
         .{
@@ -114,6 +114,7 @@ pub const node_graph_blueprint: Blueprint = .{
         // .{ .system_field = "active_node", .output_node = "NodeInteraction" },
         .{ .system_field = "camera", .output_node = "CameraControls" },
         .{ .system_field = "blueprint", .output_node = "NodeFormatting" },
+        .{ .system_field = "interaction_state", .output_node = "NodeInteraction" },
     },
     .output = &.{
         .{ .system_field = "render_event", .output_node = "DomRenderer" },

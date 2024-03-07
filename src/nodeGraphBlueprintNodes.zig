@@ -1,6 +1,6 @@
 const std = @import("std");
 const NodeGraphBlueprintEntry = @import("./interactiveNodeBuilderBlueprint.zig").NodeGraphBlueprintEntry;
-pub const Blueprint = @import("./interactiveNodeBuilderBlueprint.zig").Blueprint;
+const Blueprint = @import("./interactiveNodeBuilderBlueprint.zig").Blueprint;
 const utils = @import("./nodeUtils.zig");
 
 allocator: std.mem.Allocator,
@@ -158,7 +158,11 @@ pub fn ContextMenuInteraction(input: struct {
     },
 }) struct {
     context_menu: ContextState,
-    event: ?union(enum) { mouse_event: ExternalMouseEvent, external_node_event: ExternalNodeEvent, node_event: NodeEvent } = null,
+    event: ?union(enum) {
+        mouse_event: ExternalMouseEvent,
+        external_node_event: ExternalNodeEvent,
+        node_event: NodeEvent,
+    } = null,
 } {
     const default = .{
         .context_menu = input.context_menu,

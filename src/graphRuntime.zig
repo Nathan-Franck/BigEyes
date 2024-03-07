@@ -8,7 +8,7 @@ const Input = struct {
     type: type,
 };
 
-fn Build(allocator: std.mem.Allocator, comptime graph: Blueprint, comptime node_definitions: anytype) type {
+fn NodeGraph(allocator: std.mem.Allocator, comptime graph: Blueprint, comptime node_definitions: anytype) type {
     const SystemInputs = build_type: {
         comptime var system_input_fields: []const std.builtin.Type.StructField = &.{};
         inline for (graph.nodes) |node|
@@ -153,6 +153,7 @@ fn Build(allocator: std.mem.Allocator, comptime graph: Blueprint, comptime node_
                 else
                     unreachable;
                 node_priorities[node_index] = @max(node_priorities[node_index], current_node.priority);
+                @setEvalBranchQuota(9000);
                 inline for (graph.nodes) |node|
                     if (std.mem.eql(u8, node.uniqueID(), current_node.unique_id))
                         inline for (graph.nodes) |next_node| {
@@ -179,7 +180,7 @@ fn Build(allocator: std.mem.Allocator, comptime graph: Blueprint, comptime node_
         }
         break :precalculate node_order;
     };
-    const nodes = NodeDefinitions{ .allocator = allocator };
+    const nodes = node_definitions{ .allocator = allocator };
     return struct {
         store: SystemStore,
         fn update(self: @This(), inputs: SystemInputs) SystemOutputs {
@@ -193,18 +194,22 @@ fn Build(allocator: std.mem.Allocator, comptime graph: Blueprint, comptime node_
                 inline for (node.input_links) |link| {
                     switch (link) {
                         .input => |input| {
-                            @field(node_inputs, input.uniqueID()) = @field(inputs, input.input_field);
+                            @field(node_inputs, input.input_field) = @field(inputs, input.uniqueID());
                         },
                         .node => |node_blueprint| {
                             const node_output = @field(node_outputs, node_blueprint.from);
-                            @field(node_inputs, node_blueprint.uniqueID()) = node_output;
+                            @field(node_inputs, node_blueprint.input_field) = @field(node_output, node_blueprint.uniqueID());
                         },
                         .store => |store| {
                             @field(node_inputs, store.input_field) = @field(self.store, store.uniqueID());
                         },
                     }
                 }
-                const node_output = @call(.auto, @field(nodes, node.name), node_inputs);
+                const node_output = if (@typeInfo(@TypeOf(@field(node_definitions, node.function))).Fn.params.len == 2)
+                    @call(.auto, @field(nodes, node.function), .{ nodes, node_inputs })
+                else
+                    @call(.auto, @field(node_definitions, node.function), .{node_inputs});
+
                 @field(node_outputs, node.uniqueID()) = node_output;
             }
         }
@@ -213,11 +218,16 @@ fn Build(allocator: std.mem.Allocator, comptime graph: Blueprint, comptime node_
 
 test "Build" {
     const allocator = std.heap.page_allocator;
-    const Result = Build(allocator, node_graph_blueprint, NodeDefinitions);
-    const result = Result{ .store = .{
+    // const defn_test = NodeDefinitions{ .allocator = allocator };
+    // @compileLog(std.fmt.comptimePrint("{s}", .{@typeInfo(NodeDefinitions).Struct.decls[12].name}));
+    const qwer = NodeDefinitions.BlueprintLoader;
+    _ = qwer;
+    const MyNodeGraph = NodeGraph(allocator, node_graph_blueprint, NodeDefinitions);
+    const result = MyNodeGraph{ .store = .{
         .blueprint = node_graph_blueprint,
         .camera = .{},
         .context_menu = .{ .open = false, .location = .{ .x = 0, .y = 0 } },
+        .interaction_state = .{ .node_selection = &.{} },
     } };
     _ = result.update(.{
         .event = null,
