@@ -169,6 +169,8 @@ fn Build(allocator: std.mem.Allocator, comptime graph: Blueprint, comptime node_
             }
         }
         comptime var node_order: []const u16 = &.{};
+        @compileLog(max_node_priority);
+        @setEvalBranchQuota(9000);
         inline for (0..max_node_priority) |current_priority| {
             inline for (node_priorities, 0..) |node_priority, node_index| {
                 if (node_priority == current_priority)
@@ -180,7 +182,7 @@ fn Build(allocator: std.mem.Allocator, comptime graph: Blueprint, comptime node_
     const nodes = NodeDefinitions{ .allocator = allocator };
     return struct {
         store: SystemStore,
-        fn update(inputs: SystemInputs) SystemOutputs {
+        fn update(self: @This(), inputs: SystemInputs) SystemOutputs {
             var node_outputs: NodeOutputs = undefined;
             inline for (node_order) |node_index| {
                 const node = graph.nodes[node_index];
@@ -190,7 +192,6 @@ fn Build(allocator: std.mem.Allocator, comptime graph: Blueprint, comptime node_
                 var node_inputs: NodeInputs = undefined;
                 inline for (node.input_links) |link| {
                     switch (link) {
-                        else => {},
                         .input => |input| {
                             @field(node_inputs, input.uniqueID()) = @field(inputs, input.input_field);
                         },
@@ -199,7 +200,7 @@ fn Build(allocator: std.mem.Allocator, comptime graph: Blueprint, comptime node_
                             @field(node_inputs, node_blueprint.uniqueID()) = node_output;
                         },
                         .store => |store| {
-                            @field(node_inputs, store.uniqueID()) = @field(inputs.store, store.system_field);
+                            @field(node_inputs, store.input_field) = @field(self.store, store.uniqueID());
                         },
                     }
                 }
@@ -212,7 +213,12 @@ fn Build(allocator: std.mem.Allocator, comptime graph: Blueprint, comptime node_
 
 test "Build" {
     const allocator = std.heap.page_allocator;
-    const result = Build(allocator, node_graph_blueprint, NodeDefinitions);
+    const Result = Build(allocator, node_graph_blueprint, NodeDefinitions);
+    const result = Result{ .store = .{
+        .blueprint = node_graph_blueprint,
+        .camera = .{},
+        .context_menu = .{ .open = false, .location = .{ .x = 0, .y = 0 } },
+    } };
     _ = result.update(.{
         .event = null,
         .recieved_blueprint = null,

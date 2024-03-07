@@ -18,6 +18,11 @@ pub const ExternalMouseEvent = union(enum) {
     mouse_wheel: struct { x: f32, y: f32, z: f32 },
 };
 
+pub const GroupingEvent = union(enum) {
+    group: struct { node_names: []const []const u8 },
+    ungroup: struct { node_names: []const []const u8 },
+};
+
 pub const KeyboardModifiers = struct {
     shift: bool,
     control: bool,
