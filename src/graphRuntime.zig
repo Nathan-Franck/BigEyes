@@ -41,28 +41,27 @@ fn NodeGraph(allocator: std.mem.Allocator, comptime graph: Blueprint, comptime n
     const SystemInputs = build_type: {
         comptime var system_input_fields: []const std.builtin.Type.StructField = &.{};
         inline for (graph.nodes) |node|
-            inline for (node.input_links) |link|
-                switch (link) {
-                    else => {},
-                    .input => |input| {
-                        const field_name = input.uniqueID();
-                        const node_params = @typeInfo(@TypeOf(@field(node_definitions, node.uniqueID()))).Fn.params;
-                        const field_type = comptime for (@typeInfo(node_params[node_params.len - 1].type.?).Struct.fields) |field|
-                            if (std.mem.eql(u8, field.name, field_name)) break field.type else continue
-                        else
-                            unreachable; // TODO: Provide a useful compiler error about how blueprint and node defn's disagree.
-                        system_input_fields = comptime system_input_fields ++ for (system_input_fields) |system_input|
-                            if (std.mem.eql(u8, system_input.name, input.input_field)) break .{} else continue
-                        else
-                            .{.{
-                                .name = field_name[0.. :0],
-                                .type = field_type,
-                                .default_value = null,
-                                .is_comptime = false,
-                                .alignment = @alignOf(field_type),
-                            }};
-                    },
-                };
+            inline for (node.input_links) |link| switch (link) {
+                else => {},
+                .input => |input| {
+                    const field_name = input.uniqueID();
+                    const node_params = @typeInfo(@TypeOf(@field(node_definitions, node.uniqueID()))).Fn.params;
+                    const field_type = comptime for (@typeInfo(node_params[node_params.len - 1].type.?).Struct.fields) |field|
+                        if (std.mem.eql(u8, field.name, field_name)) break field.type else continue
+                    else
+                        unreachable; // TODO: Provide a useful compiler error about how blueprint and node defn's disagree.
+                    system_input_fields = comptime system_input_fields ++ for (system_input_fields) |system_input|
+                        if (std.mem.eql(u8, system_input.name, input.input_field)) break .{} else continue
+                    else
+                        .{.{
+                            .name = field_name[0.. :0],
+                            .type = field_type,
+                            .default_value = null,
+                            .is_comptime = false,
+                            .alignment = @alignOf(field_type),
+                        }};
+                },
+            };
         break :build_type @Type(.{ .Struct = .{
             .layout = .Auto,
             .fields = system_input_fields,
@@ -220,23 +219,21 @@ fn NodeGraph(allocator: std.mem.Allocator, comptime graph: Blueprint, comptime n
                 const node_params = @typeInfo(@TypeOf(node_defn)).Fn.params;
                 const NodeInputs = node_params[node_params.len - 1].type.?;
                 var node_inputs: NodeInputs = undefined;
-                inline for (node.input_links) |link| {
-                    switch (link) {
-                        .input => |input| {
-                            @field(node_inputs, input.input_field) = @field(inputs, input.uniqueID());
-                        },
-                        .node => |node_blueprint| {
-                            const node_outputs = @field(nodes_outputs, node_blueprint.from);
-                            const node_output = @field(node_outputs, node_blueprint.uniqueID());
-                            const InputType = @TypeOf(node_output);
-                            const OutputType = @TypeOf(@field(node_inputs, node_blueprint.input_field));
-                            @field(node_inputs, node_blueprint.input_field) = AttemptEventCast(InputType, OutputType, node_output);
-                        },
-                        .store => |store| {
-                            @field(node_inputs, store.input_field) = @field(self.store, store.uniqueID());
-                        },
-                    }
-                }
+                inline for (node.input_links) |link| switch (link) {
+                    .input => |input| {
+                        @field(node_inputs, input.input_field) = @field(inputs, input.uniqueID());
+                    },
+                    .node => |node_blueprint| {
+                        const node_outputs = @field(nodes_outputs, node_blueprint.from);
+                        const node_output = @field(node_outputs, node_blueprint.uniqueID());
+                        const InputType = @TypeOf(node_output);
+                        const OutputType = @TypeOf(@field(node_inputs, node_blueprint.input_field));
+                        @field(node_inputs, node_blueprint.input_field) = AttemptEventCast(InputType, OutputType, node_output);
+                    },
+                    .store => |store| {
+                        @field(node_inputs, store.input_field) = @field(self.store, store.uniqueID());
+                    },
+                };
                 const node_output = @call(
                     .auto,
                     @field(node_definitions, node.function),
