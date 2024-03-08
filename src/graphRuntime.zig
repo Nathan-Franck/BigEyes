@@ -228,7 +228,8 @@ fn NodeGraph(allocator: std.mem.Allocator, comptime graph: Blueprint, comptime n
                         const node_output = @field(node_outputs, node_blueprint.uniqueID());
                         const InputType = @TypeOf(node_output);
                         const OutputType = @TypeOf(@field(node_inputs, node_blueprint.input_field));
-                        @field(node_inputs, node_blueprint.input_field) = AttemptEventCast(InputType, OutputType, node_output);
+                        @field(node_inputs, node_blueprint.input_field) =
+                            AttemptEventCast(InputType, OutputType, node_output);
                     },
                     .store => |store| {
                         @field(node_inputs, store.input_field) = @field(self.store, store.uniqueID());
@@ -251,7 +252,8 @@ fn NodeGraph(allocator: std.mem.Allocator, comptime graph: Blueprint, comptime n
             var system_outputs: SystemOutputs = undefined;
             inline for (node_graph_blueprint.output) |output_defn| {
                 const node_outputs = @field(nodes_outputs, output_defn.output_node);
-                @field(system_outputs, output_defn.system_field) = @field(node_outputs, output_defn.uniqueID());
+                @field(system_outputs, output_defn.system_field) =
+                    @field(node_outputs, output_defn.uniqueID());
             }
             return system_outputs;
         }
