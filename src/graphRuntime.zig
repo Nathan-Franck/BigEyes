@@ -185,7 +185,11 @@ fn NodeGraph(allocator: std.mem.Allocator, comptime graph: Blueprint, comptime n
                         inline for (graph.nodes) |next_node| {
                             if (is_output_node: for (next_node.input_links) |input_link| switch (input_link) {
                                 else => continue,
-                                .node => |input_node| if (std.mem.eql(u8, input_node.from, current_node.unique_id)) break :is_output_node true else continue,
+                                .node => |input_node| if (std.mem.eql(
+                                    u8,
+                                    input_node.from,
+                                    current_node.unique_id,
+                                )) break :is_output_node true else continue,
                             } else break :is_output_node false)
                                 next_nodes = comptime next_nodes ++ .{.{
                                     .unique_id = next_node.uniqueID(),
@@ -233,10 +237,14 @@ fn NodeGraph(allocator: std.mem.Allocator, comptime graph: Blueprint, comptime n
                         },
                     }
                 }
-                const node_output = if (@typeInfo(@TypeOf(@field(node_definitions, node.function))).Fn.params.len == 2)
-                    @call(.auto, @field(node_definitions, node.function), .{ nodes, node_inputs })
-                else
-                    @call(.auto, @field(node_definitions, node.function), .{node_inputs});
+                const node_output = @call(
+                    .auto,
+                    @field(node_definitions, node.function),
+                    if (@typeInfo(@TypeOf(@field(node_definitions, node.function))).Fn.params.len == 2)
+                        .{ nodes, node_inputs }
+                    else
+                        .{node_inputs},
+                );
 
                 @field(nodes_outputs, node.uniqueID()) = switch (@typeInfo(@TypeOf(node_output))) {
                     else => node_output,
@@ -266,7 +274,12 @@ test "Build" {
     const result_commands = try my_node_graph.update(.{
         .event = null,
         .recieved_blueprint = null,
-        .keyboard_modifiers = .{ .shift = false, .alt = false, .control = false, .super = false },
+        .keyboard_modifiers = .{
+            .shift = false,
+            .alt = false,
+            .control = false,
+            .super = false,
+        },
     });
     std.debug.print("Result: {any}\nStore: {any}\n", .{ result_commands, my_node_graph.store });
 }
