@@ -243,7 +243,12 @@ fn NodeGraph(allocator: std.mem.Allocator, comptime graph: Blueprint, comptime n
                     .ErrorUnion => try node_output,
                 };
             }
-            unreachable;
+            var system_outputs: SystemOutputs = undefined;
+            inline for (node_graph_blueprint.output) |output_defn| {
+                const node_outputs = @field(nodes_outputs, output_defn.output_node);
+                @field(system_outputs, output_defn.system_field) = @field(node_outputs, output_defn.uniqueID());
+            }
+            return system_outputs;
         }
     };
     return Graph;

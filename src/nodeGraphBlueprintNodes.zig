@@ -307,8 +307,7 @@ pub fn NodeFormatting(input: struct {
 }) struct {
     blueprint: Blueprint,
 } {
-    _ = input;
-    unreachable; // TODO: Implement node formatting
+    return .{ .blueprint = input.blueprint };
 }
 
 const Camera = struct {}; // TODO: implement camera controls
@@ -322,8 +321,8 @@ pub fn CameraControls(input: struct {
 }) struct {
     camera: Camera,
 } {
-    _ = input;
-    unreachable; // TODO: Implement camera controls
+    // TODO - Actually take in the mouse events to move the camera around!
+    return .{ .camera = input.camera };
 }
 
 const RenderEvent = struct {}; // TODO: implement render event
@@ -337,7 +336,7 @@ pub fn DomRenderer(input: struct {
     render_event: ?RenderEvent,
 } {
     _ = input;
-    unreachable; // TODO: Implement dom renderer
+    return .{ .render_event = null };
 }
 
 test "map expression" {
