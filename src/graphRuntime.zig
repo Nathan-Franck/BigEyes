@@ -257,15 +257,16 @@ fn NodeGraph(allocator: std.mem.Allocator, comptime graph: Blueprint, comptime n
 test "Build" {
     const allocator = std.heap.page_allocator;
     const MyNodeGraph = NodeGraph(allocator, node_graph_blueprint, NodeDefinitions);
-    const result = MyNodeGraph{ .store = .{
+    const my_node_graph = MyNodeGraph{ .store = .{
         .blueprint = node_graph_blueprint,
         .camera = .{},
         .context_menu = .{ .open = false, .location = .{ .x = 0, .y = 0 } },
         .interaction_state = .{ .node_selection = &.{} },
     } };
-    _ = try result.update(.{
+    const result_commands = try my_node_graph.update(.{
         .event = null,
         .recieved_blueprint = null,
         .keyboard_modifiers = .{ .shift = false, .alt = false, .control = false, .super = false },
     });
+    std.debug.print("Result: {any}\nStore: {any}\n", .{ result_commands, my_node_graph.store });
 }
