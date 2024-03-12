@@ -132,6 +132,7 @@ test "InputLink to Json" {
         },
     };
     const json = try std.json.stringifyAlloc(allocator, inputLink, .{});
-    std.debug.print("json: {s}\n", .{json});
+    _ = json;
+    // std.debug.print("json: {s}\n", .{json});
     // expect(json).toBe(`{"node":{"from":"test","output_field":"output","input_field":"input"}}`);
 }

@@ -37,7 +37,7 @@ fn AttemptEventCast(InputType: type, OutputType: type, value: InputType) OutputT
     } else null;
 }
 
-fn NodeGraph(allocator: std.mem.Allocator, comptime graph: Blueprint, comptime node_definitions: anytype) type {
+fn NodeGraph(comptime node_definitions: anytype, allocator: std.mem.Allocator, comptime graph: Blueprint) type {
     const SystemInputs = build_type: {
         comptime var system_input_fields: []const std.builtin.Type.StructField = &.{};
         inline for (graph.nodes) |node|
@@ -271,7 +271,11 @@ fn NodeGraph(allocator: std.mem.Allocator, comptime graph: Blueprint, comptime n
 
 test "Build" {
     const allocator = std.heap.page_allocator;
-    const MyNodeGraph = NodeGraph(allocator, node_graph_blueprint, NodeDefinitions);
+    const MyNodeGraph = NodeGraph(
+        NodeDefinitions,
+        allocator,
+        node_graph_blueprint,
+    );
     var my_node_graph = MyNodeGraph{
         .store = .{
             .blueprint = .{
@@ -294,5 +298,8 @@ test "Build" {
             .super = false,
         },
     });
-    std.debug.print("Result: {any}\nStore: {any}\n", .{ result_commands, my_node_graph.store });
+    _ = result_commands;
+    // Yay, at least we can confirm that the Blueprint Loader works!
+    try std.testing.expect(my_node_graph.store.blueprint.nodes.len > 0);
+    try std.testing.expect(my_node_graph.store.blueprint.store.len > 0);
 }
