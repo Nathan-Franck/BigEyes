@@ -75,7 +75,7 @@ pub fn build(
     const zmath_pkg = @import("zmath").package(b, target, optimize, .{});
     const zglfw_pkg = @import("zglfw").package(b, target, optimize, .{ .options = .{ .shared = false } });
     const zpool_pkg = @import("zpool").package(b, target, optimize, .{});
-    const zgpu_pkg = @import("zgpu").package(b, target, optimize, .{ .deps = .{ .zglfw = zglfw_pkg, .zpool = zpool_pkg } });
+    const zgpu_pkg = @import("zgpu").package(b, target, optimize, .{ .deps = .{ .zpool = zpool_pkg } });
     const zmesh_pkg = @import("zmesh").package(b, target, optimize, .{});
 
     // Tests (default)
