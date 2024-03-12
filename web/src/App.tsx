@@ -24,8 +24,11 @@ function App() {
 
   return (
     <>
-      <div>Hello Worldi</div>
-      {testCallNode().map(result => <div>{JSON.stringify(result)}</div>)}
+      {
+        testCallNode().map(result => <div>{
+          JSON.stringify(result)
+        }</div>)
+      }
       <style>{encodedStyle}</style>
       <div>
         <a href="https://vitejs.dev" target="_blank">
@@ -46,6 +49,8 @@ function App() {
       </div>
       <p class="read-the-docs">
         Click on the Vite and Solid logos to learn more
+        What's up cool cats 🐱
+        Don't be a stranger 👹
       </p>
     </>
   )
