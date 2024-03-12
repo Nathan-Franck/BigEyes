@@ -24,6 +24,7 @@ function App() {
 
   return (
     <>
+      <div>Hello World!</div>
       <style>{encodedStyle}</style>
       <div>
         <a href="https://vitejs.dev" target="_blank">

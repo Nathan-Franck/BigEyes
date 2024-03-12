@@ -210,8 +210,9 @@ fn NodeGraph(allocator: std.mem.Allocator, comptime graph: Blueprint, comptime n
     };
     const nodes = node_definitions{ .allocator = allocator };
     const Graph = struct {
+        const Self = @This();
         store: SystemStore,
-        fn update(self: @This(), inputs: SystemInputs) !SystemOutputs {
+        fn update(self: *Self, inputs: SystemInputs) !SystemOutputs {
             var nodes_outputs: NodeOutputs = undefined;
             inline for (node_order) |node_index| {
                 const node = graph.nodes[node_index];
@@ -249,6 +250,13 @@ fn NodeGraph(allocator: std.mem.Allocator, comptime graph: Blueprint, comptime n
                     .ErrorUnion => try node_output,
                 };
             }
+            // Update store with new values from nodes!
+            inline for (node_graph_blueprint.store) |store_defn| {
+                const node_outputs = @field(nodes_outputs, store_defn.output_node);
+                @field(self.store, store_defn.system_field) =
+                    @field(node_outputs, store_defn.uniqueID());
+            }
+            // Output from system from select nodes...
             var system_outputs: SystemOutputs = undefined;
             inline for (node_graph_blueprint.output) |output_defn| {
                 const node_outputs = @field(nodes_outputs, output_defn.output_node);
@@ -264,15 +272,21 @@ fn NodeGraph(allocator: std.mem.Allocator, comptime graph: Blueprint, comptime n
 test "Build" {
     const allocator = std.heap.page_allocator;
     const MyNodeGraph = NodeGraph(allocator, node_graph_blueprint, NodeDefinitions);
-    const my_node_graph = MyNodeGraph{ .store = .{
-        .blueprint = node_graph_blueprint,
-        .camera = .{},
-        .context_menu = .{ .open = false, .location = .{ .x = 0, .y = 0 } },
-        .interaction_state = .{ .node_selection = &.{} },
-    } };
+    var my_node_graph = MyNodeGraph{
+        .store = .{
+            .blueprint = .{
+                .nodes = &.{},
+                .output = &.{},
+                .store = &.{},
+            },
+            .camera = .{},
+            .context_menu = .{ .open = false, .location = .{ .x = 0, .y = 0 } },
+            .interaction_state = .{ .node_selection = &.{} },
+        },
+    };
     const result_commands = try my_node_graph.update(.{
         .event = null,
-        .recieved_blueprint = null,
+        .recieved_blueprint = node_graph_blueprint,
         .keyboard_modifiers = .{
             .shift = false,
             .alt = false,
