@@ -24,9 +24,7 @@ function App() {
 
   return (
     <>
-      This is such a fun experience -- being able to use all the power of
-       my phone with creative code is an awesome and empowering experience
-      {
+     {
         testCallNode().map(result => <div>{
           JSON.stringify(result)
         }</div>)
@@ -34,7 +32,6 @@ function App() {
       <style>{encodedStyle}</style>
       <div>
         <a href="https://vitejs.dev" target="_blank">
-          <img src="dumb.png" alt="dumb photo of me" />
           <img src={viteLogo} class={classes.logo} alt="Vite logo" />
         </a>
         <a href="https://solidjs.com" target="_blank">
