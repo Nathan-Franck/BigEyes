@@ -6,4 +6,5 @@ import App from './App'
 
 const root = document.getElementById('root')
 
-render(() => <><div>Hello World!</div><App/></>, root!)
+// TODO: Figure out why this app isn't rendering - is it something wrong with my environment? Might have to test on the laptop...
+render(() => <><App/></>, root!)
