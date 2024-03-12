@@ -27,7 +27,9 @@ function encodeString(string: string) {
     return { ptr: pointer, length: buffer.length };
 };
 
-const { instance } = await WebAssembly.instantiateStreaming(fetch("bin/game.wasm"), {
+const result =  await fetch("bin/game.wasm");
+const buffer = await result.arrayBuffer();
+const { instance } = await WebAssembly.instantiate(buffer, {
     env: {
         memory: new WebAssembly.Memory({ initial: 2 }),
         messageFromWasm,
