@@ -16,7 +16,7 @@ export function declareStyle<const T extends Record<string, Partial<CSSStyleDecl
       classContents[subKey as any] = undefined;
       return [subKey, classContents[subclassKey as any]] as const;
     });
-    return [ ...unwrappedDefns, [className, classContents] as const, ...subClasses];
+        retun [ ...unwrappedDefns, [className, classContents] as const, ...subClasses];
   }, [] as any);
   const encodedStyle = classAndSubclassList.map((entry) => {
     const [objectKey, contents] = entry;
