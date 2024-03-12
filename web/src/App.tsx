@@ -2,7 +2,7 @@ import { createSignal } from 'solid-js'
 import solidLogo from './assets/solid.svg'
 import viteLogo from '/vite.svg'
 import { declareStyle } from "./declareStyle"
-import {} from "./zigWasmInterface"
+import { testCallNode } from "./zigWasmInterface"
 
 const { classes, encodedStyle } = declareStyle({
   solidLogo: {
@@ -24,7 +24,8 @@ function App() {
 
   return (
     <>
-      <div>Hello World!</div>
+      <div>Hello Worldi</div>
+      {testCallNode().map(result => <div>{JSON.stringify(result)}</div>)}
       <style>{encodedStyle}</style>
       <div>
         <a href="https://vitejs.dev" target="_blank">
