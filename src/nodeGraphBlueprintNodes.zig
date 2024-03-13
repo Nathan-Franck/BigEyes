@@ -325,7 +325,9 @@ pub fn CameraControls(input: struct {
     return .{ .camera = input.camera };
 }
 
-const RenderEvent = struct {}; // TODO: implement render event
+const RenderEvent = struct {
+    something_changed: bool,
+}; // TODO: implement render event
 
 pub fn DomRenderer(input: struct {
     previous_blueprint: Blueprint,
@@ -335,8 +337,11 @@ pub fn DomRenderer(input: struct {
 }) struct {
     render_event: ?RenderEvent,
 } {
-    _ = input;
-    return .{ .render_event = null };
+    const something_changed = !std.meta.eql(input.previous_blueprint, input.current_blueprint);
+    return if (something_changed)
+        .{ .render_event = .{ .something_changed = true } }
+    else
+        .{ .render_event = null };
 }
 
 test "map expression" {

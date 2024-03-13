@@ -37,7 +37,7 @@ fn AttemptEventCast(InputType: type, OutputType: type, value: InputType) OutputT
     } else null;
 }
 
-fn NodeGraph(comptime node_definitions: anytype, allocator: std.mem.Allocator, comptime graph: Blueprint) type {
+pub fn NodeGraph(comptime node_definitions: anytype, allocator: std.mem.Allocator, comptime graph: Blueprint) type {
     const SystemInputs = build_type: {
         comptime var system_input_fields: []const std.builtin.Type.StructField = &.{};
         inline for (graph.nodes) |node|
@@ -298,8 +298,9 @@ test "Build" {
             .super = false,
         },
     });
-    _ = result_commands;
     // Yay, at least we can confirm that the Blueprint Loader works!
+    // Next will be to validate that multiple steps are working in-tandem with each other...
     try std.testing.expect(my_node_graph.store.blueprint.nodes.len > 0);
     try std.testing.expect(my_node_graph.store.blueprint.store.len > 0);
+    try std.testing.expect(result_commands.render_event.?.something_changed == true);
 }
