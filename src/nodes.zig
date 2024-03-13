@@ -19,36 +19,18 @@ pub const Nodes = struct {
         );
         return result;
     }
-    pub fn testNodeGraph() !void {
+    const MyNodeGraph = graphRuntime.NodeGraph(
+        NodeDefinitions,
+        node_graph_blueprint,
+    );
+    pub fn testNodeGraph(inputs: MyNodeGraph.SystemInputs, store: MyNodeGraph.SystemStore) !MyNodeGraph.SystemOutputs {
         const allocator = std.heap.page_allocator;
-        const MyNodeGraph = graphRuntime.NodeGraph(
-            NodeDefinitions,
-            allocator,
-            node_graph_blueprint,
-        );
         var my_node_graph = MyNodeGraph{
-            .store = .{
-                .blueprint = .{
-                    .nodes = &.{},
-                    .output = &.{},
-                    .store = &.{},
-                },
-                .camera = .{},
-                .context_menu = .{ .open = false, .location = .{ .x = 0, .y = 0 } },
-                .interaction_state = .{ .node_selection = &.{} },
-            },
+            .allocator = allocator,
+            .store = store,
         };
-        const result_commands = try my_node_graph.update(.{
-            .event = null,
-            .recieved_blueprint = node_graph_blueprint,
-            .keyboard_modifiers = .{
-                .shift = false,
-                .alt = false,
-                .control = false,
-                .super = false,
-            },
-        });
-        _ = result_commands;
+        const result_commands = try my_node_graph.update(inputs);
+        return result_commands;
     }
 };
 pub const NodesEnum = DeclsToEnum(Nodes);

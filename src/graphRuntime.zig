@@ -37,101 +37,7 @@ fn AttemptEventCast(InputType: type, OutputType: type, value: InputType) OutputT
     } else null;
 }
 
-pub fn NodeGraph(comptime node_definitions: anytype, allocator: std.mem.Allocator, comptime graph: Blueprint) type {
-    const SystemInputs = build_type: {
-        comptime var system_input_fields: []const std.builtin.Type.StructField = &.{};
-        inline for (graph.nodes) |node|
-            inline for (node.input_links) |link| switch (link) {
-                else => {},
-                .input => |input| {
-                    const field_name = input.uniqueID();
-                    const node_params = @typeInfo(@TypeOf(@field(node_definitions, node.uniqueID()))).Fn.params;
-                    const field_type = comptime for (@typeInfo(node_params[node_params.len - 1].type.?).Struct.fields) |field|
-                        if (std.mem.eql(u8, field.name, field_name)) break field.type else continue
-                    else
-                        unreachable; // TODO: Provide a useful compiler error about how blueprint and node defn's disagree.
-                    system_input_fields = comptime system_input_fields ++ for (system_input_fields) |system_input|
-                        if (std.mem.eql(u8, system_input.name, input.input_field)) break .{} else continue
-                    else
-                        .{.{
-                            .name = field_name[0.. :0],
-                            .type = field_type,
-                            .default_value = null,
-                            .is_comptime = false,
-                            .alignment = @alignOf(field_type),
-                        }};
-                },
-            };
-        break :build_type @Type(.{ .Struct = .{
-            .layout = .Auto,
-            .fields = system_input_fields,
-            .decls = &.{},
-            .is_tuple = false,
-        } });
-    };
-    const SystemOutputs = build_type: {
-        comptime var system_output_fields: []const std.builtin.Type.StructField = &.{};
-        inline for (graph.output) |output_defn| {
-            const name = output_defn.uniqueID();
-            const node_id = output_defn.output_node;
-            const node = comptime for (graph.nodes) |node|
-                if (std.mem.eql(u8, node.uniqueID(), node_id)) break node else continue
-            else
-                @compileError("Node not found " ++ node_id);
-            const node_outputs = @typeInfo(@TypeOf(@field(node_definitions, node.uniqueID()))).Fn.return_type.?;
-            const field_type = comptime for (@typeInfo(node_outputs).Struct.fields) |field|
-                if (std.mem.eql(u8, field.name, output_defn.system_field)) break field.type else continue
-            else
-                unreachable; // TODO: Provide a useful compiler error about how blueprint and node defn's disagree.
-            system_output_fields = comptime system_output_fields ++ .{.{
-                .name = name[0.. :0],
-                .type = field_type,
-                .default_value = null,
-                .is_comptime = false,
-                .alignment = @alignOf(field_type),
-            }};
-        }
-        break :build_type @Type(.{ .Struct = .{
-            .layout = .Auto,
-            .fields = system_output_fields,
-            .decls = &.{},
-            .is_tuple = false,
-        } });
-    };
-    const SystemStore = build_type: {
-        const store_fields = graph.store;
-        comptime var system_store_fields: []const std.builtin.Type.StructField = &.{};
-        inline for (store_fields) |store_field| {
-            const name = store_field.system_field;
-            const node_id = store_field.output_node;
-            const node = comptime for (graph.nodes) |node|
-                if (std.mem.eql(u8, node.uniqueID(), node_id)) break node else continue
-            else
-                @compileError("Node not found " ++ node_id);
-            const node_outputs = @typeInfo(@TypeOf(@field(node_definitions, node.uniqueID()))).Fn.return_type.?;
-            const field_type = comptime for (switch (@typeInfo(node_outputs)) {
-                .ErrorUnion => |error_union| @typeInfo(error_union.payload).Struct.fields,
-                .Struct => |the_struct| the_struct.fields,
-                else => @compileError("Invalid output type, expected struct or error union with a struct"),
-            }) |field|
-                if (std.mem.eql(u8, field.name, store_field.system_field)) break field.type else continue
-            else
-                @compileError("Field not found " ++ store_field.system_field ++ " in " ++ node_id);
-            system_store_fields = comptime system_store_fields ++ .{.{
-                .name = name[0.. :0],
-                .type = field_type,
-                .default_value = null,
-                .is_comptime = false,
-                .alignment = @alignOf(field_type),
-            }};
-        }
-        break :build_type @Type(.{ .Struct = .{
-            .layout = .Auto,
-            .fields = system_store_fields,
-            .decls = &.{},
-            .is_tuple = false,
-        } });
-    };
+pub fn NodeGraph(comptime node_definitions: anytype, comptime graph: Blueprint) type {
     const NodeOutputs = build_type: {
         comptime var node_output_fields: []const std.builtin.Type.StructField = &.{};
         inline for (graph.nodes) |node| {
@@ -211,6 +117,101 @@ pub fn NodeGraph(comptime node_definitions: anytype, allocator: std.mem.Allocato
     const nodes = node_definitions{ .allocator = allocator };
     const Graph = struct {
         const Self = @This();
+        pub const SystemInputs = build_type: {
+            var system_input_fields: []const std.builtin.Type.StructField = &.{};
+            for (graph.nodes) |node|
+                for (node.input_links) |link| switch (link) {
+                    else => {},
+                    .input => |input| {
+                        const field_name = input.uniqueID();
+                        const node_params = @typeInfo(@TypeOf(@field(node_definitions, node.uniqueID()))).Fn.params;
+                        const field_type = for (@typeInfo(node_params[node_params.len - 1].type.?).Struct.fields) |field|
+                            if (std.mem.eql(u8, field.name, field_name)) break field.type else continue
+                        else
+                            unreachable; // TODO: Provide a useful compiler error about how blueprint and node defn's disagree.
+                        system_input_fields = system_input_fields ++ for (system_input_fields) |system_input|
+                            if (std.mem.eql(u8, system_input.name, input.input_field)) break .{} else continue
+                        else
+                            .{.{
+                                .name = field_name[0.. :0],
+                                .type = field_type,
+                                .default_value = null,
+                                .is_comptime = false,
+                                .alignment = @alignOf(field_type),
+                            }};
+                    },
+                };
+            break :build_type @Type(.{ .Struct = .{
+                .layout = .Auto,
+                .fields = system_input_fields,
+                .decls = &.{},
+                .is_tuple = false,
+            } });
+        };
+        pub const SystemOutputs = build_type: {
+            var system_output_fields: []const std.builtin.Type.StructField = &.{};
+            for (graph.output) |output_defn| {
+                const name = output_defn.uniqueID();
+                const node_id = output_defn.output_node;
+                const node = for (graph.nodes) |node|
+                    if (std.mem.eql(u8, node.uniqueID(), node_id)) break node else continue
+                else
+                    @compileError("Node not found " ++ node_id);
+                const node_outputs = @typeInfo(@TypeOf(@field(node_definitions, node.uniqueID()))).Fn.return_type.?;
+                const field_type = for (@typeInfo(node_outputs).Struct.fields) |field|
+                    if (std.mem.eql(u8, field.name, output_defn.system_field)) break field.type else continue
+                else
+                    unreachable; // TODO: Provide a useful compiler error about how blueprint and node defn's disagree.
+                system_output_fields = system_output_fields ++ .{.{
+                    .name = name[0.. :0],
+                    .type = field_type,
+                    .default_value = null,
+                    .is_comptime = false,
+                    .alignment = @alignOf(field_type),
+                }};
+            }
+            break :build_type @Type(.{ .Struct = .{
+                .layout = .Auto,
+                .fields = system_output_fields,
+                .decls = &.{},
+                .is_tuple = false,
+            } });
+        };
+        pub const SystemStore = build_type: {
+            const store_fields = graph.store;
+            var system_store_fields: []const std.builtin.Type.StructField = &.{};
+            for (store_fields) |store_field| {
+                const name = store_field.system_field;
+                const node_id = store_field.output_node;
+                const node = for (graph.nodes) |node|
+                    if (std.mem.eql(u8, node.uniqueID(), node_id)) break node else continue
+                else
+                    @compileError("Node not found " ++ node_id);
+                const node_outputs = @typeInfo(@TypeOf(@field(node_definitions, node.uniqueID()))).Fn.return_type.?;
+                const field_type = for (switch (@typeInfo(node_outputs)) {
+                    .ErrorUnion => |error_union| @typeInfo(error_union.payload).Struct.fields,
+                    .Struct => |the_struct| the_struct.fields,
+                    else => @compileError("Invalid output type, expected struct or error union with a struct"),
+                }) |field|
+                    if (std.mem.eql(u8, field.name, store_field.system_field)) break field.type else continue
+                else
+                    @compileError("Field not found " ++ store_field.system_field ++ " in " ++ node_id);
+                system_store_fields = system_store_fields ++ .{.{
+                    .name = name[0.. :0],
+                    .type = field_type,
+                    .default_value = null,
+                    .is_comptime = false,
+                    .alignment = @alignOf(field_type),
+                }};
+            }
+            break :build_type @Type(.{ .Struct = .{
+                .layout = .Auto,
+                .fields = system_store_fields,
+                .decls = &.{},
+                .is_tuple = false,
+            } });
+        };
+        allocator: std.mem.Allocator,
         store: SystemStore,
         fn update(self: *Self, inputs: SystemInputs) !SystemOutputs {
             var nodes_outputs: NodeOutputs = undefined;
