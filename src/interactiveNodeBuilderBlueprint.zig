@@ -1,56 +1,25 @@
-pub const SystemSource = struct {
-    system_field: ?[]const u8 = null, // if null, assume system field is the same as input field.
-    input_field: []const u8,
-
-    pub inline fn uniqueID(self: @This()) []const u8 {
-        if (self.system_field) |system_field| {
-            return system_field;
-        }
-        return self.input_field;
-    }
-};
-
-pub const InputLink = union(enum) {
-    node: struct {
-        from: []const u8,
-        output_field: ?[]const u8 = null, // if null, assume output field is the same as input field.
+pub const InputLink = struct {
+    field: []const u8,
+    source: union(enum) {
+        node: struct {
+            name: []const u8,
+            field: []const u8,
+        },
         input_field: []const u8,
-
-        pub inline fn uniqueID(self: @This()) []const u8 {
-            if (self.output_field) |name| {
-                return name;
-            }
-            return self.input_field;
-        }
+        store_field: []const u8,
     },
-    input: SystemSource,
-    store: SystemSource,
 };
 
 pub const NodeGraphBlueprintEntry = struct {
-    name: ?[]const u8 = null, // if null, assume name is function name.
+    name: []const u8,
     function: []const u8,
     input_links: []const InputLink,
-
-    pub inline fn uniqueID(self: @This()) []const u8 {
-        if (self.name) |name| {
-            return name;
-        }
-        return self.function;
-    }
 };
 
 pub const SystemSink = struct {
     output_node: []const u8,
-    output_field: ?[]const u8 = null, // if null, assume output field is the same as system field.
+    output_field: []const u8,
     system_field: []const u8,
-
-    pub inline fn uniqueID(self: @This()) []const u8 {
-        if (self.output_field) |output_field| {
-            return output_field;
-        }
-        return self.system_field;
-    }
 };
 
 pub const Blueprint = struct {
@@ -64,14 +33,14 @@ pub const node_graph_blueprint: Blueprint = .{
         .{
             .function = "BlueprintLoader",
             .input_links = &.{
-                .{ .input = .{ .input_field = "recieved_blueprint" } },
-                .{ .store = .{ .system_field = "blueprint", .input_field = "existing_blueprint" } },
+                .{ .field = "recieved_blueprint", .source = .{ .input_field = "recieved_blueprint" } },
+                .{ .field = "existing_blueprint", .source = .{ .store_field = "existing_blueprint" } },
             },
         },
         .{
             .function = "ContextMenuInteraction",
             .input_links = &.{
-                .{ .input = .{ .input_field = "event" } },
+                .{ .field = "event", .input = .{ .input_field = "event" } },
                 .{ .store = .{ .input_field = "context_menu" } },
             },
         },

@@ -35,7 +35,7 @@ pub const Nodes = struct {
             .context_menu = .{ .open = false, .location = .{ .x = 0, .y = 0 } },
             .interaction_state = .{ .node_selection = &.{} },
         };
-        break :asdf @TypeOf(mng.context_menu);
+        break :asdf @TypeOf(mng.blueprint.store);
     }) void {
         _ = store;
         // const allocator = std.heap.page_allocator;
