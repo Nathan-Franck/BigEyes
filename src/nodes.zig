@@ -24,27 +24,14 @@ pub const Nodes = struct {
         );
         return result;
     }
-    pub fn testNodeGraph(store: asdf: {
-        const mng = MyNodeGraph.SystemStore{
-            .blueprint = .{
-                .nodes = &.{},
-                .output = &.{},
-                .store = &.{},
-            },
-            .camera = .{},
-            .context_menu = .{ .open = false, .location = .{ .x = 0, .y = 0 } },
-            .interaction_state = .{ .node_selection = &.{} },
+    pub fn testNodeGraph(inputs: MyNodeGraph.SystemInputs, store: MyNodeGraph.SystemStore) MyNodeGraph.SystemOutputs {
+        const allocator = std.heap.page_allocator;
+        var my_node_graph = MyNodeGraph{
+            .allocator = allocator,
+            .store = store,
         };
-        break :asdf @TypeOf(mng.blueprint.store);
-    }) void {
-        _ = store;
-        // const allocator = std.heap.page_allocator;
-        // var my_node_graph = MyNodeGraph{
-        //     .allocator = allocator,
-        //     .store = store,
-        // };
-        // const result_commands = try my_node_graph.update(inputs);
-        // return result_commands;
+        const result_commands = try my_node_graph.update(inputs);
+        return result_commands;
     }
 };
 pub const NodesEnum = DeclsToEnum(Nodes);

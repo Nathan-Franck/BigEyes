@@ -18,7 +18,10 @@ pub inline fn typescriptTypeOf(comptime from_type: anytype, comptime options: st
         },
         .ErrorUnion => |eu| typescriptTypeOf(eu.payload, .{}), // Ignore the existence of errors for now...
         .Pointer => |pointer| switch (pointer.size) {
-            .Many, .Slice => typescriptTypeOf(pointer.child, .{}) ++ "[]",
+            .Many, .Slice => if (pointer.child == u8)
+                "string"
+            else
+                typescriptTypeOf(pointer.child, .{}) ++ "[]",
             else => "unknown",
         },
         .Union => |union_info| {
