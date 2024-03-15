@@ -35,7 +35,7 @@ pub const node_graph_blueprint: Blueprint = .{
             .function = "BlueprintLoader",
             .input_links = &.{
                 .{ .field = "recieved_blueprint", .source = .{ .input_field = "recieved_blueprint" } },
-                .{ .field = "existing_blueprint", .source = .{ .store_field = "existing_blueprint" } },
+                .{ .field = "existing_blueprint", .source = .{ .store_field = "blueprint" } },
             },
         },
         .{
@@ -110,7 +110,7 @@ pub const node_graph_blueprint: Blueprint = .{
         // .{ .system_field = "active_node", .output_node = "NodeInteraction", .output_field = "active_node" },
         .{ .system_field = "camera", .output_node = "CameraControls", .output_field = "camera" },
         .{ .system_field = "blueprint", .output_node = "NodeFormatting", .output_field = "blueprint" },
-        .{ .system_field = "interaction_state", .output_node = "NodeInteraction", .output_field = "interaction_stata" },
+        .{ .system_field = "interaction_state", .output_node = "NodeInteraction", .output_field = "interaction_state" },
     },
     .output = &.{
         .{ .system_field = "render_event", .output_node = "DomRenderer", .output_field = "render_event" },

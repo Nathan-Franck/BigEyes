@@ -98,7 +98,7 @@ fn selectionToNodes(
     const result = try allocator.alloc(NodeGraphBlueprintEntry, selection.len);
     for (result, 0..) |*item, index| {
         const existing_node = for (all_nodes) |node| {
-            if (std.meta.eql(selection[index], node.uniqueID()))
+            if (std.meta.eql(selection[index], node.name))
                 break node;
         } else unreachable;
         item.* = existing_node;
@@ -114,18 +114,18 @@ fn pasteNodesUnique(
     const unique_nodes = try allocator.alloc(NodeGraphBlueprintEntry, new_nodes.len);
     for (unique_nodes, 0..) |*unique_node, index| {
         const new_node = new_nodes[index];
-        const existing_name = if (new_node.name) |name| base_name: {
-            var split_iter = std.mem.split(u8, name, "#");
+        const existing_name = base_name: {
+            var split_iter = std.mem.split(u8, new_node.name, "#");
             break :base_name split_iter.first();
-        } else new_node.function;
+        };
         var counter: u32 = 1;
         var name_candidate = existing_name;
         while (not_unique: {
             for (existing_nodes) |node| {
-                if (std.mem.eql(u8, node.uniqueID(), name_candidate))
+                if (std.mem.eql(u8, node.name, name_candidate))
                     break :not_unique true;
             } else for (unique_nodes[0..index]) |node| {
-                if (std.mem.eql(u8, node.name.?, name_candidate))
+                if (std.mem.eql(u8, node.name, name_candidate))
                     break :not_unique true;
             } else break :not_unique false;
         }) {
@@ -287,7 +287,7 @@ pub fn NodeInteraction(self: @This(), input: struct {
                         for (input.blueprint.nodes) |node|
                             if (selection: {
                                 for (to_remove) |item|
-                                    if (std.meta.eql(item, node.uniqueID()))
+                                    if (std.meta.eql(item, node.name))
                                         break :selection null;
                                 break :selection node;
                             }) |selected|
@@ -509,6 +509,6 @@ test "duplicate node" {
         .keyboard_modifiers = .{ .shift = false, .control = false, .alt = false, .super = false },
     });
     try std.testing.expectEqual(second_output.blueprint.nodes.len, 4);
-    try std.testing.expectEqualStrings(second_output.blueprint.nodes[2].name.?, "test");
-    try std.testing.expectEqualStrings(second_output.blueprint.nodes[3].name.?, "test#3");
+    try std.testing.expectEqualStrings(second_output.blueprint.nodes[2].name, "test");
+    try std.testing.expectEqualStrings(second_output.blueprint.nodes[3].name, "test#3");
 }

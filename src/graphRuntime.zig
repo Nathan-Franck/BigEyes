@@ -41,14 +41,14 @@ pub fn NodeGraph(comptime node_definitions: anytype, comptime graph: Blueprint) 
     const NodeOutputs = build_type: {
         comptime var node_output_fields: []const std.builtin.Type.StructField = &.{};
         inline for (graph.nodes) |node| {
-            const node_defn = @field(node_definitions, node.uniqueID());
+            const node_defn = @field(node_definitions, node.name);
             const node_outputs = @typeInfo(@TypeOf(node_defn)).Fn.return_type.?;
             const non_error_outputs = switch (@typeInfo(node_outputs)) {
                 else => node_outputs,
                 .ErrorUnion => |error_union| error_union.payload,
             };
             node_output_fields = comptime node_output_fields ++ .{.{
-                .name = node.uniqueID()[0.. :0],
+                .name = node.name[0.. :0],
                 .type = non_error_outputs,
                 .default_value = null,
                 .is_comptime = false,
@@ -67,9 +67,9 @@ pub fn NodeGraph(comptime node_definitions: anytype, comptime graph: Blueprint) 
         var node_priorities = [_]u16{0} ** graph.nodes.len;
         var next_nodes: []const struct { name: []const u8, priority: u16 } = &.{};
         gather_initial_nodes: inline for (graph.nodes) |node| {
-            inline for (node.input_links) |link| switch (link) {
+            inline for (node.input_links) |link| switch (link.source) {
                 else => {},
-                .input => {
+                .input_field => {
                     next_nodes = comptime next_nodes ++ .{.{ .name = node.name, .priority = 0 }};
                     continue :gather_initial_nodes;
                 },
@@ -88,16 +88,16 @@ pub fn NodeGraph(comptime node_definitions: anytype, comptime graph: Blueprint) 
                 inline for (graph.nodes) |node|
                     if (std.mem.eql(u8, node.name, current_node.name))
                         inline for (graph.nodes) |next_node| {
-                            if (is_output_node: for (next_node.input_links) |input_link| switch (input_link) {
+                            if (is_output_node: for (next_node.input_links) |link| switch (link.source) {
                                 else => continue,
                                 .node => |input_node| if (std.mem.eql(
                                     u8,
-                                    input_node.from,
+                                    input_node.name,
                                     current_node.name,
                                 )) break :is_output_node true else continue,
                             } else break :is_output_node false)
                                 next_nodes = comptime next_nodes ++ .{.{
-                                    .unique_id = next_node.name,
+                                    .name = next_node.name,
                                     .priority = current_node.priority + 1,
                                 }};
                             max_node_priority = @max(max_node_priority, current_node.priority + 1);
@@ -122,7 +122,7 @@ pub fn NodeGraph(comptime node_definitions: anytype, comptime graph: Blueprint) 
                 for (node.input_links) |link| switch (link.source) {
                     else => {},
                     .input_field => |input_field| {
-                        const node_params = @typeInfo(@TypeOf(@field(node_definitions, node.uniqueID()))).Fn.params;
+                        const node_params = @typeInfo(@TypeOf(@field(node_definitions, node.name))).Fn.params;
                         const field_type = for (@typeInfo(node_params[node_params.len - 1].type.?).Struct.fields) |field|
                             if (std.mem.eql(u8, field.name, input_field)) break field.type else continue
                         else
@@ -149,13 +149,13 @@ pub fn NodeGraph(comptime node_definitions: anytype, comptime graph: Blueprint) 
         pub const SystemOutputs = build_type: {
             var system_output_fields: []const std.builtin.Type.StructField = &.{};
             for (graph.output) |output_defn| {
-                const name = output_defn.uniqueID();
+                const name = output_defn.system_field;
                 const node_id = output_defn.output_node;
                 const node = for (graph.nodes) |node|
-                    if (std.mem.eql(u8, node.uniqueID(), node_id)) break node else continue
+                    if (std.mem.eql(u8, node.name, node_id)) break node else continue
                 else
                     @compileError("Node not found " ++ node_id);
-                const node_outputs = @typeInfo(@TypeOf(@field(node_definitions, node.uniqueID()))).Fn.return_type.?;
+                const node_outputs = @typeInfo(@TypeOf(@field(node_definitions, node.name))).Fn.return_type.?;
                 const field_type = for (@typeInfo(node_outputs).Struct.fields) |field|
                     if (std.mem.eql(u8, field.name, output_defn.system_field)) break field.type else continue
                 else
@@ -182,10 +182,10 @@ pub fn NodeGraph(comptime node_definitions: anytype, comptime graph: Blueprint) 
                 const name = store_field.system_field;
                 const node_id = store_field.output_node;
                 const node = for (graph.nodes) |node|
-                    if (std.mem.eql(u8, node.uniqueID(), node_id)) break node else continue
+                    if (std.mem.eql(u8, node.name, node_id)) break node else continue
                 else
                     @compileError("Node not found " ++ node_id);
-                const node_outputs = @typeInfo(@TypeOf(@field(node_definitions, node.uniqueID()))).Fn.return_type.?;
+                const node_outputs = @typeInfo(@TypeOf(@field(node_definitions, node.name))).Fn.return_type.?;
                 const field_type = for (switch (@typeInfo(node_outputs)) {
                     .ErrorUnion => |error_union| @typeInfo(error_union.payload).Struct.fields,
                     .Struct => |the_struct| the_struct.fields,
@@ -216,24 +216,24 @@ pub fn NodeGraph(comptime node_definitions: anytype, comptime graph: Blueprint) 
             var nodes_outputs: NodeOutputs = undefined;
             inline for (node_order) |node_index| {
                 const node = graph.nodes[node_index];
-                const node_defn = @field(node_definitions, node.uniqueID());
+                const node_defn = @field(node_definitions, node.name);
                 const node_params = @typeInfo(@TypeOf(node_defn)).Fn.params;
                 const NodeInputs = node_params[node_params.len - 1].type.?;
                 var node_inputs: NodeInputs = undefined;
-                inline for (node.input_links) |link| switch (link) {
-                    .input => |input| {
-                        @field(node_inputs, input.input_field) = @field(inputs, input.uniqueID());
+                inline for (node.input_links) |link| switch (link.source) {
+                    .input_field => |input_field| {
+                        @field(node_inputs, link.field) = @field(inputs, input_field);
+                    },
+                    .store_field => |store_field| {
+                        @field(node_inputs, link.field) = @field(self.store, store_field);
                     },
                     .node => |node_blueprint| {
-                        const node_outputs = @field(nodes_outputs, node_blueprint.from);
-                        const node_output = @field(node_outputs, node_blueprint.uniqueID());
+                        const node_outputs = @field(nodes_outputs, node_blueprint.name);
+                        const node_output = @field(node_outputs, node_blueprint.field);
                         const InputType = @TypeOf(node_output);
-                        const OutputType = @TypeOf(@field(node_inputs, node_blueprint.input_field));
-                        @field(node_inputs, node_blueprint.input_field) =
+                        const OutputType = @TypeOf(@field(node_inputs, link.field));
+                        @field(node_inputs, link.field) =
                             AttemptEventCast(InputType, OutputType, node_output);
-                    },
-                    .store => |store| {
-                        @field(node_inputs, store.input_field) = @field(self.store, store.uniqueID());
                     },
                 };
                 const node_output = @call(
@@ -245,7 +245,7 @@ pub fn NodeGraph(comptime node_definitions: anytype, comptime graph: Blueprint) 
                         .{node_inputs},
                 );
 
-                @field(nodes_outputs, node.uniqueID()) = switch (@typeInfo(@TypeOf(node_output))) {
+                @field(nodes_outputs, node.name) = switch (@typeInfo(@TypeOf(node_output))) {
                     else => node_output,
                     .ErrorUnion => try node_output,
                 };
@@ -254,14 +254,14 @@ pub fn NodeGraph(comptime node_definitions: anytype, comptime graph: Blueprint) 
             inline for (node_graph_blueprint.store) |store_defn| {
                 const node_outputs = @field(nodes_outputs, store_defn.output_node);
                 @field(self.store, store_defn.system_field) =
-                    @field(node_outputs, store_defn.uniqueID());
+                    @field(node_outputs, store_defn.output_field);
             }
             // Output from system from select nodes...
             var system_outputs: SystemOutputs = undefined;
             inline for (node_graph_blueprint.output) |output_defn| {
                 const node_outputs = @field(nodes_outputs, output_defn.output_node);
                 @field(system_outputs, output_defn.system_field) =
-                    @field(node_outputs, output_defn.uniqueID());
+                    @field(node_outputs, output_defn.output_field);
             }
             return system_outputs;
         }
