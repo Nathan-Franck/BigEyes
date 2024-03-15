@@ -65,12 +65,12 @@ pub fn NodeGraph(comptime node_definitions: anytype, comptime graph: Blueprint) 
     const node_order = precalculate: {
         var max_node_priority: u16 = 0;
         var node_priorities = [_]u16{0} ** graph.nodes.len;
-        var next_nodes: []const struct { unique_id: []const u8, priority: u16 } = &.{};
+        var next_nodes: []const struct { name: []const u8, priority: u16 } = &.{};
         gather_initial_nodes: inline for (graph.nodes) |node| {
             inline for (node.input_links) |link| switch (link) {
                 else => {},
                 .input => {
-                    next_nodes = comptime next_nodes ++ .{.{ .unique_id = node.uniqueID(), .priority = 0 }};
+                    next_nodes = comptime next_nodes ++ .{.{ .name = node.name, .priority = 0 }};
                     continue :gather_initial_nodes;
                 },
             };
@@ -80,24 +80,24 @@ pub fn NodeGraph(comptime node_definitions: anytype, comptime graph: Blueprint) 
             next_nodes = &.{};
             inline for (current_nodes) |current_node| {
                 const node_index = for (graph.nodes, 0..) |node, index|
-                    if (std.mem.eql(u8, node.uniqueID(), current_node.unique_id)) break index else continue
+                    if (std.mem.eql(u8, node.name, current_node.name)) break index else continue
                 else
                     unreachable;
                 node_priorities[node_index] = @max(node_priorities[node_index], current_node.priority);
                 @setEvalBranchQuota(9000);
                 inline for (graph.nodes) |node|
-                    if (std.mem.eql(u8, node.uniqueID(), current_node.unique_id))
+                    if (std.mem.eql(u8, node.name, current_node.name))
                         inline for (graph.nodes) |next_node| {
                             if (is_output_node: for (next_node.input_links) |input_link| switch (input_link) {
                                 else => continue,
                                 .node => |input_node| if (std.mem.eql(
                                     u8,
                                     input_node.from,
-                                    current_node.unique_id,
+                                    current_node.name,
                                 )) break :is_output_node true else continue,
                             } else break :is_output_node false)
                                 next_nodes = comptime next_nodes ++ .{.{
-                                    .unique_id = next_node.uniqueID(),
+                                    .unique_id = next_node.name,
                                     .priority = current_node.priority + 1,
                                 }};
                             max_node_priority = @max(max_node_priority, current_node.priority + 1);
@@ -119,20 +119,19 @@ pub fn NodeGraph(comptime node_definitions: anytype, comptime graph: Blueprint) 
         pub const SystemInputs = build_type: {
             var system_input_fields: []const std.builtin.Type.StructField = &.{};
             for (graph.nodes) |node|
-                for (node.input_links) |link| switch (link) {
+                for (node.input_links) |link| switch (link.source) {
                     else => {},
-                    .input => |input| {
-                        const field_name = input.uniqueID();
+                    .input_field => |input_field| {
                         const node_params = @typeInfo(@TypeOf(@field(node_definitions, node.uniqueID()))).Fn.params;
                         const field_type = for (@typeInfo(node_params[node_params.len - 1].type.?).Struct.fields) |field|
-                            if (std.mem.eql(u8, field.name, field_name)) break field.type else continue
+                            if (std.mem.eql(u8, field.name, input_field)) break field.type else continue
                         else
                             unreachable; // TODO: Provide a useful compiler error about how blueprint and node defn's disagree.
                         system_input_fields = system_input_fields ++ for (system_input_fields) |system_input|
-                            if (std.mem.eql(u8, system_input.name, input.input_field)) break .{} else continue
+                            if (std.mem.eql(u8, system_input.name, input_field)) break .{} else continue
                         else
                             .{.{
-                                .name = field_name[0.. :0],
+                                .name = input_field[0.. :0],
                                 .type = field_type,
                                 .default_value = null,
                                 .is_comptime = false,

@@ -31,6 +31,7 @@ pub const Blueprint = struct {
 pub const node_graph_blueprint: Blueprint = .{
     .nodes = &.{
         .{
+            .name = "BlueprintLoader",
             .function = "BlueprintLoader",
             .input_links = &.{
                 .{ .field = "recieved_blueprint", .source = .{ .input_field = "recieved_blueprint" } },
@@ -38,55 +39,81 @@ pub const node_graph_blueprint: Blueprint = .{
             },
         },
         .{
+            .name = "ContextMenuInteraction",
             .function = "ContextMenuInteraction",
             .input_links = &.{
-                .{ .field = "event", .input = .{ .input_field = "event" } },
-                .{ .store = .{ .input_field = "context_menu" } },
+                .{ .field = "event", .source = .{ .input_field = "event" } },
+                .{ .field = "context_menu", .source = .{ .store_field = "context_menu" } },
             },
         },
         .{
+            .name = "NodeInteraction",
             .function = "NodeInteraction",
             .input_links = &.{
-                .{ .input = .{ .input_field = "keyboard_modifiers" } },
-                .{ .store = .{ .input_field = "interaction_state" } },
-                .{ .node = .{ .input_field = "blueprint", .from = "BlueprintLoader" } },
-                .{ .node = .{ .input_field = "event", .output_field = "event", .from = "ContextMenuInteraction" } },
+                .{ .field = "keyboard_modifiers", .source = .{ .input_field = "keyboard_modifiers" } },
+                .{ .field = "interaction_state", .source = .{ .store_field = "interaction_state" } },
+                .{ .field = "blueprint", .source = .{ .node = .{ .name = "BlueprintLoader", .field = "blueprint" } } },
+                .{ .field = "event", .source = .{ .node = .{ .name = "ContextMenuInteraction", .field = "event" } } },
             },
         },
         .{
+            .name = "CameraControls",
             .function = "CameraControls",
             .input_links = &.{
-                .{ .input = .{ .input_field = "keyboard_modifiers" } },
-                .{ .store = .{ .input_field = "camera" } },
-                .{ .node = .{ .input_field = "event", .output_field = "event", .from = "NodeInteraction" } },
+                .{
+                    .field = "keyboard_modifiers",
+                    .source = .{ .input_field = "keyboard_modifiers" },
+                },
+                .{
+                    .field = "camera",
+                    .source = .{ .store_field = "camera" },
+                },
+                .{
+                    .field = "event",
+                    .source = .{ .node = .{ .field = "event", .name = "NodeInteraction" } },
+                },
             },
         },
         .{
+            .name = "NodeFormatting",
             .function = "NodeFormatting",
             .input_links = &.{
-                .{ .node = .{ .input_field = "event", .from = "ContextMenuInteraction" } },
-                .{ .node = .{ .input_field = "blueprint", .from = "NodeInteraction" } },
+                .{ .field = "event", .source = .{ .node = .{ .field = "event", .name = "ContextMenuInteraction" } } },
+                .{ .field = "blueprint", .source = .{ .node = .{ .field = "blueprint", .name = "NodeInteraction" } } },
             },
         },
         .{
+            .name = "DomRenderer",
             .function = "DomRenderer",
             .input_links = &.{
-                .{ .store = .{ .input_field = "previous_blueprint", .system_field = "blueprint" } },
-                .{ .node = .{ .input_field = "current_blueprint", .output_field = "blueprint", .from = "NodeFormatting" } },
-                .{ .node = .{ .input_field = "camera", .from = "CameraControls" } },
-                .{ .node = .{ .input_field = "context_menu", .from = "ContextMenuInteraction" } },
+                .{
+                    .field = "previous_blueprint",
+                    .source = .{ .store_field = "blueprint" },
+                },
+                .{
+                    .field = "current_blueprint",
+                    .source = .{ .node = .{ .field = "blueprint", .name = "NodeFormatting" } },
+                },
+                .{
+                    .field = "camera",
+                    .source = .{ .node = .{ .field = "camera", .name = "CameraControls" } },
+                },
+                .{
+                    .field = "context_menu",
+                    .source = .{ .node = .{ .field = "context_menu", .name = "ContextMenuInteraction" } },
+                },
             },
         },
     },
     .store = &.{
-        .{ .system_field = "context_menu", .output_node = "ContextMenuInteraction" },
-        // .{ .system_field = "active_node", .output_node = "NodeInteraction" },
-        .{ .system_field = "camera", .output_node = "CameraControls" },
-        .{ .system_field = "blueprint", .output_node = "NodeFormatting" },
-        .{ .system_field = "interaction_state", .output_node = "NodeInteraction" },
+        .{ .system_field = "context_menu", .output_node = "ContextMenuInteraction", .output_field = "context_menu" },
+        // .{ .system_field = "active_node", .output_node = "NodeInteraction", .output_field = "active_node" },
+        .{ .system_field = "camera", .output_node = "CameraControls", .output_field = "camera" },
+        .{ .system_field = "blueprint", .output_node = "NodeFormatting", .output_field = "blueprint" },
+        .{ .system_field = "interaction_state", .output_node = "NodeInteraction", .output_field = "interaction_stata" },
     },
     .output = &.{
-        .{ .system_field = "render_event", .output_node = "DomRenderer" },
+        .{ .system_field = "render_event", .output_node = "DomRenderer", .output_field = "render_event" },
     },
 };
 
@@ -94,14 +121,15 @@ test "InputLink to Json" {
     const std = @import("std");
     const allocator = std.heap.page_allocator;
     const inputLink: InputLink = .{
-        .node = .{
-            .from = "test",
-            .output_field = "output",
-            .input_field = "input",
-        },
+        .field = "input",
+        .source = .{ .node = .{
+            .name = "test",
+            .field = "input",
+        } },
     };
     const json = try std.json.stringifyAlloc(allocator, inputLink, .{});
     _ = json;
+    _ = node_graph_blueprint;
     // std.debug.print("json: {s}\n", .{json});
-    // expect(json).toBe(`{"node":{"from":"test","output_field":"output","input_field":"input"}}`);
+    // expect(json).toBe(`{"node":{"from":"test","output_field":"output","field":"input"}}`);
 }
