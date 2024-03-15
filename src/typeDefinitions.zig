@@ -2,6 +2,8 @@ const std = @import("std");
 
 pub inline fn typescriptTypeOf(comptime from_type: anytype, comptime options: struct { first: bool = false }) []const u8 {
     return comptime switch (@typeInfo(from_type)) {
+        .Bool => "boolean",
+        .Void => "void",
         .Int => "number",
         .Float => "number",
         .Optional => |optional_info| typescriptTypeOf(optional_info.child, .{}) ++ " | undefined",
@@ -31,7 +33,15 @@ pub inline fn typescriptTypeOf(comptime from_type: anytype, comptime options: st
             return result;
         },
         .Struct => |struct_info| {
-            const decls: []const u8 = &.{};
+            var decls: []const u8 = &.{};
+            for (struct_info.decls, 0..) |decl, i| {
+                decls = decls ++ std.fmt.comptimePrint("{s}{s}{s}: {s}", .{
+                    if (i == 0) "" else ", ",
+                    if (options.first) "\n\t" else "",
+                    decl.name,
+                    typescriptTypeOf(@TypeOf(@field(from_type, decl.name)), .{}),
+                });
+            }
             var fields: []const u8 = &.{};
             for (struct_info.fields, 0..) |field, i| {
                 const field_type, const is_optional = switch (@typeInfo(field.type)) {
@@ -61,7 +71,7 @@ pub inline fn typescriptTypeOf(comptime from_type: anytype, comptime options: st
             }
             return std.fmt.comptimePrint("({s}) => {s}", .{ params, typescriptTypeOf(function_info.return_type.?, .{}) });
         },
-        else => "unknown",
+        else => std.fmt.comptimePrint("unknown /** zig type is {any} **/", .{ @typeInfo(from_type) }),
     };
 }
 

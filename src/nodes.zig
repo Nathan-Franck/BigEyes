@@ -4,6 +4,11 @@ const graphRuntime = @import("./graphRuntime.zig");
 const NodeDefinitions = @import("./nodeGraphBlueprintNodes.zig");
 const node_graph_blueprint = @import("./interactiveNodeBuilderBlueprint.zig").node_graph_blueprint;
 
+const MyNodeGraph = graphRuntime.NodeGraph(
+    NodeDefinitions,
+    node_graph_blueprint,
+);
+
 pub const Nodes = struct {
     pub fn helloSlice(faces: []subdiv.Face) ![]subdiv.Face {
         const allocator = std.heap.page_allocator;
@@ -19,18 +24,27 @@ pub const Nodes = struct {
         );
         return result;
     }
-    const MyNodeGraph = graphRuntime.NodeGraph(
-        NodeDefinitions,
-        node_graph_blueprint,
-    );
-    pub fn testNodeGraph(inputs: MyNodeGraph.SystemInputs, store: MyNodeGraph.SystemStore) !MyNodeGraph.SystemOutputs {
-        const allocator = std.heap.page_allocator;
-        var my_node_graph = MyNodeGraph{
-            .allocator = allocator,
-            .store = store,
+    pub fn testNodeGraph(store: asdf: {
+        const mng = MyNodeGraph.SystemStore{
+            .blueprint = .{
+                .nodes = &.{},
+                .output = &.{},
+                .store = &.{},
+            },
+            .camera = .{},
+            .context_menu = .{ .open = false, .location = .{ .x = 0, .y = 0 } },
+            .interaction_state = .{ .node_selection = &.{} },
         };
-        const result_commands = try my_node_graph.update(inputs);
-        return result_commands;
+        break :asdf @TypeOf(mng.context_menu);
+    }) void {
+        _ = store;
+        // const allocator = std.heap.page_allocator;
+        // var my_node_graph = MyNodeGraph{
+        //     .allocator = allocator,
+        //     .store = store,
+        // };
+        // const result_commands = try my_node_graph.update(inputs);
+        // return result_commands;
     }
 };
 pub const NodesEnum = DeclsToEnum(Nodes);

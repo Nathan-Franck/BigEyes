@@ -114,7 +114,6 @@ pub fn NodeGraph(comptime node_definitions: anytype, comptime graph: Blueprint) 
         }
         break :precalculate node_order;
     };
-    const nodes = node_definitions{ .allocator = allocator };
     const Graph = struct {
         const Self = @This();
         pub const SystemInputs = build_type: {
@@ -213,7 +212,8 @@ pub fn NodeGraph(comptime node_definitions: anytype, comptime graph: Blueprint) 
         };
         allocator: std.mem.Allocator,
         store: SystemStore,
-        fn update(self: *Self, inputs: SystemInputs) !SystemOutputs {
+        pub fn update(self: *Self, inputs: SystemInputs) !SystemOutputs {
+            const nodes = node_definitions{ .allocator = self.allocator };
             var nodes_outputs: NodeOutputs = undefined;
             inline for (node_order) |node_index| {
                 const node = graph.nodes[node_index];
@@ -274,10 +274,10 @@ test "Build" {
     const allocator = std.heap.page_allocator;
     const MyNodeGraph = NodeGraph(
         NodeDefinitions,
-        allocator,
         node_graph_blueprint,
     );
     var my_node_graph = MyNodeGraph{
+        .allocator = allocator,
         .store = .{
             .blueprint = .{
                 .nodes = &.{},
