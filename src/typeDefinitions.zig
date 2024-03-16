@@ -26,8 +26,11 @@ pub inline fn typescriptTypeOf(comptime from_type: anytype, comptime options: st
         },
         .Enum => |enum_info| {
             var result: []const u8 = &.{};
-            for (enum_info.fields) |field| {
-                result = result ++ "|" ++ field.name;
+            for (enum_info.fields, 0..) |field, i| {
+                result = result ++ std.fmt.comptimePrint("{s}\"{s}\"", .{
+                    if (i == 0) "" else " | ",
+                    field.name,
+                });
             }
             return result;
         },
