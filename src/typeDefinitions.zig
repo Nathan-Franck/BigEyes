@@ -24,6 +24,16 @@ pub inline fn typescriptTypeOf(comptime from_type: anytype, comptime options: st
                 typescriptTypeOf(pointer.child, .{}) ++ "[]",
             else => "unknown",
         },
+        .Enum => |enum_info| {
+            var result: []const u8 = &.{};
+            for (enum_info.fields, 0..) |field, i| {
+                result = result ++ std.fmt.comptimePrint("{s}\"{s}\"", .{
+                    if (i == 0) "" else " | ",
+                    field.name,
+                });
+            }
+            return result;
+        },
         .Union => |union_info| {
             var result: []const u8 = &.{};
             for (union_info.fields, 0..) |field, i| {
@@ -74,7 +84,7 @@ pub inline fn typescriptTypeOf(comptime from_type: anytype, comptime options: st
             }
             return std.fmt.comptimePrint("({s}) => {s}", .{ params, typescriptTypeOf(function_info.return_type.?, .{}) });
         },
-        else => std.fmt.comptimePrint("unknown /** zig type is {any} **/", .{ @typeInfo(from_type) }),
+        else => std.fmt.comptimePrint("unknown /** zig type is {any} **/", .{@typeInfo(from_type)}),
     };
 }
 
