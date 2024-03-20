@@ -31,7 +31,15 @@ fn callWithJsonErr(name_ptr: [*]const u8, name_len: usize, args_ptr: [*]const u8
     switch (case) {
         inline else => |fn_name| {
             const func = @field(nodes.Nodes, @tagName(fn_name));
-            const args = try std.json.parseFromSlice(nodes.Args(func), allocator, args_string, .{});
+            var diagnostics = std.json.Diagnostics{};
+            var scanner = std.json.Scanner.initCompleteInput(allocator, args_string);
+            defer scanner.deinit();
+            scanner.enableDiagnostics(&diagnostics);
+
+            const args = std.json.parseFromTokenSource(nodes.Args(func), allocator, &scanner, .{}) catch |err| {
+                dumpError(try std.fmt.allocPrint(allocator, "{s}", .{args_string[0..@intCast(diagnostics.getByteOffset())]}));
+                return err;
+            };
             const result = try @call(.auto, func, args.value);
             dumpMessage(try std.json.stringifyAlloc(allocator, result, .{}));
         },
@@ -39,9 +47,9 @@ fn callWithJsonErr(name_ptr: [*]const u8, name_len: usize, args_ptr: [*]const u8
 }
 
 export fn callWithJson(name_ptr: [*]const u8, name_len: usize, args_ptr: [*]const u8, args_len: usize) void {
-    const allocator = std.heap.page_allocator;
-    callWithJsonErr(name_ptr, name_len, args_ptr, args_len) catch |err| {
-        dumpError(std.fmt.allocPrint(allocator, "error: {?}\n", .{err}) catch unreachable);
+    // const allocator = std.heap.page_allocator;
+    callWithJsonErr(name_ptr, name_len, args_ptr, args_len) catch {
+        // dumpError(std.fmt.allocPrint(allocator, "error: {?}\n", .{err}) catch unreachable);
         return;
     };
 }

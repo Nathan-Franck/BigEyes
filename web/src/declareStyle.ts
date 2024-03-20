@@ -16,12 +16,12 @@ export function declareStyle<const T extends Record<string, Partial<CSSStyleDecl
       classContents[subKey as any] = undefined;
       return [subKey, classContents[subclassKey as any]] as const;
     });
-        retun [ ...unwrappedDefns, [className, classContents] as const, ...subClasses];
+        return [ ...unwrappedDefns, [className, classContents] as const, ...subClasses];
   }, [] as any);
   const encodedStyle = classAndSubclassList.map((entry) => {
     const [objectKey, contents] = entry;
     return `.${objectKey as string} {${Object.keys(contents).map((key) => {
-      const dashedKey = key.replace(/[A-Z]/g, (match) => `-${match.toLowerCase()}`);
+      const dashedKey = key.replace(/[A-Z]/g, () => `-$match.toLowerCase()}`);
       return `${dashedKey}: ${contents[key as any]};`
     }).join('')}}`
   }).join('');

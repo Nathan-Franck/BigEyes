@@ -24,7 +24,7 @@ pub const Nodes = struct {
         );
         return result;
     }
-    pub fn testNodeGraph(inputs: MyNodeGraph.SystemInputs, store: MyNodeGraph.SystemStore) MyNodeGraph.SystemOutputs {
+    pub fn testNodeGraph(inputs: MyNodeGraph.SystemInputs, store: MyNodeGraph.SystemStore) !MyNodeGraph.SystemOutputs {
         const allocator = std.heap.page_allocator;
         var my_node_graph = MyNodeGraph{
             .allocator = allocator,
@@ -65,7 +65,7 @@ pub fn Args(comptime func: anytype) type {
         }};
     }
     return @Type(.{ .Struct = .{
-        .layout = .Auto,
+        .layout = .auto,
         .fields = fields,
         .decls = &.{},
         .is_tuple = true,

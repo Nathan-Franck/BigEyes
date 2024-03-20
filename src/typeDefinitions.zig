@@ -6,7 +6,7 @@ pub inline fn typescriptTypeOf(comptime from_type: anytype, comptime options: st
         .Void => "void",
         .Int => "number",
         .Float => "number",
-        .Optional => |optional_info| typescriptTypeOf(optional_info.child, .{}) ++ " | undefined",
+        .Optional => |optional_info| typescriptTypeOf(optional_info.child, .{}) ++ " | null",
         .Array => |array_info| typescriptTypeOf(array_info.child, .{}) ++ "[]",
         .Vector => |vector_info| {
             const chlid = typescriptTypeOf(vector_info.child, .{});
@@ -57,9 +57,10 @@ pub inline fn typescriptTypeOf(comptime from_type: anytype, comptime options: st
             }
             var fields: []const u8 = &.{};
             for (struct_info.fields, 0..) |field, i| {
+                const default = .{ field.type, false };
                 const field_type, const is_optional = switch (@typeInfo(field.type)) {
-                    else => .{ field.type, false },
-                    .Optional => |field_optional_info| .{ field_optional_info.child, true },
+                    else => default,
+                    .Optional => |field_optional_info| if (field.default_value) .{ field_optional_info.child, true } else default,
                 };
                 fields = fields ++ std.fmt.comptimePrint("{s}{s}{s}{s}: {s}", .{
                     if (i == 0) "" else ", ",

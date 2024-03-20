@@ -55,8 +55,8 @@ pub fn NodeGraph(comptime node_definitions: anytype, comptime graph: Blueprint) 
                 .alignment = @alignOf(non_error_outputs),
             }};
         }
-        break :build_type @Type(.{ .Struct = .{
-            .layout = .Auto,
+        break :build_type @Type(std.builtin.Type{ .Struct = .{
+            .layout = .auto,
             .fields = node_output_fields,
             .decls = &.{},
             .is_tuple = false,
@@ -140,7 +140,7 @@ pub fn NodeGraph(comptime node_definitions: anytype, comptime graph: Blueprint) 
                     },
                 };
             break :build_type @Type(.{ .Struct = .{
-                .layout = .Auto,
+                .layout = .auto,
                 .fields = system_input_fields,
                 .decls = &.{},
                 .is_tuple = false,
@@ -169,7 +169,7 @@ pub fn NodeGraph(comptime node_definitions: anytype, comptime graph: Blueprint) 
                 }};
             }
             break :build_type @Type(.{ .Struct = .{
-                .layout = .Auto,
+                .layout = .auto,
                 .fields = system_output_fields,
                 .decls = &.{},
                 .is_tuple = false,
@@ -203,7 +203,7 @@ pub fn NodeGraph(comptime node_definitions: anytype, comptime graph: Blueprint) 
                 }};
             }
             break :build_type @Type(.{ .Struct = .{
-                .layout = .Auto,
+                .layout = .auto,
                 .fields = system_store_fields,
                 .decls = &.{},
                 .is_tuple = false,
@@ -303,4 +303,12 @@ test "Build" {
     try std.testing.expect(my_node_graph.store.blueprint.nodes.len > 0);
     try std.testing.expect(my_node_graph.store.blueprint.store.len > 0);
     try std.testing.expect(result_commands.render_event.?.something_changed == true);
+    // const my_enum = enum {
+    //     hello,
+    //     goodbye,
+    // };
+    // const my_state = struct {
+    //     test_me: my_enum,
+    // };
+    // std.debug.print("\n{s}\n", .{try std.json.stringifyAlloc(allocator, my_state{ .test_me = .hello }, .{})});
 }

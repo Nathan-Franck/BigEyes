@@ -1,6 +1,8 @@
 import type { Nodes } from "../gen/nodes.d.ts";
 
 let onMessage: null | ((message: string) => void) = null;
+let onError: null | ((error: string) => void) = null;
+
 function messageFromWasm(sourcePtr: number, sourceLen: number) {
   const str = (new TextDecoder()).decode(new Uint8Array(instance.exports.memory.buffer, sourcePtr, sourceLen))
   if (onMessage == null)
@@ -11,7 +13,10 @@ function messageFromWasm(sourcePtr: number, sourceLen: number) {
 
 function errorFromWasm(sourcePtr: number, sourceLen: number) {
   const str = (new TextDecoder()).decode(new Uint8Array(instance.exports.memory.buffer, sourcePtr, sourceLen))
-  console.error(str)
+  if (onError == null)
+    console.error(str)
+  else
+    onError(str);
 }
 
 function encodeString(string: string) {
@@ -44,12 +49,15 @@ const { instance } = await WebAssembly.instantiateStreaming(fetch("bin/game.wasm
   },
 };
 
-function callNode<T extends keyof Nodes>(name: T, ...args: Parameters<Nodes[T]>): ReturnType<Nodes[T]> {
+function callNode<T extends keyof Nodes>(name: T, ...args: Parameters<Nodes[T]>): { error: string } | ReturnType<Nodes[T]> {
   const nameBuffer = encodeString(name);
   const argsBuffer = encodeString(JSON.stringify(args));
-  let result: ReturnType<Nodes[T]> = null as any;
+  let result: { error: string } | ReturnType<Nodes[T]> = null as any;
   onMessage = (message) => {
     result = JSON.parse(message);
+  };
+  onError = (error) => {
+    result = { error };
   };
   instance.exports.callWithJson(
     nameBuffer.ptr,
@@ -63,6 +71,26 @@ function callNode<T extends keyof Nodes>(name: T, ...args: Parameters<Nodes[T]>)
 
 export function testCallNode() {
   const result = [
+    callNode("testNodeGraph", {
+      event: null,
+      keyboard_modifiers: { shift: false, control: false, alt: false, super: false },
+      recieved_blueprint: { output: [], store: [], nodes: [{ function: "what", input_links: [], name: "hey" }] },
+    }, {
+      blueprint: { nodes: [], output: [], store: [] },
+      interaction_state: {
+        node_selection: [],
+        box_selection: null,
+        clipboard: null,
+        wiggle: null,
+      },
+      camera: {},
+      context_menu: {
+        selected_node: null,
+        open: false,
+        location: { x: 0, y: 0 },
+        options: [],
+      }
+    }),
     callNode("helloSlice", [[1, 2, 3]]),
     callNode("testSubdiv", [
       [0, 1, 2, 3],
