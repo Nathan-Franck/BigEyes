@@ -130,10 +130,16 @@ pub fn NodeGraph(comptime node_definitions: anytype, comptime graph: Blueprint) 
                         system_input_fields = system_input_fields ++ for (system_input_fields) |system_input|
                             if (std.mem.eql(u8, system_input.name, input_field)) break .{} else continue
                         else
-                            .{.{
+                            .{std.builtin.Type.StructField{
                                 .name = input_field[0.. :0],
                                 .type = field_type,
-                                .default_value = null,
+                                .default_value = switch (@typeInfo(field_type)) {
+                                    else => null,
+                                    .Optional => |optional| blk: {
+                                        const default_value: ?optional.child = null;
+                                        break :blk @ptrCast(&default_value);
+                                    },
+                                },
                                 .is_comptime = false,
                                 .alignment = @alignOf(field_type),
                             }};
@@ -289,7 +295,6 @@ test "Build" {
         },
     };
     const result_commands = try my_node_graph.update(.{
-        .event = null,
         .recieved_blueprint = node_graph_blueprint,
         .keyboard_modifiers = .{
             .shift = false,
@@ -303,6 +308,7 @@ test "Build" {
     try std.testing.expect(my_node_graph.store.blueprint.nodes.len > 0);
     try std.testing.expect(my_node_graph.store.blueprint.store.len > 0);
     try std.testing.expect(result_commands.render_event.?.something_changed == true);
+
     // const my_enum = enum {
     //     hello,
     //     goodbye,

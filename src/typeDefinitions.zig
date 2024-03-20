@@ -9,10 +9,10 @@ pub inline fn typescriptTypeOf(comptime from_type: anytype, comptime options: st
         .Optional => |optional_info| typescriptTypeOf(optional_info.child, .{}) ++ " | null",
         .Array => |array_info| typescriptTypeOf(array_info.child, .{}) ++ "[]",
         .Vector => |vector_info| {
-            const chlid = typescriptTypeOf(vector_info.child, .{});
+            const child = typescriptTypeOf(vector_info.child, .{});
             var result: []const u8 = &.{};
             for (0..vector_info.len) |i| {
-                result = result ++ std.fmt.comptimePrint("{s}{s}", .{ if (i == 0) "" else ", ", chlid });
+                result = result ++ std.fmt.comptimePrint("{s}{s}", .{ if (i == 0) "" else ", ", child });
             }
             return std.fmt.comptimePrint("[{s}]", .{result});
         },
@@ -60,7 +60,7 @@ pub inline fn typescriptTypeOf(comptime from_type: anytype, comptime options: st
                 const default = .{ field.type, false };
                 const field_type, const is_optional = switch (@typeInfo(field.type)) {
                     else => default,
-                    .Optional => |field_optional_info| if (field.default_value) .{ field_optional_info.child, true } else default,
+                    .Optional => |field_optional_info| if (field.default_value) |_| .{ field_optional_info.child, true } else default,
                 };
                 fields = fields ++ std.fmt.comptimePrint("{s}{s}{s}{s}: {s}", .{
                     if (i == 0) "" else ", ",
