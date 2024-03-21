@@ -24,14 +24,23 @@ pub const Nodes = struct {
         );
         return result;
     }
-    pub fn testNodeGraph(inputs: MyNodeGraph.SystemInputs, store: MyNodeGraph.SystemStore) !MyNodeGraph.SystemOutputs {
+    pub fn testNodeGraph(
+        inputs: MyNodeGraph.SystemInputs,
+        store: MyNodeGraph.SystemStore,
+    ) !struct {
+        outputs: MyNodeGraph.SystemOutputs,
+        store: MyNodeGraph.SystemStore,
+    } {
         const allocator = std.heap.page_allocator;
         var my_node_graph = MyNodeGraph{
             .allocator = allocator,
             .store = store,
         };
         const result_commands = try my_node_graph.update(inputs);
-        return result_commands;
+        return .{
+            .outputs = result_commands,
+            .store = my_node_graph.store,
+        };
     }
 };
 pub const NodesEnum = DeclsToEnum(Nodes);

@@ -49,7 +49,7 @@ const { instance } = await WebAssembly.instantiateStreaming(fetch("bin/game.wasm
   },
 };
 
-function callNode<T extends keyof Nodes>(name: T, ...args: Parameters<Nodes[T]>): { error: string } | ReturnType<Nodes[T]> {
+export function callNode<T extends keyof Nodes>(name: T, ...args: Parameters<Nodes[T]>): { error: string } | ReturnType<Nodes[T]> {
   const nameBuffer = encodeString(name);
   const argsBuffer = encodeString(JSON.stringify(args));
   let result: { error: string } | ReturnType<Nodes[T]> = null as any;
