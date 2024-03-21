@@ -10,7 +10,7 @@ Can 3D toon graphics be easy?
 ### Building
 
 Requires Zig 0.11
-> Currently on zig version 0.12.0-dev.2638+38c2a2573
+> Currently on zig version 0.12.0-dev.3381+7057bffc1
 
 ```
 git submodule update 
