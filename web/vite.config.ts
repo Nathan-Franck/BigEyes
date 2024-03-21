@@ -1,7 +1,7 @@
 import { defineConfig } from 'vite'
-import solid from 'vite-plugin-solid'
-import wasm from 'vite-plugin-wasm'
+import preact from '@preact/preset-vite'
 
+// https://vitejs.dev/config/
 export default defineConfig({
-  plugins: [solid(), wasm()],
+  plugins: [preact()],
 })

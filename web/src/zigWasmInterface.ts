@@ -1,4 +1,4 @@
-import type { Nodes } from "../gen/nodes.d.ts";
+import type { Nodes } from "../../gen/nodes";
 
 let onMessage: null | ((message: string) => void) = null;
 let onError: null | ((error: string) => void) = null;
