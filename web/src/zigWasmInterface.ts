@@ -72,20 +72,15 @@ function callNode<T extends keyof Nodes>(name: T, ...args: Parameters<Nodes[T]>)
 export function testCallNode() {
   const result = [
     callNode("testNodeGraph", {
-      event: null,
       keyboard_modifiers: { shift: false, control: false, alt: false, super: false },
       recieved_blueprint: { output: [], store: [], nodes: [{ function: "what", input_links: [], name: "hey" }] },
     }, {
       blueprint: { nodes: [], output: [], store: [] },
       interaction_state: {
         node_selection: [],
-        box_selection: null,
-        clipboard: null,
-        wiggle: null,
       },
       camera: {},
       context_menu: {
-        selected_node: null,
         open: false,
         location: { x: 0, y: 0 },
         options: [],
