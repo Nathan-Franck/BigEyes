@@ -10,7 +10,7 @@ const MyNodeGraph = graphRuntime.NodeGraph(
 );
 
 pub const interface = struct {
-    pub fn helloSlice(faces: []subdiv.Face) ![]subdiv.Face {
+    pub fn helloSliceHiHi(faces: []subdiv.Face) ![]subdiv.Face {
         const allocator = std.heap.page_allocator;
         return std.mem.concat(allocator, subdiv.Face, &.{ faces, &.{&.{ 4, 5, 6 }} });
     }

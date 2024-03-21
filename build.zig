@@ -5,8 +5,8 @@ const ExportMeshes = struct {
     allocator: std.mem.Allocator,
     files: []const []const u8,
     step: std.Build.Step,
-    pub fn create(b: *std.Build, files: []const []const u8) *ExportMeshes {
-        const self = b.allocator.create(ExportMeshes) catch @panic("OOM");
+    pub fn create(b: *std.Build, files: []const []const u8) *@This() {
+        const self = b.allocator.create(@This()) catch @panic("OOM");
         self.* = .{
             .allocator = b.allocator,
             .files = files,
@@ -21,7 +21,7 @@ const ExportMeshes = struct {
     }
     fn exportMeshes(step: *std.Build.Step, prog_node: *std.Progress.Node) !void {
         _ = prog_node;
-        const self = @fieldParentPtr(ExportMeshes, "step", step);
+        const self = @fieldParentPtr(@This(), "step", step);
 
         var b = step.owner;
 
@@ -64,13 +64,64 @@ const ExportMeshes = struct {
     }
 };
 
+fn GenerateTypescripTypes(interface: anytype) type {
+    return struct {
+        allocator: std.mem.Allocator,
+        folder_path: []const u8,
+        file_name: []const u8,
+        step: std.Build.Step,
+        pub fn create(b: *std.Build, folder_path: []const u8, file_name: []const u8) *@This() {
+            const self = b.allocator.create(@This()) catch @panic("OOM");
+            self.* = .{
+                .allocator = b.allocator,
+                .folder_path = folder_path,
+                .file_name = file_name,
+                .step = std.Build.Step.init(.{
+                    .id = .custom,
+                    .name = "export_meshes",
+                    .owner = b,
+                    .makeFn = doStep,
+                }),
+            };
+            return self;
+        }
+        pub fn doStep(step: *std.Build.Step, prog_node: *std.Progress.Node) anyerror!void {
+            _ = prog_node;
+
+            const self = @fieldParentPtr(@This(), "step", step);
+
+            const typescriptTypeOf = @import("src/typeDefinitions.zig").typescriptTypeOf;
+
+            const typeInfo = comptime typescriptTypeOf(interface, .{ .first = true });
+            const contents = "export type WasmInterface = " ++ typeInfo;
+            const file_path = try std.fmt.allocPrint(self.allocator, "{s}/{s}", .{ self.folder_path, self.file_name });
+            std.fs.cwd().makeDir(self.folder_path) catch {};
+            std.fs.cwd().deleteFile(file_path) catch {};
+            const file = try std.fs.cwd().createFile(file_path, .{});
+            try file.writeAll(contents);
+        }
+    };
+}
+
 pub fn build(
     b: *std.Build,
 ) !void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
-    const export_meshes = ExportMeshes.create(b, &.{ "boss", "cube", "Cat", "RockLevel" });
+    const export_meshes = ExportMeshes.create(b, &.{
+        "boss",
+        "cube",
+        "Cat",
+        "RockLevel",
+    });
+    const generate_typescript_types = GenerateTypescripTypes(
+        @import("src/wasmInterface.zig").interface,
+    ).create(
+        b,
+        "web/gen",
+        "wasmInterface.d.ts",
+    );
     const zgui_pkg = @import("zgui").package(b, target, optimize, .{ .options = .{ .backend = .glfw_wgpu } });
     const zmath_pkg = @import("zmath").package(b, target, optimize, .{});
     const zglfw_pkg = @import("zglfw").package(b, target, optimize, .{ .options = .{ .shared = false } });
@@ -116,6 +167,7 @@ pub fn build(
         // exe.max_memory = std.wasm.page_size * number_of_pages;
 
         // exe.step.dependOn(&export_meshes.step);
+        exe.step.dependOn(&generate_typescript_types.step);
 
         const install_artifact = b.addInstallArtifact(exe, .{ .dest_dir = .{ .override = .{ .custom = "../web/bin" } } });
         const install_step = b.step("wasm", "build a wasm");
