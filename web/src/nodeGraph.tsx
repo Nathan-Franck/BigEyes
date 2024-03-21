@@ -1,9 +1,12 @@
 import { useState } from 'preact/hooks';
-import { callNode } from './zigWasmInterface';
+import { callWasm } from './zigWasmInterface';
 
 export function NodeGraph() {
-
-  var store: Extract<ReturnType<typeof callNode<"testNodeGraph">>, { store: any; }>["store"] = {
+  
+  const interfaceFunctionName = "callNodeGraph" as const;
+  type InterfaceFunction = typeof callWasm<typeof interfaceFunctionName>;
+  
+  var store: Extract<ReturnType<InterfaceFunction>, { store: any; }>["store"] = {
     blueprint: { nodes: [], output: [], store: [] },
     interaction_state: {
       node_selection: [],
@@ -20,8 +23,8 @@ export function NodeGraph() {
     keyboard_modifiers: { shift: false, control: false, alt: false, super: false },
   });
 
-  function call(inputs: Parameters<typeof callNode<"testNodeGraph">>[1]) {
-    const result = callNode("testNodeGraph", inputs, store);
+  function call(inputs: Parameters<InterfaceFunction>[1]) {
+    const result = callWasm(interfaceFunctionName, inputs, store);
     if ("error" in result) {
       return result;
     }

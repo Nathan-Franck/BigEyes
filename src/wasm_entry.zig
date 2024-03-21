@@ -1,6 +1,6 @@
 const std = @import("std");
 const subdiv = @import("./subdiv.zig");
-const nodes = @import("./nodes.zig");
+const wasmInterface = @import("./wasmInterface.zig");
 
 export fn allocUint8(length: u32) [*]const u8 {
     const slice = std.heap.page_allocator.alloc(u8, length) catch
@@ -24,19 +24,19 @@ fn callWithJsonErr(name_ptr: [*]const u8, name_len: usize, args_ptr: [*]const u8
     const allocator = std.heap.page_allocator;
     const name: []const u8 = name_ptr[0..name_len];
     const args_string: []const u8 = args_ptr[0..args_len];
-    const case = std.meta.stringToEnum(nodes.NodesEnum, name) orelse {
+    const case = std.meta.stringToEnum(wasmInterface.InterfaceEnum, name) orelse {
         dumpError(try std.fmt.allocPrint(allocator, "unknown function: {s}\n", .{name}));
         return;
     };
     switch (case) {
         inline else => |fn_name| {
-            const func = @field(nodes.Nodes, @tagName(fn_name));
+            const func = @field(wasmInterface.interface, @tagName(fn_name));
             var diagnostics = std.json.Diagnostics{};
             var scanner = std.json.Scanner.initCompleteInput(allocator, args_string);
             defer scanner.deinit();
             scanner.enableDiagnostics(&diagnostics);
 
-            const args = std.json.parseFromTokenSource(nodes.Args(func), allocator, &scanner, .{}) catch |err| {
+            const args = std.json.parseFromTokenSource(wasmInterface.Args(func), allocator, &scanner, .{}) catch |err| {
                 dumpError(try std.fmt.allocPrint(allocator, "{s}", .{args_string[0..@intCast(diagnostics.getByteOffset())]}));
                 return err;
             };

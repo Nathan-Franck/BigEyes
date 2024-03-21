@@ -1,4 +1,4 @@
-import type { Nodes } from "../../gen/nodes";
+import type { WasmInterface } from "../gen/wasmInterface";
 
 let onMessage: null | ((message: string) => void) = null;
 let onError: null | ((error: string) => void) = null;
@@ -49,10 +49,10 @@ const { instance } = await WebAssembly.instantiateStreaming(fetch("bin/game.wasm
   },
 };
 
-export function callNode<T extends keyof Nodes>(name: T, ...args: Parameters<Nodes[T]>): { error: string } | ReturnType<Nodes[T]> {
+export function callWasm<T extends keyof WasmInterface>(name: T, ...args: Parameters<WasmInterface[T]>): { error: string } | ReturnType<WasmInterface[T]> {
   const nameBuffer = encodeString(name);
   const argsBuffer = encodeString(JSON.stringify(args));
-  let result: { error: string } | ReturnType<Nodes[T]> = null as any;
+  let result: { error: string } | ReturnType<WasmInterface[T]> = null as any;
   onMessage = (message) => {
     result = JSON.parse(message);
   };
@@ -71,7 +71,7 @@ export function callNode<T extends keyof Nodes>(name: T, ...args: Parameters<Nod
 
 export function testCallNode() {
   const result = [
-    callNode("testNodeGraph", {
+    callWasm("callNodeGraph", {
       keyboard_modifiers: { shift: false, control: false, alt: false, super: false },
       recieved_blueprint: { output: [], store: [], nodes: [{ function: "what", input_links: [], name: "hey" }] },
     }, {
@@ -86,8 +86,8 @@ export function testCallNode() {
         options: [],
       }
     }),
-    callNode("helloSlice", [[1, 2, 3]]),
-    callNode("testSubdiv", [
+    callWasm("helloSlice", [[1, 2, 3]]),
+    callWasm("testSubdiv", [
       [0, 1, 2, 3],
       [0, 1, 5, 4],
     ], [

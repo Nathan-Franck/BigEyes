@@ -90,10 +90,10 @@ pub inline fn typescriptTypeOf(comptime from_type: anytype, comptime options: st
 }
 
 pub fn main() !void {
-    const typeInfo = comptime typescriptTypeOf(@import("./nodes.zig").Nodes, .{ .first = true });
-    const contents = "export type Nodes = " ++ typeInfo;
+    const typeInfo = comptime typescriptTypeOf(@import("./wasmInterface.zig").interface, .{ .first = true });
+    const contents = "export type WasmInterface = " ++ typeInfo;
     std.fs.cwd().makeDir("web/gen") catch {};
-    std.fs.cwd().deleteFile("web/gen/nodes.d.ts") catch {};
-    const file = try std.fs.cwd().createFile("web/gen/nodes.d.ts", .{});
+    std.fs.cwd().deleteFile("web/gen/wasmInterface.d.ts") catch {};
+    const file = try std.fs.cwd().createFile("web/gen/wasmInterface.d.ts", .{});
     try file.writeAll(contents);
 }

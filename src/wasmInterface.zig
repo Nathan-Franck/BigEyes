@@ -9,7 +9,7 @@ const MyNodeGraph = graphRuntime.NodeGraph(
     node_graph_blueprint,
 );
 
-pub const Nodes = struct {
+pub const interface = struct {
     pub fn helloSlice(faces: []subdiv.Face) ![]subdiv.Face {
         const allocator = std.heap.page_allocator;
         return std.mem.concat(allocator, subdiv.Face, &.{ faces, &.{&.{ 4, 5, 6 }} });
@@ -24,7 +24,7 @@ pub const Nodes = struct {
         );
         return result;
     }
-    pub fn testNodeGraph(
+    pub fn callNodeGraph(
         inputs: MyNodeGraph.SystemInputs,
         store: MyNodeGraph.SystemStore,
     ) !struct {
@@ -43,7 +43,8 @@ pub const Nodes = struct {
         };
     }
 };
-pub const NodesEnum = DeclsToEnum(Nodes);
+
+pub const InterfaceEnum = DeclsToEnum(interface);
 
 pub fn DeclsToEnum(comptime container: type) type {
     const info = @typeInfo(container);
@@ -61,6 +62,7 @@ pub fn DeclsToEnum(comptime container: type) type {
         .is_exhaustive = true,
     } });
 }
+
 pub fn Args(comptime func: anytype) type {
     const ParamInfo = @typeInfo(@TypeOf(func)).Fn.params;
     var fields: []const std.builtin.Type.StructField = &.{};
