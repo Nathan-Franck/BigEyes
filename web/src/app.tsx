@@ -2,7 +2,7 @@ import { useState } from 'preact/hooks'
 import preactLogo from './assets/preact.svg'
 import viteLogo from '/vite.svg'
 import './app.css'
-import { callNode } from './zigWasmInterface';
+import { NodeGraph } from './nodeGraph';
 
 // const { classes, encodedStyle } = declareStyle({
 //   solidLogo: {
@@ -19,46 +19,11 @@ import { callNode } from './zigWasmInterface';
 //   }
 // });
 
-function thinger(inputs: Parameters<typeof callNode<"testNodeGraph">>[1]) {
-  const result = callNode("testNodeGraph", inputs, store);
-  if ("error" in result) {
-    return result;
-  }
-  store = result.store;
-  return result.outputs;
-}
-
-var store: Extract<ReturnType<typeof callNode<"testNodeGraph">>, { store: any }>["store"] = {
-  blueprint: { nodes: [], output: [], store: [] },
-  interaction_state: {
-    node_selection: [],
-  },
-  camera: {},
-  context_menu: {
-    open: false,
-    location: { x: 0, y: 0 },
-    options: [],
-  }
-};
-
-const initial_result = thinger({
-  keyboard_modifiers: { shift: false, control: false, alt: false, super: false },
-});
-
-function getGraphSignal() {
-  const [result, setResult] = useState(initial_result);
-  return {
-    graphResult: result,
-    callGraph: (inputs: Parameters<typeof thinger>[0]) => {
-      const result = thinger(inputs);
-      setResult(result);
-    },
-  };
-}
+const nodeGraph = NodeGraph();
 
 export function App() {
   const [count, setCount] = useState(0)
-  const { graphResult, callGraph } = getGraphSignal();
+  const { graphResult, callGraph } = nodeGraph.useState();
 
   return (
     <>
@@ -66,7 +31,7 @@ export function App() {
         keyboard_modifiers: { shift: false, control: false, alt: false, super: false },
         recieved_blueprint: { output: [], store: [], nodes: [{ function: "what", input_links: [], name: "hey" }] },
       })}>
-        {"error" in graphResult ? <>{graphResult.error}</> : <>{graphResult.render_event?.something_changed ? "Something Changed!" : "Nothing Changed"}</> }
+        {"error" in graphResult ? <>{graphResult.error}</> : <>{graphResult.render_event?.something_changed ? "Something Changed!" : "Nothing Changed"}</>}
       </button>
       <div>
         <a href="https://vitejs.dev" target="_blank">
