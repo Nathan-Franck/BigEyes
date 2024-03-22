@@ -82,28 +82,28 @@ pub const node_graph_blueprint: Blueprint = .{
                 .{ .field = "blueprint", .source = .{ .node = .{ .field = "blueprint", .name = "NodeInteraction" } } },
             },
         },
-        .{
-            .name = "DomRenderer",
-            .function = "DomRenderer",
-            .input_links = &.{
-                .{
-                    .field = "previous_blueprint",
-                    .source = .{ .store_field = "blueprint" },
-                },
-                .{
-                    .field = "current_blueprint",
-                    .source = .{ .node = .{ .field = "blueprint", .name = "NodeFormatting" } },
-                },
-                .{
-                    .field = "camera",
-                    .source = .{ .node = .{ .field = "camera", .name = "CameraControls" } },
-                },
-                .{
-                    .field = "context_menu",
-                    .source = .{ .node = .{ .field = "context_menu", .name = "ContextMenuInteraction" } },
-                },
-            },
-        },
+        // .{
+        //     .name = "DomRenderer",
+        //     .function = "DomRenderer",
+        //     .input_links = &.{
+        //         .{
+        //             .field = "previous_blueprint",
+        //             .source = .{ .store_field = "blueprint" },
+        //         },
+        //         .{
+        //             .field = "current_blueprint",
+        //             .source = .{ .node = .{ .field = "blueprint", .name = "NodeFormatting" } },
+        //         },
+        //         .{
+        //             .field = "camera",
+        //             .source = .{ .node = .{ .field = "camera", .name = "CameraControls" } },
+        //         },
+        //         .{
+        //             .field = "context_menu",
+        //             .source = .{ .node = .{ .field = "context_menu", .name = "ContextMenuInteraction" } },
+        //         },
+        //     },
+        // },
     },
     .store = &.{
         .{ .system_field = "context_menu", .output_node = "ContextMenuInteraction", .output_field = "context_menu" },
@@ -113,7 +113,9 @@ pub const node_graph_blueprint: Blueprint = .{
         .{ .system_field = "interaction_state", .output_node = "NodeInteraction", .output_field = "interaction_state" },
     },
     .output = &.{
-        .{ .system_field = "render_event", .output_node = "DomRenderer", .output_field = "render_event" },
+        .{ .system_field = "blueprint", .output_node = "NodeFormatting", .output_field = "blueprint" },
+        .{ .system_field = "camera", .output_node = "CameraControls", .output_field = "camera" },
+        // .{ .system_field = "render_event", .output_node = "DomRenderer", .output_field = "render_event" },
     },
 };
 
