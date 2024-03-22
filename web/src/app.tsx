@@ -30,9 +30,11 @@ export function App() {
       <button onClick={() => callGraph({
         keyboard_modifiers: { shift: false, control: false, alt: false, super: false },
         recieved_blueprint: { output: [], store: [], nodes: [{ function: "what", input_links: [], name: "hey" }] },
-      })}>
-        {"error" in graphResult ? <>{graphResult.error}</> : <>{graphResult.render_event?.something_changed ? "Something Changed!" : "Nothing Changed"}</>}
-      </button>
+      })}> {
+          "error" in graphResult
+            ? <>{graphResult.error}</>
+            : <>{graphResult.blueprint.nodes.length }</>
+        } </button>
       <div>
         <a href="https://vitejs.dev" target="_blank">
           <img src={viteLogo} class="logo" alt="Vite logo" />
