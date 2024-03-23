@@ -59,12 +59,17 @@ export function callWasm<T extends keyof WasmInterface>(name: T, ...args: Parame
   onError = (error) => {
     result = { error };
   };
-  instance.exports.callWithJson(
-    nameBuffer.ptr,
-    nameBuffer.length,
-    argsBuffer.ptr,
-    argsBuffer.length
-  );
+  try {
+    instance.exports.callWithJson(
+      nameBuffer.ptr,
+      nameBuffer.length,
+      argsBuffer.ptr,
+      argsBuffer.length
+    );
+  }
+  catch (e) {
+    result = { error: e.message }
+  }
   onMessage = null;
   return result;
 }
@@ -73,7 +78,7 @@ export function testCallNode() {
   const result = [
     callWasm("callNodeGraph", {
       keyboard_modifiers: { shift: false, control: false, alt: false, super: false },
-      recieved_blueprint: { output: [], store: [], nodes: [{ function: "what", input_links: [], name: "hey" }] },
+     recieved_blueprint: { output: [], store: [], nodes: [{ function: "what", input_links: [], name: "hey" }] },
     }, {
       blueprint: { nodes: [], output: [], store: [] },
       interaction_state: {
@@ -86,7 +91,7 @@ export function testCallNode() {
         options: [],
       }
     }),
-    callWasm("helloSlice", [[1, 2, 3]]),
+    callWasm("helloSliceHiHi", [[1, 2, 3]]),
     callWasm("testSubdiv", [
       [0, 1, 2, 3],
       [0, 1, 5, 4],
