@@ -280,21 +280,26 @@ pub fn NodeInteraction(self: @This(), input: struct {
                         break :concat try pasteNodesUnique(self.allocator, input.blueprint.nodes, new_nodes);
                     },
                 }) },
-                .delete => |delete| .{ .interaction_state = input.interaction_state, .blueprint = utils.copyWith(input.blueprint, .{
-                    .nodes = filter: {
-                        const to_remove = if (selection.len > 0) selection else &.{delete.node_name};
-                        var result = std.ArrayList(NodeGraphBlueprintEntry).init(self.allocator);
-                        for (input.blueprint.nodes) |node|
-                            if (selection: {
-                                for (to_remove) |item|
-                                    if (std.meta.eql(item, node.name))
-                                        break :selection null;
-                                break :selection node;
-                            }) |selected|
-                                try result.append(selected);
-                        break :filter result.items;
-                    },
-                }) },
+                .delete => |delete| .{
+                    .interaction_state = input.interaction_state,
+                    .blueprint = utils.copyWith(input.blueprint, .{
+                        .nodes = filter: {
+                            const to_remove = if (selection.len > 0) selection else &.{delete.node_name};
+                            var result = std.ArrayList(NodeGraphBlueprintEntry).init(self.allocator);
+                            for (input.blueprint.nodes) |node|
+                                if (selection: {
+                                    for (to_remove) |item|
+                                        if (std.mem.eql(u8, item, node.name))
+                                            break :selection null;
+                                    break :selection node;
+                                }) |selected|
+                                    try result.append(selected);
+                            break :filter result.items;
+                            // _ = delete;
+                            // break :filter &[_]NodeGraphBlueprintEntry{};
+                        },
+                    }),
+                },
             },
         }
     else

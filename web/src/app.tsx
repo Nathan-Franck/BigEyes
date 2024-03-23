@@ -33,7 +33,14 @@ export function App() {
     <>
       <button onClick={() => callGraph({
         keyboard_modifiers,
-        recieved_blueprint: { output: [], store: [], nodes: [{ function: "what", input_links: [], name: "hey!" }] },
+        recieved_blueprint: {
+          output: [],
+          store: [],
+          nodes: [
+            { function: "what", input_links: [], name: "hey!" }, 
+            { function: "what", input_links: [], name: "hey2!" },
+          ]
+        },
       })}> {
           <>{graphResult.blueprint.nodes.length}</>
         } </button>
