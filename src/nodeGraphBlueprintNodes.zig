@@ -98,7 +98,7 @@ fn selectionToNodes(
     const result = try allocator.alloc(NodeGraphBlueprintEntry, selection.len);
     for (result, 0..) |*item, index| {
         const existing_node = for (all_nodes) |node| {
-            if (std.meta.eql(selection[index], node.name))
+            if (std.mem.eql(u8, selection[index], node.name))
                 break node;
         } else unreachable;
         item.* = existing_node;
@@ -244,7 +244,8 @@ pub fn NodeInteraction(self: @This(), input: struct {
                 .external_node_event => |node_event| switch (node_event.mouse_event) {
                     else => default,
                     .mouse_down => .{ .blueprint = input.blueprint, .interaction_state = utils.copyWith(input.interaction_state, .{
-                        .node_selection = if (for (selection, 0..) |item, index| (if (std.meta.eql(
+                        .node_selection = if (for (selection, 0..) |item, index| (if (std.mem.eql(
+                            u8,
                             item,
                             node_event.node_name,
                         )) break index) else null) |index| try std.mem.concat(self.allocator, []const u8, &.{
@@ -273,13 +274,16 @@ pub fn NodeInteraction(self: @This(), input: struct {
                 .paste => if (input.interaction_state.clipboard) |clipboard| .{ .interaction_state = input.interaction_state, .blueprint = utils.copyWith(input.blueprint, .{
                     .nodes = try pasteNodesUnique(self.allocator, input.blueprint.nodes, clipboard),
                 }) } else default,
-                .duplicate => |duplicate| .{ .interaction_state = input.interaction_state, .blueprint = utils.copyWith(input.blueprint, .{
-                    .nodes = concat: {
-                        const to_duplicate = if (selection.len > 0) selection else &.{duplicate.node_name};
-                        const new_nodes = try selectionToNodes(self.allocator, input.blueprint.nodes, to_duplicate);
-                        break :concat try pasteNodesUnique(self.allocator, input.blueprint.nodes, new_nodes);
-                    },
-                }) },
+                .duplicate => |duplicate| .{
+                    .interaction_state = input.interaction_state,
+                    .blueprint = utils.copyWith(input.blueprint, .{
+                        .nodes = concat: {
+                            const to_duplicate = if (selection.len > 0) selection else &.{duplicate.node_name};
+                            const new_nodes = try selectionToNodes(self.allocator, input.blueprint.nodes, to_duplicate);
+                            break :concat try pasteNodesUnique(self.allocator, input.blueprint.nodes, new_nodes);
+                        },
+                    }),
+                },
                 .delete => |delete| .{
                     .interaction_state = input.interaction_state,
                     .blueprint = utils.copyWith(input.blueprint, .{
