@@ -115,6 +115,7 @@ pub const node_graph_blueprint: Blueprint = .{
     .output = &.{
         .{ .system_field = "blueprint", .output_node = "NodeFormatting", .output_field = "blueprint" },
         .{ .system_field = "camera", .output_node = "CameraControls", .output_field = "camera" },
+        .{ .system_field = "context_menu", .output_node = "ContextMenuInteraction", .output_field = "context_menu" },
         // .{ .system_field = "render_event", .output_node = "DomRenderer", .output_field = "render_event" },
     },
 };

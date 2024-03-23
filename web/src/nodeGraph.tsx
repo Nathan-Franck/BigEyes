@@ -33,6 +33,7 @@ export function NodeGraph() {
   }
 
   return {
+    getStore: () => store,
     useState: () => {
       const [result, setResult] = useState(initial_result);
       return {
