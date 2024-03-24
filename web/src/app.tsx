@@ -3,21 +3,39 @@ import preactLogo from './assets/preact.svg'
 import viteLogo from '/vite.svg'
 import './app.css'
 import { NodeGraph } from './nodeGraph';
+import { declareStyle } from './declareStyle';
 
-// const { classes, encodedStyle } = declareStyle({
-//   solidLogo: {
-//     height: "6em",
-//     padding: "1.5em",
-//     willChange: "filter",
-//     transition: "filter 300ms",
-//   },
-//   logo: {
-//     filter: "grayscale(100%)",
-//     "&:hover": {
-//       filter: "grayscale(0%)",
-//     }
-//   }
-// });
+const { classes, encodedStyle } = declareStyle({
+  solidLogo: {
+    height: "6em",
+    padding: "1.5em",
+    willChange: "filter",
+    transition: "filter 300ms",
+  },
+  logo: {
+    filter: "grayscale(100%)",
+    "&:hover": {
+      filter: "grayscale(0%)",
+    }
+  },
+  node: {
+  },
+  contextMenu: {
+    display: "flex",
+    flexDirection: "column",
+    width: "max-content",
+    backgroundColor: "#333",
+    borderRadius: "10px",
+  },
+  contextMenuSeperator: {
+    height: "1px",
+    margin: "5px",
+    backgroundColor: "#0008",
+  },
+  contextMenuItem: {
+    backgroundColor: "#0000",
+  },
+});
 
 // TODO - Get the error messages from the console showing up
 // https://stackoverflow.com/questions/6604192/showing-console-errors-and-alerts-in-a-div-inside-the-page
@@ -34,13 +52,15 @@ export function App() {
 
   return (
     <>
+      <div>{encodedStyle}</div>
+      <style>{encodedStyle}</style>
       <button onClick={() => callGraph({
         keyboard_modifiers,
         recieved_blueprint: {
           output: [],
           store: [],
           nodes: [
-            { function: "what", input_links: [], name: "hey!" }, 
+            { function: "what", input_links: [], name: "hey!" },
             { function: "what", input_links: [], name: "hey2!" },
           ]
         },
@@ -48,7 +68,7 @@ export function App() {
           <>{graphResult.blueprint.nodes.length}</>
         } </button>
       {
-        graphResult.blueprint.nodes.map(node => <div onClick={event => callGraph({
+        graphResult.blueprint.nodes.map(node => <button class={classes.node} onClick={event => callGraph({
           keyboard_modifiers,
           event: {
             external_node_event: {
@@ -66,20 +86,24 @@ export function App() {
             }
           }
         })
-        } > {node.name}</div >)
+        }>{node.name}</button>)
       }
-      {
+      <div class={classes.contextMenu}>{
         graphResult.context_menu.open
-          ? graphResult.context_menu.options.map(option => <button onClick={() => callGraph({
-            keyboard_modifiers,
-            event: {
-              context_event: {
-                option_selected: option
+          ? graphResult.context_menu.options.map((option, index) => <>
+            {index > 0 ? <div class={classes.contextMenuSeperator} /> : null}
+            <button class={classes.contextMenuItem} onClick={() => callGraph({
+              keyboard_modifiers,
+              event: {
+                context_event: {
+                  option_selected: option
+                }
               }
-            }
-          })}>{option}</button>)
+            })}>{option}</button>
+          </>
+          )
           : null
-      }
+      }</div>
       <div>{JSON.stringify(nodeGraph.getStore())}</div>
       <div>{JSON.stringify("event" in graphResult ? graphResult.event : null)}</div>
       <div>

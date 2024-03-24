@@ -67,7 +67,7 @@ export function callWasm<T extends keyof WasmInterface>(name: T, ...args: Parame
       argsBuffer.length
     );
   }
-  catch (e) {
+  catch (e: any) {
     result = { error: e.message }
   }
   onMessage = null;
@@ -78,7 +78,7 @@ export function testCallNode() {
   const result = [
     callWasm("callNodeGraph", {
       keyboard_modifiers: { shift: false, control: false, alt: false, super: false },
-     recieved_blueprint: { output: [], store: [], nodes: [{ function: "what", input_links: [], name: "hey" }] },
+      recieved_blueprint: { output: [], store: [], nodes: [{ function: "what", input_links: [], name: "hey" }] },
     }, {
       blueprint: { nodes: [], output: [], store: [] },
       interaction_state: {
