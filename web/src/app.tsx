@@ -6,17 +6,8 @@ import { NodeGraph } from './nodeGraph';
 import { declareStyle } from './declareStyle';
 
 const { classes, encodedStyle } = declareStyle({
-  solidLogo: {
-    height: "6em",
-    padding: "1.5em",
-    willChange: "filter",
-    transition: "filter 300ms",
-  },
-  logo: {
-    filter: "grayscale(100%)",
-    "&:hover": {
-      filter: "grayscale(0%)",
-    }
+  nodeGraph: {
+    backgroundColor: "#3333",
   },
   node: {
   },
@@ -67,27 +58,29 @@ export function App() {
       })}> {
           <>{graphResult.blueprint.nodes.length}</>
         } </button>
-      {
-        graphResult.blueprint.nodes.map(node => <button class={classes.node} onClick={event => callGraph({
-          keyboard_modifiers,
-          event: {
-            external_node_event: {
-              mouse_event: {
-                mouse_down: {
-                  button: event.button == 0
-                    ? "right" /**temp for touch testing **/
-                    : event.button == 1
-                      ? "middle"
-                      : "right",
-                  location: { x: event.x, y: event.y }
+      <div class={classes.nodeGraph}>
+        {
+          graphResult.blueprint.nodes.map(node => <button class={classes.node} onClick={event => callGraph({
+            keyboard_modifiers,
+            event: {
+              external_node_event: {
+                mouse_event: {
+                  mouse_down: {
+                    button: event.button == 0
+                      ? "right" /**temp for touch testing **/
+                      : event.button == 1
+                        ? "middle"
+                        : "right",
+                    location: { x: event.x, y: event.y }
+                  },
                 },
-              },
-              node_name: node.name,
+                node_name: node.name,
+              }
             }
-          }
-        })
-        }>{node.name}</button>)
-      }
+          })
+          }>{node.name}</button>) 
+        }
+      </div>
       <div class={classes.contextMenu}>{
         graphResult.context_menu.open
           ? graphResult.context_menu.options.map((option, index) => <>
@@ -100,8 +93,7 @@ export function App() {
                 }
               }
             })}>{option}</button>
-          </>
-          )
+          </>)
           : null
       }</div>
       <div>{JSON.stringify(nodeGraph.getStore())}</div>

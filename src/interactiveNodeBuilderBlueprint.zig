@@ -109,7 +109,7 @@ pub const node_graph_blueprint: Blueprint = .{
         .{ .system_field = "context_menu", .output_node = "ContextMenuInteraction", .output_field = "context_menu" },
         // .{ .system_field = "active_node", .output_node = "NodeInteraction", .output_field = "active_node" },
         .{ .system_field = "camera", .output_node = "CameraControls", .output_field = "camera" },
-        .{ .system_field = "blueprint", .output_node = "NodeFormatting", .output_field = "blueprint" },
+        .{ .system_field = "blueprint", .output_node = "NodeInteraction", .output_field = "blueprint" },
         .{ .system_field = "interaction_state", .output_node = "NodeInteraction", .output_field = "interaction_state" },
     },
     .output = &.{
