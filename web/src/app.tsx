@@ -1,9 +1,7 @@
-import { useState, useEffect } from 'preact/hooks'
-import preactLogo from './assets/preact.svg'
-import viteLogo from '/vite.svg'
 import './app.css'
 import { NodeGraph } from './nodeGraph';
 import { declareStyle } from './declareStyle';
+import { useEffect } from 'preact/hooks'  
 
 const { classes, encodedStyle } = declareStyle({
   nodeGraph: {
@@ -34,35 +32,30 @@ const { classes, encodedStyle } = declareStyle({
 const nodeGraph = NodeGraph();
 
 export function App() {
-  const [count, setCount] = useState(0)
   const { graphResult, callGraph } = nodeGraph.useState();
   if ("error" in graphResult)
     return <div>Error: {graphResult.error}</div>
 
-  const nodeReferences: Record<string, HTMLButtonElement | null> = {};
+  const nodeReferences: Record<string, HTMLButtonElement> = {};
   const keyboard_modifiers = { alt: false, control: false, super: false, shift: false };
 
   useEffect(() => {
-    for (var [node, button] of Object.entries(nodeReferences)) {
-      if (button == null)
-        continue;
-      callGraph({
-        keyboard_modifiers,
-        post_render_event: {
-          node_dimensions: {
+    callGraph({
+      keyboard_modifiers,
+      post_render_event: {
+        node_dimensions: Object.entries(nodeReferences)
+          .map(([node, button]) => ({
             node, data: {
               width: button.clientWidth,
               height: button.clientHeight,
             }
-          }
-        }
-      });
-    }
+          }))
+      }
+    });
   });
 
   return (
     <>
-      <div>{encodedStyle}</div>
       <style>{encodedStyle}</style>
       <button onClick={() => callGraph({
         keyboard_modifiers,
@@ -70,8 +63,8 @@ export function App() {
           output: [],
           store: [],
           nodes: [
-            { function: "what", input_links: [], name: "hey!" },
-            { function: "what", input_links: [], name: "hey2!" },
+            { function: "what", input_links: [], name: "testNode" },
+            { function: "what", input_links: [], name: "anotherNode" },
           ]
         },
       })}> {
@@ -80,7 +73,10 @@ export function App() {
       <div class={classes.nodeGraph}>
         {
           graphResult.blueprint.nodes.map(node => <button
-            ref={elem => nodeReferences[node.name] = elem}
+            ref={elem => {
+              if (elem != null)
+                nodeReferences[node.name] = elem
+            }}
             class={classes.node}
             onClick={event => callGraph({
               keyboard_modifiers,
@@ -118,8 +114,6 @@ export function App() {
           </>)
           : null
       }</div>
-      <div>{JSON.stringify(nodeGraph.getStore())}</div>
-      <div>{JSON.stringify("event" in graphResult ? graphResult.event : null)}</div>
     </>
   )
 }
