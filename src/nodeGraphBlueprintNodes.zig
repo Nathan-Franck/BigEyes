@@ -311,7 +311,7 @@ pub fn NodeInteraction(self: @This(), input: struct {
 }
 
 const NodeRenderStatsEvent = union(enum) {
-    pixel_dimensions: NodeData(PixelDimensions),
+    node_dimensions: NodeData(PixelDimensions),
 };
 const PixelCoord = struct { x: u32, y: u32 };
 const PixelDimensions = struct { width: u32, height: u32 };
@@ -340,15 +340,15 @@ pub fn NodeFormatting(
     try node_dimensions.appendSlice(input.node_dimensions);
     if (input.post_render_event) |post_render_event| {
         switch (post_render_event) {
-            else => {},
+            // else => {}, Only one case right now TODO more cases? Or just clear the union!
             .node_dimensions => |node_dimensions_event| {
                 if (!replaced_existing: for (node_dimensions.items) |*existing| {
-                    if (std.mem.eql(u8, existing.node, node_dimensions.node)) {
+                    if (std.mem.eql(u8, existing.node, node_dimensions_event.node)) {
                         existing.data = node_dimensions_event.data;
                         break :replaced_existing true;
                     }
                 } else false) {
-                    node_dimensions.append(node_dimensions);
+                    try node_dimensions.append(node_dimensions_event);
                 }
             },
         }

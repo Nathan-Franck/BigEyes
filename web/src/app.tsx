@@ -1,4 +1,4 @@
-import { useState } from 'preact/hooks'
+import { useState, useEffect } from 'preact/hooks'
 import preactLogo from './assets/preact.svg'
 import viteLogo from '/vite.svg'
 import './app.css'
@@ -39,7 +39,26 @@ export function App() {
   if ("error" in graphResult)
     return <div>Error: {graphResult.error}</div>
 
+  const nodeReferences: Record<string, HTMLButtonElement | null> = {};
   const keyboard_modifiers = { alt: false, control: false, super: false, shift: false };
+
+  useEffect(() => {
+    for (var [node, button] of Object.entries(nodeReferences)) {
+      if (button == null)
+        continue;
+      callGraph({
+        keyboard_modifiers,
+        post_render_event: {
+          node_dimensions: {
+            node, data: {
+              width: button.clientWidth,
+              height: button.clientHeight,
+            }
+          }
+        }
+      });
+    }
+  });
 
   return (
     <>
@@ -60,25 +79,28 @@ export function App() {
         } </button>
       <div class={classes.nodeGraph}>
         {
-          graphResult.blueprint.nodes.map(node => <button class={classes.node} onClick={event => callGraph({
-            keyboard_modifiers,
-            event: {
-              external_node_event: {
-                mouse_event: {
-                  mouse_down: {
-                    button: event.button == 0
-                      ? "right" /**temp for touch testing **/
-                      : event.button == 1
-                        ? "middle"
-                        : "right",
-                    location: { x: event.x, y: event.y }
+          graphResult.blueprint.nodes.map(node => <button
+            ref={elem => nodeReferences[node.name] = elem}
+            class={classes.node}
+            onClick={event => callGraph({
+              keyboard_modifiers,
+              event: {
+                external_node_event: {
+                  mouse_event: {
+                    mouse_down: {
+                      button: event.button == 0
+                        ? "right" /**temp for touch testing **/
+                        : event.button == 1
+                          ? "middle"
+                          : "right",
+                      location: { x: event.x, y: event.y }
+                    },
                   },
-                },
-                node_name: node.name,
+                  node_name: node.name,
+                }
               }
-            }
-          })
-          }>{node.name}</button>) 
+            })
+            }>{node.name}</button>)
         }
       </div>
       <div class={classes.contextMenu}>{
