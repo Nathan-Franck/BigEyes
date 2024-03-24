@@ -8,6 +8,7 @@ export function NodeGraph() {
   
   var store: Extract<ReturnType<InterfaceFunction>, { store: any; }>["store"] = {
     blueprint: { nodes: [], output: [], store: [] },
+    node_dimensions: [],
     interaction_state: {
       node_selection: [],
     },
