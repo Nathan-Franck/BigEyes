@@ -328,35 +328,30 @@ pub fn NodeFormatting(
     input: struct {
         blueprint: Blueprint,
         node_dimensions: []const NodeData(PixelDimensions),
-        event: ?union {
-            // grouping_event: GroupingEvent,
-            node_render_stats_event: NodeRenderStatsEvent,
-        },
+        post_render_event: ?NodeRenderStatsEvent,
+        event: ?GroupingEvent,
     },
-) struct {
+) !struct {
     node_coords: []const NodeData(PixelCoord),
     node_dimensions: []const NodeData(PixelDimensions),
 } {
     const node_coords = std.ArrayList(NodeData(PixelCoord)).init(self.allocator);
     var node_dimensions = std.ArrayList(NodeData(PixelDimensions)).init(self.allocator);
-    node_dimensions.appendSlice(input.node_dimensions);
-    switch (input.event) {
-        else => {},
-        .node_render_stats_event => |stats_event| {
-            switch (stats_event) {
-                else => {},
-                .node_dimensions => |node_dimensions_event| {
-                    if (!replaced_existing: for (node_dimensions.items) |*existing| {
-                        if (std.mem.eql(u8, existing.node, node_dimensions.node)) {
-                            existing.data = node_dimensions_event.data;
-                            break :replaced_existing true;
-                        }
-                    }) {
-                        node_dimensions.append(node_dimensions);
+    try node_dimensions.appendSlice(input.node_dimensions);
+    if (input.post_render_event) |post_render_event| {
+        switch (post_render_event) {
+            else => {},
+            .node_dimensions => |node_dimensions_event| {
+                if (!replaced_existing: for (node_dimensions.items) |*existing| {
+                    if (std.mem.eql(u8, existing.node, node_dimensions.node)) {
+                        existing.data = node_dimensions_event.data;
+                        break :replaced_existing true;
                     }
-                },
-            }
-        },
+                } else false) {
+                    node_dimensions.append(node_dimensions);
+                }
+            },
+        }
     }
     return .{
         .node_coords = node_coords.items,

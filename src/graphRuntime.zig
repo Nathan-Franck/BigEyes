@@ -162,7 +162,11 @@ pub fn NodeGraph(comptime node_definitions: anytype, comptime graph: Blueprint) 
                 else
                     @compileError("Node not found " ++ node_id);
                 const node_outputs = @typeInfo(@TypeOf(@field(node_definitions, node.name))).Fn.return_type.?;
-                const field_type = for (@typeInfo(node_outputs).Struct.fields) |field|
+                const non_error_outputs = switch (@typeInfo(node_outputs)) {
+                    else => node_outputs,
+                    .ErrorUnion => |error_union| error_union.payload,
+                };
+                const field_type = for (@typeInfo(non_error_outputs).Struct.fields) |field|
                     if (std.mem.eql(u8, field.name, output_defn.system_field)) break field.type else continue
                 else
                     unreachable; // TODO: Provide a useful compiler error about how blueprint and node defn's disagree.
