@@ -137,26 +137,31 @@ fn pasteNodesUnique(
     return try std.mem.concat(allocator, NodeGraphBlueprintEntry, &.{ existing_nodes, unique_nodes });
 }
 
-const BlueprintLoaderInputs = struct {
-    recieved_blueprint: ?Blueprint,
-    existing_blueprint: Blueprint,
-};
-pub fn BlueprintLoader(input: BlueprintLoaderInputs) struct { blueprint: Blueprint } {
-    if (input.recieved_blueprint) |update| {
-        return .{ .blueprint = update };
+pub fn BlueprintLoader(
+    _: @This(),
+    recieved_blueprint_event: ?Blueprint,
+    state: struct {
+        existing_blueprint: Blueprint,
+    },
+) struct { blueprint: Blueprint } {
+    if (recieved_blueprint_event) |event| {
+        return .{ .blueprint = event };
     } else {
-        return .{ .blueprint = input.existing_blueprint };
+        return .{ .blueprint = state.existing_blueprint };
     }
 }
 
-pub fn ContextMenuInteraction(input: struct {
-    context_menu: ContextState,
-    event: ?union(enum) {
+pub fn ContextMenuInteraction(
+    _: @This(),
+    input_event: ?union(enum) {
         mouse_event: ExternalMouseEvent,
         external_node_event: ExternalNodeEvent,
         context_event: ExternalContextEvent,
     },
-}) struct {
+    state: struct {
+        context_menu: ContextState,
+    },
+) struct {
     context_menu: ContextState,
     event: ?union(enum) {
         mouse_event: ExternalMouseEvent,
@@ -166,10 +171,10 @@ pub fn ContextMenuInteraction(input: struct {
     } = null,
 } {
     const default = .{
-        .context_menu = input.context_menu,
-        .event = utils.eventTransform(utils.NodeOutputEventType(ContextMenuInteraction), input.event),
+        .context_menu = state.context_menu,
+        .event = utils.eventTransform(utils.NodeOutputEventType(ContextMenuInteraction), input_event),
     };
-    return if (input.event) |event| switch (event) {
+    return if (input_event) |event| switch (event) {
         .external_node_event => |node_event| switch (node_event.mouse_event) {
             else => default,
             .mouse_down => |mouse_down| switch (mouse_down.button) {
@@ -186,7 +191,7 @@ pub fn ContextMenuInteraction(input: struct {
             else => default,
             .mouse_down => |mouse_down| switch (mouse_down.button) {
                 else => default,
-                .left => .{ .context_menu = utils.copyWith(input.context_menu, .{ .open = false }) },
+                .left => .{ .context_menu = utils.copyWith(state.context_menu, .{ .open = false }) },
                 .right => .{ .context_menu = .{
                     .open = true,
                     .location = mouse_down.location,
@@ -199,11 +204,11 @@ pub fn ContextMenuInteraction(input: struct {
                 const menu_option_selected = std.meta.stringToEnum(ContextMenuOption, context_event.option_selected);
                 const menu_node_option_selected = std.meta.stringToEnum(ContextMenuNodeOption, context_event.option_selected);
                 break :result .{
-                    .context_menu = utils.copyWith(input.context_menu, .{ .open = false }),
+                    .context_menu = utils.copyWith(state.context_menu, .{ .open = false }),
                     .event = if (menu_option_selected) |option| switch (option) {
-                        .paste => .{ .node_event = .{ .paste = input.context_menu.location } },
+                        .paste => .{ .node_event = .{ .paste = state.context_menu.location } },
                         .@"new..." => unreachable, // TODO: Implement new node creation.
-                    } else if (menu_node_option_selected) |option| if (input.context_menu.selected_node) |selected_node| switch (option) {
+                    } else if (menu_node_option_selected) |option| if (state.context_menu.selected_node) |selected_node| switch (option) {
                         .delete => .{ .node_event = .{ .delete = .{ .node_name = selected_node } } },
                         .duplicate => .{ .node_event = .{ .duplicate = .{ .node_name = selected_node } } },
                         .copy => .{ .node_event = .{ .copy = .{ .node_name = selected_node } } },
@@ -214,16 +219,19 @@ pub fn ContextMenuInteraction(input: struct {
     } else default;
 }
 
-pub fn NodeInteraction(self: @This(), input: struct {
-    keyboard_modifiers: KeyboardModifiers,
-    interaction_state: InteractionState,
-    blueprint: Blueprint,
-    event: ?union(enum) {
+pub fn NodeInteraction(
+    self: @This(),
+    input_event: ?union(enum) {
         mouse_event: ExternalMouseEvent,
         external_node_event: ExternalNodeEvent,
         node_event: NodeEvent,
     },
-}) !struct {
+    input: struct {
+        keyboard_modifiers: KeyboardModifiers,
+        interaction_state: InteractionState,
+        blueprint: Blueprint,
+    },
+) !struct {
     interaction_state: InteractionState,
     blueprint: Blueprint,
     event: ?union(enum) {
@@ -235,9 +243,9 @@ pub fn NodeInteraction(self: @This(), input: struct {
     const default = .{
         .interaction_state = input.interaction_state,
         .blueprint = input.blueprint,
-        .event = utils.eventTransform(utils.NodeOutputEventType(NodeInteraction), input.event),
+        .event = utils.eventTransform(utils.NodeOutputEventType(NodeInteraction), input_event),
     };
-    return if (input.event) |event|
+    return if (input_event) |event|
         if (input.keyboard_modifiers.shift)
             switch (event) {
                 else => default,
@@ -325,11 +333,13 @@ fn NodeData(T: type) type {
 
 pub fn NodeFormatting(
     self: @This(),
-    input: struct {
+    input_event: ?union {
+        grouping_event: GroupingEvent,
+        post_render_event: NodeRenderStatsEvent,
+    },
+    state: struct {
         blueprint: Blueprint,
         node_dimensions: []const NodeData(PixelDimensions),
-        post_render_event: ?NodeRenderStatsEvent,
-        event: ?GroupingEvent,
     },
 ) !struct {
     node_coords: []const NodeData(PixelCoord),
@@ -337,19 +347,23 @@ pub fn NodeFormatting(
 } {
     const node_coords = std.ArrayList(NodeData(PixelCoord)).init(self.allocator);
     var node_dimensions = std.ArrayList(NodeData(PixelDimensions)).init(self.allocator);
-    try node_dimensions.appendSlice(input.node_dimensions);
-    if (input.post_render_event) |post_render_event| {
-        switch (post_render_event) {
-            // else => {}, Only one case right now TODO more cases? Or just clear the union!
-            .node_dimensions => |node_dimensions_event| for (node_dimensions_event) |update|
-                if (!replaced_existing: for (node_dimensions.items) |*existing| {
-                    if (std.mem.eql(u8, existing.node, update.node)) {
-                        existing.data = update.data;
-                        break :replaced_existing true;
-                    }
-                } else false) {
-                    try node_dimensions.append(update);
-                },
+    try node_dimensions.appendSlice(state.node_dimensions);
+    if (input_event) |event| {
+        switch (event) {
+            .post_render_event => |post_render_event| {
+                switch (post_render_event) {
+                    // else => {}, Only one case right now TODO more cases? Or just clear the union!
+                    .node_dimensions => |node_dimensions_event| for (node_dimensions_event) |update|
+                        if (!replaced_existing: for (node_dimensions.items) |*existing| {
+                            if (std.mem.eql(u8, existing.node, update.node)) {
+                                existing.data = update.data;
+                                break :replaced_existing true;
+                            }
+                        } else false) {
+                            try node_dimensions.append(update);
+                        },
+                }
+            },
         }
     }
     return .{
@@ -360,15 +374,18 @@ pub fn NodeFormatting(
 
 const Camera = struct {}; // TODO: implement camera controls
 
-pub fn CameraControls(input: struct {
-    keyboard_modifiers: KeyboardModifiers,
-    camera: Camera,
+pub fn CameraControls(
     event: ?union(enum) {
         mouse_event: ExternalMouseEvent,
     },
-}) struct {
+    input: struct {
+        keyboard_modifiers: KeyboardModifiers,
+        camera: Camera,
+    },
+) struct {
     camera: Camera,
 } {
+    _ = event;
     // TODO - Actually take in the mouse events to move the camera around!
     return .{ .camera = input.camera };
 }

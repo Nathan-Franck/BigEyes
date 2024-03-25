@@ -72,7 +72,7 @@ export function App() {
         } </button>
       <div class={classes.nodeGraph}>
         {
-          graphResult.blueprint.nodes.map(node => <button
+          graphResult.blueprint.nodes.map(node => <button 
             ref={elem => {
               if (elem != null)
                 nodeReferences[node.name] = elem

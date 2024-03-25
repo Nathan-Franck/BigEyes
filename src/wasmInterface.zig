@@ -32,6 +32,7 @@ pub const interface = struct {
         store: MyNodeGraph.SystemStore,
     } {
         const allocator = std.heap.page_allocator;
+
         var my_node_graph = MyNodeGraph{
             .allocator = allocator,
             .store = store,
