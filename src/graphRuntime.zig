@@ -1,4 +1,5 @@
 const std = @import("std");
+const helper = @import("./Helper.zig");
 const Blueprint = @import("./interactiveNodeBuilderBlueprint.zig").Blueprint;
 const NodeDefinitions = @import("./nodeGraphBlueprintNodes.zig");
 const node_graph_blueprint = @import("./interactiveNodeBuilderBlueprint.zig").node_graph_blueprint;
@@ -8,18 +9,14 @@ const Input = struct {
     type: type,
 };
 
-inline fn IsEventType(the_type: type) bool {
-    return switch (@typeInfo(the_type)) {
-        else => false,
-        .Optional => |optional| switch (@typeInfo(optional.child)) {
-            else => false,
-            .Union => true,
-        },
-    };
-}
+const NodeParams = enum {
+    self,
+    event,
+    store,
+};
 
 fn AttemptEventCast(InputType: type, OutputType: type, value: InputType) OutputType {
-    return if (!IsEventType(InputType))
+    return if (!helper.IsEventType(InputType))
         value
     else if (value) |non_null_value| blk: {
         const active_tag_index = @intFromEnum(non_null_value);
@@ -123,10 +120,11 @@ pub fn NodeGraph(comptime node_definitions: anytype, comptime graph: Blueprint) 
                     else => {},
                     .input_field => |input_field| {
                         const node_params = @typeInfo(@TypeOf(@field(node_definitions, node.name))).Fn.params;
-                        const field_type = for (@typeInfo(node_params[node_params.len - 1].type.?).Struct.fields) |field|
+                        @compileLog(@typeName(@TypeOf(@field(node_definitions, node.name))));
+                        const field_type = for (@typeInfo(node_params[@intFromEnum(NodeParams.event)].type.?).Union.fields) |field|
                             if (std.mem.eql(u8, field.name, input_field)) break field.type else continue
                         else
-                            unreachable; // TODO: Provide a useful compiler error about how blueprint and node defn's disagree.
+                            @compileError(node.name ++ " " ++ input_field ++ " not found");
                         system_input_fields = system_input_fields ++ for (system_input_fields) |system_input|
                             if (std.mem.eql(u8, system_input.name, input_field)) break .{} else continue
                         else

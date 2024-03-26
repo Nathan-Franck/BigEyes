@@ -139,13 +139,15 @@ fn pasteNodesUnique(
 
 pub fn BlueprintLoader(
     _: @This(),
-    recieved_blueprint_event: ?Blueprint,
+    input_event: ?union(enum) {
+        recieved_blueprint: Blueprint,
+    },
     state: struct {
         existing_blueprint: Blueprint,
     },
 ) struct { blueprint: Blueprint } {
-    if (recieved_blueprint_event) |event| {
-        return .{ .blueprint = event };
+    if (input_event) |event| {
+        return .{ .blueprint = event.recieved_blueprint };
     } else {
         return .{ .blueprint = state.existing_blueprint };
     }
@@ -168,7 +170,7 @@ pub fn ContextMenuInteraction(
         external_node_event: ExternalNodeEvent,
         node_event: NodeEvent,
         grouping_event: GroupingEvent,
-    } = null,
+    },
 } {
     const default = .{
         .context_menu = state.context_menu,
@@ -333,9 +335,9 @@ fn NodeData(T: type) type {
 
 pub fn NodeFormatting(
     self: @This(),
-    input_event: ?union {
-        grouping_event: GroupingEvent,
-        post_render_event: NodeRenderStatsEvent,
+    input_event: ?union(enum) {
+        GroupingEvent: GroupingEvent,
+        NodeRenderStatsEvent: NodeRenderStatsEvent,
     },
     state: struct {
         blueprint: Blueprint,
@@ -350,7 +352,8 @@ pub fn NodeFormatting(
     try node_dimensions.appendSlice(state.node_dimensions);
     if (input_event) |event| {
         switch (event) {
-            .post_render_event => |post_render_event| {
+            .GroupingEvent => unreachable,
+            .NodeRenderStatsEvent => |post_render_event| {
                 switch (post_render_event) {
                     // else => {}, Only one case right now TODO more cases? Or just clear the union!
                     .node_dimensions => |node_dimensions_event| for (node_dimensions_event) |update|
@@ -400,7 +403,9 @@ pub fn DomRenderer(input: struct {
     camera: Camera,
     context_menu: ContextState,
 }) struct {
-    render_event: ?RenderEvent,
+    event: ?union(enum) {
+        RenderEvent: RenderEvent,
+    },
 } {
     const something_changed = !std.meta.eql(input.previous_blueprint, input.current_blueprint);
     return if (something_changed)
