@@ -1,7 +1,7 @@
 import './app.css'
 import { NodeGraph } from './nodeGraph';
 import { declareStyle } from './declareStyle';
-import { useEffect } from 'preact/hooks'  
+import { useEffect, useRef } from 'preact/hooks'
 
 const { classes, encodedStyle } = declareStyle({
   nodeGraph: {
@@ -53,6 +53,18 @@ export function App() {
       }
     });
   });
+  const contextMenuRef = useRef<HTMLDivElement>(null);
+  const wasContextFocused = false;
+  useEffect(() => {
+    if (contextMenuRef.current) {
+      if (!wasContextFocused) {
+        (contextMenuRef.current?.firstChild as HTMLButtonElement).focus(); 
+        wasContextFocused = true;
+      }
+    } else { 
+      wasContextFocused = false;
+    }
+   });
 
   return (
     <>
@@ -99,7 +111,7 @@ export function App() {
             }>{node.name}</button>)
         }
       </div>
-      <div class={classes.contextMenu}>{
+      <div class={classes.contextMenu} ref={contextMenuRef}>{
         graphResult.context_menu.open
           ? graphResult.context_menu.options.map((option, index) => <>
             {index > 0 ? <div class={classes.contextMenuSeperator} /> : null}
