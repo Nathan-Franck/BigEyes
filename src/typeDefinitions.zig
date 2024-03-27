@@ -90,10 +90,17 @@ pub inline fn typescriptTypeOf(comptime from_type: anytype, comptime options: st
 }
 
 pub fn main() !void {
-    const typeInfo = comptime typescriptTypeOf(@import("./wasmInterface.zig").interface, .{ .first = true });
+    const interface = @import("src/wasmInterface.zig").interface;
+    const allocator = std.heap.page_allocator;
+    build_typescript_type(allocator, interface, "src", "wasmInterface.d.ts");
+}
+
+pub fn build_typescript_type(allocator: std.mem.Allocator, interface: anytype, folder_path: []const u8, file_name: []const u8) void {
+    const typeInfo = comptime typescriptTypeOf(interface, .{ .first = true });
     const contents = "export type WasmInterface = " ++ typeInfo;
-    std.fs.cwd().makeDir("web/gen") catch {};
-    std.fs.cwd().deleteFile("web/gen/wasmInterface.d.ts") catch {};
-    const file = try std.fs.cwd().createFile("web/gen/wasmInterface.d.ts", .{});
+    const file_path = try std.fmt.allocPrint(allocator, "{s}/{s}", .{ folder_path, file_name });
+    std.fs.cwd().makeDir(folder_path) catch {};
+    std.fs.cwd().deleteFile(file_path) catch {};
+    const file = try std.fs.cwd().createFile(file_path, .{});
     try file.writeAll(contents);
 }

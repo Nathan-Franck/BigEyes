@@ -54,15 +54,15 @@ export function App() {
     });
   });
   const contextMenuRef = useRef<HTMLDivElement>(null);
-  const wasContextFocused = false;
+  var contextMenuOpen = false;
   useEffect(() => {
     if (contextMenuRef.current) {
-      if (!wasContextFocused) {
-        (contextMenuRef.current?.firstChild as HTMLButtonElement).focus(); 
-        wasContextFocused = true;
+      if (!contextMenuOpen) {
+        contextMenuRef.current.querySelector("button")?.focus(); 
+        contextMenuOpen = true;
       }
     } else { 
-      wasContextFocused = false;
+      contextMenuOpen = false;
     }
    });
 
