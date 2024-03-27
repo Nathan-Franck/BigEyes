@@ -32,7 +32,7 @@ const { classes, encodedStyle } = declareStyle({
 const nodeGraph = NodeGraph();
 
 export function App() {
-  const { graphResult, callGraph } = nodeGraph.useState();
+  const { graphOutputs: graphResult, callGraph } = nodeGraph.useState();
   if ("error" in graphResult)
     return <div>Error: {graphResult.error}</div>
 
@@ -51,8 +51,12 @@ export function App() {
             }
           }))
       }
-    });
+    }); 
   });
+
+  const rerenderCount = useRef(0);
+  rerenderCount.current += 1;
+
   const contextMenuRef = useRef<HTMLDivElement>(null);
   const contextMenuOpen = useRef(false);
   useEffect(() => {
@@ -80,7 +84,7 @@ export function App() {
           ]
         },
       })}> {
-          <>{graphResult.blueprint.nodes.length}</>
+          rerenderCount.current
         } </button>
       <div class={classes.nodeGraph}>
         {

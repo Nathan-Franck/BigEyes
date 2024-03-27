@@ -28,7 +28,7 @@ pub const interface = struct {
         inputs: MyNodeGraph.SystemInputs,
         store: MyNodeGraph.SystemStore,
     ) !struct {
-        outputs: MyNodeGraph.SystemOutputs,
+        outputs: ?MyNodeGraph.SystemOutputs,
         store: MyNodeGraph.SystemStore,
     } {
         const allocator = std.heap.page_allocator;
@@ -36,12 +36,17 @@ pub const interface = struct {
             .allocator = allocator,
             .store = store,
         };
-        const result_commands = try my_node_graph.update(inputs);
+        const outputs = try my_node_graph.update(inputs);
+        var hasher = std.hash.Adler32.init();
+        std.hash.autoHashStrat(&hasher, outputs, .DeepRecursive);
+        const send_outputs = hasher.final() != previous_outputs_hash;
+        previous_outputs_hash = hasher.final();
         return .{
-            .outputs = result_commands,
+            .outputs = if (send_outputs) outputs else null,
             .store = my_node_graph.store,
         };
     }
+    var previous_outputs_hash: u32 = 0;
 };
 
 pub const InterfaceEnum = DeclsToEnum(interface);

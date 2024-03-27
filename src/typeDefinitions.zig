@@ -90,12 +90,12 @@ pub inline fn typescriptTypeOf(comptime from_type: anytype, comptime options: st
 }
 
 pub fn main() !void {
-    const interface = @import("src/wasmInterface.zig").interface;
+    const interface = @import("./wasmInterface.zig").interface;
     const allocator = std.heap.page_allocator;
-    build_typescript_type(allocator, interface, "src", "wasmInterface.d.ts");
+    try build_typescript_type(allocator, interface, "src", "../web/gen/wasmInterface.d.ts");
 }
 
-pub fn build_typescript_type(allocator: std.mem.Allocator, interface: anytype, folder_path: []const u8, file_name: []const u8) void {
+pub fn build_typescript_type(allocator: std.mem.Allocator, interface: anytype, folder_path: []const u8, file_name: []const u8) !void {
     const typeInfo = comptime typescriptTypeOf(interface, .{ .first = true });
     const contents = "export type WasmInterface = " ++ typeInfo;
     const file_path = try std.fmt.allocPrint(allocator, "{s}/{s}", .{ folder_path, file_name });

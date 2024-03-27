@@ -2,10 +2,10 @@ import { useState } from 'preact/hooks';
 import { callWasm } from './zigWasmInterface';
 
 export function NodeGraph() {
-  
+
   const interfaceFunctionName = "callNodeGraph" as const;
   type InterfaceFunction = typeof callWasm<typeof interfaceFunctionName>;
-  
+
   var store: Extract<ReturnType<InterfaceFunction>, { store: any; }>["store"] = {
     blueprint: { nodes: [], output: [], store: [] },
     node_dimensions: [],
@@ -20,9 +20,9 @@ export function NodeGraph() {
     }
   };
 
-  const initial_result = call({
+  const initial_outputs: NonNullable<Extract<ReturnType<InterfaceFunction>, { outputs: any; }>["outputs"]> | { error: string } = call({
     keyboard_modifiers: { shift: false, control: false, alt: false, super: false },
-  });
+  })!;
 
   function call(inputs: Parameters<InterfaceFunction>[1]) {
     const result = callWasm(interfaceFunctionName, inputs, store);
@@ -36,12 +36,13 @@ export function NodeGraph() {
   return {
     getStore: () => store,
     useState: () => {
-      const [result, setResult] = useState(initial_result);
+      const [outputs, setOutputs] = useState(initial_outputs);
       return {
-        graphResult: result,
+        graphOutputs: outputs,
         callGraph: (inputs: Parameters<typeof call>[0]) => {
           const result = call(inputs);
-          setResult(result);
+          if (result != null)
+            setOutputs(result);
         },
       };
     }
