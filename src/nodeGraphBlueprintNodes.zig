@@ -15,7 +15,7 @@ pub const ExternalMouseEvent = union(enum) {
     mouse_down: struct { location: GraphLocation, button: MouseButton },
     mouse_up: struct { location: GraphLocation, button: MouseButton },
     mouse_move: GraphLocation,
-    mouse_wheel: struct { x: f32, y: f32, z: f32 },
+    mouse_wheel: struct { x: u32, y: u32, z: u32 },
 };
 
 pub const GroupingEvent = union(enum) {
@@ -31,8 +31,8 @@ pub const KeyboardModifiers = struct {
 };
 
 pub const GraphLocation = struct {
-    x: f32,
-    y: f32,
+    x: u32,
+    y: u32,
 };
 
 pub const ExternalNodeEvent = struct {
