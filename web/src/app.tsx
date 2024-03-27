@@ -36,14 +36,14 @@ export function App() {
   if ("error" in graphResult)
     return <div>Error: {graphResult.error}</div>
 
-  const nodeReferences: Record<string, HTMLButtonElement> = {};
+  const nodeReferences = useRef<Record<string, HTMLButtonElement>>({});
   const keyboard_modifiers = { alt: false, control: false, super: false, shift: false };
 
   useEffect(() => {
     callGraph({
       keyboard_modifiers,
       post_render_event: {
-        node_dimensions: Object.entries(nodeReferences)
+        node_dimensions: Object.entries(nodeReferences.current)
           .map(([node, button]) => ({
             node, data: {
               width: button.clientWidth,
@@ -54,17 +54,17 @@ export function App() {
     });
   });
   const contextMenuRef = useRef<HTMLDivElement>(null);
-  var contextMenuOpen = false;
+  const contextMenuOpen = useRef(false);
   useEffect(() => {
     if (contextMenuRef.current) {
-      if (!contextMenuOpen) {
-        contextMenuRef.current.querySelector("button")?.focus(); 
-        contextMenuOpen = true;
+      if (!contextMenuOpen.current) {
+        contextMenuRef.current.querySelector("button")?.focus();
+        contextMenuOpen.current = true;
       }
-    } else { 
-      contextMenuOpen = false;
+    } else {
+      contextMenuOpen.current = false;
     }
-   });
+  });
 
   return (
     <>
@@ -87,7 +87,7 @@ export function App() {
           graphResult.blueprint.nodes.map(node => <button
             ref={elem => {
               if (elem != null)
-                nodeReferences[node.name] = elem
+                nodeReferences.current[node.name] = elem
             }}
             class={classes.node}
             onClick={event => callGraph({
@@ -111,21 +111,23 @@ export function App() {
             }>{node.name}</button>)
         }
       </div>
-      <div class={classes.contextMenu} ref={contextMenuRef}>{
+      {
         graphResult.context_menu.open
-          ? graphResult.context_menu.options.map((option, index) => <>
-            {index > 0 ? <div class={classes.contextMenuSeperator} /> : null}
-            <button class={classes.contextMenuItem} onClick={() => callGraph({
-              keyboard_modifiers,
-              event: {
-                context_event: {
-                  option_selected: option
+          ? <div class={classes.contextMenu} ref={contextMenuRef}>{
+            graphResult.context_menu.options.map((option, index) => <>
+              {index > 0 ? <div class={classes.contextMenuSeperator} /> : null}
+              <button class={classes.contextMenuItem} onClick={() => callGraph({
+                keyboard_modifiers,
+                event: {
+                  context_event: {
+                    option_selected: option
+                  }
                 }
-              }
-            })}>{option}</button>
-          </>)
+              })}>{option}</button>
+            </>)
+          }</div>
           : null
-      }</div>
+      }
     </>
   )
 }
