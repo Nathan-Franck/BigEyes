@@ -81,7 +81,7 @@ pub fn NodeGraph(comptime node_definitions: anytype, comptime graph: Blueprint) 
                 else
                     unreachable;
                 node_priorities[node_index] = @max(node_priorities[node_index], current_node.priority);
-                @setEvalBranchQuota(9000);
+                @setEvalBranchQuota(9001);
                 inline for (graph.nodes) |node|
                     if (std.mem.eql(u8, node.name, current_node.name))
                         inline for (graph.nodes) |next_node| {
@@ -102,7 +102,7 @@ pub fn NodeGraph(comptime node_definitions: anytype, comptime graph: Blueprint) 
             }
         }
         comptime var node_order: []const u16 = &.{};
-        @setEvalBranchQuota(9000);
+        @setEvalBranchQuota(9001);
         inline for (0..max_node_priority) |current_priority| {
             inline for (node_priorities, 0..) |node_priority, node_index| {
                 if (node_priority == current_priority)
@@ -165,7 +165,10 @@ pub fn NodeGraph(comptime node_definitions: anytype, comptime graph: Blueprint) 
                     .ErrorUnion => |error_union| error_union.payload,
                 };
                 const field_type = for (@typeInfo(non_error_outputs).Struct.fields) |field|
-                    if (std.mem.eql(u8, field.name, output_defn.system_field)) break field.type else continue
+                    if (std.mem.eql(u8, field.name, output_defn.system_field))
+                        break field.type
+                    else
+                        continue
                 else
                     unreachable; // TODO: Provide a useful compiler error about how blueprint and node defn's disagree.
                 system_output_fields = system_output_fields ++ .{.{
@@ -196,7 +199,7 @@ pub fn NodeGraph(comptime node_definitions: anytype, comptime graph: Blueprint) 
                 const node_outputs = @typeInfo(@TypeOf(@field(node_definitions, node.name))).Fn.return_type.?;
                 const field_type = for (switch (@typeInfo(node_outputs)) {
                     .ErrorUnion => |error_union| @typeInfo(error_union.payload).Struct.fields,
-                    .Struct => |the_struct| the_struct.fields,
+                    .Struct => |my_struct| my_struct.fields,
                     else => @compileError("Invalid output type, expected struct or error union with a struct"),
                 }) |field|
                     if (std.mem.eql(u8, field.name, store_field.system_field)) break field.type else continue
