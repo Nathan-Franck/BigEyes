@@ -16,9 +16,7 @@ const NodeParams = enum {
 };
 
 fn AttemptEventCast(InputType: type, OutputType: type, value: InputType) OutputType {
-    return if (!helper.IsEventType(InputType))
-        value
-    else if (value) |non_null_value| blk: {
+    if (value) |non_null_value| blk: {
         const active_tag_index = @intFromEnum(non_null_value);
         inline for (@typeInfo(@typeInfo(InputType).Optional.child).Union.fields, 0..) |field_candidate, field_index| {
             if (active_tag_index == field_index) {

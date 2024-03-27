@@ -1,15 +1,5 @@
 const std = @import("std");
 
-pub inline fn IsEventType(the_type: type) bool {
-    return switch (@typeInfo(the_type)) {
-        else => false,
-        .Optional => |optional| switch (@typeInfo(optional.child)) {
-            else => false,
-            .Union => true,
-        },
-    };
-}
-
 pub inline fn ExtractEventFields(the_type: type) []const std.builtin.Type.UnionField {
     return switch (@typeInfo(the_type)) {
         else => &.{},
@@ -32,13 +22,12 @@ pub inline fn ComposeEventType(event_fields: []const std.builtin.Type.UnionField
                 .is_exhaustive = true,
                 .fields = enum_fields: {
                     var fields: []const std.builtin.Type.EnumField = &.{};
-                    for (event_fields, 0..) |event_field, i| {
+                    break :enum_fields for (event_fields, 0..) |event_field, i| {
                         fields = fields ++ .{std.builtin.Type.EnumField{
                             .name = event_field.name,
                             .value = i,
                         }};
-                    }
-                    break :enum_fields fields;
+                    } else fields;
                 },
             } }),
         } }),
