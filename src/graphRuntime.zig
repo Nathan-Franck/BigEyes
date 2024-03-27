@@ -1,5 +1,5 @@
 const std = @import("std");
-const helper = @import("./Helper.zig");
+const helper = @import("./eventHelper.zig");
 const Blueprint = @import("./interactiveNodeBuilderBlueprint.zig").Blueprint;
 const NodeDefinitions = @import("./nodeGraphBlueprintNodes.zig");
 const node_graph_blueprint = @import("./interactiveNodeBuilderBlueprint.zig").node_graph_blueprint;
