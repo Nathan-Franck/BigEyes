@@ -29,7 +29,30 @@ const { classes, encodedStyle } = declareStyle({
 // TODO - Get the error messages from the console showing up
 // https://stackoverflow.com/questions/6604192/showing-console-errors-and-alerts-in-a-div-inside-the-page
 
-const nodeGraph = NodeGraph();
+const keyboard_modifiers = { alt: false, control: false, super: false, shift: false };
+const nodeGraph = NodeGraph({
+  keyboard_modifiers,
+  recieved_blueprint: {
+    nodes: [
+      { function: "test", input_links: [], name: "TestA" },
+      { function: "test", input_links: [], name: "TestB" },
+    ],
+    output: [],
+    store: [],
+  },
+}, {
+  blueprint: { nodes: [], output: [], store: [] },
+  node_dimensions: [],
+  interaction_state: {
+    node_selection: [],
+  },
+  camera: {},
+  context_menu: {
+    open: false,
+    location: { x: 0, y: 0 },
+    options: [],
+  }
+});
 
 export function App() {
   const { graphOutputs: graphResult, callGraph } = nodeGraph.useState();
@@ -37,7 +60,6 @@ export function App() {
     return <div>Error: {graphResult.error}</div>
 
   const nodeReferences = useRef<Record<string, HTMLButtonElement>>({});
-  const keyboard_modifiers = { alt: false, control: false, super: false, shift: false };
 
   useEffect(() => {
     callGraph({
@@ -51,7 +73,7 @@ export function App() {
             }
           }))
       }
-    }); 
+    });
   });
 
   const rerenderCount = useRef(0);
@@ -73,19 +95,7 @@ export function App() {
   return (
     <>
       <style>{encodedStyle}</style>
-      <button onClick={() => callGraph({
-        keyboard_modifiers,
-        recieved_blueprint: {
-          output: [],
-          store: [],
-          nodes: [
-            { function: "what", input_links: [], name: "testNode" },
-            { function: "what", input_links: [], name: "anotherNode" },
-          ]
-        },
-      })}> {
-          rerenderCount.current
-        } </button>
+      <div> renderCount: {rerenderCount.current} </div>
       <div class={classes.nodeGraph}>
         {
           graphResult.blueprint.nodes.map(node => <button
