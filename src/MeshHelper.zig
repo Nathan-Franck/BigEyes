@@ -1,5 +1,5 @@
 const std = @import("std");
-const zmath = @import("zmath");
+const zmath = @import("./zmath/main.zig");
 const spec = @import("MeshSpec.zig");
 const Point = spec.Point;
 const Quad = spec.Quad;

@@ -115,26 +115,12 @@ pub fn build(
         "Cat",
         "RockLevel",
     });
-    // const generate_typescript_types = GenerateTypescripTypes(
-    //     @import("src/wasmInterface.zig").interface,
-    // ).create(
-    //     b,
-    //     "web/gen",
-    //     "wasmInterface.d.ts",
-    // );
-    const zgui_pkg = @import("zgui").package(b, target, optimize, .{ .options = .{ .backend = .glfw_wgpu } });
-    const zmath_pkg = @import("zmath").package(b, target, optimize, .{});
-    const zglfw_pkg = @import("zglfw").package(b, target, optimize, .{ .options = .{ .shared = false } });
-    const zpool_pkg = @import("zpool").package(b, target, optimize, .{});
-    const zgpu_pkg = @import("zgpu").package(b, target, optimize, .{ .deps = .{ .zpool = zpool_pkg } });
-    const zmesh_pkg = @import("zmesh").package(b, target, optimize, .{});
 
     // Tests (default)
     {
         // const main_tests = b.addTest(.{ .root_source_file = .{ .path = thisDir() ++ "/tests.zig" } });
         const main_tests = b.addTest(.{ .root_source_file = .{ .path = thisDir() ++ "/src/tests.zig" } });
         // main_tests.root_module.addImport("embedded_assets", embedded_assets);
-        zmath_pkg.link(main_tests);
         const run_unit_tests = b.addRunArtifact(main_tests);
         const test_step = b.step("exe-test", "run tests");
         test_step.dependOn(&run_unit_tests.step);
@@ -149,7 +135,6 @@ pub fn build(
             .name = "game",
             .root_source_file = .{ .path = thisDir() ++ "/src/wasm_entry.zig" },
         });
-        zmath_pkg.link(exe);
 
         // Latest wasm hack - https://github.com/ringtailsoftware/zig-wasm-audio-framebuffer/blob/master/build.zig
         exe.entry = .disabled;
@@ -182,11 +167,6 @@ pub fn build(
             .target = target,
             .optimize = optimize,
         });
-        zgui_pkg.link(exe);
-        zglfw_pkg.link(exe);
-        zgpu_pkg.link(exe);
-        zmath_pkg.link(exe);
-        zmesh_pkg.link(exe);
         exe.step.dependOn(&export_meshes.step);
         // Windows hax
         exe.want_lto = false;

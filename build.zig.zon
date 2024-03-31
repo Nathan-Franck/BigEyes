@@ -44,7 +44,7 @@
         },
         .@"zig-webui" = .{
             .url = "https://github.com/webui-dev/zig-webui/archive/main.tar.gz",
-            .hash = "12206bd0ea07432c248f4525f10d37077a417024d16c5c3be4c6a05c6e41b3c98feb",
+            .hash = "1220f6c970472659a99148a40bb54f765c646cbe5cd3f0a6898f64b2bb1d03f18c8b",
         },
     },
 }
