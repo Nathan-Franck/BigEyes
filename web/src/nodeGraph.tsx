@@ -5,7 +5,7 @@ type InterfaceFunction = typeof callWasm<typeof interfaceFunctionName>;
 const interfaceFunctionName = "callNodeGraph" as const;
 type Inputs = Parameters<InterfaceFunction>[1];
 type Store = Parameters<InterfaceFunction>[2];
-type Outputs = (ReturnType<InterfaceFunction> & { outputs: any })["outputs"]
+type Outputs = Extract<ReturnType<InterfaceFunction>, { outputs: any }>["outputs"]
 
 export function NodeGraph(initial_inputs: Inputs, store: Store) {
 

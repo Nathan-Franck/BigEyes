@@ -74,35 +74,3 @@ export function callWasm<T extends keyof WasmInterface>(name: T, ...args: Parame
   return result;
 }
 
-export function testCallNode() {
-  const result = [
-    callWasm("callNodeGraph", {
-      keyboard_modifiers: { shift: false, control: false, alt: false, super: false },
-      recieved_blueprint: { output: [], store: [], nodes: [{ function: "what", input_links: [], name: "hey" }] },
-    }, {
-      blueprint: { nodes: [], output: [], store: [] },
-      interaction_state: {
-        node_selection: [],
-      },
-      camera: {},
-      context_menu: {
-        open: false,
-        location: { x: 0, y: 0 },
-        options: [],
-      }
-    }),
-    callWasm("helloSliceHiHi", [[1, 2, 3]]),
-    callWasm("testSubdiv", [
-      [0, 1, 2, 3],
-      [0, 1, 5, 4],
-    ], [
-      [-1.1, 1.0, 1.0, 1.0],
-      [-1.0, -1.0, 1.0, 1.0],
-      [1.0, -1.0, 1.0, 1.0],
-      [1.0, 1.0, 1.0, 1.0],
-      [-1.0, 1.0, -1.0, 1.0],
-      [-1.0, -1.0, -1.0, 1.0],
-    ])
-  ];
-  return result;
-}

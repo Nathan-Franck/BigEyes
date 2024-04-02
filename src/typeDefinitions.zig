@@ -103,4 +103,5 @@ pub fn build_typescript_type(allocator: std.mem.Allocator, interface: anytype, f
     std.fs.cwd().deleteFile(file_path) catch {};
     const file = try std.fs.cwd().createFile(file_path, .{});
     try file.writeAll(contents);
+    std.debug.print("Wrote file to {s}\n", .{file_path});
 }

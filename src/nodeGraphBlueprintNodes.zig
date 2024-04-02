@@ -335,7 +335,7 @@ pub fn NodeFormatting(
     node_coords: []const NodeData(PixelCoord),
     node_dimensions: []const NodeData(PixelDimensions),
 } {
-    const node_coords = std.ArrayList(NodeData(PixelCoord)).init(self.allocator);
+    var node_coords = std.ArrayList(NodeData(PixelCoord)).init(self.allocator);
     var node_dimensions = std.ArrayList(NodeData(PixelDimensions)).init(self.allocator);
     try node_dimensions.appendSlice(input.node_dimensions);
     if (input.post_render_event) |post_render_event| {
@@ -352,6 +352,28 @@ pub fn NodeFormatting(
                 },
         }
     }
+    // TEMP - Grid of nodes until there's actual relationships between nodes to represent
+    {
+        var x: u32 = 0;
+        var y: u32 = 0;
+        var pixelMaxHeight: u32 = 0;
+        const pixelSpacing = 10;
+        const pixelMaxWidth = 500;
+        for (node_dimensions.items) |dimension| {
+            try node_coords.append(.{ .node = dimension.node, .data = .{
+                .x = x,
+                .y = y,
+            } });
+            pixelMaxHeight = @max(pixelMaxHeight, dimension.data.height);
+            x += dimension.data.width + pixelSpacing;
+            if (x > pixelMaxWidth) {
+                x = 0;
+                y += pixelMaxHeight + pixelSpacing;
+                pixelMaxHeight = 0;
+            }
+        }
+    }
+
     return .{
         .node_coords = node_coords.items,
         .node_dimensions = node_dimensions.items,
