@@ -94,17 +94,11 @@ export function App() {
   const contextMenuRef = useRef<HTMLDivElement>(null);
   const contextMenuOpen = useRef(false);
   useEffect(() => {
+    // When first opening the menu, we should focus the first button so it's easy to keyboard-first this context menu.
     if (!contextMenuRef.current) {
       contextMenuOpen.current = false;
     }
     else {
-
-      // // position the context menu from theh nodeGraph state.
-      // const { x, y } = graphOutputs.context_menu.location;
-      // contextMenuRef.current.style.left = `${x}px`;
-      // contextMenuRef.current.style.right = `${y}px`;
-
-      // When first opening the menu, we should focus the first button so it's easy to keyboard-first this context menu.
       if (!contextMenuOpen.current) {
         contextMenuRef.current.querySelector("button")?.focus();
         contextMenuOpen.current = true;
