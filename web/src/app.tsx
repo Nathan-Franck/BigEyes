@@ -1,22 +1,18 @@
 import './app.css'
 import { NodeGraph } from './nodeGraph';
 import { declareStyle } from './declareStyle';
-import { useEffect, useRef } from 'preact/hooks'
-
-const fullscreenStyle = {
-  position: "absolute",
-  top: "0px",
-  left: "0px",
-  width: "100%",
-  height: "100vh",
-} as const;
+import { useEffect, useRef } from 'preact/hooks' 
 
 const { classes, encodedStyle } = declareStyle({
   nodeGraph: {
   },
   nodeGraphBackground: {
     backgroundColor: "#555",
-    ...fullscreenStyle,
+    position: "absolute",
+    top: "0px",
+    left: "0px",
+    width: "100%",
+    height: "100vh",
   },
   node: {
   },
