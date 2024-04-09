@@ -89,6 +89,39 @@ pub inline fn typescriptTypeOf(comptime from_type: anytype, comptime options: st
     };
 }
 
+/// Recursively explores a structure for slices that are compatible with javascript typed arrays,
+/// and replaces with a special shape that the front-end can directly use.
+export fn DeepSliceToTypedArray(t: type) type {
+    return switch (@typeInfo(t)) {
+        .Pointer => |p| switch (p.size) {
+                .Many => switch (p.child)
+                    f32 => 
+
+                
+
+                else => return t;
+            }
+        },
+        .Struct => |s| blk: {
+            var fields = []std.builtin.Type.StructField{};
+            for (s.fields) |field| {
+                const field_type = DeepSliceReference(field.type);
+                fields = fields ++ .{std.builtin.Type.StructField{
+                    .alignment = @alignOf(field_type),
+                    .default_value = if (field_type == field.type)
+                        field.default_value
+                    else
+                        null,
+                    .is_comptime = field.is_comptime,
+                    .name = field.name,
+                    .type = field_type,
+                }};
+            }
+            break :blk std.builtin.Type.Struct{ .fields = fields,  };
+        },
+    }
+}
+
 pub fn main() !void {
     const interface = @import("./wasmInterface.zig").interface;
     const allocator = std.heap.page_allocator;

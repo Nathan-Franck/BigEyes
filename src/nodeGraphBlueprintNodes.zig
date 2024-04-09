@@ -174,6 +174,7 @@ pub fn ContextMenuInteraction(input: struct {
             else => default,
             .mouse_down => |mouse_down| switch (mouse_down.button) {
                 else => default,
+                .left => .{ .context_menu = utils.copyWith(input.context_menu, .{ .open = false }) },
                 .right => .{ .context_menu = .{
                     .open = true,
                     .selected_node = node_event.node_name,

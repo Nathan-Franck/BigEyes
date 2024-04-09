@@ -46,10 +46,33 @@ fn callWithJsonErr(name_ptr: [*]const u8, name_len: usize, args_ptr: [*]const u8
     }
 }
 
+/// Recursively explores a structure for slices that are compatible with javascript typed arrays,
+/// and replaces with a special shape that the front-end can directly use.
+fn DeepSliceReference(t: type) type {
+    switch (@typeInfo(t)) {
+        .Struct => |s| {
+            var fields = []std.builtin.Type.StructField{};
+            for (s.fields) |field| {
+                const field_type = DeepSliceReference(field.type);
+                fields = fields ++ .{std.builtin.Type.StructField{
+                    .alignment = @alignOf(field_type),
+                    .default_value = if (field_type == field.type)
+                        field.default_value
+                    else
+                        null,
+                    .is_comptime = field.is_comptime,
+                    .name = field.name,
+                    .type = field_type,
+                }};
+            }
+        },
+    }
+}
+
 export fn callWithJson(name_ptr: [*]const u8, name_len: usize, args_ptr: [*]const u8, args_len: usize) void {
     // const allocator = std.heap.page_allocator;
     callWithJsonErr(name_ptr, name_len, args_ptr, args_len) catch {
-        // dumpError(std.fmt.allocPrint(allocator, "error: {?}\n", .{err}) catch unreachable);
+        // dumperror(std.fmt.allocprint(allocator, "error: {?}\n", .{err}) catch unreachable);
         return;
     };
 }
