@@ -105,77 +105,135 @@ pub const TypedArrayReference = struct {
 /// Int16Array
 /// Int32Array
 /// NOT Uint8Array - since in Zig this is put aside for strings
-pub fn DeepTypedArrayReferences(t: type) type {
+pub fn DeepTypedArrayReferences(t: type) struct { type: type, changed: bool = false } {
     return switch (@typeInfo(t)) {
-        else => t,
+        else => .{ .type = t },
         .Array => |a| switch (a.child) {
-            f32, f64, i8, i16, i32, u16, u32 => TypedArrayReference,
-            else => @Type(.{ .Array = .{
-                .len = a.len,
-                .sentinel = a.sentinel,
-                .child = DeepTypedArrayReferences(a.child),
-            } }),
+            f32, f64, i8, i16, i32, u16, u32 => .{ .changed = true, .type = TypedArrayReference },
+            else => blk: {
+                const child = DeepTypedArrayReferences(a.child);
+                break :blk if (!child.changed)
+                    .{ .type = t }
+                else
+                    .{ .changed = true, .type = @Type(.{ .Array = .{ .len = a.len, .sentinel = a.sentinel, .child = child.type } }) };
+            },
         },
         .Pointer => |p| switch (p.size) {
             .Many, .Slice => switch (p.child) {
-                f32, f64, i8, i16, i32, u16, u32 => TypedArrayReference,
-                else => @Type(.{ .Pointer = utils.copyWith(p, .{ .child = DeepTypedArrayReferences(p.child) }) }),
+                f32, f64, i8, i16, i32, u16, u32 => .{ .changed = true, .type = TypedArrayReference },
+                else => blk: {
+                    const child = DeepTypedArrayReferences(p.child);
+                    break :blk if (!child.changed)
+                        .{ .type = t }
+                    else
+                        .{ .changed = true, .type = @Type(.{ .Pointer = utils.copyWith(p, .{ .child = child.type }) }) };
+                },
             },
-            else => @Type(.{ .Pointer = utils.copyWith(p, .{ .child = DeepTypedArrayReferences(p.child) }) }),
+            else => blk: {
+                const child = DeepTypedArrayReferences(p.child);
+                break :blk if (!child.changed)
+                    .{ .type = t }
+                else
+                    .{ .changed = true, .type = @Type(.{ .Pointer = utils.copyWith(p, .{ .child = child.type }) }) };
+            },
+        },
+        .Union => |u| blk: {
+            var fields: []const std.builtin.Type.UnionField = &.{};
+            var changed = false;
+            for (u.fields) |field| {
+                const new_field = DeepTypedArrayReferences(field.type);
+                changed = changed or new_field.changed;
+                fields = fields ++ .{utils.copyWith(field, .{
+                    .type = new_field.type,
+                })};
+            }
+            break :blk if (!changed)
+                .{ .type = t }
+            else
+                .{ .changed = true, .type = @Type(.{ .Union = utils.copyWith(u, .{ .fields = fields }) }) };
         },
         .Struct => |s| blk: {
             var fields: []const std.builtin.Type.StructField = &.{};
+            var changed = false;
             for (s.fields) |field| {
-                const field_type = DeepTypedArrayReferences(field.type);
+                const new_field = DeepTypedArrayReferences(field.type);
+                changed = changed or new_field.changed;
                 fields = fields ++ .{std.builtin.Type.StructField{
                     .is_comptime = field.is_comptime,
                     .name = field.name,
-                    .type = field_type,
-                    .alignment = @alignOf(field_type),
-                    .default_value = if (field_type == field.type)
+                    .type = new_field.type,
+                    .alignment = @alignOf(new_field.type),
+                    .default_value = if (new_field.type == field.type)
                         field.default_value
                     else
                         null,
                 }};
             }
-            break :blk @Type(.{ .Struct = utils.copyWith(s, .{ .fields = fields }) });
-        },
-        .Union => |u| blk: {
-            var fields: []const std.builtin.Type.UnionField = &.{};
-            for (u.fields) |field| {
-                fields = fields ++ .{utils.copyWith(field, .{
-                    .type = DeepTypedArrayReferences(field.type),
-                })};
-            }
-            break :blk @Type(.{ .Union = utils.copyWith(u, .{ .fields = fields }) });
+            break :blk if (!changed)
+                .{ .type = t }
+            else
+                .{ .changed = true, .type = @Type(.{ .Struct = utils.copyWith(s, .{ .fields = fields }) }) };
         },
     };
 }
 
+// pub fn deepTypedArrayReferences(data: anytype) DeepTypedArrayReferences(data) {
+//     if (DeepTypedArrayReferences(data) == data) {
+//         return data;
+//     }
+//     return switch (@typeInfo(@TypeOf(data))) {
+//         else => data,
+//         .Array => |a| switch (a.child) {
+//             f32, f64, i8, i16, i32, u16, u32 => .{
+//                 .pointer = @intFromPtr(data),
+//                 .length = data.len * @sizeOf(a.child),
+//                 .type = switch (a.child) {
+//                     f32 => "Float32Array",
+//                     f64 => "Float64Array",
+//                     i8 => "Int8Array",
+//                     i16 => "Int16Array",
+//                     i32 => "Int32Array",
+//                     u16 => "Uint16Array",
+//                     u32 => "Uint32Array",
+//                     else => unreachable,
+//                 },
+//             },
+//             else =>
+//         },
+//     };
+// }
+
 test "DeepTypedArrayReferences" {
     {
-        const actual = DeepTypedArrayReferences([]f32);
+        const actual = DeepTypedArrayReferences([]f32).type;
         const expected = TypedArrayReference;
         try std.testing.expect(actual == expected);
     }
 
     { // Struct
-        const t = DeepTypedArrayReferences(struct { a: []f32, b: []const u8 });
+        const t = DeepTypedArrayReferences(struct { a: []f32, b: []const u8 }).type;
         _ = t{ .a = .{ .type = "Float32Array", .pointer = 0, .length = 0 }, .b = "Hello World!" };
     }
 
     { // Slice
-        const t = DeepTypedArrayReferences(struct { a: []const []f32 });
+        const t = DeepTypedArrayReferences(struct { a: []const []f32 }).type;
         _ = t{ .a = &.{.{ .type = "Float32Array", .pointer = 0, .length = 0 }} };
     }
 
     { // Array
-        const t = DeepTypedArrayReferences(struct { a: [2][]f32 });
+        const t = DeepTypedArrayReferences(struct { a: [2][]f32 }).type;
         _ = t{ .a = .{ .{ .type = "Float32Array", .pointer = 0, .length = 0 }, .{ .type = "Float32Array", .pointer = 0, .length = 0 } } };
     }
+
     { // Union
-        const t = DeepTypedArrayReferences(union { a: []f32, b: []const u8 });
+        const t = DeepTypedArrayReferences(union { a: []f32, b: []const u8 }).type;
         _ = t{ .a = .{ .type = "Float32Array", .pointer = 0, .length = 0 } };
+    }
+
+    { // Deep type equality when nothing is referenceable
+        const original = struct { a: []const u8, b: []const u8 };
+        const transfromed = DeepTypedArrayReferences(original).type;
+        try std.testing.expect(original == transfromed);
     }
 }
 
