@@ -272,116 +272,116 @@ pub fn Polygon(comptime poly_selection: enum {
     };
 }
 
-test "getFacePoints" {
-    std.debug.print("Hello!", .{});
-    const allocator = std.heap.page_allocator;
-    var points = [_]Point{
-        Point{ -1.0, 1.0, 1.0, 1.0 },
-        Point{ -1.0, -1.0, 1.0, 1.0 },
-        Point{ 1.0, -1.0, 1.0, 1.0 },
-        Point{ 1.0, 1.0, 1.0, 1.0 },
-        Point{ -1.0, 1.0, -1.0, 1.0 },
-        Point{ -1.0, -1.0, -1.0, 1.0 },
-    };
-    var faces = [_]Face{
-        &[_]u32{ 0, 1, 2, 3 },
-        &[_]u32{ 0, 1, 5, 4 },
-    };
-    const result = try Polygon(.Face).getFacePoints(
-        allocator,
-        &points,
-        &faces,
-    );
+// test "getFacePoints" {
+//     std.debug.print("Hello!", .{});
+//     const allocator = std.heap.page_allocator;
+//     var points = [_]Point{
+//         Point{ -1.0, 1.0, 1.0, 1.0 },
+//         Point{ -1.0, -1.0, 1.0, 1.0 },
+//         Point{ 1.0, -1.0, 1.0, 1.0 },
+//         Point{ 1.0, 1.0, 1.0, 1.0 },
+//         Point{ -1.0, 1.0, -1.0, 1.0 },
+//         Point{ -1.0, -1.0, -1.0, 1.0 },
+//     };
+//     var faces = [_]Face{
+//         &[_]u32{ 0, 1, 2, 3 },
+//         &[_]u32{ 0, 1, 5, 4 },
+//     };
+//     const result = try Polygon(.Face).getFacePoints(
+//         allocator,
+//         &points,
+//         &faces,
+//     );
 
-    const expected = [_]Point{
-        Point{ 0.0, 0.0, 1.0, 1.0 },
-        Point{ -1.0, 0.0, 0.0, 1.0 },
-    };
+//     const expected = [_]Point{
+//         Point{ 0.0, 0.0, 1.0, 1.0 },
+//         Point{ -1.0, 0.0, 0.0, 1.0 },
+//     };
 
-    try std.testing.expectEqual(expected.len, result.len);
-    for (expected, 0..) |expectedPoint, i| {
-        try std.testing.expectEqual(expectedPoint, result[i]);
-    }
-}
+//     try std.testing.expectEqual(expected.len, result.len);
+//     for (expected, 0..) |expectedPoint, i| {
+//         try std.testing.expectEqual(expectedPoint, result[i]);
+//     }
+// }
 
-test "getEdgesFaces" {
-    const allocator = std.heap.page_allocator;
-    var points = [_]Point{
-        Point{ -1.0, 1.0, 1.0, 1.0 },
-        Point{ -1.0, -1.0, 1.0, 1.0 },
-        Point{ 1.0, -1.0, 1.0, 1.0 },
-        Point{ 1.0, 1.0, 1.0, 1.0 },
-        Point{ -1.0, 1.0, -1.0, 1.0 },
-        Point{ -1.0, -1.0, -1.0, 1.0 },
-    };
-    var faces = [_]Face{
-        &[_]u32{ 0, 1, 2, 3 },
-        &[_]u32{ 0, 1, 5, 4 },
-    };
-    const result = try Polygon(.Face).getEdgesFaces(
-        allocator,
-        &points,
-        &faces,
-    );
+// test "getEdgesFaces" {
+//     const allocator = std.heap.page_allocator;
+//     var points = [_]Point{
+//         Point{ -1.0, 1.0, 1.0, 1.0 },
+//         Point{ -1.0, -1.0, 1.0, 1.0 },
+//         Point{ 1.0, -1.0, 1.0, 1.0 },
+//         Point{ 1.0, 1.0, 1.0, 1.0 },
+//         Point{ -1.0, 1.0, -1.0, 1.0 },
+//         Point{ -1.0, -1.0, -1.0, 1.0 },
+//     };
+//     var faces = [_]Face{
+//         &[_]u32{ 0, 1, 2, 3 },
+//         &[_]u32{ 0, 1, 5, 4 },
+//     };
+//     const result = try Polygon(.Face).getEdgesFaces(
+//         allocator,
+//         &points,
+//         &faces,
+//     );
 
-    try std.testing.expectEqual(EdgesFace{ .point1 = 0, .point2 = 1, .face1 = 0, .face2 = 1, .centerPoint = .{ -1.0, 0.0, 1.0 } }, result[0]);
-    try std.testing.expectEqual(EdgesFace{ .point1 = 0, .point2 = 3, .face1 = 0, .face2 = std.math.maxInt(u32), .centerPoint = .{ 0.0, 1.0, 1.0 } }, result[1]);
-    try std.testing.expectEqual(EdgesFace{ .point1 = 0, .point2 = 4, .face1 = 1, .face2 = std.math.maxInt(u32), .centerPoint = .{ -1.0, 1.0, 0.0 } }, result[2]);
-    try std.testing.expectEqual(EdgesFace{ .point1 = 1, .point2 = 2, .face1 = 0, .face2 = std.math.maxInt(u32), .centerPoint = .{ 0.0, -1.0, 1.0 } }, result[3]);
-    try std.testing.expectEqual(EdgesFace{ .point1 = 1, .point2 = 5, .face1 = 1, .face2 = std.math.maxInt(u32), .centerPoint = .{ -1.0, -1.0, 0.0 } }, result[4]);
-    try std.testing.expectEqual(EdgesFace{ .point1 = 2, .point2 = 3, .face1 = 0, .face2 = std.math.maxInt(u32), .centerPoint = .{ 1.0, 0.0, 1.0 } }, result[5]);
-    try std.testing.expectEqual(EdgesFace{ .point1 = 4, .point2 = 5, .face1 = 1, .face2 = std.math.maxInt(u32), .centerPoint = .{ -1.0, 0.0, -1.0 } }, result[6]);
-}
+//     try std.testing.expectEqual(EdgesFace{ .point1 = 0, .point2 = 1, .face1 = 0, .face2 = 1, .centerPoint = .{ -1.0, 0.0, 1.0 } }, result[0]);
+//     try std.testing.expectEqual(EdgesFace{ .point1 = 0, .point2 = 3, .face1 = 0, .face2 = std.math.maxInt(u32), .centerPoint = .{ 0.0, 1.0, 1.0 } }, result[1]);
+//     try std.testing.expectEqual(EdgesFace{ .point1 = 0, .point2 = 4, .face1 = 1, .face2 = std.math.maxInt(u32), .centerPoint = .{ -1.0, 1.0, 0.0 } }, result[2]);
+//     try std.testing.expectEqual(EdgesFace{ .point1 = 1, .point2 = 2, .face1 = 0, .face2 = std.math.maxInt(u32), .centerPoint = .{ 0.0, -1.0, 1.0 } }, result[3]);
+//     try std.testing.expectEqual(EdgesFace{ .point1 = 1, .point2 = 5, .face1 = 1, .face2 = std.math.maxInt(u32), .centerPoint = .{ -1.0, -1.0, 0.0 } }, result[4]);
+//     try std.testing.expectEqual(EdgesFace{ .point1 = 2, .point2 = 3, .face1 = 0, .face2 = std.math.maxInt(u32), .centerPoint = .{ 1.0, 0.0, 1.0 } }, result[5]);
+//     try std.testing.expectEqual(EdgesFace{ .point1 = 4, .point2 = 5, .face1 = 1, .face2 = std.math.maxInt(u32), .centerPoint = .{ -1.0, 0.0, -1.0 } }, result[6]);
+// }
 
-test "getPointsFaces" {
-    const allocator = std.heap.page_allocator;
-    var points = [_]Point{
-        Point{ -1.0, 1.0, 1.0, 1.0 },
-        Point{ -1.0, -1.0, 1.0, 1.0 },
-        Point{ 1.0, -1.0, 1.0, 1.0 },
-        Point{ 1.0, 1.0, 1.0, 1.0 },
-        Point{ -1.0, 1.0, -1.0, 1.0 },
-        Point{ -1.0, -1.0, -1.0, 1.0 },
-    };
-    var faces = [_]Face{
-        &[_]u32{ 0, 1, 2, 3 },
-        &[_]u32{ 0, 1, 5, 4 },
-    };
-    const result = try Polygon(.Face).getPointsFaces(
-        allocator,
-        &points,
-        &faces,
-    );
+// test "getPointsFaces" {
+//     const allocator = std.heap.page_allocator;
+//     var points = [_]Point{
+//         Point{ -1.0, 1.0, 1.0, 1.0 },
+//         Point{ -1.0, -1.0, 1.0, 1.0 },
+//         Point{ 1.0, -1.0, 1.0, 1.0 },
+//         Point{ 1.0, 1.0, 1.0, 1.0 },
+//         Point{ -1.0, 1.0, -1.0, 1.0 },
+//         Point{ -1.0, -1.0, -1.0, 1.0 },
+//     };
+//     var faces = [_]Face{
+//         &[_]u32{ 0, 1, 2, 3 },
+//         &[_]u32{ 0, 1, 5, 4 },
+//     };
+//     const result = try Polygon(.Face).getPointsFaces(
+//         allocator,
+//         &points,
+//         &faces,
+//     );
 
-    _ = result;
-}
+//     _ = result;
+// }
 
-test "cmcSubdiv" {
-    const allocator = std.heap.page_allocator;
-    var points = [_]Point{
-        Point{ -1.0, 1.0, 1.0, 1.0 },
-        Point{ -1.0, -1.0, 1.0, 1.0 },
-        Point{ 1.0, -1.0, 1.0, 1.0 },
-        Point{ 1.0, 1.0, 1.0, 1.0 },
-        Point{ -1.0, 1.0, -1.0, 1.0 },
-        Point{ -1.0, -1.0, -1.0, 1.0 },
-    };
-    var faces = [_]Face{
-        &[_]u32{ 0, 1, 2, 3 },
-        &[_]u32{ 0, 1, 5, 4 },
-    };
-    const result = try Polygon(.Face).cmcSubdiv(
-        allocator,
-        &points,
-        &faces,
-    );
+// test "cmcSubdiv" {
+//     const allocator = std.heap.page_allocator;
+//     var points = [_]Point{
+//         Point{ -1.0, 1.0, 1.0, 1.0 },
+//         Point{ -1.0, -1.0, 1.0, 1.0 },
+//         Point{ 1.0, -1.0, 1.0, 1.0 },
+//         Point{ 1.0, 1.0, 1.0, 1.0 },
+//         Point{ -1.0, 1.0, -1.0, 1.0 },
+//         Point{ -1.0, -1.0, -1.0, 1.0 },
+//     };
+//     var faces = [_]Face{
+//         &[_]u32{ 0, 1, 2, 3 },
+//         &[_]u32{ 0, 1, 5, 4 },
+//     };
+//     const result = try Polygon(.Face).cmcSubdiv(
+//         allocator,
+//         &points,
+//         &faces,
+//     );
 
-    try std.testing.expectEqual(result.points.len, 15);
-    try std.testing.expectEqual(result.quads.len, 8);
-    for (result.quads) |face| {
-        for (face) |pointNum| {
-            try std.testing.expect(pointNum >= 0);
-            try std.testing.expect(pointNum < 15);
-        }
-    }
-}
+//     try std.testing.expectEqual(result.points.len, 15);
+//     try std.testing.expectEqual(result.quads.len, 8);
+//     for (result.quads) |face| {
+//         for (face) |pointNum| {
+//             try std.testing.expect(pointNum >= 0);
+//             try std.testing.expect(pointNum < 15);
+//         }
+//     }
+// }

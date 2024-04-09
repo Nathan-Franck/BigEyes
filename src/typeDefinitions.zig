@@ -84,32 +84,127 @@ pub inline fn typescriptTypeOf(comptime from_type: anytype, comptime options: st
             for (function_info.params, 0..) |param, i| {
                 params = params ++ std.fmt.comptimePrint("{s}arg{d}: {s}", .{ if (i == 0) "" else ", ", i, typescriptTypeOf(param.type.?, .{}) });
             }
-            return std.fmt.comptimePrint("({s}) => {s}", .{ params, typescriptTypeOf(function_info.return_type.?, .{}) });
+            const ReturnType = DeepTypedArrayReferences(function_info.return_type.?).type;
+            return std.fmt.comptimePrint("({s}) => {s}", .{ params, typescriptTypeOf(ReturnType, .{}) });
         },
         else => std.fmt.comptimePrint("unknown /** zig type is {any} **/", .{@typeInfo(from_type)}),
     };
 }
 
-pub const TypedArrayReference = struct {
-    type: []const u8,
-    pointer: u32,
-    length: u32,
-};
-
 /// Recursively explores a structure for slices that are compatible with javascript typed arrays,
 /// and replaces with a special shape that the front-end can directly use.
+///
 /// Supported typed arrays are:
-/// Float32Array
-/// Float64Array
-/// Int8Array
-/// Int16Array
-/// Int32Array
-/// NOT Uint8Array - since in Zig this is put aside for strings
-pub fn DeepTypedArrayReferences(t: type) struct { type: type, changed: bool = false } {
+/// * Float32Array
+/// * Float64Array
+/// * Int8Array
+/// * Int16Array
+/// * Int32Array
+/// * NOT Uint8Array - since in Zig this is put aside for strings
+pub fn deepTypedArrayReferences(t: type, allocator: std.mem.Allocator, data: t) !DeepTypedArrayReferences(t).type {
+    if (!DeepTypedArrayReferences(t).changed) {
+        return data;
+    }
+    return switch (@typeInfo(t)) {
+        else => data,
+        .ErrorUnion => deepTypedArrayReferences(try data),
+        .Union => |u| blk: {
+            const active_field = u.fields[@intFromEnum(data)];
+            break :blk @unionInit(t, active_field.name, deepTypedArrayReferences(active_field.type, allocator, @field(data, active_field.name)));
+        },
+        .Struct => |s| blk: {
+            var new_data: DeepTypedArrayReferences(t).type = undefined;
+            inline for (s.fields) |field| {
+                const result = deepTypedArrayReferences(field.type, allocator, @field(data, field.name));
+                @field(new_data, field.name) = result;
+            }
+            break :blk new_data;
+        },
+        .Array => |a| switch (a.child) {
+            else => blk: {
+                var elements = [a.len]a.child;
+                for (data, 0..) |elem, idx| {
+                    elements[idx] = deepTypedArrayReferences(a.child, allocator, elem);
+                }
+                break :blk elements.items;
+            },
+            f32, f64, i8, i16, i32, u16, u32 => .{
+                .ptr = @intFromPtr(data),
+                .len = data.len * @sizeOf(a.child),
+                .type = switch (a.child) {
+                    f32 => .Float32Array,
+                    f64 => .Float64Array,
+                    i8 => .Int8Array,
+                    i16 => .Int16Array,
+                    i32 => .Int32Array,
+                    u16 => .Uint16Array,
+                    u32 => .Uint32Array,
+                    else => unreachable,
+                },
+            },
+        },
+        .Pointer => |p| switch (p.size) {
+            else => blk: {
+                const elements = std.ArrayList(p.child).init(allocator);
+                for (data) |elem| {
+                    elements.append(deepTypedArrayReferences(p.child, allocator, elem));
+                }
+                break :blk elements.items;
+            },
+            .Many, .Slice => switch (p.child) {
+                else => blk: {
+                    const elements = std.ArrayList(p.child).init(allocator);
+                    for (data) |elem| {
+                        elements.append(deepTypedArrayReferences(p.child, allocator, elem));
+                    }
+                    break :blk elements.items;
+                },
+                f32, f64, i8, i16, i32, u16, u32 => .{
+                    .ptr = @intFromPtr(@as(*const p.child, @ptrCast(data))),
+                    .len = data.len * @sizeOf(p.child),
+                    .type = switch (p.child) {
+                        f32 => .Float32Array,
+                        f64 => .Float64Array,
+                        i8 => .Int8Array,
+                        i16 => .Int16Array,
+                        i32 => .Int32Array,
+                        u16 => .Uint16Array,
+                        u32 => .Uint32Array,
+                        else => unreachable,
+                    },
+                },
+            },
+        },
+    };
+}
+
+pub fn TypedArrayReference(type_enum: type) type {
+    return struct {
+        type: type_enum,
+        ptr: usize,
+        len: usize,
+    };
+}
+
+fn DeepTypedArrayReferences(t: type) struct { type: type, changed: bool = false } {
     return switch (@typeInfo(t)) {
         else => .{ .type = t },
+        .ErrorUnion => |eu| DeepTypedArrayReferences(eu.payload),
         .Array => |a| switch (a.child) {
-            f32, f64, i8, i16, i32, u16, u32 => .{ .changed = true, .type = TypedArrayReference },
+            f32, f64, i8, i16, i32, u16, u32 => .{
+                .changed = true,
+                .type = switch (a.child) {
+                    else => unreachable,
+                    f32 => TypedArrayReference(enum { Float32Array }),
+                    f64 => TypedArrayReference(enum { Float64Array }),
+                    i8 => TypedArrayReference(enum { Int8Array }),
+                    i16 => TypedArrayReference(enum { Int16Array }),
+                    i32 => TypedArrayReference(enum { Int32Array }),
+                    u16 => TypedArrayReference(enum { Uint16Array }),
+                    u32 => TypedArrayReference(enum { Uint32Array }),
+                },
+            },
+
             else => blk: {
                 const child = DeepTypedArrayReferences(a.child);
                 break :blk if (!child.changed)
@@ -120,7 +215,19 @@ pub fn DeepTypedArrayReferences(t: type) struct { type: type, changed: bool = fa
         },
         .Pointer => |p| switch (p.size) {
             .Many, .Slice => switch (p.child) {
-                f32, f64, i8, i16, i32, u16, u32 => .{ .changed = true, .type = TypedArrayReference },
+                f32, f64, i8, i16, i32, u16, u32 => .{
+                    .changed = true,
+                    .type = switch (p.child) {
+                        else => unreachable,
+                        f32 => TypedArrayReference(enum { Float32Array }),
+                        f64 => TypedArrayReference(enum { Float64Array }),
+                        i8 => TypedArrayReference(enum { Int8Array }),
+                        i16 => TypedArrayReference(enum { Int16Array }),
+                        i32 => TypedArrayReference(enum { Int32Array }),
+                        u16 => TypedArrayReference(enum { Uint16Array }),
+                        u32 => TypedArrayReference(enum { Uint32Array }),
+                    },
+                },
                 else => blk: {
                     const child = DeepTypedArrayReferences(p.child);
                     break :blk if (!child.changed)
@@ -177,32 +284,6 @@ pub fn DeepTypedArrayReferences(t: type) struct { type: type, changed: bool = fa
     };
 }
 
-// pub fn deepTypedArrayReferences(data: anytype) DeepTypedArrayReferences(data) {
-//     if (DeepTypedArrayReferences(data) == data) {
-//         return data;
-//     }
-//     return switch (@typeInfo(@TypeOf(data))) {
-//         else => data,
-//         .Array => |a| switch (a.child) {
-//             f32, f64, i8, i16, i32, u16, u32 => .{
-//                 .pointer = @intFromPtr(data),
-//                 .length = data.len * @sizeOf(a.child),
-//                 .type = switch (a.child) {
-//                     f32 => "Float32Array",
-//                     f64 => "Float64Array",
-//                     i8 => "Int8Array",
-//                     i16 => "Int16Array",
-//                     i32 => "Int32Array",
-//                     u16 => "Uint16Array",
-//                     u32 => "Uint32Array",
-//                     else => unreachable,
-//                 },
-//             },
-//             else =>
-//         },
-//     };
-// }
-
 test "DeepTypedArrayReferences" {
     {
         const actual = DeepTypedArrayReferences([]f32).type;
@@ -212,28 +293,46 @@ test "DeepTypedArrayReferences" {
 
     { // Struct
         const t = DeepTypedArrayReferences(struct { a: []f32, b: []const u8 }).type;
-        _ = t{ .a = .{ .type = "Float32Array", .pointer = 0, .length = 0 }, .b = "Hello World!" };
+        _ = t{ .a = .{ .type = "Float32Array", .ptr = 0, .len = 0 }, .b = "Hello World!" };
     }
 
     { // Slice
         const t = DeepTypedArrayReferences(struct { a: []const []f32 }).type;
-        _ = t{ .a = &.{.{ .type = "Float32Array", .pointer = 0, .length = 0 }} };
+        _ = t{ .a = &.{.{ .type = "Float32Array", .ptr = 0, .len = 0 }} };
     }
 
     { // Array
         const t = DeepTypedArrayReferences(struct { a: [2][]f32 }).type;
-        _ = t{ .a = .{ .{ .type = "Float32Array", .pointer = 0, .length = 0 }, .{ .type = "Float32Array", .pointer = 0, .length = 0 } } };
+        _ = t{ .a = .{ .{ .type = "Float32Array", .ptr = 0, .len = 0 }, .{ .type = "Float32Array", .ptr = 0, .len = 0 } } };
     }
 
     { // Union
         const t = DeepTypedArrayReferences(union { a: []f32, b: []const u8 }).type;
-        _ = t{ .a = .{ .type = "Float32Array", .pointer = 0, .length = 0 } };
+        _ = t{ .a = .{ .type = "Float32Array", .ptr = 0, .len = 0 } };
     }
 
     { // Deep type equality when nothing is referenceable
         const original = struct { a: []const u8, b: []const u8 };
         const transfromed = DeepTypedArrayReferences(original).type;
         try std.testing.expect(original == transfromed);
+    }
+}
+
+test "deepTypedArrayReferences" {
+    const allocator = std.heap.page_allocator;
+    const TheType = struct { a: []const f32, b: []const u8 };
+    const data: TheType = .{ .a = &.{ 1.0, 2.0, 3.0 }, .b = "Hello World!" };
+    const actual = deepTypedArrayReferences(TheType, allocator, data);
+    try std.testing.expect(actual.a.len == 12);
+    try std.testing.expect(std.mem.eql(u8, actual.b, "Hello World!"));
+    try std.testing.expect(std.mem.eql(u8, actual.a.type, "Float32Array"));
+}
+
+test "DeepTypedArrayReferences Mesh type conversion" {
+    const Mesh = @import("./subdiv.zig").Mesh;
+    {
+        const actual = DeepTypedArrayReferences(Mesh).type;
+        _ = actual{ .points = &.{}, .quads = &.{.{ .type = "Uint32Array", .ptr = 0, .len = 0 }} };
     }
 }
 
