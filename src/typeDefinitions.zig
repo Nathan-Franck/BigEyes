@@ -195,7 +195,7 @@ pub fn TypedArrayReference(type_enum: type) type {
     };
 }
 
-fn DeepTypedArrayReferences(t: type) struct { type: type, changed: bool = false } {
+pub fn DeepTypedArrayReferences(t: type) struct { type: type, changed: bool = false } {
     return switch (@typeInfo(t)) {
         else => .{ .type = t },
         .ErrorUnion => |eu| DeepTypedArrayReferences(eu.payload),

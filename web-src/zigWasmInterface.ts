@@ -20,19 +20,6 @@ function errorFromWasm(sourcePtr: number, sourceLen: number) {
     onError(str);
 }
 
-function encodeString(string: string) {
-  const buffer = new TextEncoder().encode(string);
-  const pointer = instance.exports.allocUint8(buffer.length + 1);
-  const slice = new Uint8Array(
-    instance.exports.memory.buffer,
-    pointer,
-    buffer.length + 1
-  );
-  slice.set(buffer);
-  slice[buffer.length] = 0;
-  return { ptr: pointer, length: buffer.length };
-};
-
 const instance = (await init({
   env: {
     memory: new WebAssembly.Memory({ initial: 2 }),
@@ -49,8 +36,8 @@ const instance = (await init({
 };
 
 export function callWasm<T extends keyof WasmInterface>(name: T, ...args: Parameters<WasmInterface[T]>): { error: string } | ReturnType<WasmInterface[T]> {
-  const nameBuffer = encodeString(name);
-  const argsBuffer = encodeString(JSON.stringify(args));
+  const nameBuffer = stringToSlice(name);
+  const argsBuffer = stringToSlice(JSON.stringify(args));
   let result: { error: string } | ReturnType<WasmInterface[T]> = null as any;
   onMessage = (message) => {
     result = JSON.parse(message);
@@ -61,9 +48,9 @@ export function callWasm<T extends keyof WasmInterface>(name: T, ...args: Parame
   try {
     instance.exports.callWithJson(
       nameBuffer.ptr,
-      nameBuffer.length,
+      nameBuffer.len,
       argsBuffer.ptr,
-      argsBuffer.length
+      argsBuffer.len
     );
   }
   catch (e: any) {
@@ -73,3 +60,35 @@ export function callWasm<T extends keyof WasmInterface>(name: T, ...args: Parame
   return result;
 }
 
+export function stringToSlice(string: string) {
+  const buffer = new TextEncoder().encode(string);
+  const pointer = instance.exports.allocUint8(buffer.length + 1);
+  const slice = new Uint8Array(
+    instance.exports.memory.buffer,
+    pointer,
+    buffer.length + 1
+  );
+  slice.set(buffer);
+  slice[buffer.length] = 0;
+  return { type: <const>"Uint8Array", ptr: pointer, len: buffer.length };
+};
+
+export function sliceToString(slice: { type: "Uint8Array", ptr: number, len: number }) {
+  return new TextDecoder().decode(new Uint8Array(instance.exports.memory.buffer, slice.ptr, slice.len));
+}
+
+function sliceToArrayFunc<T extends new(buffer: ArrayBuffer, byteOffset: number, length: number) => any>(constructor: T) {
+  return (slice: { type: T, pointer: number, length: number }) => {
+    return new constructor(instance.exports.memory.buffer, slice.pointer, slice.length);
+  }
+}
+
+export const sliceToArray = {
+  "Uint8Array": sliceToArrayFunc(Uint8Array),
+  "Uint16Array": sliceToArrayFunc(Uint16Array),
+  "Uint32Array": sliceToArrayFunc(Uint32Array),
+  "Int8Array": sliceToArrayFunc(Int8Array),
+  "Int16Array": sliceToArrayFunc(Int16Array),
+  "Int32Array": sliceToArrayFunc(Int32Array),
+  "Float32Array": sliceToArrayFunc(Float32Array),
+};

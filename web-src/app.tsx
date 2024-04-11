@@ -2,6 +2,7 @@ import './app.css'
 import { NodeGraph } from './nodeGraph';
 import { declareStyle } from './declareStyle';
 import { useEffect, useRef } from 'preact/hooks' 
+import { stringToSlice, sliceToString } from './zigWasmInterface';
 
 const { classes, encodedStyle } = declareStyle({
   nodeGraph: {
@@ -48,19 +49,8 @@ const nodeGraph = NodeGraph({
     output: [],
     store: [],
   },
-}, {
-  blueprint: { nodes: [], output: [], store: [] },
-  node_dimensions: [],
-  interaction_state: {
-    node_selection: [],
-  },
-  camera: {},
-  context_menu: {
-    open: false,
-    location: { x: 0, y: 0 },
-    options: [],
-  }
-});
+}, );
+
 
 export function App() {
   const { graphOutputs, callGraph } = nodeGraph.useState();
@@ -106,7 +96,7 @@ export function App() {
   {
     const positions = graphOutputs.node_coords;
     for (const { node, data: position } of positions) {
-      const button = nodeReferences.current[node];
+      const button = nodeReferences.current[sliceToString(node)];
       if (button && "innerHTML" in button) {
         button.style.position = "absolute";
         button.style.left = `${position.x}px`;
@@ -150,7 +140,7 @@ export function App() {
                   keyboard_modifiers,
                   event: {
                     context_event: {
-                      option_selected: option
+                      option_selected: sliceToString(option)
                     }
                   }
                 })}>{option}</button>
@@ -162,7 +152,7 @@ export function App() {
           graphOutputs.blueprint.nodes.map(node => <button
             ref={elem => {
               if (elem != null)
-                nodeReferences.current[node.name] = elem
+                nodeReferences.current[sliceToString(node.name)] = elem
             }}
             class={classes.node}
             onClick={event => callGraph({
@@ -179,7 +169,7 @@ export function App() {
                       location: { x: event.x, y: event.y }
                     },
                   },
-                  node_name: node.name,
+                  node_name: sliceToString(node.name),
                 }
               }
             })

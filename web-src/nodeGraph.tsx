@@ -4,18 +4,16 @@ import { callWasm } from './zigWasmInterface';
 type InterfaceFunction = typeof callWasm<typeof interfaceFunctionName>;
 const interfaceFunctionName = "callNodeGraph" as const;
 type Inputs = Parameters<InterfaceFunction>[1];
-type Store = Parameters<InterfaceFunction>[2];
 type Outputs = Extract<ReturnType<InterfaceFunction>, { outputs: any }>["outputs"]
 
-export function NodeGraph(initial_inputs: Inputs, store: Store) {
+export function NodeGraph(initial_inputs: Inputs) {
 
   const initial_outputs = call(initial_inputs)!;
 
   function call(inputs: Inputs): { error: string } | Outputs {
-    const result = callWasm(interfaceFunctionName, inputs, store);
+    const result = callWasm(interfaceFunctionName, inputs);
     if ("error" in result)
       return result;
-    store = result.store;
     return result.outputs;
   }
 

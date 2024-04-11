@@ -3,6 +3,7 @@ const std = @import("std");
 const graphRuntime = @import("./graphRuntime.zig");
 const NodeDefinitions = @import("./nodeGraphBlueprintNodes.zig");
 const node_graph_blueprint = @import("./interactiveNodeBuilderBlueprint.zig").node_graph_blueprint;
+const typeDefinitions = @import("./typeDefinitions.zig");
 
 const MyNodeGraph = graphRuntime.NodeGraph(
     NodeDefinitions,
@@ -25,29 +26,47 @@ pub const interface = struct {
         return result;
     }
 
+    var previous_outputs_hash: u32 = 0;
+    var store: MyNodeGraph.SystemStore = .{
+        .blueprint = .{
+            .nodes = &.{},
+            .output = &.{},
+            .store = &.{},
+        },
+        .node_dimensions = &.{},
+        .interaction_state = .{
+            .node_selection = &.{},
+        },
+        .camera = .{},
+        .context_menu = .{
+            .open = false,
+            .location = .{ .x = 0, .y = 0 },
+            .options = &.{},
+        },
+    };
+
     pub fn callNodeGraph(
         inputs: MyNodeGraph.SystemInputs,
-        store: MyNodeGraph.SystemStore,
     ) !struct {
-        outputs: ?MyNodeGraph.SystemOutputs,
-        store: MyNodeGraph.SystemStore,
+        outputs: ?typeDefinitions.DeepTypedArrayReferences(MyNodeGraph.SystemOutputs).type,
     } {
         const allocator = std.heap.page_allocator;
         var my_node_graph = MyNodeGraph{
             .allocator = allocator,
             .store = store,
         };
+        store = my_node_graph.store;
         const outputs = try my_node_graph.update(inputs);
-        var hasher = std.hash.Adler32.init();
-        std.hash.autoHashStrat(&hasher, outputs, .DeepRecursive);
-        const send_outputs = hasher.final() != previous_outputs_hash;
-        previous_outputs_hash = hasher.final();
+        const send_outputs = blk: {
+            var hasher = std.hash.Adler32.init();
+            std.hash.autoHashStrat(&hasher, outputs, .DeepRecursive);
+            defer previous_outputs_hash = hasher.final();
+            break :blk hasher.final() != previous_outputs_hash;
+        };
         return .{
-            .outputs = if (send_outputs) outputs else null,
-            .store = my_node_graph.store,
+            .outputs = if (send_outputs) try typeDefinitions.deepTypedArrayReferences(@TypeOf(outputs), allocator, outputs) else null,
         };
     }
-    var previous_outputs_hash: u32 = 0;
 };
 
 pub const InterfaceEnum = DeclsToEnum(interface);

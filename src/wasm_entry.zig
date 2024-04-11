@@ -42,8 +42,7 @@ fn callWithJsonErr(name_ptr: [*]const u8, name_len: usize, args_ptr: [*]const u8
                 return err;
             };
             const result = try @call(.auto, func, args.value);
-            const transmittable_result = try typeDefinitions.deepTypedArrayReferences(@TypeOf(result), allocator, result);
-            dumpMessage(try std.json.stringifyAlloc(allocator, transmittable_result, .{}));
+            dumpMessage(try std.json.stringifyAlloc(allocator, result, .{}));
         },
     }
 }
