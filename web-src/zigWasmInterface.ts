@@ -1,4 +1,5 @@
 import type { WasmInterface } from "../gen/wasmInterface";
+import init from '../bin/game.wasm?init';
 
 let onMessage: null | ((message: string) => void) = null;
 let onError: null | ((error: string) => void) = null;
@@ -32,20 +33,18 @@ function encodeString(string: string) {
   return { ptr: pointer, length: buffer.length };
 };
 
-const { instance } = await WebAssembly.instantiateStreaming(fetch("bin/game.wasm"), {
+const instance = (await init({
   env: {
     memory: new WebAssembly.Memory({ initial: 2 }),
     messageFromWasm,
     errorFromWasm,
   },
-}) as any as {
-  instance: {
-    exports: {
-      dumpNodeTypeInfo: () => void,
-      callWithJson: (name_ptr: number, name_len: number, args_ptr: number, args_len: number) => void, // TODO: Generate from zig file
-      allocUint8: (length: number) => number,
-      memory: WebAssembly.Memory,
-    },
+})) as {
+  exports: {
+    dumpNodeTypeInfo: () => void,
+    callWithJson: (name_ptr: number, name_len: number, args_ptr: number, args_len: number) => void, // TODO: Generate from zig file
+    allocUint8: (length: number) => number,
+    memory: WebAssembly.Memory,
   },
 };
 

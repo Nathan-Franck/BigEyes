@@ -31,6 +31,11 @@ pub const Blueprint = struct {
 pub const node_graph_blueprint: Blueprint = .{
     .nodes = &.{
         .{
+            .name = "AllResources",
+            .function = "AllResources",
+            .input_links = &.{},
+        },
+        .{
             .name = "BlueprintLoader",
             .function = "BlueprintLoader",
             .input_links = &.{
@@ -116,6 +121,7 @@ pub const node_graph_blueprint: Blueprint = .{
         .{ .system_field = "node_dimensions", .output_node = "NodeFormatting", .output_field = "node_dimensions" },
     },
     .output = &.{
+        .{ .system_field = "smile_test", .output_node = "AllResources", .output_field = "smile_test" },
         .{ .system_field = "event", .output_node = "ContextMenuInteraction", .output_field = "event" },
         .{ .system_field = "blueprint", .output_node = "NodeInteraction", .output_field = "blueprint" },
         .{ .system_field = "camera", .output_node = "CameraControls", .output_field = "camera" },

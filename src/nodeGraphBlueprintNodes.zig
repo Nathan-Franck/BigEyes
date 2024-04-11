@@ -396,6 +396,14 @@ pub fn CameraControls(input: struct {
     return .{ .camera = input.camera };
 }
 
+pub fn AllResources(_: struct {}) struct {
+    smile_test: []const u8,
+} {
+    return .{
+        .smile_test = @embedFile("content/SmileTest.png"),
+    };
+}
+
 const RenderEvent = struct {
     something_changed: bool,
 }; // TODO: implement render event
