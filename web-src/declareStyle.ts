@@ -17,8 +17,8 @@ export function declareStyle<const T extends Record<string, unknown>>(
     const classContents = style[className];
     const subClasses = Object.keys(classContents).filter((key) => key.startsWith('&')).map((subclassKey) => {
       const subKey = `${className as any}${subclassKey.split('&')[1]}`;
-      classContents[subKey as any] = undefined;
-      return [subKey, classContents[subclassKey as any]] as const;
+      classContents[subKey as keyof typeof classContents] = undefined as any;
+      return [subKey, classContents[subclassKey as keyof typeof classContents]] as const;
     });
     return [...unwrappedDefns, [className, classContents] as const, ...subClasses];
   }, [] as any);

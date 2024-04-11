@@ -79,18 +79,18 @@ export function sliceToString(slice: { type: "Uint8Array", ptr: number, len: num
   return result;
 }
 
-function sliceToArrayFunc<T extends new(buffer: ArrayBuffer, byteOffset: number, length: number) => any>(constructor: T) {
-  return (slice: { type: T, pointer: number, length: number }) => {
-    return new constructor(instance.exports.memory.buffer, slice.pointer, slice.length);
+function sliceToArrayFunc<N extends string, T extends new(buffer: ArrayBuffer, byteOffset: number, length: number) => any>(_: N, constructor: T) {
+  return (slice: { type: N, ptr: number, len: number }) => {
+    return new constructor(instance.exports.memory.buffer, slice.ptr, slice.len);
   }
 }
 
-export const sliceToArray = {
-  "Uint8Array": sliceToArrayFunc(Uint8Array),
-  "Uint16Array": sliceToArrayFunc(Uint16Array),
-  "Uint32Array": sliceToArrayFunc(Uint32Array),
-  "Int8Array": sliceToArrayFunc(Int8Array),
-  "Int16Array": sliceToArrayFunc(Int16Array),
-  "Int32Array": sliceToArrayFunc(Int32Array),
-  "Float32Array": sliceToArrayFunc(Float32Array),
+export const sliceToArray = <const>{
+  "Uint8Array": sliceToArrayFunc("Uint8Array", Uint8Array),
+  "Uint16Array": sliceToArrayFunc("Uint16Array", Uint16Array),
+  "Uint32Array": sliceToArrayFunc("Uint32Array", Uint32Array),
+  "Int8Array": sliceToArrayFunc("Int8Array", Int8Array),
+  "Int16Array": sliceToArrayFunc("Int16Array", Int16Array),
+  "Int32Array": sliceToArrayFunc("Int32Array", Int32Array),
+  "Float32Array": sliceToArrayFunc("Float32Array", Float32Array),
 };

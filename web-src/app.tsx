@@ -2,7 +2,7 @@ import './app.css'
 import { NodeGraph } from './nodeGraph';
 import { declareStyle } from './declareStyle';
 import { useEffect, useRef } from 'preact/hooks' 
-import { stringToSlice, sliceToString } from './zigWasmInterface';
+import { sliceToArray, sliceToString } from './zigWasmInterface';
 
 const { classes, encodedStyle } = declareStyle({
   nodeGraph: {
@@ -14,6 +14,7 @@ const { classes, encodedStyle } = declareStyle({
     left: "0px",
     width: "100%",
     height: "100vh",
+    zIndex: "-1",
   },
   node: {
   },
@@ -130,7 +131,6 @@ export function App() {
         });
       }}></div>
       <div class={classes.nodeGraph} >
-        <div> renderCount: {rerenderCount.current} lastTarget: {lastTargetRef.current?.textContent}</div>
         {
           graphOutputs.context_menu.open
             ? <div class={classes.contextMenu} ref={contextMenuRef}>{
@@ -176,6 +176,7 @@ export function App() {
             }>{sliceToString(node.name)}</button>)
         }
       </div>
+      <img src={window.URL.createObjectURL(new Blob([sliceToArray.Uint8Array(graphOutputs.smile_test)], { type: 'image/png' }))} title="Smile Test"></img>
     </>
   )
 }
