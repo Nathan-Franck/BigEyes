@@ -1,6 +1,7 @@
 const std = @import("std");
 const subdiv = @import("./subdiv.zig");
 const wasmInterface = @import("./wasmInterface.zig");
+const typeDefinitions = @import("./typeDefinitions.zig");
 
 export fn allocUint8(length: u32) [*]const u8 {
     const slice = std.heap.page_allocator.alloc(u8, length) catch
@@ -41,30 +42,8 @@ fn callWithJsonErr(name_ptr: [*]const u8, name_len: usize, args_ptr: [*]const u8
                 return err;
             };
             const result = try @call(.auto, func, args.value);
-            dumpMessage(try std.json.stringifyAlloc(allocator, result, .{}));
-        },
-    }
-}
-
-/// Recursively explores a structure for slices that are compatible with javascript typed arrays,
-/// and replaces with a special shape that the front-end can directly use.
-fn DeepSliceReference(t: type) type {
-    switch (@typeInfo(t)) {
-        .Struct => |s| {
-            var fields = []std.builtin.Type.StructField{};
-            for (s.fields) |field| {
-                const field_type = DeepSliceReference(field.type);
-                fields = fields ++ .{std.builtin.Type.StructField{
-                    .alignment = @alignOf(field_type),
-                    .default_value = if (field_type == field.type)
-                        field.default_value
-                    else
-                        null,
-                    .is_comptime = field.is_comptime,
-                    .name = field.name,
-                    .type = field_type,
-                }};
-            }
+            const transmittable_result = try typeDefinitions.deepTypedArrayReferences(@TypeOf(result), allocator, result);
+            dumpMessage(try std.json.stringifyAlloc(allocator, transmittable_result, .{}));
         },
     }
 }

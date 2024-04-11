@@ -24,6 +24,7 @@ pub const interface = struct {
         );
         return result;
     }
+
     pub fn callNodeGraph(
         inputs: MyNodeGraph.SystemInputs,
         store: MyNodeGraph.SystemStore,
