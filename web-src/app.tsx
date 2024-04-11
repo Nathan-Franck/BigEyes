@@ -143,7 +143,7 @@ export function App() {
                       option_selected: sliceToString(option)
                     }
                   }
-                })}>{option}</button>
+                })}>{sliceToString(option)}</button>
               </>)
             }</div>
             : null
@@ -173,7 +173,7 @@ export function App() {
                 }
               }
             })
-            }>{node.name}</button>)
+            }>{sliceToString(node.name)}</button>)
         }
       </div>
     </>

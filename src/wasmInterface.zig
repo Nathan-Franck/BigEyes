@@ -27,21 +27,24 @@ pub const interface = struct {
     }
 
     var previous_outputs_hash: u32 = 0;
-    var store: MyNodeGraph.SystemStore = .{
-        .blueprint = .{
-            .nodes = &.{},
-            .output = &.{},
-            .store = &.{},
-        },
-        .node_dimensions = &.{},
-        .interaction_state = .{
-            .node_selection = &.{},
-        },
-        .camera = .{},
-        .context_menu = .{
-            .open = false,
-            .location = .{ .x = 0, .y = 0 },
-            .options = &.{},
+    var my_node_graph = MyNodeGraph{
+        .allocator = std.heap.page_allocator,
+        .store = .{
+            .blueprint = .{
+                .nodes = &.{},
+                .output = &.{},
+                .store = &.{},
+            },
+            .node_dimensions = &.{},
+            .interaction_state = .{
+                .node_selection = &.{},
+            },
+            .camera = .{},
+            .context_menu = .{
+                .open = false,
+                .location = .{ .x = 0, .y = 0 },
+                .options = &.{},
+            },
         },
     };
 
@@ -50,12 +53,6 @@ pub const interface = struct {
     ) !struct {
         outputs: ?typeDefinitions.DeepTypedArrayReferences(MyNodeGraph.SystemOutputs).type,
     } {
-        const allocator = std.heap.page_allocator;
-        var my_node_graph = MyNodeGraph{
-            .allocator = allocator,
-            .store = store,
-        };
-        store = my_node_graph.store;
         const outputs = try my_node_graph.update(inputs);
         const send_outputs = blk: {
             var hasher = std.hash.Adler32.init();
@@ -64,7 +61,7 @@ pub const interface = struct {
             break :blk hasher.final() != previous_outputs_hash;
         };
         return .{
-            .outputs = if (send_outputs) try typeDefinitions.deepTypedArrayReferences(@TypeOf(outputs), allocator, outputs) else null,
+            .outputs = if (send_outputs) try typeDefinitions.deepTypedArrayReferences(@TypeOf(outputs), std.heap.page_allocator, outputs) else null,
         };
     }
 };

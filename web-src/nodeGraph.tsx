@@ -11,6 +11,7 @@ export function NodeGraph(initial_inputs: Inputs) {
   const initial_outputs = call(initial_inputs)!;
 
   function call(inputs: Inputs): { error: string } | Outputs {
+    console.log("Calling wasm with inputs", inputs);
     const result = callWasm(interfaceFunctionName, inputs);
     if ("error" in result)
       return result;
@@ -25,7 +26,10 @@ export function NodeGraph(initial_inputs: Inputs) {
         callGraph: (inputs: Inputs) => {
           const new_result = call(inputs);
           if (new_result != null)
+            {
+            console.log("Got result", new_result);
             setOutputs(new_result);
+            }
         },
       };
     }
