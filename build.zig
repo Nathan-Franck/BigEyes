@@ -154,7 +154,7 @@ pub fn build(
         // exe.step.dependOn(&export_meshes.step);
         // exe.step.dependOn(&generate_typescript_types.step);
 
-        const install_artifact = b.addInstallArtifact(exe, .{ .dest_dir = .{ .override = .{ .custom = "../web/bin" } } });
+        const install_artifact = b.addInstallArtifact(exe, .{ .dest_dir = .{ .override = .{ .custom = "../bin" } } });
         const install_step = b.step("wasm", "build a wasm");
         install_step.dependOn(&install_artifact.step);
     }

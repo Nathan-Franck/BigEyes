@@ -38,7 +38,7 @@ fn callWithJsonErr(name_ptr: [*]const u8, name_len: usize, args_ptr: [*]const u8
             scanner.enableDiagnostics(&diagnostics);
 
             const args = std.json.parseFromTokenSource(wasmInterface.Args(func), allocator, &scanner, .{}) catch |err| {
-                dumpError(try std.fmt.allocPrint(allocator, "{s}", .{args_string[0..@intCast(diagnostics.getByteOffset())]}));
+                // dumpError(try std.fmt.allocPrint(allocator, "Something in here isn't parsing right: {s}", .{args_string[0..@intCast(diagnostics.getByteOffset())]}));
                 return err;
             };
             const result = try @call(.auto, func, args.value);

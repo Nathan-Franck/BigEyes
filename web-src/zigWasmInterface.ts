@@ -74,7 +74,9 @@ export function stringToSlice(string: string) {
 };
 
 export function sliceToString(slice: { type: "Uint8Array", ptr: number, len: number }) {
-  return new TextDecoder().decode(new Uint8Array(instance.exports.memory.buffer, slice.ptr, slice.len));
+  const result = new TextDecoder().decode(new Uint8Array(instance.exports.memory.buffer, slice.ptr, slice.len));
+  console.log(result)
+  return result;
 }
 
 function sliceToArrayFunc<T extends new(buffer: ArrayBuffer, byteOffset: number, length: number) => any>(constructor: T) {
