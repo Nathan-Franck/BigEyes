@@ -2,7 +2,7 @@ import './app.css'
 import { NodeGraph } from './nodeGraph';
 import { declareStyle } from './declareStyle';
 import { useEffect, useRef } from 'preact/hooks' 
-import { sliceToArray, sliceToString } from './zigWasmInterface';
+import { sliceToArray, sliceToString, callWasm } from './zigWasmInterface';
 
 const { classes, encodedStyle } = declareStyle({
   nodeGraph: {
@@ -51,6 +51,8 @@ const nodeGraph = NodeGraph({
     store: [],
   },
 }, );
+
+const allResources = callWasm("getAllResources") as Exclude<ReturnType<typeof callWasm<"getAllResources">>, {"error": any}>;
 
 
 export function App() {
@@ -115,8 +117,9 @@ export function App() {
       const canvas = canvasRef.current;
       const ctx = canvas.getContext('2d');
       if (ctx) {
-        const { data, width, height } = graphOutputs.smile_test;
-        const imageData = new ImageData(sliceToArray.Uint8ClampedArray(data), width, height);
+        const { data, width, height } = allResources.smile_test;
+        const clampedData = sliceToArray.Uint8ClampedArray(data);
+        const imageData = new ImageData(clampedData, width, height);
         ctx.putImageData(imageData, 0, 0);
       }
     }
