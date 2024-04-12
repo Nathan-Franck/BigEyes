@@ -131,7 +131,7 @@ pub fn build(
     {
         var exe = b.addExecutable(.{
             .target = b.resolveTargetQuery(.{ .cpu_arch = .wasm32, .os_tag = .freestanding }),
-            .optimize = optimize,
+            .optimize = .ReleaseSafe,
             .name = "game",
             .root_source_file = .{ .path = thisDir() ++ "/src/wasm_entry.zig" },
         });
