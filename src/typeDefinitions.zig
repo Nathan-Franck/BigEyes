@@ -110,18 +110,19 @@ pub fn deepTypedArrayReferences(t: type, allocator: std.mem.Allocator, data: t) 
         .ErrorUnion => try deepTypedArrayReferences(try data),
         .Optional => |op| if (data) |non_null_data| try deepTypedArrayReferences(op.child, allocator, non_null_data) else null,
         .Union => |u| blk: {
-            const active_field = inline for (u.fields, 0..) |field, i| if (i == @intFromEnum(data)) {
-                break field;
-            } else unreachable;
-            break :blk @unionInit(
-                DeepTypedArrayReferences(t).type,
-                active_field.name,
-                try deepTypedArrayReferences(active_field.type, allocator, @field(data, active_field.name)),
-            );
+            inline for (u.fields, 0..) |field, i| if (i == @intFromEnum(data)) {
+                break :blk @unionInit(
+                    DeepTypedArrayReferences(t).type,
+                    field.name,
+                    try deepTypedArrayReferences(field.type, allocator, @field(data, field.name)),
+                );
+            };
+            @panic("awful bonus");
         },
         .Struct => |s| blk: {
             var new_data: DeepTypedArrayReferences(t).type = undefined;
             inline for (s.fields) |field| {
+                @import("wasm_entry.zig").dumpDebugLog(field.name);
                 const result = try deepTypedArrayReferences(field.type, allocator, @field(data, field.name));
                 @field(new_data, field.name) = result;
             }
@@ -162,6 +163,7 @@ pub fn deepTypedArrayReferences(t: type, allocator: std.mem.Allocator, data: t) 
             .Many, .Slice => switch (p.child) {
                 else => blk: {
                     var elements = std.ArrayList(DeepTypedArrayReferences(p.child).type).init(allocator);
+                    @import("wasm_entry.zig").dumpDebugLog(try std.fmt.allocPrint(allocator, "{d}", .{data.len}));
                     for (data) |elem| {
                         try elements.append(try deepTypedArrayReferences(p.child, allocator, elem));
                     }

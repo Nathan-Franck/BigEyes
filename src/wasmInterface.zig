@@ -54,6 +54,7 @@ pub const interface = struct {
         outputs: ?typeDefinitions.DeepTypedArrayReferences(MyNodeGraph.SystemOutputs).type,
     } {
         const outputs = try my_node_graph.update(inputs);
+        // const send_outputs = true;
         const send_outputs = blk: {
             var hasher = std.hash.Adler32.init();
             std.hash.autoHashStrat(&hasher, outputs, .DeepRecursive);
@@ -61,7 +62,7 @@ pub const interface = struct {
             break :blk hasher.final() != previous_outputs_hash;
         };
         return .{
-            .outputs = if (send_outputs) try typeDefinitions.deepTypedArrayReferences(@TypeOf(outputs), std.heap.page_allocator, outputs) else null,
+            .outputs = if (send_outputs) try typeDefinitions.deepTypedArrayReferences(@TypeOf(outputs), my_node_graph.allocator, outputs) else null,
         };
     }
 };

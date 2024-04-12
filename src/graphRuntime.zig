@@ -82,7 +82,7 @@ pub fn NodeGraph(comptime node_definitions: anytype, comptime graph: Blueprint) 
                 const node_index = for (graph.nodes, 0..) |node, index|
                     if (std.mem.eql(u8, node.name, current_node.name)) break index else continue
                 else
-                    unreachable;
+                    @panic("trump tart");
                 node_priorities[node_index] = @max(node_priorities[node_index], current_node.priority);
                 @setEvalBranchQuota(9000);
                 inline for (graph.nodes) |node|
@@ -126,7 +126,7 @@ pub fn NodeGraph(comptime node_definitions: anytype, comptime graph: Blueprint) 
                         const field_type = for (@typeInfo(node_params[node_params.len - 1].type.?).Struct.fields) |field|
                             if (std.mem.eql(u8, field.name, input_field)) break field.type else continue
                         else
-                            unreachable; // TODO: Provide a useful compiler error about how blueprint and node defn's disagree.
+                            @panic("fancy serve"); // TODO: Provide a useful compiler error about how blueprint and node defn's disagree.
                         system_input_fields = system_input_fields ++ for (system_input_fields) |system_input|
                             if (std.mem.eql(u8, system_input.name, input_field)) break .{} else continue
                         else
@@ -169,7 +169,7 @@ pub fn NodeGraph(comptime node_definitions: anytype, comptime graph: Blueprint) 
                 const field_type = for (@typeInfo(non_error_outputs).Struct.fields) |field|
                     if (std.mem.eql(u8, field.name, output_defn.system_field)) break field.type else continue
                 else
-                    unreachable; // TODO: Provide a useful compiler error about how blueprint and node defn's disagree.
+                    @panic("arced virus"); // TODO: Provide a useful compiler error about how blueprint and node defn's disagree.
                 system_output_fields = system_output_fields ++ .{.{
                     .name = name[0.. :0],
                     .type = field_type,

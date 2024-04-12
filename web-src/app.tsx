@@ -60,20 +60,20 @@ export function App() {
 
   const nodeReferences = useRef<Record<string, HTMLButtonElement>>({});
 
-  useEffect(() => {
-    callGraph({
-      keyboard_modifiers,
-      post_render_event: {
-        node_dimensions: Object.entries(nodeReferences.current)
-          .map(([node, button]) => ({
-            node, data: {
-              width: button.clientWidth,
-              height: button.clientHeight,
-            }
-          }))
-      }
-    });
-  });
+  // useEffect(() => {
+  //   callGraph({
+  //     keyboard_modifiers,
+  //     post_render_event: {
+  //       node_dimensions: Object.entries(nodeReferences.current)
+  //         .map(([node, button]) => ({
+  //           node, data: {
+  //             width: button.clientWidth,
+  //             height: button.clientHeight,
+  //           }
+  //         }))
+  //     }
+  //   });
+  // });
 
   const rerenderCount = useRef(0);
   rerenderCount.current += 1;

@@ -13,12 +13,18 @@ extern fn messageFromWasm(source_pointer: [*]const u8, source_len: usize) void;
 
 extern fn errorFromWasm(source_pointer: [*]const u8, source_len: usize) void;
 
+extern fn debugLogFromWasm(source_pointer: [*]const u8, source_len: usize) void;
+
 fn dumpMessage(source: []const u8) void {
     messageFromWasm(source.ptr, source.len);
 }
 
 fn dumpError(source: []const u8) void {
     errorFromWasm(source.ptr, source.len);
+}
+
+pub fn dumpDebugLog(source: []const u8) void {
+    debugLogFromWasm(source.ptr, source.len);
 }
 
 fn callWithJsonErr(name_ptr: [*]const u8, name_len: usize, args_ptr: [*]const u8, args_len: usize) !void {

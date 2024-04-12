@@ -12,6 +12,11 @@ function messageFromWasm(sourcePtr: number, sourceLen: number) {
     onMessage(str)
 }
 
+function debugLogFromWasm(sourcePtr: number, sourceLen: number) {
+  const str = (new TextDecoder()).decode(new Uint8Array(instance.exports.memory.buffer, sourcePtr, sourceLen))
+  console.log(str)
+}
+
 function errorFromWasm(sourcePtr: number, sourceLen: number) {
   const str = (new TextDecoder()).decode(new Uint8Array(instance.exports.memory.buffer, sourcePtr, sourceLen))
   if (onError == null)
@@ -25,6 +30,7 @@ const instance = (await init({
     memory: new WebAssembly.Memory({ initial: 2 }),
     messageFromWasm,
     errorFromWasm,
+    debugLogFromWasm,
   },
 })) as {
   exports: {

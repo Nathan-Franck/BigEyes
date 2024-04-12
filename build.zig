@@ -143,11 +143,11 @@ pub fn build(
         // // <https://github.com/ziglang/zig/issues/8633>
         // exe.global_base = 6560;
         // exe.import_memory = true;
-        // exe.stack_size = std.wasm.page_size;
+        // exe.stack_size = std.wasm.page_size * 128;
 
         // // Number of pages reserved for heap memory.
         // // This must match the number of pages used in script.js.
-        // const number_of_pages = 2;
+        // const number_of_pages = 4;
         // exe.initial_memory = std.wasm.page_size * number_of_pages;
         // exe.max_memory = std.wasm.page_size * number_of_pages;
 

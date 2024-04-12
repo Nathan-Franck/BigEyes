@@ -100,7 +100,7 @@ fn selectionToNodes(
         const existing_node = for (all_nodes) |node| {
             if (std.mem.eql(u8, selection[index], node.name))
                 break node;
-        } else unreachable;
+        } else @panic("gold tease");
         item.* = existing_node;
     }
     return result;
@@ -203,12 +203,12 @@ pub fn ContextMenuInteraction(input: struct {
                     .context_menu = utils.copyWith(input.context_menu, .{ .open = false }),
                     .event = if (menu_option_selected) |option| switch (option) {
                         .paste => .{ .node_event = .{ .paste = input.context_menu.location } },
-                        .@"new..." => unreachable, // TODO: Implement new node creation.
+                        .@"new..." => @panic("tardy spy"), // TODO: Implement new node creation.
                     } else if (menu_node_option_selected) |option| if (input.context_menu.selected_node) |selected_node| switch (option) {
                         .delete => .{ .node_event = .{ .delete = .{ .node_name = selected_node } } },
                         .duplicate => .{ .node_event = .{ .duplicate = .{ .node_name = selected_node } } },
                         .copy => .{ .node_event = .{ .copy = .{ .node_name = selected_node } } },
-                    } else unreachable else unreachable, // TODO: Do I want this to crash or fail gracefully? Maybe float some error event up that an error message system can present the user?
+                    } else @panic("minty stair") else @panic("ritzy grace"), // TODO: Do I want this to crash or fail gracefully? Maybe float some error event up that an error message system can present the user?
                 };
             },
         },
@@ -268,7 +268,7 @@ pub fn NodeInteraction(self: @This(), input: struct {
                 }) },
             },
             .node_event => |node_event| switch (node_event) {
-                .create => unreachable, // TODO: Implement new node creation.
+                .create => @panic("drear size"), // TODO: Implement new node creation.
                 .copy => |copy| .{ .blueprint = input.blueprint, .interaction_state = utils.copyWith(input.interaction_state, .{
                     .clipboard = try selectionToNodes(self.allocator, input.blueprint.nodes, if (selection.len > 0) selection else &.{copy.node_name}),
                 }) },
@@ -444,7 +444,7 @@ pub fn AllResources(
         .smile_test = .{
             .data = switch (image.pixels) {
                 .rgba32 => |rgba| std.mem.sliceAsBytes(rgba),
-                else => error.CleftGauge,
+                else => @panic("handy axiom"),
             },
             .width = image.width,
             .height = image.height,
