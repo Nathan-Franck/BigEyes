@@ -21,7 +21,7 @@ const ExportMeshes = struct {
     }
     fn exportMeshes(step: *std.Build.Step, prog_node: *std.Progress.Node) !void {
         _ = prog_node;
-        const self = @fieldParentPtr(@This(), "step", step);
+        const self = @as(*ExportMeshes, @fieldParentPtr("step", step));
 
         var b = step.owner;
 
@@ -131,7 +131,7 @@ pub fn build(
     {
         var exe = b.addExecutable(.{
             .target = b.resolveTargetQuery(.{ .cpu_arch = .wasm32, .os_tag = .freestanding }),
-            .optimize = .ReleaseSmall,
+            .optimize = optimize,
             .name = "game",
             .root_source_file = .{ .path = thisDir() ++ "/src/wasm_entry.zig" },
         });

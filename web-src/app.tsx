@@ -107,6 +107,20 @@ export function App() {
   }
 
   const lastTargetRef = useRef<HTMLElement | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  // Display image on canvas
+  useEffect(() => {
+    if (canvasRef.current) {
+      const canvas = canvasRef.current;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        const { data, width, height } = graphOutputs.smile_test;
+        const imageData = new ImageData(sliceToArray.Uint8ClampedArray(data), width, height);
+        ctx.putImageData(imageData, 0, 0);
+      }
+    }
+  });
 
   return (
     <>
@@ -176,7 +190,7 @@ export function App() {
             }>{sliceToString(node.name)}</button>)
         }
       </div>
-      <img src={window.URL.createObjectURL(new Blob([sliceToArray.Uint8Array(graphOutputs.smile_test)], { type: 'image/png' }))} title="Smile Test"></img>
+      <canvas ref={canvasRef} id="canvas" width="1000" height="1000"></canvas>
     </>
   )
 }

@@ -86,6 +86,7 @@ function sliceToArrayFunc<N extends string, T extends new(buffer: ArrayBuffer, b
 }
 
 export const sliceToArray = <const>{
+  "Uint8ClampedArray": sliceToArrayFunc("Uint8Array", Uint8ClampedArray),
   "Uint8Array": sliceToArrayFunc("Uint8Array", Uint8Array),
   "Uint16Array": sliceToArrayFunc("Uint16Array", Uint16Array),
   "Uint32Array": sliceToArrayFunc("Uint32Array", Uint32Array),
