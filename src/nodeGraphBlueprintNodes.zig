@@ -396,11 +396,45 @@ pub fn CameraControls(input: struct {
     return .{ .camera = input.camera };
 }
 
+const SpriteSheetRaw = struct {
+    png: []const u8,
+    json: []const u8,
+};
+
 pub fn AllResources(_: struct {}) struct {
     smile_test: []const u8,
 } {
+    const animations = .{
+        "Attack",
+        "AttackStartup",
+        "Idle-loop",
+        "Run-loop",
+        "RunEnd",
+        "RunStart",
+    };
+    const base_name = "content/RoyalArcher_FullHD_";
+    const file_extensions = .{ ".png", ".json" };
+    var fields: []const []std.builtin.Type.StructField = .{};
+    inline for (animations) |animation| for (file_extensions) |extension| {
+        const file_path = base_name ++ animation ++ extension;
+        const file_data = @embedFile(file_path);
+        fields = fields ++ &std.builtin.Type.StructField{
+            .alignment = @alignOf([]const u8),
+            .is_comptime = false,
+            .name = file_path,
+            .type = @TypeOf(file_data),
+        };
+    };
+    const RoyalArcher = @Type(std.builtin.Type{ .Struct = .{
+        .decls = &.{},
+        .is_tuple = false,
+        .layout = .auto,
+        .fields = fields,
+    } });
     return .{
         .smile_test = @embedFile("content/SmileTest.png"),
+        .RoyalArcher = RoyalArcher{
+
     };
 }
 
