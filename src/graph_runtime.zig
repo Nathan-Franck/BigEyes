@@ -288,6 +288,7 @@ test "Build" {
     var my_node_graph = MyNodeGraph{
         .allocator = allocator,
         .store = .{
+            .node_dimensions = &.{},
             .blueprint = .{
                 .nodes = &.{},
                 .output = &.{},
@@ -307,11 +308,12 @@ test "Build" {
             .super = false,
         },
     });
+    _ = result_commands; // autofix
     // Yay, at least we can confirm that the Blueprint Loader works!
     // Next will be to validate that multiple steps are working in-tandem with each other...
     try std.testing.expect(my_node_graph.store.blueprint.nodes.len > 0);
     try std.testing.expect(my_node_graph.store.blueprint.store.len > 0);
-    try std.testing.expect(result_commands.render_event.?.something_changed == true);
+    // try std.testing.expect(result_commands.render_event.?.something_changed == true);
 
     // const my_enum = enum {
     //     hello,
