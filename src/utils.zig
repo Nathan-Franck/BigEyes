@@ -28,18 +28,92 @@ pub fn copyWith(source_data: anytype, field_changes: anytype) @TypeOf(source_dat
     }
 }
 
-pub fn deepClone(T: type, allocator: std.mem.Allocator, source: anytype) T {
-    _ = allocator; // autofix
-    switch (@typeInfo(T)) {
-        else => @compileError("Not implemented yet!"),
-        .Array => |array_info| {},
-        .Struct => |struct_info| {
-            var result: T = undefined;
-            inline for (struct_info.fields) |field| {
-                @field(result, field.name) = @field(source, field.name);
+pub fn deepClone(
+    T: type,
+    allocator: std.mem.Allocator,
+    source: anytype,
+) !struct {
+    value: T,
+    allocator_used: bool = false,
+} {
+    return switch (@typeInfo(T)) {
+        // else => @compileError(std.fmt.comptimePrint("{?}", .{T}) ++ " is not a supported type"),
+        else => .{ .value = source, .allocator_used = false },
+        .Array => |a| blk: {
+            var elements: [a.len]a.child = undefined;
+            var allocator_used = false;
+            for (T, 0..) |elem, idx| {
+                const result = try deepClone(a.child, allocator, elem);
+                allocator_used = allocator_used or result.allocator_used;
+                elements[idx] = result.value;
             }
-            return result;
+            if (!allocator_used) {
+                break :blk .{ .value = source, .allocator_used = false };
+            } else {
+                break :blk .{ .value = elements, .allocator_used = true };
+            }
         },
+        .Struct => |struct_info| blk: {
+            var result: T = undefined;
+            var allocator_used = false;
+            inline for (struct_info.fields) |field| {
+                const field_value = @field(source, field.name);
+                const field_clone = try deepClone(field.type, allocator, field_value);
+                allocator_used = allocator_used or field_clone.allocator_used;
+                @field(result, field.name) = field_clone.value;
+            }
+            if (!allocator_used) {
+                break :blk .{ .value = source, .allocator_used = false };
+            } else {
+                break :blk .{ .value = result, .allocator_used = true };
+            }
+        },
+        .Union => |union_info| {
+            _ = union_info; // autofix
+            @panic("Not implemented yet!");
+        },
+        .Pointer => |pointer_info| switch (pointer_info.size) {
+            .Many, .Slice => blk: {
+                var elements = std.ArrayList(pointer_info.child).init(allocator);
+                for (source) |elem| {
+                    const result = try deepClone(pointer_info.child, allocator, elem);
+                    try elements.append(result.value);
+                }
+                break :blk .{ .value = elements.items, .allocator_used = true };
+            },
+            else => unreachable,
+        },
+        .Optional => blk: {
+            if (source) |non_null_source| {
+                const result = deepClone(non_null_source);
+                break :blk .{ .value = result.value, .allocator_used = result.allocator_used };
+            } else {
+                break :blk .{ .value = null, .allocator_used = false };
+            }
+        },
+    };
+}
+
+test "deepClone" {
+    { // Simple struct
+        const Type = struct { a: i32, b: i32 };
+        const source: Type = .{ .a = 1, .b = 2 };
+        const result = try deepClone(Type, std.heap.page_allocator, source);
+        try std.testing.expect(std.meta.eql(source, result.value));
+    }
+
+    { // slice
+        const Type = []const i32;
+        const source: Type = &.{ 1, 2, 3 };
+        const result = try deepClone(Type, std.heap.page_allocator, source);
+        try std.testing.expect(std.mem.eql(i32, source, result.value));
+    }
+
+    { // Struct with slices inside
+        const Type = struct { a: []const i32, b: []const i32 };
+        const source: Type = .{ .a = &.{ 1, 2, 3 }, .b = &.{ 4, 5, 6 } };
+        const result = try deepClone(Type, std.heap.page_allocator, source);
+        try std.testing.expect(std.mem.eql(i32, source.a, result.value.a));
     }
 }
 
