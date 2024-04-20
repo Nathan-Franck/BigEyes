@@ -1,5 +1,5 @@
 const std = @import("std");
-const utils = @import("./nodeUtils.zig");
+const utils = @import("./utils.zig");
 
 pub inline fn typescriptTypeOf(comptime from_type: anytype, comptime options: struct { first: bool = false }) []const u8 {
     return comptime switch (@typeInfo(from_type)) {
@@ -100,7 +100,7 @@ pub inline fn typescriptTypeOf(comptime from_type: anytype, comptime options: st
 /// * Int8Array
 /// * Int16Array
 /// * Int32Array
-/// * NOT Uint8Array - since in Zig this is put aside for strings
+/// * Uint8Array - This is tricky, since in Zig this is put aside for strings... and most likely we don't want to obfuscate strings in JSON
 pub fn deepTypedArrayReferences(t: type, allocator: std.mem.Allocator, data: t) !DeepTypedArrayReferences(t).type {
     if (!DeepTypedArrayReferences(t).changed) {
         return data;
@@ -128,29 +128,12 @@ pub fn deepTypedArrayReferences(t: type, allocator: std.mem.Allocator, data: t) 
             }
             break :blk new_data;
         },
-        .Array => |a| switch (a.child) {
-            else => blk: {
-                var elements = [a.len]a.child;
-                for (data, 0..) |elem, idx| {
-                    elements[idx] = try deepTypedArrayReferences(a.child, allocator, elem);
-                }
-                break :blk elements.items;
-            },
-            f32, f64, i8, i16, i32, u8, u16, u32 => .{
-                .ptr = @intFromPtr(&data),
-                .len = data.len * @sizeOf(a.child),
-                .type = switch (a.child) {
-                    f32 => .Float32Array,
-                    f64 => .Float64Array,
-                    i8 => .Int8Array,
-                    i16 => .Int16Array,
-                    i32 => .Int32Array,
-                    u8 => .Uint8Array,
-                    u16 => .Uint16Array,
-                    u32 => .Uint32Array,
-                    else => unreachable,
-                },
-            },
+        .Array => |a| blk: {
+            var elements: [a.len]DeepTypedArrayReferences(a.child).type = undefined;
+            for (data, 0..) |elem, idx| {
+                elements[idx] = try deepTypedArrayReferences(a.child, allocator, elem);
+            }
+            break :blk elements;
         },
         .Pointer => |p| switch (p.size) {
             else => blk: {
@@ -171,7 +154,7 @@ pub fn deepTypedArrayReferences(t: type, allocator: std.mem.Allocator, data: t) 
                 },
                 f32, f64, i8, i16, i32, u8, u16, u32 => .{
                     .ptr = @intFromPtr(@as(*const p.child, @ptrCast(data))),
-                    .len = data.len * @sizeOf(p.child),
+                    .len = data.len,
                     .type = switch (p.child) {
                         f32 => .Float32Array,
                         f64 => .Float64Array,
@@ -240,31 +223,14 @@ pub fn DeepTypedArrayReferences(t: type) struct { type: type, changed: bool = fa
             break :blk if (!changed)
                 .{ .type = t }
             else
-                .{ .changed = true, .type = @Type(.{ .Struct = utils.copyWith(s, .{ .fields = fields }) }) };
+                .{ .changed = true, .type = @Type(.{ .Struct = utils.copyWith(s, .{ .decls = &[_]std.builtin.Type.Declaration{}, .fields = fields }) }) };
         },
-        .Array => |a| switch (a.child) {
-            f32, f64, i8, i16, i32, u8, u16, u32 => .{
-                .changed = true,
-                .type = switch (a.child) {
-                    else => unreachable,
-                    f32 => TypedArrayReference(enum { Float32Array }),
-                    f64 => TypedArrayReference(enum { Float64Array }),
-                    i8 => TypedArrayReference(enum { Int8Array }),
-                    i16 => TypedArrayReference(enum { Int16Array }),
-                    i32 => TypedArrayReference(enum { Int32Array }),
-                    u8 => TypedArrayReference(enum { Uint8Array }),
-                    u16 => TypedArrayReference(enum { Uint16Array }),
-                    u32 => TypedArrayReference(enum { Uint32Array }),
-                },
-            },
-
-            else => blk: {
-                const child = DeepTypedArrayReferences(a.child);
-                break :blk if (!child.changed)
-                    .{ .type = t }
-                else
-                    .{ .changed = true, .type = @Type(.{ .Array = .{ .len = a.len, .sentinel = a.sentinel, .child = child.type } }) };
-            },
+        .Array => |a| blk: {
+            const child = DeepTypedArrayReferences(a.child);
+            break :blk if (!child.changed)
+                .{ .type = t }
+            else
+                .{ .changed = true, .type = @Type(.{ .Array = .{ .len = a.len, .sentinel = a.sentinel, .child = child.type } }) };
         },
         .Pointer => |p| switch (p.size) {
             .Many, .Slice => switch (p.child) {
@@ -302,17 +268,6 @@ pub fn DeepTypedArrayReferences(t: type) struct { type: type, changed: bool = fa
 }
 
 test "DeepTypedArrayReferences" {
-    // {
-    //     const actual = DeepTypedArrayReferences([]f32).type;
-    //     const expected = TypedArrayReference(enum { Float32Array });
-    //     try std.testing.expect(actual == expected);
-    // }
-
-    // { // Struct
-    //     const t = DeepTypedArrayReferences(struct { a: []f32, b: []const u8 }).type;
-    //     _ = t{ .a = .{ .type = .Float32Array, .ptr = 0, .len = 0 }, .b = "Hello World!" };
-    // }
-
     { // Slice
         const t = DeepTypedArrayReferences(struct { a: []const []f32 }).type;
         _ = t{ .a = &.{.{ .type = .Float32Array, .ptr = 0, .len = 0 }} };
@@ -343,39 +298,4 @@ test "DeepTypedArrayReferences" {
         const transfromed = DeepTypedArrayReferences(original).type;
         try std.testing.expect(original == transfromed);
     }
-}
-
-// test "deepTypedArrayReferences" {
-//     const allocator = std.heap.page_allocator;
-//     const TheType = struct { a: []const f32, b: []const u8 };
-//     const data: TheType = .{ .a = &.{ 1.0, 2.0, 3.0 }, .b = "Hello World!" };
-//     const actual = deepTypedArrayReferences(TheType, allocator, data);
-//     try std.testing.expect(actual.a.len == 12);
-//     try std.testing.expect(std.mem.eql(u8, actual.b, "Hello World!"));
-//     try std.testing.expect(std.mem.eql(u8, actual.a.type, .Float32Array));
-// }
-
-test "DeepTypedArrayReferences Mesh type conversion" {
-    const Mesh = @import("./subdiv.zig").Mesh;
-    {
-        const actual = DeepTypedArrayReferences(Mesh).type;
-        _ = actual{ .points = &.{}, .quads = &.{.{ .type = .Uint32Array, .ptr = 0, .len = 0 }} };
-    }
-}
-
-pub fn main() !void {
-    const interface = @import("./wasmInterface.zig").interface;
-    const allocator = std.heap.page_allocator;
-    try build_typescript_type(allocator, interface, "src", "../gen/wasmInterface.d.ts");
-}
-
-pub fn build_typescript_type(allocator: std.mem.Allocator, interface: anytype, folder_path: []const u8, file_name: []const u8) !void {
-    const typeInfo = comptime typescriptTypeOf(interface, .{ .first = true });
-    const contents = "export type WasmInterface = " ++ typeInfo;
-    const file_path = try std.fmt.allocPrint(allocator, "{s}/{s}", .{ folder_path, file_name });
-    std.fs.cwd().makeDir(folder_path) catch {};
-    std.fs.cwd().deleteFile(file_path) catch {};
-    const file = try std.fs.cwd().createFile(file_path, .{});
-    try file.writeAll(contents);
-    std.debug.print("Wrote file to {s}\n", .{file_path});
 }

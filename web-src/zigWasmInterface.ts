@@ -1,4 +1,4 @@
-import type { WasmInterface } from "../gen/wasmInterface";
+import type { WasmInterface } from "../bin/game";
 import init from '../bin/game.wasm?init';
 
 let onMessage: null | ((message: string) => void) = null;
