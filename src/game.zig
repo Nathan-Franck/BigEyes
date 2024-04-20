@@ -1,11 +1,11 @@
 const subdiv = @import("./subdiv.zig");
 const std = @import("std");
-const graphRuntime = @import("./graphRuntime.zig");
-const NodeDefinitions = @import("./nodeGraphBlueprintNodes.zig");
-const node_graph_blueprint = @import("./interactiveNodeBuilderBlueprint.zig").node_graph_blueprint;
-const typeDefinitions = @import("./typeDefinitions.zig");
+const graph_runtime = @import("./graph_runtime.zig");
+const NodeDefinitions = @import("./node_graph_blueprint_nodes.zig");
+const node_graph_blueprint = @import("./interactive_node_builder_blueprint.zig").node_graph_blueprint;
+const typeDefinitions = @import("./type_definitions.zig");
 
-const MyNodeGraph = graphRuntime.NodeGraph(
+const MyNodeGraph = graph_runtime.NodeGraph(
     NodeDefinitions,
     node_graph_blueprint,
 );

@@ -2,7 +2,7 @@ const std = @import("std");
 const typescriptTypeOf = @import("type_definitions.zig").typescriptTypeOf;
 
 pub fn main() !void {
-    const interface = @import("./game.zig");
+    const interface = @import("./game.zig").interface;
     const allocator = std.heap.page_allocator;
     try build_typescript_type(allocator, interface, "src", "../bin/game.d.ts");
 }

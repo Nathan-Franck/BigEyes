@@ -1,7 +1,8 @@
 const std = @import("std");
-const NodeGraphBlueprintEntry = @import("./interactiveNodeBuilderBlueprint.zig").NodeGraphBlueprintEntry;
-const Blueprint = @import("./interactiveNodeBuilderBlueprint.zig").Blueprint;
-const utils = @import("./nodeUtils.zig");
+const NodeGraphBlueprintEntry = @import("./interactive_node_builder_blueprint.zig").NodeGraphBlueprintEntry;
+const Blueprint = @import("./interactive_node_builder_blueprint.zig").Blueprint;
+const utils = @import("./utils.zig");
+const utils_node = @import("./utils_node.zig");
 
 allocator: std.mem.Allocator,
 
@@ -168,7 +169,7 @@ pub fn ContextMenuInteraction(input: struct {
 } {
     const default = .{
         .context_menu = input.context_menu,
-        .event = utils.eventTransform(utils.NodeOutputEventType(ContextMenuInteraction), input.event),
+        .event = utils_node.eventTransform(utils_node.NodeOutputEventType(ContextMenuInteraction), input.event),
     };
     return if (input.event) |event| switch (event) {
         .external_node_event => |node_event| switch (node_event.mouse_event) {
@@ -237,7 +238,7 @@ pub fn NodeInteraction(self: @This(), input: struct {
     const default = .{
         .interaction_state = input.interaction_state,
         .blueprint = input.blueprint,
-        .event = utils.eventTransform(utils.NodeOutputEventType(NodeInteraction), input.event),
+        .event = utils_node.eventTransform(utils_node.NodeOutputEventType(NodeInteraction), input.event),
     };
     return if (input.event) |event|
         if (input.keyboard_modifiers.shift)
@@ -471,7 +472,7 @@ test "delete node from context menu" {
         },
     });
     const second_output = try instance.NodeInteraction(.{
-        .event = utils.eventTransform(utils.NodeInputEventType(NodeInteraction), first_output.event),
+        .event = utils_node.eventTransform(utils.NodeInputEventType(NodeInteraction), first_output.event),
         .interaction_state = .{
             .node_selection = &.{"test"},
             .wiggle = null,
@@ -500,7 +501,7 @@ test "delete node from context menu with a current selection" {
         },
     });
     const second_output = try instance.NodeInteraction(.{
-        .event = utils.eventTransform(utils.NodeInputEventType(NodeInteraction), first_output.event),
+        .event = utils_node.eventTransform(utils.NodeInputEventType(NodeInteraction), first_output.event),
         .interaction_state = .{
             .node_selection = &.{ "test", "something_else" },
             .wiggle = null,
@@ -528,7 +529,7 @@ test "delete node from context menu with a current selection" {
 //         .context_menu = .{ .open = false, .location = .{ .x = 0, .y = 0 }, .options = &.{}, .selected_node = "test" },
 //     });
 //     const second_output = try instance.NodeInteraction(.{
-//         .event = utils.eventTransform(utils.NodeInputEventType(NodeInteraction), first_output.event),
+//         .event = utils_node.eventTransform(utils.NodeInputEventType(NodeInteraction), first_output.event),
 //         .interaction_state = .{ .node_selection = &.{"something_else"}, .wiggle = null, .box_selection = null },
 //         .blueprint = .{ .nodes = &.{
 //             .{ .name = "test", .function = "test", .input_links = &.{} },
@@ -551,7 +552,7 @@ test "delete node from context menu with a current selection" {
 //         .context_menu = .{ .open = false, .location = .{ .x = 0, .y = 0 }, .options = &.{}, .selected_node = "test" },
 //     });
 //     const second_output = try instance.NodeInteraction(.{
-//         .event = utils.eventTransform(utils.NodeInputEventType(NodeInteraction), first_output.event),
+//         .event = utils_node.eventTransform(utils.NodeInputEventType(NodeInteraction), first_output.event),
 //         .interaction_state = .{ .node_selection = &.{ "test", "something_else" }, .wiggle = null, .box_selection = null },
 //         .blueprint = .{
 //             .nodes = &.{.{ .name = "test", .function = "test", .input_links = &.{} }},
@@ -572,7 +573,7 @@ test "duplicate node" {
         .context_menu = .{ .open = false, .location = .{ .x = 0, .y = 0 }, .options = &.{}, .selected_node = "test" },
     });
     const second_output = try instance.NodeInteraction(.{
-        .event = utils.eventTransform(utils.NodeInputEventType(NodeInteraction), first_output.event),
+        .event = utils_node.eventTransform(utils.NodeInputEventType(NodeInteraction), first_output.event),
         .interaction_state = .{ .node_selection = &.{ "test#1", "test#2" }, .wiggle = null, .box_selection = null },
         .blueprint = .{ .nodes = &.{
             .{ .name = "test#1", .function = "test", .input_links = &.{} },

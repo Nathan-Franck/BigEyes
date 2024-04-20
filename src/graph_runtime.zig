@@ -1,7 +1,7 @@
 const std = @import("std");
-const Blueprint = @import("./interactiveNodeBuilderBlueprint.zig").Blueprint;
-const NodeDefinitions = @import("./nodeGraphBlueprintNodes.zig");
-const node_graph_blueprint = @import("./interactiveNodeBuilderBlueprint.zig").node_graph_blueprint;
+const Blueprint = @import("./interactive_node_builder_blueprint.zig").Blueprint;
+const NodeDefinitions = @import("./node_graph_blueprint_nodes.zig");
+const node_graph_blueprint = @import("./interactive_node_builder_blueprint.zig").node_graph_blueprint;
 
 const Input = struct {
     name: []const u8,
