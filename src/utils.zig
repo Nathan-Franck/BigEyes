@@ -28,6 +28,21 @@ pub fn copyWith(source_data: anytype, field_changes: anytype) @TypeOf(source_dat
     }
 }
 
+pub fn deepClone(T: type, allocator: std.mem.Allocator, source: anytype) T {
+    _ = allocator; // autofix
+    switch (@typeInfo(T)) {
+        else => @compileError("Not implemented yet!"),
+        .Array => |array_info| {},
+        .Struct => |struct_info| {
+            var result: T = undefined;
+            inline for (struct_info.fields) |field| {
+                @field(result, field.name) = @field(source, field.name);
+            }
+            return result;
+        },
+    }
+}
+
 /// Takes any type that has fields and returns a list of the field names as strings.
 /// NOTE: Required to run at comptime from the callsite.
 pub fn fieldNamesToStrings(comptime with_fields: type) []const []const u8 {

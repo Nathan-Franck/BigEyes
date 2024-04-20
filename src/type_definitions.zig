@@ -122,7 +122,6 @@ pub fn deepTypedArrayReferences(t: type, allocator: std.mem.Allocator, data: t) 
         .Struct => |s| blk: {
             var new_data: DeepTypedArrayReferences(t).type = undefined;
             inline for (s.fields) |field| {
-                @import("wasm_entry.zig").dumpDebugLog(field.name);
                 const result = try deepTypedArrayReferences(field.type, allocator, @field(data, field.name));
                 @field(new_data, field.name) = result;
             }
@@ -146,7 +145,6 @@ pub fn deepTypedArrayReferences(t: type, allocator: std.mem.Allocator, data: t) 
             .Many, .Slice => switch (p.child) {
                 else => blk: {
                     var elements = std.ArrayList(DeepTypedArrayReferences(p.child).type).init(allocator);
-                    @import("wasm_entry.zig").dumpDebugLog(try std.fmt.allocPrint(allocator, "{d}", .{data.len}));
                     for (data) |elem| {
                         try elements.append(try deepTypedArrayReferences(p.child, allocator, elem));
                     }
