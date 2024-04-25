@@ -35,5 +35,7 @@ blender triangle_wgpu_content/cube.blend --background --python .\tools\custom-gl
 ### Future Development Directions
 
 - Forest rendering would be really nice to try out, just to satisfy my personal interests
+  - Just go full 3D since that can look the coolest, with a dense forest
+  - Use that cool algorithm that I already know about
 - Orthographic rendering would be cool because I can optimize it pretty strongly for low-end hardware and power concious devices like phones
 - Loading in 3D models with multiple textures (diffuse, normal, rough-spec) and having a basic display for those models with maybe some cubemap lighting
