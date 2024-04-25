@@ -222,8 +222,7 @@ pub fn NodeGraph(comptime node_definitions: anytype, comptime graph: Blueprint) 
         };
         allocator: std.mem.Allocator,
         store: SystemStore,
-        pub fn update(self: *Self, raw_inputs: SystemInputs) !SystemOutputs {
-            const inputs = utils.deepClone(SystemInputs, self.allocator, raw_inputs);
+        pub fn update(self: *Self, inputs: SystemInputs) !SystemOutputs {
             const nodes = node_definitions{ .allocator = self.allocator };
             var nodes_outputs: NodeOutputs = undefined;
             inline for (node_order) |node_index| {
@@ -232,7 +231,7 @@ pub fn NodeGraph(comptime node_definitions: anytype, comptime graph: Blueprint) 
                 const node_params = @typeInfo(@TypeOf(node_defn)).Fn.params;
                 const NodeInputs = node_params[node_params.len - 1].type.?;
                 var node_inputs: NodeInputs = undefined;
-                for (node.input_links) |link| switch (link.source) {
+                inline for (node.input_links) |link| switch (link.source) {
                     .input_field => |input_field| {
                         @field(node_inputs, link.field) = @field(inputs, input_field);
                     },
@@ -272,8 +271,9 @@ pub fn NodeGraph(comptime node_definitions: anytype, comptime graph: Blueprint) 
             var system_outputs: SystemOutputs = undefined;
             inline for (node_graph_blueprint.output) |output_defn| {
                 const node_outputs = @field(nodes_outputs, output_defn.output_node);
+                const result = @field(node_outputs, output_defn.output_field);
                 @field(system_outputs, output_defn.system_field) =
-                    @field(node_outputs, output_defn.output_field);
+                    (try utils.deepClone(@TypeOf(result), self.allocator, result)).value;
             }
             return system_outputs;
         }

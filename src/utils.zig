@@ -83,9 +83,9 @@ pub fn deepClone(
             },
             else => unreachable,
         },
-        .Optional => blk: {
+        .Optional => |optional_info| blk: {
             if (source) |non_null_source| {
-                const result = deepClone(non_null_source);
+                const result = try deepClone(optional_info.child, allocator, non_null_source);
                 break :blk .{ .value = result.value, .allocator_used = result.allocator_used };
             } else {
                 break :blk .{ .value = null, .allocator_used = false };
