@@ -8,6 +8,8 @@ type Outputs = Extract<ReturnType<InterfaceFunction>, { outputs: any }>["outputs
 
 export function NodeGraph(initial_inputs: Inputs) {
 
+  callWasm("init");
+
   const initial_outputs = call(initial_inputs)!;
 
   function call(inputs: Inputs): { error: string } | Outputs {

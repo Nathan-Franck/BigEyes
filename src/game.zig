@@ -48,6 +48,10 @@ pub const interface = struct {
         },
     };
 
+    pub fn init() !void {
+        try my_node_graph.init();
+    }
+
     pub fn callNodeGraph(
         inputs: MyNodeGraph.SystemInputs,
     ) !struct {

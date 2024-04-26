@@ -222,8 +222,11 @@ pub fn NodeGraph(comptime node_definitions: anytype, comptime graph: Blueprint) 
         };
         allocator: std.mem.Allocator,
         store: SystemStore,
+        pub fn init(self: *Self) !void {
+            self.store = (try utils.deepClone(SystemStore, self.allocator, self.store)).value;
+            @import("./wasm_entry.zig").dumpDebugLog("Initialized the store to ensure that all data within the store is owned by the allocator");
+        }
         pub fn update(self: *Self, inputs: SystemInputs) !SystemOutputs {
-            // const inputs = (try utils.deepClone(SystemInputs, self.allocator, raw_inputs)).value;
             const nodes = node_definitions{ .allocator = self.allocator };
             var nodes_outputs: NodeOutputs = undefined;
             inline for (node_order) |node_index| {
@@ -262,15 +265,20 @@ pub fn NodeGraph(comptime node_definitions: anytype, comptime graph: Blueprint) 
                     .ErrorUnion => try node_output,
                 };
             }
-            // Update store with new values from nodes!
+            // Copy over new store values...
+            var new_store: SystemStore = undefined;
             inline for (node_graph_blueprint.store) |store_defn| {
                 const node_outputs = @field(nodes_outputs, store_defn.output_node);
                 const new_store_field = @field(node_outputs, store_defn.output_field);
                 const StoreField = @TypeOf(new_store_field);
-                // try utils.deepFree(StoreField, self.allocator, @field(self.store, store_defn.system_field));
                 const owned_new_store_field = try utils.deepClone(StoreField, self.allocator, new_store_field);
-                @field(self.store, store_defn.system_field) = owned_new_store_field.value;
+                @field(new_store, store_defn.system_field) = owned_new_store_field.value;
             }
+            // Free old store values...
+            try utils.deepFree(SystemStore, self.allocator, self.store); // Doing this currently crashes the program...
+            // Update store with new values!
+            self.store = new_store;
+
             // Output from system from select nodes...
             var system_outputs: SystemOutputs = undefined;
             inline for (node_graph_blueprint.output) |output_defn| {

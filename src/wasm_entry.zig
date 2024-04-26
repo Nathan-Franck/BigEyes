@@ -88,8 +88,10 @@ fn callWithJsonErr(name_ptr: [*]const u8, name_len: usize, args_ptr: [*]const u8
                 return err;
             };
             const result = try @call(.auto, func, args.value);
-            const converted_result = try type_definitions.deepTypedArrayReferences(@TypeOf(result), allocator, result);
-            dumpMessage(try std.json.stringifyAlloc(allocator, converted_result, .{}));
+            if (@TypeOf(result) != void) {
+                const converted_result = try type_definitions.deepTypedArrayReferences(@TypeOf(result), allocator, result);
+                dumpMessage(try std.json.stringifyAlloc(allocator, converted_result, .{}));
+            }
             _ = message_arena.reset(.retain_capacity);
         },
     }
