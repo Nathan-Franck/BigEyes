@@ -37,7 +37,6 @@ pub fn deepClone(
     allocator_used: bool = false,
 } {
     return switch (@typeInfo(T)) {
-        // else => @compileError(std.fmt.comptimePrint("{?}", .{T}) ++ " is not a supported type"),
         else => .{ .value = source, .allocator_used = false },
         .Array => |a| blk: {
             var elements: [a.len]a.child = undefined;
@@ -102,7 +101,7 @@ pub fn deepClone(
                 break :blk .{ .value = elements.items, .allocator_used = true };
             },
             else => {
-                @import("./wasm_entry.zig").dumpDebugLog("deepClone: Pointer");
+                @import("./wasm_entry.zig").dumpDebugLog("deepClone: Not implemented --- Pointer");
                 unreachable;
             },
         },
@@ -112,6 +111,53 @@ pub fn deepClone(
                 break :blk .{ .value = result.value, .allocator_used = result.allocator_used };
             } else {
                 break :blk .{ .value = null, .allocator_used = false };
+            }
+        },
+    };
+}
+
+pub fn deepFree(
+    T: type,
+    allocator: std.mem.Allocator,
+    source: anytype,
+) !void {
+    return switch (@typeInfo(T)) {
+        else => {},
+        .Array => |a| for (T) |elem| {
+            try deepFree(a.child, allocator, elem);
+        },
+        .Struct => |struct_info| inline for (struct_info.fields) |field| {
+            try deepFree(field.type, allocator, @field(source, field.name));
+        },
+        .Union => |union_info| {
+            const active_tag_index = @intFromEnum(source);
+            inline for (union_info.fields, 0..) |field_candidate, field_index| {
+                if (active_tag_index == field_index) {
+                    try deepFree(
+                        field_candidate.type,
+                        allocator,
+                        @field(source, field_candidate.name),
+                    );
+                    break;
+                }
+            }
+            unreachable;
+        },
+        .Pointer => |pointer_info| switch (pointer_info.size) {
+            .Many, .Slice => {
+                for (source) |elem| {
+                    try deepFree(pointer_info.child, allocator, elem);
+                }
+                allocator.free(source);
+            },
+            else => {
+                @import("./wasm_entry.zig").dumpDebugLog("deepFree: Not implemented --- Pointer");
+                unreachable;
+            },
+        },
+        .Optional => |optional_info| {
+            if (source) |non_null_source| {
+                try deepFree(optional_info.child, allocator, non_null_source);
             }
         },
     };

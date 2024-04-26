@@ -222,8 +222,8 @@ pub fn NodeGraph(comptime node_definitions: anytype, comptime graph: Blueprint) 
         };
         allocator: std.mem.Allocator,
         store: SystemStore,
-        pub fn update(self: *Self, raw_inputs: SystemInputs) !SystemOutputs {
-            const inputs = (try utils.deepClone(SystemInputs, self.allocator, raw_inputs)).value;
+        pub fn update(self: *Self, inputs: SystemInputs) !SystemOutputs {
+            // const inputs = (try utils.deepClone(SystemInputs, self.allocator, raw_inputs)).value;
             const nodes = node_definitions{ .allocator = self.allocator };
             var nodes_outputs: NodeOutputs = undefined;
             inline for (node_order) |node_index| {
@@ -265,16 +265,18 @@ pub fn NodeGraph(comptime node_definitions: anytype, comptime graph: Blueprint) 
             // Update store with new values from nodes!
             inline for (node_graph_blueprint.store) |store_defn| {
                 const node_outputs = @field(nodes_outputs, store_defn.output_node);
-                @field(self.store, store_defn.system_field) =
-                    @field(node_outputs, store_defn.output_field);
+                const new_store_field = @field(node_outputs, store_defn.output_field);
+                const StoreField = @TypeOf(new_store_field);
+                // try utils.deepFree(StoreField, self.allocator, @field(self.store, store_defn.system_field));
+                const owned_new_store_field = try utils.deepClone(StoreField, self.allocator, new_store_field);
+                @field(self.store, store_defn.system_field) = owned_new_store_field.value;
             }
             // Output from system from select nodes...
             var system_outputs: SystemOutputs = undefined;
             inline for (node_graph_blueprint.output) |output_defn| {
                 const node_outputs = @field(nodes_outputs, output_defn.output_node);
                 const result = @field(node_outputs, output_defn.output_field);
-                @field(system_outputs, output_defn.system_field) =
-                    (try utils.deepClone(@TypeOf(result), self.allocator, result)).value;
+                @field(system_outputs, output_defn.system_field) = result;
             }
             return system_outputs;
         }
