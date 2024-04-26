@@ -1,7 +1,7 @@
 zig-cache
 zig-out
-# web/bin
-# libs/zig-gamedev
+bin
+*.blend.json
 
 # Logs
 logs
