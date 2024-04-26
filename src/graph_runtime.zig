@@ -224,8 +224,12 @@ pub fn NodeGraph(comptime node_definitions: anytype, comptime graph: Blueprint) 
         arena: ?std.heap.ArenaAllocator = null,
         store: SystemStore,
         pub fn update(self: *Self, inputs: SystemInputs) !SystemOutputs {
+
+            // Use the previous arena if it exists, otherwise create a new one.
             var arena = if (self.arena) |arena| arena else std.heap.ArenaAllocator.init(self.allocator);
             const nodes = node_definitions{ .allocator = arena.allocator() };
+
+            // Process all nodes...
             var nodes_outputs: NodeOutputs = undefined;
             inline for (node_order) |node_index| {
                 const node = graph.nodes[node_index];
@@ -263,15 +267,18 @@ pub fn NodeGraph(comptime node_definitions: anytype, comptime graph: Blueprint) 
                     .ErrorUnion => try node_output,
                 };
             }
+
+            // Start the next arena!
+            var next_arena = std.heap.ArenaAllocator.init(self.allocator);
+            self.arena = next_arena;
+
             // Copy over new store values...
             inline for (node_graph_blueprint.store) |store_defn| {
-                const result = @field(nodes_outputs, store_defn.output_node);
-                @field(self.store, store_defn.system_field) = @field(result, store_defn.output_field);
+                const node_result = @field(nodes_outputs, store_defn.output_node);
+                const result = @field(node_result, store_defn.output_field);
+                @field(self.store, store_defn.system_field) =
+                    (try utils.deepClone(@TypeOf(result), next_arena.allocator(), result)).value;
             }
-            // Claim ownership over the new values ...
-            var next_arena = std.heap.ArenaAllocator.init(self.allocator);
-            self.store = (try utils.deepClone(SystemStore, next_arena.allocator(), self.store)).value;
-            self.arena = next_arena;
 
             // Output from system from select nodes...
             var system_outputs: SystemOutputs = undefined;
@@ -279,10 +286,10 @@ pub fn NodeGraph(comptime node_definitions: anytype, comptime graph: Blueprint) 
                 const node_outputs = @field(nodes_outputs, output_defn.output_node);
                 const result = @field(node_outputs, output_defn.output_field);
                 @field(system_outputs, output_defn.system_field) =
-                    (try utils.deepClone(@TypeOf(result), self.allocator, result)).value; // TODO return a struct that we can deinit()
+                    (try utils.deepClone(@TypeOf(result), next_arena.allocator(), result)).value;
             }
 
-            // Free the arena!
+            // Free the previous arena!
             arena.deinit();
 
             return system_outputs;
