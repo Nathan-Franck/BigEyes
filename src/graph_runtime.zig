@@ -223,8 +223,15 @@ pub fn NodeGraph(comptime node_definitions: anytype, comptime graph: Blueprint) 
         allocator: std.mem.Allocator,
         store: SystemStore,
         pub fn init(self: *Self) !void {
+            const old_store = self.store;
             self.store = (try utils.deepClone(SystemStore, self.allocator, self.store)).value;
-            @import("./wasm_entry.zig").dumpDebugLog("Initialized the store to ensure that all data within the store is owned by the allocator");
+
+            const dump = @import("./wasm_entry.zig").dumpDebugLog;
+            dump(try std.fmt.allocPrint(self.allocator, "{d} <> {d}", .{
+                @intFromPtr(@as(*const @typeInfo(@TypeOf(self.store.blueprint.nodes)).Pointer.child, @ptrCast(self.store.blueprint.nodes))),
+                @intFromPtr(@as(*const @typeInfo(@TypeOf(old_store.blueprint.nodes)).Pointer.child, @ptrCast(old_store.blueprint.nodes))),
+            }));
+            dump("Initialized the store to ensure that all data within the store is owned by the allocator");
         }
         pub fn update(self: *Self, inputs: SystemInputs) !SystemOutputs {
             const nodes = node_definitions{ .allocator = self.allocator };
@@ -266,22 +273,20 @@ pub fn NodeGraph(comptime node_definitions: anytype, comptime graph: Blueprint) 
                 };
             }
             // Copy over new store values...
-            var new_store: SystemStore = self.store;
+            const old_store: SystemStore = self.store;
             inline for (node_graph_blueprint.store) |store_defn| {
-                const node_outputs = @field(nodes_outputs, store_defn.output_node);
-                const new_store_field = @field(node_outputs, store_defn.output_field);
-                const StoreField = @TypeOf(new_store_field);
-                const owned_new_store_field = try utils.deepClone(StoreField, self.allocator, new_store_field);
-                @field(new_store, store_defn.system_field) = owned_new_store_field.value;
+                const result = @field(nodes_outputs, store_defn.output_node);
+                @field(self.store, store_defn.system_field) = @field(result, store_defn.output_field);
             }
-            // Free old store values...
-            inline for (node_graph_blueprint.store) |store_defn| {
-                const old_store_field = @field(self.store, store_defn.system_field);
-                const StoreField = @TypeOf(old_store_field);
-                try utils.deepFree(StoreField, self.allocator, old_store_field); // This actively breaks things.
-            }
-            // Update store with new values!
-            self.store = new_store;
+            // Claim ownership over the new values ...
+            self.store = (try utils.deepClone(SystemStore, self.allocator, self.store)).value;
+            // Free old store values!
+            // try utils.deepFree(SystemStore, self.allocator, old_store);
+            const dump = @import("./wasm_entry.zig").dumpDebugLog;
+            dump(try std.fmt.allocPrint(self.allocator, "{d} <> {d}", .{
+                @intFromPtr(@as(*const @typeInfo(@TypeOf(self.store.blueprint.nodes)).Pointer.child, @ptrCast(self.store.blueprint.nodes))),
+                @intFromPtr(@as(*const @typeInfo(@TypeOf(old_store.blueprint.nodes)).Pointer.child, @ptrCast(old_store.blueprint.nodes))),
+            }));
 
             // Output from system from select nodes...
             var system_outputs: SystemOutputs = undefined;

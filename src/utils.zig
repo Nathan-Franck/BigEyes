@@ -98,6 +98,7 @@ pub fn deepClone(
                     const result = try deepClone(pointer_info.child, allocator, elem);
                     try elements.append(result.value);
                 }
+                @import("./wasm_entry.zig").dumpDebugLog("Actually doing some cloning with the new allocator!");
                 break :blk .{ .value = elements.items, .allocator_used = true };
             },
             else => {
