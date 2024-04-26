@@ -28,7 +28,7 @@ const ExportMeshes = struct {
         var export_count: u32 = 0;
 
         for (self.files) |file| {
-            const full_path = try std.fmt.allocPrint(self.allocator, "content/{s}.blend", .{file});
+            const full_path = try std.fmt.allocPrint(self.allocator, content_dir ++ "/{s}.blend", .{file});
 
             var man = b.graph.cache.obtain();
             defer man.deinit();
@@ -49,7 +49,7 @@ const ExportMeshes = struct {
                     full_path,
                     "--background",
                     "--python",
-                    "content/custom-gltf.py",
+                    content_dir ++ "/custom-gltf.py",
                 },
                 .cwd = try std.process.getCwdAlloc(self.allocator),
             });
@@ -151,7 +151,7 @@ pub fn build(
         // exe.initial_memory = std.wasm.page_size * number_of_pages;
         // exe.max_memory = std.wasm.page_size * number_of_pages;
 
-        // exe.step.dependOn(&export_meshes.step);
+        exe.step.dependOn(&export_meshes.step);
         // exe.step.dependOn(&generate_typescript_types.step);
 
         const install_artifact = b.addInstallArtifact(exe, .{ .dest_dir = .{ .override = .{ .custom = "../bin" } } });
