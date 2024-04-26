@@ -68,10 +68,29 @@ pub fn deepClone(
                 break :blk .{ .value = result, .allocator_used = true };
             }
         },
-        .Union => |union_info| {
-            _ = union_info; // autofix
-            @import("./wasm_entry.zig").dumpDebugLog("Not implemented yet: Union");
-            @panic("Not implemented yet!");
+        .Union => |union_info| blk: {
+            const active_tag_index = @intFromEnum(source);
+            inline for (union_info.fields, 0..) |field_candidate, field_index| {
+                if (active_tag_index == field_index) {
+                    const result = try deepClone(
+                        field_candidate.type,
+                        allocator,
+                        @field(source, field_candidate.name),
+                    );
+                    if (!result.allocator_used) {
+                        break :blk .{
+                            .value = source,
+                            .allocator_used = false,
+                        };
+                    } else {
+                        break :blk .{
+                            .value = @unionInit(T, field_candidate.name, result.value),
+                            .allocator_used = true,
+                        };
+                    }
+                }
+            }
+            unreachable;
         },
         .Pointer => |pointer_info| switch (pointer_info.size) {
             .Many, .Slice => blk: {

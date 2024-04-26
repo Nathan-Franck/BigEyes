@@ -232,6 +232,7 @@ pub fn NodeGraph(comptime node_definitions: anytype, comptime graph: Blueprint) 
                 const node_params = @typeInfo(@TypeOf(node_defn)).Fn.params;
                 const NodeInputs = node_params[node_params.len - 1].type.?;
                 var node_inputs: NodeInputs = undefined;
+                inline for (node.input_links) |link| switch (link.source) {
                     .input_field => |input_field| {
                         @field(node_inputs, link.field) = @field(inputs, input_field);
                     },
