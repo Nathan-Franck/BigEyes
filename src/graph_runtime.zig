@@ -221,20 +221,11 @@ pub fn NodeGraph(comptime node_definitions: anytype, comptime graph: Blueprint) 
             } });
         };
         allocator: std.mem.Allocator,
+        arena: ?std.heap.ArenaAllocator = null,
         store: SystemStore,
-        pub fn init(self: *Self) !void {
-            const old_store = self.store;
-            self.store = (try utils.deepClone(SystemStore, self.allocator, self.store)).value;
-
-            const dump = @import("./wasm_entry.zig").dumpDebugLog;
-            dump(try std.fmt.allocPrint(self.allocator, "{d} <> {d}", .{
-                @intFromPtr(@as(*const @typeInfo(@TypeOf(self.store.blueprint.nodes)).Pointer.child, @ptrCast(self.store.blueprint.nodes))),
-                @intFromPtr(@as(*const @typeInfo(@TypeOf(old_store.blueprint.nodes)).Pointer.child, @ptrCast(old_store.blueprint.nodes))),
-            }));
-            dump("Initialized the store to ensure that all data within the store is owned by the allocator");
-        }
         pub fn update(self: *Self, inputs: SystemInputs) !SystemOutputs {
-            const nodes = node_definitions{ .allocator = self.allocator };
+            var arena = if (self.arena) |arena| arena else std.heap.ArenaAllocator.init(self.allocator);
+            const nodes = node_definitions{ .allocator = arena.allocator() };
             var nodes_outputs: NodeOutputs = undefined;
             inline for (node_order) |node_index| {
                 const node = graph.nodes[node_index];
@@ -273,28 +264,27 @@ pub fn NodeGraph(comptime node_definitions: anytype, comptime graph: Blueprint) 
                 };
             }
             // Copy over new store values...
-            const old_store: SystemStore = self.store;
             inline for (node_graph_blueprint.store) |store_defn| {
                 const result = @field(nodes_outputs, store_defn.output_node);
                 @field(self.store, store_defn.system_field) = @field(result, store_defn.output_field);
             }
             // Claim ownership over the new values ...
-            self.store = (try utils.deepClone(SystemStore, self.allocator, self.store)).value;
-            // Free old store values!
-            // try utils.deepFree(SystemStore, self.allocator, old_store);
-            const dump = @import("./wasm_entry.zig").dumpDebugLog;
-            dump(try std.fmt.allocPrint(self.allocator, "{d} <> {d}", .{
-                @intFromPtr(@as(*const @typeInfo(@TypeOf(self.store.blueprint.nodes)).Pointer.child, @ptrCast(self.store.blueprint.nodes))),
-                @intFromPtr(@as(*const @typeInfo(@TypeOf(old_store.blueprint.nodes)).Pointer.child, @ptrCast(old_store.blueprint.nodes))),
-            }));
+            var next_arena = std.heap.ArenaAllocator.init(self.allocator);
+            self.store = (try utils.deepClone(SystemStore, next_arena.allocator(), self.store)).value;
+            self.arena = next_arena;
 
             // Output from system from select nodes...
             var system_outputs: SystemOutputs = undefined;
             inline for (node_graph_blueprint.output) |output_defn| {
                 const node_outputs = @field(nodes_outputs, output_defn.output_node);
                 const result = @field(node_outputs, output_defn.output_field);
-                @field(system_outputs, output_defn.system_field) = result;
+                @field(system_outputs, output_defn.system_field) =
+                    (try utils.deepClone(@TypeOf(result), self.allocator, result)).value; // TODO return a struct that we can deinit()
             }
+
+            // Free the arena!
+            arena.deinit();
+
             return system_outputs;
         }
     };
