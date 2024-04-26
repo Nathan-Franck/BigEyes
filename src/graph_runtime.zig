@@ -275,7 +275,11 @@ pub fn NodeGraph(comptime node_definitions: anytype, comptime graph: Blueprint) 
                 @field(new_store, store_defn.system_field) = owned_new_store_field.value;
             }
             // Free old store values...
-            try utils.deepFree(SystemStore, self.allocator, self.store); // Doing this currently crashes the program...
+            inline for (node_graph_blueprint.store) |store_defn| {
+                const old_store_field = @field(self.store, store_defn.system_field);
+                const StoreField = @TypeOf(old_store_field);
+                try utils.deepFree(StoreField, self.allocator, old_store_field); // This actively breaks things.
+            }
             // Update store with new values!
             self.store = new_store;
 
