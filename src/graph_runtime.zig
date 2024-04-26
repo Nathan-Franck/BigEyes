@@ -280,21 +280,24 @@ pub fn NodeGraph(comptime node_definitions: anytype, comptime graph: Blueprint) 
             }
             // Claim ownership over the new values ...
             self.store = (try utils.deepClone(SystemStore, self.allocator, self.store)).value;
-            // Free old store values!
-            // try utils.deepFree(SystemStore, self.allocator, old_store);
-            const dump = @import("./wasm_entry.zig").dumpDebugLog;
-            dump(try std.fmt.allocPrint(self.allocator, "{d} <> {d}", .{
-                @intFromPtr(@as(*const @typeInfo(@TypeOf(self.store.blueprint.nodes)).Pointer.child, @ptrCast(self.store.blueprint.nodes))),
-                @intFromPtr(@as(*const @typeInfo(@TypeOf(old_store.blueprint.nodes)).Pointer.child, @ptrCast(old_store.blueprint.nodes))),
-            }));
 
             // Output from system from select nodes...
             var system_outputs: SystemOutputs = undefined;
             inline for (node_graph_blueprint.output) |output_defn| {
                 const node_outputs = @field(nodes_outputs, output_defn.output_node);
                 const result = @field(node_outputs, output_defn.output_field);
-                @field(system_outputs, output_defn.system_field) = result;
+                @field(system_outputs, output_defn.system_field) =
+                    (try utils.deepClone(@TypeOf(result), self.allocator, result)).value; // TODO return a struct that we can deinit()
             }
+
+            // Free old store values!
+            try utils.deepFree(SystemStore, self.allocator, old_store);
+            const dump = @import("./wasm_entry.zig").dumpDebugLog;
+            dump(try std.fmt.allocPrint(self.allocator, "{d} <> {d}", .{
+                @intFromPtr(@as(*const @typeInfo(@TypeOf(self.store.blueprint.nodes)).Pointer.child, @ptrCast(self.store.blueprint.nodes))),
+                @intFromPtr(@as(*const @typeInfo(@TypeOf(old_store.blueprint.nodes)).Pointer.child, @ptrCast(old_store.blueprint.nodes))),
+            }));
+
             return system_outputs;
         }
     };
