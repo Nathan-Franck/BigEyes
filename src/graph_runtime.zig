@@ -266,7 +266,7 @@ pub fn NodeGraph(comptime node_definitions: anytype, comptime graph: Blueprint) 
                 };
             }
             // Copy over new store values...
-            var new_store: SystemStore = undefined;
+            var new_store: SystemStore = self.store;
             inline for (node_graph_blueprint.store) |store_defn| {
                 const node_outputs = @field(nodes_outputs, store_defn.output_node);
                 const new_store_field = @field(node_outputs, store_defn.output_field);
@@ -316,7 +316,7 @@ test "Build" {
             .interaction_state = .{ .node_selection = &.{} },
         },
     };
-    const result_commands = try my_node_graph.update(.{
+    _ = try my_node_graph.update(.{
         .recieved_blueprint = node_graph_blueprint,
         .keyboard_modifiers = .{
             .shift = false,
@@ -325,7 +325,6 @@ test "Build" {
             .super = false,
         },
     });
-    _ = result_commands; // autofix
     // Yay, at least we can confirm that the Blueprint Loader works!
     // Next will be to validate that multiple steps are working in-tandem with each other...
     try std.testing.expect(my_node_graph.store.blueprint.nodes.len > 0);

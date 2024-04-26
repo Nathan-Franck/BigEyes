@@ -31,7 +31,7 @@ pub fn copyWith(source_data: anytype, field_changes: anytype) @TypeOf(source_dat
 pub fn deepClone(
     T: type,
     allocator: std.mem.Allocator,
-    source: anytype,
+    source: T,
 ) !struct {
     value: T,
     allocator_used: bool = false,
@@ -119,7 +119,7 @@ pub fn deepClone(
 pub fn deepFree(
     T: type,
     allocator: std.mem.Allocator,
-    source: anytype,
+    source: T,
 ) !void {
     return switch (@typeInfo(T)) {
         else => {},
