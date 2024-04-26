@@ -70,6 +70,7 @@ pub fn deepClone(
         },
         .Union => |union_info| {
             _ = union_info; // autofix
+            @import("./wasm_entry.zig").dumpDebugLog("Not implemented yet: Union");
             @panic("Not implemented yet!");
         },
         .Pointer => |pointer_info| switch (pointer_info.size) {
@@ -81,7 +82,10 @@ pub fn deepClone(
                 }
                 break :blk .{ .value = elements.items, .allocator_used = true };
             },
-            else => unreachable,
+            else => {
+                @import("./wasm_entry.zig").dumpDebugLog("deepClone: Pointer");
+                unreachable;
+            },
         },
         .Optional => |optional_info| blk: {
             if (source) |non_null_source| {
