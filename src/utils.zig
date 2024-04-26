@@ -31,13 +31,12 @@ pub fn copyWith(source_data: anytype, field_changes: anytype) @TypeOf(source_dat
 pub fn deepClone(
     T: type,
     allocator: std.mem.Allocator,
-    source: anytype,
+    source: T,
 ) !struct {
     value: T,
     allocator_used: bool = false,
 } {
     return switch (@typeInfo(T)) {
-        // else => @compileError(std.fmt.comptimePrint("{?}", .{T}) ++ " is not a supported type"),
         else => .{ .value = source, .allocator_used = false },
         .Array => |a| blk: {
             var elements: [a.len]a.child = undefined;
@@ -68,9 +67,29 @@ pub fn deepClone(
                 break :blk .{ .value = result, .allocator_used = true };
             }
         },
-        .Union => |union_info| {
-            _ = union_info; // autofix
-            @panic("Not implemented yet!");
+        .Union => |union_info| blk: {
+            const active_tag_index = @intFromEnum(source);
+            inline for (union_info.fields, 0..) |field_candidate, field_index| {
+                if (active_tag_index == field_index) {
+                    const result = try deepClone(
+                        field_candidate.type,
+                        allocator,
+                        @field(source, field_candidate.name),
+                    );
+                    if (!result.allocator_used) {
+                        break :blk .{
+                            .value = source,
+                            .allocator_used = false,
+                        };
+                    } else {
+                        break :blk .{
+                            .value = @unionInit(T, field_candidate.name, result.value),
+                            .allocator_used = true,
+                        };
+                    }
+                }
+            }
+            unreachable;
         },
         .Pointer => |pointer_info| switch (pointer_info.size) {
             .Many, .Slice => blk: {
@@ -79,9 +98,13 @@ pub fn deepClone(
                     const result = try deepClone(pointer_info.child, allocator, elem);
                     try elements.append(result.value);
                 }
+                @import("./wasm_entry.zig").dumpDebugLog("Actually doing some cloning with the new allocator!");
                 break :blk .{ .value = elements.items, .allocator_used = true };
             },
-            else => unreachable,
+            else => {
+                @import("./wasm_entry.zig").dumpDebugLog("deepClone: Not implemented --- Pointer");
+                unreachable;
+            },
         },
         .Optional => |optional_info| blk: {
             if (source) |non_null_source| {

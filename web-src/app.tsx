@@ -52,8 +52,6 @@ const nodeGraph = NodeGraph({
   },
 },);
 
-const allResources = callWasm("getAllResources") as Exclude<ReturnType<typeof callWasm<"getAllResources">>, { "error": any }>;
-
 
 export function App() {
   const { graphOutputs, callGraph } = nodeGraph.useState();
@@ -109,22 +107,6 @@ export function App() {
   }
 
   const lastTargetRef = useRef<HTMLElement | null>(null);
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
-
-  // Display image on canvas
-  useEffect(() => {
-    if (canvasRef.current) {
-      const canvas = canvasRef.current;
-      const ctx = canvas.getContext('2d');
-      if (ctx) {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        const { data, width, height } = allResources.smile_test;
-        const clampedData = sliceToArray.Uint8ClampedArray(data);
-        const imageData = new ImageData(clampedData, width, height);
-        ctx.putImageData(imageData, -306, -306, 306, 306, 296, 296);
-      }
-    }
-  });
 
   return (
     <>
@@ -194,7 +176,6 @@ export function App() {
             }>{sliceToString(node.name)}</button>)
         }
       </div>
-      <canvas ref={canvasRef} id="canvas" width="1000" height="1000"></canvas>
     </>
   )
 }

@@ -26,60 +26,6 @@ pub const interface = struct {
         return result;
     }
 
-    const SpriteSheetRaw = struct {
-        png: []const u8,
-        json: []const u8,
-    };
-    pub fn getAllResources() !struct {
-        smile_test: struct { data: []const u8, width: usize, height: usize },
-    } {
-        const allocator = std.heap.page_allocator;
-
-        // const animations = .{
-        //     "Attack",
-        //     "AttackStartup",
-        //     "Idle-loop",
-        //     "Run-loop",
-        //     "RunEnd",
-        //     "RunStart",
-        // };
-        // const base_name = "content/RoyalArcher_FullHD_";
-        // const file_extensions = .{ ".png", ".json" };
-        // var fields: []const []std.builtin.Type.StructField = .{};
-        // inline for (animations) |animation| for (file_extensions) |extension| {
-        //     const file_path = base_name ++ animation ++ extension;
-        //     const file_data = @embedFile(file_path);
-        //     fields = fields ++ &std.builtin.Type.StructField{
-        //         .alignment = @alignOf([]const u8),
-        //         .is_comptime = false,
-        //         .name = file_path,
-        //         .type = @TypeOf(file_data),
-        //     };
-        // };
-        // const RoyalArcher = @Type(std.builtin.Type{ .Struct = .{
-        //     .decls = &.{},
-        //     .is_tuple = false,
-        //     .layout = .auto,
-        //     .fields = fields,
-        // } });
-        const Png = @import("./zigimg/src/formats/png.zig");
-
-        const png_data = @embedFile("content/RoyalArcher_FullHD_Attack.png");
-        var stream_source = std.io.StreamSource{ .const_buffer = std.io.fixedBufferStream(png_data) };
-        var default_options = Png.DefaultOptions{};
-        const image = try Png.load(&stream_source, allocator, default_options.get());
-        return .{
-            .smile_test = .{
-                .data = switch (image.pixels) {
-                    .rgba32 => |rgba| std.mem.sliceAsBytes(rgba),
-                    else => @panic("handy axiom"),
-                },
-                .width = image.width,
-                .height = image.height,
-            },
-        };
-    }
-
     var previous_outputs_hash: u32 = 0;
     var my_node_graph = MyNodeGraph{
         .allocator = std.heap.page_allocator,

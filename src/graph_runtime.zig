@@ -221,9 +221,15 @@ pub fn NodeGraph(comptime node_definitions: anytype, comptime graph: Blueprint) 
             } });
         };
         allocator: std.mem.Allocator,
+        arena: ?std.heap.ArenaAllocator = null,
         store: SystemStore,
         pub fn update(self: *Self, inputs: SystemInputs) !SystemOutputs {
-            const nodes = node_definitions{ .allocator = self.allocator };
+
+            // Use the previous arena if it exists, otherwise create a new one.
+            var arena = if (self.arena) |arena| arena else std.heap.ArenaAllocator.init(self.allocator);
+            const nodes = node_definitions{ .allocator = arena.allocator() };
+
+            // Process all nodes...
             var nodes_outputs: NodeOutputs = undefined;
             inline for (node_order) |node_index| {
                 const node = graph.nodes[node_index];
@@ -261,20 +267,31 @@ pub fn NodeGraph(comptime node_definitions: anytype, comptime graph: Blueprint) 
                     .ErrorUnion => try node_output,
                 };
             }
-            // Update store with new values from nodes!
+
+            // Start the next arena!
+            var next_arena = std.heap.ArenaAllocator.init(self.allocator);
+            self.arena = next_arena;
+
+            // Copy over new store values...
             inline for (node_graph_blueprint.store) |store_defn| {
-                const node_outputs = @field(nodes_outputs, store_defn.output_node);
+                const node_result = @field(nodes_outputs, store_defn.output_node);
+                const result = @field(node_result, store_defn.output_field);
                 @field(self.store, store_defn.system_field) =
-                    @field(node_outputs, store_defn.output_field);
+                    (try utils.deepClone(@TypeOf(result), next_arena.allocator(), result)).value;
             }
+
             // Output from system from select nodes...
             var system_outputs: SystemOutputs = undefined;
             inline for (node_graph_blueprint.output) |output_defn| {
                 const node_outputs = @field(nodes_outputs, output_defn.output_node);
                 const result = @field(node_outputs, output_defn.output_field);
                 @field(system_outputs, output_defn.system_field) =
-                    (try utils.deepClone(@TypeOf(result), self.allocator, result)).value;
+                    (try utils.deepClone(@TypeOf(result), next_arena.allocator(), result)).value;
             }
+
+            // Free the previous arena!
+            arena.deinit();
+
             return system_outputs;
         }
     };
@@ -301,7 +318,7 @@ test "Build" {
             .interaction_state = .{ .node_selection = &.{} },
         },
     };
-    const result_commands = try my_node_graph.update(.{
+    _ = try my_node_graph.update(.{
         .recieved_blueprint = node_graph_blueprint,
         .keyboard_modifiers = .{
             .shift = false,
@@ -310,7 +327,6 @@ test "Build" {
             .super = false,
         },
     });
-    _ = result_commands; // autofix
     // Yay, at least we can confirm that the Blueprint Loader works!
     // Next will be to validate that multiple steps are working in-tandem with each other...
     try std.testing.expect(my_node_graph.store.blueprint.nodes.len > 0);
