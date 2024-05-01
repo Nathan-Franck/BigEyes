@@ -1,9 +1,11 @@
-const subdiv = @import("./subdiv.zig");
 const std = @import("std");
 const graph_runtime = @import("./graph_runtime.zig");
 const NodeDefinitions = @import("./node_graph_blueprint_nodes.zig");
 const node_graph_blueprint = @import("./interactive_node_builder_blueprint.zig").node_graph_blueprint;
 const typeDefinitions = @import("./type_definitions.zig");
+
+const subdiv = @import("./subdiv.zig");
+const MeshLoader = @import("./MeshLoader.zig");
 
 const MyNodeGraph = graph_runtime.NodeGraph(
     NodeDefinitions,
@@ -11,19 +13,12 @@ const MyNodeGraph = graph_runtime.NodeGraph(
 );
 
 pub const interface = struct {
-    pub fn helloSliceHiHi(faces: []subdiv.Face) ![]subdiv.Face {
+    pub fn getResources() struct {
+        subdiv_cat: []MeshLoader.Mesh,
+    } {
         const allocator = std.heap.page_allocator;
-        return std.mem.concat(allocator, subdiv.Face, &.{ faces, &.{&.{ 4, 5, 6 }} });
-    }
-
-    pub fn testSubdiv(faces: []subdiv.Face, points: []subdiv.Point) !subdiv.Mesh {
-        const allocator = std.heap.page_allocator;
-        const result = try subdiv.Polygon(.Face).cmcSubdiv(
-            allocator,
-            points,
-            faces,
-        );
-        return result;
+        const meshes = try MeshLoader.getMeshes(allocator);
+        return meshes.items;
     }
 
     var previous_outputs_hash: u32 = 0;
