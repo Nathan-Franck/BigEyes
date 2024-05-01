@@ -98,11 +98,9 @@ pub fn deepClone(
                     const result = try deepClone(pointer_info.child, allocator, elem);
                     try elements.append(result.value);
                 }
-                @import("./wasm_entry.zig").dumpDebugLog("Actually doing some cloning with the new allocator!");
                 break :blk .{ .value = elements.items, .allocator_used = true };
             },
             else => {
-                @import("./wasm_entry.zig").dumpDebugLog("deepClone: Not implemented --- Pointer");
                 unreachable;
             },
         },
@@ -143,9 +141,16 @@ test "deepClone" {
 /// Takes any type that has fields and returns a list of the field names as strings.
 /// NOTE: Required to run at comptime from the callsite.
 pub fn fieldNamesToStrings(comptime with_fields: type) []const []const u8 {
-    var options: []const []const u8 = &.{};
-    for (std.meta.fields(with_fields)) |field| {
+    comptime var options: []const []const u8 = &.{};
+    inline for (std.meta.fields(with_fields)) |field| {
         options = options ++ .{field.name};
     }
     return options;
+}
+
+test "fieldNamesToStrings" {
+    const Type = struct { a: i32, b: i32 };
+    const result = fieldNamesToStrings(Type);
+    try std.testing.expect(std.mem.eql(u8, result[0], "a"));
+    try std.testing.expect(std.mem.eql(u8, result[1], "b"));
 }
