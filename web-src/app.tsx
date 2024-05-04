@@ -36,6 +36,8 @@ const { classes, encodedStyle } = declareStyle({
   },
 });
 
+const resources = callWasm("getResources")
+
 // TODO - Get the error messages from the console showing up
 // https://stackoverflow.com/questions/6604192/showing-console-errors-and-alerts-in-a-div-inside-the-page
 

@@ -13,9 +13,7 @@ const MyNodeGraph = graph_runtime.NodeGraph(
 );
 
 pub const interface = struct {
-    pub fn getResources() struct {
-        subdiv_cat: []MeshLoader.Mesh,
-    } {
+    pub fn getResources() ![]subdiv.Mesh {
         const allocator = std.heap.page_allocator;
         const meshes = try MeshLoader.getMeshes(allocator);
         return meshes.items;

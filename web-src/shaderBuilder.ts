@@ -339,7 +339,7 @@ export namespace ShaderBuilder {
 						gl.vertexAttribDivisor(attributeLocation, 1);
 					}
 				});
-		}
+		}02
 
 		// 🖌 Draw the arrays/elements using size determined from aggregating buffers
 		{
