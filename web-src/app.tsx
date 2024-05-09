@@ -155,7 +155,7 @@ export function App() {
       gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
     }
 
-    console.log(resources.meshes.length);
+    console.log(sliceToArray.Uint32Array(resources.meshes[0].indices).slice(0, 14));
     ShaderBuilder.renderMaterial(gl, coolMesh, {
       indices: ShaderBuilder.createElementBuffer(gl, sliceToArray.Uint32Array(resources.meshes[0].indices)),
       position: ShaderBuilder.createBuffer(gl, sliceToArray.Float32Array(resources.meshes[0].position)),

@@ -55,10 +55,10 @@ pub fn Polygon(comptime poly_selection: enum { Quad, Face }) type {
         ) []u32 {
             var indices = std.ArrayList(u32).init(allocator);
             for (polygons) |polygon| {
-                for (polygon[1..], 1..) |_, i| {
+                for (polygon[1 .. polygon.len - 1], 1..) |_, i| {
                     indices.append(polygon[0]) catch unreachable;
-                    indices.append(polygon[i - 1]) catch unreachable;
                     indices.append(polygon[i]) catch unreachable;
+                    indices.append(polygon[i + 1]) catch unreachable;
                 }
             }
             return indices.items;
