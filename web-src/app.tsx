@@ -1,8 +1,9 @@
 import './app.css'
 import { NodeGraph } from './nodeGraph';
 import { declareStyle } from './declareStyle';
-import { useEffect, useRef } from 'preact/hooks'
+import { useEffect, useRef, useState } from 'preact/hooks'
 import { sliceToArray, sliceToString, callWasm } from './zigWasmInterface';
+import { ShaderBuilder } from './shaderBuilder';
 
 const { classes, encodedStyle } = declareStyle({
   nodeGraph: {
@@ -34,9 +35,17 @@ const { classes, encodedStyle } = declareStyle({
   contextMenuItem: {
     backgroundColor: "#0000",
   },
+  canvas: {
+    width: "100%",
+    height: "100%",
+    position: "absolute",
+    left: 0,
+    top: 0,
+    zIndex: -1,
+  },
 });
 
-const resources = callWasm("getResources")
+const resources = callWasm("getResources");
 
 // TODO - Get the error messages from the console showing up
 // https://stackoverflow.com/questions/6604192/showing-console-errors-and-alerts-in-a-div-inside-the-page
@@ -60,6 +69,7 @@ export function App() {
   if ("error" in graphOutputs)
     return <div>Error: {graphOutputs.error}</div>
 
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const nodeReferences = useRef<Record<string, HTMLButtonElement>>({});
 
   // useEffect(() => {
@@ -93,6 +103,68 @@ export function App() {
         contextMenuOpen.current = true;
       }
     }
+  });
+
+  const [windowSize, setWindowSize] = useState({ width: window.innerWidth, height: window.innerHeight });
+
+  useEffect(() => {
+    const resizeHandler = () => {
+      setWindowSize({ width: window.innerWidth, height: window.innerHeight });
+    };
+    window.addEventListener('resize', resizeHandler);
+    return () => {
+      window.removeEventListener('resize', resizeHandler);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!canvasRef.current)
+      return;
+    const canvas = canvasRef.current;
+    const gl = canvas.getContext('webgl2');
+    if (!gl)
+      return;
+    if ("error" in resources)
+      return;
+    const coolMesh = ShaderBuilder.generateMaterial(gl, { 
+      mode: 'TRIANGLES',
+      globals: {
+        indices: { type: "element" },
+        position: { type: "attribute", unit: "vec3" },
+        perspectiveMatrix: { type: "uniform", unit: "mat4", count: 1 },
+      },
+      vertSource: `
+          precision highp float;
+          void main(void) {
+              gl_Position = perspectiveMatrix * vec4(position, 1);
+          }
+      `,
+      fragSource: `
+          precision highp float;
+          void main(void) {
+              gl_FragColor = vec4(1, 1, 1, 1);
+          }
+      `,
+    });
+    
+    {
+      gl.clearColor(0, 0, 0, 1);
+      gl.clear(gl.COLOR_BUFFER_BIT);
+      gl.viewport(0, 0, windowSize.width, windowSize.height);
+      gl.enable(gl.BLEND);
+      gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+    }
+
+    ShaderBuilder.renderMaterial(gl, coolMesh, {
+      indices: ShaderBuilder.createElementBuffer(gl, sliceToArray.Uint32Array(resources[0].indices)),
+      position: ShaderBuilder.createBuffer(gl, sliceToArray.Float32Array(resources[0].position)),
+      perspectiveMatrix: [
+        1, 0, 0, 0,
+        0, 1, 0, 0,
+        0, 0, 1, 0,
+        0, 0, 0, 1
+      ], 
+    });
   });
 
   // Given the refs to all the nodes, we can move these around based on the nodeGraph data 
@@ -178,6 +250,7 @@ export function App() {
             }>{sliceToString(node.name)}</button>)
         }
       </div>
+      <canvas ref={canvasRef} class={classes.canvas} id="canvas" width={windowSize.width} height={windowSize.height}></canvas>
     </>
   )
 }
