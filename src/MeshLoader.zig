@@ -1,5 +1,5 @@
 const std = @import("std");
-const subdiv = @import("subdiv");
+const subdiv = @import("./subdiv.zig");
 const MeshHelper = @import("./MeshHelper.zig");
 const MeshSpec = @import("./MeshSpec.zig");
 
