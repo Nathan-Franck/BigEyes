@@ -1477,9 +1477,11 @@ test "zmath.modAngle" {
     try expect(approxEqAbs(modAngle(splat(F32x4, 2.5 * math.pi)), splat(F32x4, 0.5 * math.pi), 0.0005));
 }
 
+const enable_cross_platform_determinism = false;
+
 pub inline fn mulAdd(v0: anytype, v1: anytype, v2: anytype) @TypeOf(v0, v1, v2) {
     const T = @TypeOf(v0, v1, v2);
-    if (@import("zmath_options").enable_cross_platform_determinism) {
+    if (enable_cross_platform_determinism) {
         return v0 * v1 + v2; // Compiler will generate mul, add sequence (no fma even if the target supports it).
     } else {
         if (cpu_arch == .x86_64 and has_avx and has_fma) {

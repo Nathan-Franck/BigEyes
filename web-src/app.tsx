@@ -3,7 +3,7 @@ import { NodeGraph } from './nodeGraph';
 import { declareStyle } from './declareStyle';
 import { useEffect, useRef, useState } from 'preact/hooks'
 import { sliceToArray, sliceToString, callWasm } from './zigWasmInterface';
-import { ShaderBuilder } from './shaderBuilder';
+import { Mat4, ShaderBuilder } from './shaderBuilder';
 
 const { classes, encodedStyle } = declareStyle({
   nodeGraph: {
@@ -155,15 +155,11 @@ export function App() {
       gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
     }
 
+    console.log(resources.meshes.length);
     ShaderBuilder.renderMaterial(gl, coolMesh, {
-      indices: ShaderBuilder.createElementBuffer(gl, sliceToArray.Uint32Array(resources[0].indices)),
-      position: ShaderBuilder.createBuffer(gl, sliceToArray.Float32Array(resources[0].position)),
-      perspectiveMatrix: [
-        1, 0, 0, 0,
-        0, 1, 0, 0,
-        0, 0, 1, 0,
-        0, 0, 0, 1
-      ], 
+      indices: ShaderBuilder.createElementBuffer(gl, sliceToArray.Uint32Array(resources.meshes[0].indices)),
+      position: ShaderBuilder.createBuffer(gl, sliceToArray.Float32Array(resources.meshes[0].position)),
+      perspectiveMatrix: resources.world_matrix.flatMap(row => row) as Mat4,
     });
   });
 

@@ -7,6 +7,7 @@ const typeDefinitions = @import("./type_definitions.zig");
 const subdiv = @import("./subdiv.zig");
 const MeshHelper = @import("./MeshHelper.zig");
 const MeshSpec = @import("./MeshSpec.zig");
+const zmath = @import("./zmath/main.zig");
 
 const MyNodeGraph = graph_runtime.NodeGraph(
     NodeDefinitions,
@@ -31,7 +32,7 @@ const hexColors = [_][3]f32{
 };
 
 pub const interface = struct {
-    pub fn getResources() ![]Mesh {
+    pub fn getResources() !struct { world_matrix: zmath.Mat, meshes: []Mesh } {
         const allocator = std.heap.page_allocator;
         const json_data = @embedFile("content/Cat.blend.json");
         const mesh_input_data = std.json.parseFromSlice(MeshSpec, allocator, json_data, .{}) catch |err| {
@@ -69,7 +70,18 @@ pub const interface = struct {
                 };
             });
         }
-        return meshes.items;
+        return .{
+            .world_matrix = zmath.mul(
+                zmath.translationV(zmath.loadArr3(.{ 0, 0, 10 })),
+                zmath.perspectiveFovLh(
+                    0.25 * 3.14159,
+                    @as(f32, @floatFromInt(1920)) / @as(f32, @floatFromInt(1080)),
+                    0.1,
+                    500.0,
+                ),
+            ),
+            .meshes = meshes.items,
+        };
     }
 
     var previous_outputs_hash: u32 = 0;
