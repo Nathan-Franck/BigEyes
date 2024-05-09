@@ -42,12 +42,12 @@ pub const interface = struct {
         for (mesh_input_data.value.meshes) |input_data| {
             const flipped_vertices = MeshHelper.flipYZ(allocator, input_data.vertices);
             try meshes.append(mesh: {
-                var result = try subdiv.Polygon(.Face).cmcSubdiv(allocator, flipped_vertices, input_data.polygons);
-                var subdiv_count: u32 = 1;
-                while (subdiv_count < 3) {
-                    result = try subdiv.Polygon(.Quad).cmcSubdiv(allocator, result.points, result.quads);
-                    subdiv_count += 1;
-                }
+                // var result = try subdiv.Polygon(.Face).cmcSubdiv(allocator, flipped_vertices, input_data.polygons);
+                // var subdiv_count: u32 = 1;
+                // while (subdiv_count < 3) {
+                //     result = try subdiv.Polygon(.Quad).cmcSubdiv(allocator, result.points, result.quads);
+                //     subdiv_count += 1;
+                // }
                 // const vertices = vertices: {
                 //     const normals = MeshHelper.Polygon(.Quad).calculateNormals(allocator, result.points, result.quads);
                 //     var vertices = std.ArrayList(Vertex).init(allocator);
@@ -62,12 +62,10 @@ pub const interface = struct {
                 // };
                 break :mesh .{
                     .label = input_data.name,
-                    .position = if (allocator.alloc(f32, result.points.len * 3)) |points| for (result.points, 0..) |point, index| {
+                    .position = if (allocator.alloc(f32, flipped_vertices.len * 3)) |points| for (flipped_vertices, 0..) |point, index| {
                         std.mem.copyForwards(f32, points[index * 3 .. index * 3 + 3], @as([4]f32, point)[0..3]);
                     } else points else |_| unreachable,
-                    // .color = ,
-                    // .normal = ,
-                    .indices = MeshHelper.Polygon(.Quad).toTriangles(allocator, result.quads),
+                    .indices = MeshHelper.Polygon(.Face).toTriangles(allocator, input_data.polygons),
                 };
             });
         }
