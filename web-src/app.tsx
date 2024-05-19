@@ -126,7 +126,7 @@ export function App() {
       return;
     if ("error" in resources)
       return;
-    const coolMesh = ShaderBuilder.generateMaterial(gl, { 
+    const coolMesh = ShaderBuilder.generateMaterial(gl, {
       mode: 'TRIANGLES',
       globals: {
         indices: { type: "element" },
@@ -146,7 +146,7 @@ export function App() {
           }
       `,
     });
-    
+
     {
       gl.clearColor(0, 0, 0, 1);
       gl.clear(gl.COLOR_BUFFER_BIT);
@@ -201,6 +201,7 @@ export function App() {
         });
       }}></div>
       <div class={classes.nodeGraph} >
+        <div style={{ color: "red" }}>{"error" in resources ? "nothing" : sliceToArray.Float32Array(resources.meshes[0].position)}</div>
         {
           graphOutputs.context_menu.open
             ? <div class={classes.contextMenu} ref={contextMenuRef}>{

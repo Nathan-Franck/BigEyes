@@ -85,8 +85,8 @@ export function sliceToString(slice: { type: "Uint8Array", ptr: number, len: num
   return result;
 }
 
-function sliceToArrayFunc<N extends string, T extends new(buffer: ArrayBuffer, byteOffset: number, length: number) => any>(_: N, constructor: T) {
-  return (slice: { type: N, ptr: number, len: number }) => {
+function sliceToArrayFunc<N extends string, T extends { new(buffer: ArrayBuffer, byteOffset: number, length: number): any}>(_: N, constructor: T) {
+  return (slice: { type: N, ptr: number, len: number }): InstanceType<T> => {
     return new constructor(instance.exports.memory.buffer, slice.ptr, slice.len);
   }
 }

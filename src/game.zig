@@ -63,9 +63,16 @@ pub const interface = struct {
                 // };
                 break :mesh .{
                     .label = input_data.name,
-                    .position = if (allocator.alloc(f32, result.points.len * 3)) |points| for (result.points, 0..) |point, index| {
-                        std.mem.copyForwards(f32, points[index * 3 .. index * 3 + 3], @as([4]f32, point)[0..3]);
-                    } else points else |_| unreachable,
+                    .position = if (allocator.alloc(f32, result.points.len * 3)) |points|
+                        for (result.points, 0..) |point, index| {
+                            std.mem.copyForwards(
+                                f32,
+                                points[index * 3 .. index * 3 + 3],
+                                @as([4]f32, point)[0..3],
+                            );
+                        } else points
+                    else |_|
+                        unreachable,
                     .indices = MeshHelper.Polygon(.Quad).toTriangles(allocator, result.quads),
                 };
             });
