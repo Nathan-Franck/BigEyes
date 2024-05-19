@@ -27,7 +27,10 @@ pub fn Polygon(comptime poly_selection: enum { Quad, Face }) type {
             var vertexToPoly = std.AutoHashMap(u32, std.ArrayList(Poly)).init(allocator);
             for (polygons) |polygon| {
                 for (polygon) |vertex| {
-                    var polysList = if (vertexToPoly.get(vertex)) |existing| existing else std.ArrayList(Poly).init(allocator);
+                    var polysList = if (vertexToPoly.get(vertex)) |existing|
+                        existing
+                    else
+                        std.ArrayList(Poly).init(allocator);
                     polysList.append(polygon) catch unreachable;
                     vertexToPoly.put(vertex, polysList) catch unreachable;
                 }
@@ -39,9 +42,15 @@ pub fn Polygon(comptime poly_selection: enum { Quad, Face }) type {
                     for (local_polys.items) |poly| {
                         var poly_normal = Point{ 0, 0, 0, 0 };
                         for (poly[1..], 1..) |_, j| {
-                            poly_normal -= zmath.cross3(points[poly[j - 1]] - points[poly[0]], points[poly[j]] - points[poly[0]]);
+                            poly_normal -= zmath.cross3(
+                                points[poly[j - 1]] - points[poly[0]],
+                                points[poly[j]] - points[poly[0]],
+                            );
                         }
-                        average_normal += zmath.normalize3(poly_normal) / @as(@Vector(4, f32), @splat(@floatFromInt(local_polys.items.len)));
+                        average_normal += zmath.normalize3(poly_normal) / @as(
+                            @Vector(4, f32),
+                            @splat(@floatFromInt(local_polys.items.len)),
+                        );
                     }
                     break :average_normal average_normal;
                 } else Point{ 0, 0, 0, 0 }) catch unreachable;
