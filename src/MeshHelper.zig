@@ -35,7 +35,7 @@ pub fn Polygon(comptime poly_selection: enum { Quad, Face }) type {
             points: []const Point,
             polygons: []const Poly,
         ) []const Point {
-            const arena = std.heap.ArenaAllocator.init(allocator);
+            var arena = std.heap.ArenaAllocator.init(allocator);
             defer arena.deinit();
 
             var vertexToPoly = std.AutoHashMap(u32, std.ArrayList(*const Poly)).init(arena.allocator());
