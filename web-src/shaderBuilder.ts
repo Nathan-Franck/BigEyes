@@ -273,7 +273,7 @@ export namespace ShaderBuilder {
 		}
 		gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
 		gl.bufferData(gl.ARRAY_BUFFER, data, gl.STATIC_DRAW);
-		return { type: "attribute", buffer, length: data.length, };
+		return { type: "attribute", buffer, length: data.length };
 	}
 
 	export function renderMaterial<T extends ShaderGlobals>(
@@ -353,15 +353,15 @@ export namespace ShaderBuilder {
 				.reduce((bufferCounts, entry) => {
 					const [key, global] = entry;
 					const data = (binds as any)[key] as SizedBuffer;
-					const stride = unitToSize[global.unit];
+					const unitSize = unitToSize[global.unit];
 					return global.instanced ?
 						{
 							...bufferCounts,
-							instance: Math.max(bufferCounts.instance, data.length / stride),
+							instance: Math.max(bufferCounts.instance, data.length / unitSize),
 						} :
 						{
 							...bufferCounts,
-							element: Math.max(bufferCounts.element, data.length / stride),
+							element: Math.max(bufferCounts.element, data.length / unitSize),
 						};
 				}, { element: 0, instance: 1 });
 			const elementEntry = Object.entries(material.globals)
@@ -370,7 +370,7 @@ export namespace ShaderBuilder {
 			if (elementEntry != null) {
 				const [elementKey] = elementEntry;
 				const data = (binds as any)[elementKey] as ElementBuffer;
-				gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, data.buffer); 
+				gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, data.buffer);
 				gl.drawElementsInstanced(gl[material.mode], data.length, gl[data.glType], 0, bufferCounts.instance);
 			} else {
 				gl.drawArraysInstanced(gl[material.mode], 0, bufferCounts.element, bufferCounts.instance);

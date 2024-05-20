@@ -45,7 +45,9 @@ const { classes, encodedStyle } = declareStyle({
   },
 });
 
+const startLoadResources = Date.now();
 const resources = callWasm("getResources");
+const resourcesLoadTime = Date.now() - startLoadResources;
 
 // TODO - Get the error messages from the console showing up
 // https://stackoverflow.com/questions/6604192/showing-console-errors-and-alerts-in-a-div-inside-the-page
@@ -204,10 +206,7 @@ export function App() {
       }}></div>
       <div class={classes.nodeGraph} >
         <div style={{ color: "red" }}>{
-          // "error" in resources
-          //   ? "nothing"
-          //   : JSON.stringify(sliceToArray.Uint32Array(resources.meshes[1].indices).slice(0, 6))
-          // JSON.stringify(what)
+          resourcesLoadTime
         }</div>
         {
           // graphOutputs.context_menu.open

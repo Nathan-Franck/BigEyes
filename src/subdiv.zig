@@ -201,14 +201,14 @@ pub fn Polygon(comptime poly_selection: enum {
 
         pub fn cmcSubdiv(allocator: std.mem.Allocator, inputPoints: []const Point, inputFaces: []const Poly) !Mesh {
             var arena = std.heap.ArenaAllocator.init(allocator);
-            defer arena.deinit();
+            // defer arena.deinit();
 
             const facePoints = try getFacePoints(arena.allocator(), inputPoints, inputFaces);
             const edgesFaces = try getEdgesFaces(arena.allocator(), inputPoints, inputFaces);
             const edgePoints = try getEdgePoints(arena.allocator(), edgesFaces, facePoints);
             const initialNewPoints = try getNewPoints(arena.allocator(), inputPoints, inputFaces, facePoints, edgesFaces);
             var facePointNums = try ArrayList(u32).initCapacity(arena.allocator(), facePoints.len);
-            var newPoints = try ArrayList(Point).initCapacity(arena.allocator(), initialNewPoints.len);
+            var newPoints = try ArrayList(Point).initCapacity(allocator, initialNewPoints.len);
             try newPoints.appendSlice(initialNewPoints);
             var nextPointNum = newPoints.items.len;
             for (facePoints) |facePoint| {
@@ -216,7 +216,7 @@ pub fn Polygon(comptime poly_selection: enum {
                 try facePointNums.append(@as(u32, @intCast(nextPointNum)));
                 nextPointNum += 1;
             }
-            var edgePointNums = std.AutoHashMap([2]u32, u32).init(allocator);
+            var edgePointNums = std.AutoHashMap([2]u32, u32).init(arena.allocator());
             for (edgesFaces, 0..) |edgeFace, edgeNum| {
                 const point1, const point2 = edgeFace.points;
                 const edgePoint = edgePoints[edgeNum];
@@ -224,7 +224,7 @@ pub fn Polygon(comptime poly_selection: enum {
                 try edgePointNums.put(switchNums([2]u32{ point1, point2 }), @as(u32, @intCast(nextPointNum)));
                 nextPointNum += 1;
             }
-            var newFaces = try ArrayList(Quad).initCapacity(allocator, inputFaces.len);
+            var newQuads = try ArrayList(Quad).initCapacity(allocator, inputFaces.len);
             for (inputFaces, 0..) |oldFace, oldFaceNum| {
                 for (0..oldFace.len) |pointIndex| {
                     const nextPointIndex = if (pointIndex == oldFace.len - 1) 0 else pointIndex + 1;
@@ -235,10 +235,10 @@ pub fn Polygon(comptime poly_selection: enum {
                     const facePointAbcdZ = facePointNums.items[oldFaceNum];
                     const edgePointAb = edgePointNums.get(switchNums([2]u32{ a, b })).?;
                     const edgePointZa = edgePointNums.get(switchNums([2]u32{ z, a })).?;
-                    try newFaces.append([_]u32{ a, edgePointAb, facePointAbcdZ, edgePointZa });
+                    try newQuads.append([_]u32{ a, edgePointAb, facePointAbcdZ, edgePointZa });
                 }
             }
-            return .{ .points = newPoints.items, .quads = newFaces.items };
+            return .{ .points = newPoints.items, .quads = newQuads.items };
         }
 
         pub fn cmcSubdivOnlyPoints(allocator: std.mem.Allocator, inputPoints: []const Point, inputFaces: []const Poly) ![]const Point {

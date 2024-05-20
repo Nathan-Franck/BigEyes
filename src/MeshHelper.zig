@@ -13,6 +13,17 @@ pub fn flipYZ(allocator: std.mem.Allocator, points: []const spec.Point) []const 
     return flipped.items;
 }
 
+pub fn pointsToFloatSlice(allocator: std.mem.Allocator, points: []const spec.Point) []const f32 {
+    var float_slice = allocator.alloc(f32, points.len * 3) catch unreachable;
+    return for (points, 0..) |point, index| {
+        std.mem.copyForwards(
+            f32,
+            float_slice[index * 3 .. index * 3 + 3],
+            @as([4]f32, point)[0..3],
+        );
+    } else float_slice;
+}
+
 pub fn Polygon(comptime poly_selection: enum { Quad, Face }) type {
     const Poly = switch (poly_selection) {
         .Quad => Quad,
@@ -58,7 +69,7 @@ pub fn Polygon(comptime poly_selection: enum { Quad, Face }) type {
             return normals.items;
         }
 
-        pub fn toTriangles(
+        pub fn toTriangleIndices(
             allocator: std.mem.Allocator,
             polygons: []const Poly,
         ) []u32 {

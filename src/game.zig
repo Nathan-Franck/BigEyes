@@ -16,10 +16,10 @@ const MyNodeGraph = graph_runtime.NodeGraph(
 
 pub const Mesh = struct {
     label: []const u8,
-    indices: []u32,
-    position: []f32,
+    indices: []const u32,
+    position: []const f32,
     // color: []f32,
-    // normal: []f32,
+    // normals: []const f32,
 };
 
 const hexColors = [_][3]f32{
@@ -40,40 +40,27 @@ pub const interface = struct {
             return err;
         };
         var meshes = std.ArrayList(Mesh).init(allocator);
+        var arena = std.heap.ArenaAllocator.init(allocator);
+        defer arena.deinit();
         for (mesh_input_data.value.meshes) |input_data| {
-            const flipped_vertices = MeshHelper.flipYZ(allocator, input_data.vertices);
+            const flipped_vertices = MeshHelper.flipYZ(arena.allocator(), input_data.vertices);
             try meshes.append(mesh: {
-                // var result = try subdiv.Polygon(.Face).cmcSubdiv(allocator, flipped_vertices, input_data.polygons);
+                const input_vertices = flipped_vertices; // input_data.vertices
+                const result = try subdiv.Polygon(.Face).cmcSubdiv(arena.allocator(), input_vertices, input_data.polygons);
                 // var subdiv_count: u32 = 0;
                 // while (subdiv_count < 1) {
-                //     result = try subdiv.Polygon(.Quad).cmcSubdiv(allocator, result.points, result.quads);
+                //     result = try subdiv.Polygon(.Quad).cmcSubdiv(arena.allocator(), result.points, result.quads);
                 //     subdiv_count += 1;
                 // }
-                // const vertices = vertices: {
-                //     const normals = MeshHelper.Polygon(.Quad).calculateNormals(allocator, result.points, result.quads);
-                //     var vertices = std.ArrayList(Vertex).init(allocator);
-                //     for (result.points, 0..) |point, i| {
-                //         try vertices.append(Vertex{
-                //             .position = @as([4]f32, point)[0..3].*,
-                //             .color = hexColors[i % hexColors.len],
-                //             .normal = @as([4]f32, normals[i])[0..3].*,
-                //         });
-                //     }
-                //     break :vertices vertices.items;
-                // };
+                const mesh_helper = MeshHelper.Polygon(.Quad);
                 break :mesh .{
                     .label = input_data.name,
-                    .position = if (allocator.alloc(f32, flipped_vertices.len * 3)) |points|
-                        for (flipped_vertices, 0..) |point, index| {
-                            std.mem.copyForwards(
-                                f32,
-                                points[index * 3 .. index * 3 + 3],
-                                @as([4]f32, point)[0..3],
-                            );
-                        } else points
-                    else |_|
-                        unreachable,
-                    .indices = MeshHelper.Polygon(.Face).toTriangles(allocator, input_data.polygons),
+                    .indices = mesh_helper.toTriangleIndices(allocator, result.quads),
+                    .position = MeshHelper.pointsToFloatSlice(allocator, result.points),
+                    // .normals = MeshHelper.pointsToFloatSlice(
+                    //     allocator,
+                    //     mesh_helper.calculateNormals(arena.allocator(), result.points, result.quads),
+                    // ),
                 };
             });
         }
