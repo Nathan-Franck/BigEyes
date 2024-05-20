@@ -35,13 +35,16 @@ pub fn Polygon(comptime poly_selection: enum { Quad, Face }) type {
             points: []const Point,
             polygons: []const Poly,
         ) []const Point {
-            var vertexToPoly = std.AutoHashMap(u32, std.ArrayList(Poly)).init(allocator);
-            for (polygons) |polygon| {
+            const arena = std.heap.ArenaAllocator.init(allocator);
+            defer arena.deinit();
+
+            var vertexToPoly = std.AutoHashMap(u32, std.ArrayList(*const Poly)).init(arena.allocator());
+            for (polygons) |*polygon| {
                 for (polygon) |vertex| {
                     var polysList = if (vertexToPoly.get(vertex)) |existing|
                         existing
                     else
-                        std.ArrayList(Poly).init(allocator);
+                        std.ArrayList(*const Poly).init(arena.allocator());
                     polysList.append(polygon) catch unreachable;
                     vertexToPoly.put(vertex, polysList) catch unreachable;
                 }

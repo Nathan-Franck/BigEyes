@@ -133,20 +133,23 @@ export function App() {
       globals: {
         indices: { type: "element" },
         position: { type: "attribute", unit: "vec3" },
+        normals: { type: "attribute", unit: "vec3" },
+        normal: { type: "varying", unit: "vec3" },
         item_position: { type: "attribute", unit: "vec3", instanced: true },
         perspectiveMatrix: { type: "uniform", unit: "mat4", count: 1 },
       },
       vertSource: `
-          precision highp float;
-          void main(void) {
-              gl_Position = perspectiveMatrix * vec4(item_position + position, 1);
-          }
+        precision highp float;
+        void main(void) {
+          gl_Position = perspectiveMatrix * vec4(item_position + position, 1);
+          normal = normals;
+        }
       `,
       fragSource: `
-          precision highp float;
-          void main(void) {
-              gl_FragColor = vec4(1, 1, 1, 1);
-          }
+        precision highp float;
+        void main(void) { 
+          gl_FragColor = vec4(normal, 1);
+        }
       `,
     });
 
@@ -156,12 +159,14 @@ export function App() {
       gl.viewport(0, 0, windowSize.width, windowSize.height);
       gl.enable(gl.BLEND);
       gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
-      gl.disable(gl.CULL_FACE);
+      gl.enable(gl.DEPTH_TEST);
+      // gl.disable(gl.CULL_FACE);
     }
 
     ShaderBuilder.renderMaterial(gl, coolMesh, {
       indices: ShaderBuilder.createElementBuffer(gl, sliceToArray.Uint32Array(resources.meshes[0].indices)),
       position: ShaderBuilder.createBuffer(gl, sliceToArray.Float32Array(resources.meshes[0].position)),
+      normals: ShaderBuilder.createBuffer(gl, sliceToArray.Float32Array(resources.meshes[0].normals)),
       item_position: ShaderBuilder.createBuffer(gl, new Float32Array([0, 0, 0])),
       perspectiveMatrix: resources.world_matrix.flatMap(row => row) as Mat4,
     });
