@@ -65,6 +65,7 @@ pub fn Polygon(comptime poly_selection: enum { Quad, Face }) type {
             var indices = std.ArrayList(u32).init(allocator);
             for (polygons) |polygon| {
                 for (polygon[1 .. polygon.len - 1], 1..) |_, i| {
+                    // const i = 2;
                     indices.appendSlice(&.{
                         polygon[0],
                         polygon[i],

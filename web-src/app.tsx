@@ -131,12 +131,13 @@ export function App() {
       globals: {
         indices: { type: "element" },
         position: { type: "attribute", unit: "vec3" },
+        item_position: { type: "attribute", unit: "vec3", instanced: true },
         perspectiveMatrix: { type: "uniform", unit: "mat4", count: 1 },
       },
       vertSource: `
           precision highp float;
           void main(void) {
-              gl_Position = perspectiveMatrix * vec4(position, 1);
+              gl_Position = perspectiveMatrix * vec4(item_position + position, 1);
           }
       `,
       fragSource: `
@@ -153,12 +154,13 @@ export function App() {
       gl.viewport(0, 0, windowSize.width, windowSize.height);
       gl.enable(gl.BLEND);
       gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+      gl.disable(gl.CULL_FACE);
     }
 
-    console.log(sliceToArray.Uint32Array(resources.meshes[0].indices).slice(0, 14));
     ShaderBuilder.renderMaterial(gl, coolMesh, {
       indices: ShaderBuilder.createElementBuffer(gl, sliceToArray.Uint32Array(resources.meshes[0].indices)),
       position: ShaderBuilder.createBuffer(gl, sliceToArray.Float32Array(resources.meshes[0].position)),
+      item_position: ShaderBuilder.createBuffer(gl, new Float32Array([0, 0, 0])),
       perspectiveMatrix: resources.world_matrix.flatMap(row => row) as Mat4,
     });
   });
@@ -166,7 +168,7 @@ export function App() {
   // Given the refs to all the nodes, we can move these around based on the nodeGraph data 
   {
     const positions = graphOutputs.node_coords;
-    for (const { node, data: position } of positions) {
+    for(const { node, data: position } of positions) {
       const button = nodeReferences.current[sliceToString(node)];
       if (button && "innerHTML" in button) {
         button.style.position = "absolute";
@@ -201,50 +203,55 @@ export function App() {
         });
       }}></div>
       <div class={classes.nodeGraph} >
-        <div style={{ color: "red" }}>{"error" in resources ? "nothing" : sliceToArray.Float32Array(resources.meshes[0].position)}</div>
+        <div style={{ color: "red" }}>{
+          // "error" in resources
+          //   ? "nothing"
+          //   : JSON.stringify(sliceToArray.Uint32Array(resources.meshes[1].indices).slice(0, 6))
+          // JSON.stringify(what)
+        }</div>
         {
-          graphOutputs.context_menu.open
-            ? <div class={classes.contextMenu} ref={contextMenuRef}>{
-              graphOutputs.context_menu.options.map((option, index) => <>
-                {index > 0 ? <div class={classes.contextMenuSeperator} /> : null}
-                < button class={classes.contextMenuItem} onClick={() => callGraph({
-                  keyboard_modifiers,
-                  event: {
-                    context_event: {
-                      option_selected: sliceToString(option)
-                    }
-                  }
-                })}>{sliceToString(option)}</button>
-              </>)
-            }</div>
-            : null
+          // graphOutputs.context_menu.open
+          //   ? <div class={classes.contextMenu} ref={contextMenuRef}>{
+          //     graphOutputs.context_menu.options.map((option, index) => <>
+          //       {index > 0 ? <div class={classes.contextMenuSeperator} /> : null}
+          //       < button class={classes.contextMenuItem} onClick={() => callGraph({
+          //         keyboard_modifiers,
+          //         event: {
+          //           context_event: {
+          //             option_selected: sliceToString(option)
+          //           }
+          //         }
+          //       })}>{sliceToString(option)}</button>
+          //     </>)
+          //   }</div>
+          //   : null
         }
         {
-          graphOutputs.blueprint.nodes.map(node => <button
-            ref={elem => {
-              if (elem != null)
-                nodeReferences.current[sliceToString(node.name)] = elem
-            }}
-            class={classes.node}
-            onClick={event => callGraph({
-              keyboard_modifiers,
-              event: {
-                external_node_event: {
-                  mouse_event: {
-                    mouse_down: {
-                      button: event.button == 0
-                        ? "right" /**temp for touch testing **/
-                        : event.button == 1
-                          ? "middle"
-                          : "right",
-                      location: { x: event.x, y: event.y }
-                    },
-                  },
-                  node_name: sliceToString(node.name),
-                }
-              }
-            })
-            }>{sliceToString(node.name)}</button>)
+          // graphOutputs.blueprint.nodes.map(node => <button
+          //   ref={elem => {
+          //     if (elem != null)
+          //       nodeReferences.current[sliceToString(node.name)] = elem
+          //   }}
+          //   class={classes.node}
+          //   onClick={event => callGraph({
+          //     keyboard_modifiers,
+          //     event: {
+          //       external_node_event: {
+          //         mouse_event: {
+          //           mouse_down: {
+          //             button: event.button == 0
+          //               ? "right" /**temp for touch testing **/
+          //               : event.button == 1
+          //                 ? "middle"
+          //                 : "right",
+          //             location: { x: event.x, y: event.y }
+          //           },
+          //         },
+          //         node_name: sliceToString(node.name),
+          //       }
+          //     }
+          //   })
+          //   }>{sliceToString(node.name)}</button>)
         }
       </div>
       <canvas ref={canvasRef} class={classes.canvas} id="canvas" width={windowSize.width} height={windowSize.height}></canvas>
