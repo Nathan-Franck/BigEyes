@@ -4,7 +4,10 @@ const ArrayList = std.ArrayList;
 pub const Point = @Vector(4, f32);
 pub const Face = []const u32;
 pub const Quad = [4]u32;
-pub const Mesh = struct { points: []const Point, quads: []const Quad };
+pub const Mesh = struct {
+    points: []const Point,
+    quads: []const Quad,
+};
 const EdgesFace = struct {
     points: struct { u32, u32 },
     faces: struct { u32, u32 },

@@ -118,9 +118,7 @@ pub fn build(
 
     // Tests (default)
     {
-        // const main_tests = b.addTest(.{ .root_source_file = .{ .path = thisDir() ++ "/tests.zig" } });
-        const main_tests = b.addTest(.{ .root_source_file = .{ .path = thisDir() ++ "/src/tests.zig" } });
-        // main_tests.root_module.addImport("embedded_assets", embedded_assets);
+        const main_tests = b.addTest(.{ .root_source_file = .{ .cwd_relative = "src/tests.zig" } });
         const run_unit_tests = b.addRunArtifact(main_tests);
         const test_step = b.step("exe-test", "run tests");
         test_step.dependOn(&run_unit_tests.step);
@@ -133,7 +131,7 @@ pub fn build(
             .target = b.resolveTargetQuery(.{ .cpu_arch = .wasm32, .os_tag = .freestanding }),
             .optimize = .ReleaseFast,
             .name = "game",
-            .root_source_file = .{ .path = thisDir() ++ "/src/wasm_entry.zig" },
+            .root_source_file = .{ .cwd_relative = "src/wasm_entry.zig" },
         });
 
         // Latest wasm hack - https://github.com/ringtailsoftware/zig-wasm-audio-framebuffer/blob/master/build.zig
@@ -163,7 +161,7 @@ pub fn build(
     {
         const exe = b.addExecutable(.{
             .name = "triangle_wgpu",
-            .root_source_file = .{ .path = thisDir() ++ "/src/main.zig" },
+            .root_source_file = .{ .cwd_relative = "src/main.zig" },
             .target = target,
             .optimize = optimize,
         });
