@@ -46,12 +46,12 @@ pub const interface = struct {
             const flipped_vertices = MeshHelper.flipYZ(arena.allocator(), input_data.vertices);
             try meshes.append(mesh: {
                 const input_vertices = flipped_vertices; // input_data.vertices
-                var result = try subdiv.Polygon(.Face).cmcSubdiv(arena.allocator(), input_vertices, input_data.polygons);
-                var subdiv_count: u32 = 0;
-                while (subdiv_count < 1) {
-                    result = try subdiv.Polygon(.Quad).cmcSubdiv(arena.allocator(), result.points, result.quads);
-                    subdiv_count += 1;
-                }
+                const result = try subdiv.Polygon(.Face).cmcSubdiv(arena.allocator(), input_vertices, input_data.polygons);
+                // var subdiv_count: u32 = 0;
+                // while (subdiv_count < 1) {
+                //     result = try subdiv.Polygon(.Quad).cmcSubdiv(arena.allocator(), result.points, result.quads);
+                //     subdiv_count += 1;
+                // }
                 const mesh_helper = MeshHelper.Polygon(.Quad);
                 break :mesh .{
                     .label = input_data.name,
