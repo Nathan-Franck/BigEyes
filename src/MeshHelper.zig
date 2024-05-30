@@ -5,7 +5,7 @@ const Point = spec.Point;
 const Quad = spec.Quad;
 const Face = spec.Face;
 
-fn convertThinger(hex_str: []const u8) f32 {
+fn hexToFloat(hex_str: []const u8) f32 {
     var bytes: [4]u8 = undefined;
     _ = std.fmt.hexToBytes(&bytes, hex_str) catch unreachable;
     return @as(f32, @bitCast(bytes));
@@ -16,12 +16,12 @@ pub fn decodeVertexDataFromHexidecimal(allocator: std.mem.Allocator, hex_str: []
     var i: u32 = 0;
     while (i < hex_str.len) {
         result.append(Point{
-            convertThinger(hex_str[i + 0 .. i + 2]),
-            convertThinger(hex_str[i + 2 .. i + 4]),
-            convertThinger(hex_str[i + 4 .. i + 6]),
+            hexToFloat(hex_str[i + 0 .. i + 8]),
+            hexToFloat(hex_str[i + 8 .. i + 16]),
+            hexToFloat(hex_str[i + 16 .. i + 24]),
             1,
         }) catch unreachable;
-        i += 6;
+        i += 24;
     }
     return result.items;
 }
