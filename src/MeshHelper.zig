@@ -5,17 +5,23 @@ const Point = spec.Point;
 const Quad = spec.Quad;
 const Face = spec.Face;
 
-pub fn decodeVertexDataFromHexidecimal(allocator: std.mem.Allocator, string: []const u8) []const spec.Point {
+fn convertThinger(hex_str: []const u8) f32 {
+    var bytes: [4]u8 = undefined;
+    _ = std.fmt.hexToBytes(&bytes, hex_str) catch unreachable;
+    return @as(f32, @bitCast(bytes));
+}
+
+pub fn decodeVertexDataFromHexidecimal(allocator: std.mem.Allocator, hex_str: []const u8) []const spec.Point {
     var result = std.ArrayList(Point).init(allocator);
     var i: u32 = 0;
-    while (i < string.len) {
+    while (i < hex_str.len) {
         result.append(Point{
-            std.fmt.parseFloat(f32, string[i + 0 .. i + 4]) catch unreachable,
-            std.fmt.parseFloat(f32, string[i + 4 .. i + 8]) catch unreachable,
-            std.fmt.parseFloat(f32, string[i + 8 .. i + 12]) catch unreachable,
+            convertThinger(hex_str[i + 0 .. i + 2]),
+            convertThinger(hex_str[i + 2 .. i + 4]),
+            convertThinger(hex_str[i + 4 .. i + 6]),
             1,
         }) catch unreachable;
-        i += 4;
+        i += 6;
     }
     return result.items;
 }
