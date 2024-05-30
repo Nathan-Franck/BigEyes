@@ -45,23 +45,25 @@ pub const interface = struct {
         var arena = std.heap.ArenaAllocator.init(allocator);
         defer arena.deinit();
         for (mesh_input_data.value.meshes) |input_data| {
-            const flipped_vertices = MeshHelper.flipYZ(arena.allocator(), input_data.frame_to_vertices[0]);
+            const vertices = MeshHelper.decodeVertexDataFromHexidecimal(arena.allocator(), input_data.frame_to_vertices[0]);
+            const flipped_vertices = MeshHelper.flipYZ(arena.allocator(), vertices);
             try meshes.append(mesh: {
                 const input_vertices = flipped_vertices; // input_data.vertices
-                var result = try subdiv.Polygon(.Face).cmcSubdiv(arena.allocator(), input_vertices, input_data.polygons);
-                var subdiv_count: u32 = 0;
-                while (subdiv_count < 1) {
-                    result = try subdiv.Polygon(.Quad).cmcSubdiv(arena.allocator(), result.points, result.quads);
-                    subdiv_count += 1;
-                }
-                const mesh_helper = MeshHelper.Polygon(.Quad);
+                _ = input_vertices;
+                // var result = try subdiv.Polygon(.Face).cmcSubdiv(arena.allocator(), input_vertices, input_data.polygons);
+                // var subdiv_count: u32 = 0;
+                // while (subdiv_count < 1) {
+                //     result = try subdiv.Polygon(.Quad).cmcSubdiv(arena.allocator(), result.points, result.quads);
+                //     subdiv_count += 1;
+                // }
+                const mesh_helper = MeshHelper.Polygon(.Face);
                 break :mesh .{
                     .label = input_data.name,
-                    .indices = mesh_helper.toTriangleIndices(allocator, result.quads),
-                    .position = MeshHelper.pointsToFloatSlice(allocator, result.points),
+                    .indices = mesh_helper.toTriangleIndices(allocator, input_data.polygons),
+                    .position = MeshHelper.pointsToFloatSlice(allocator, vertices),
                     .normals = MeshHelper.pointsToFloatSlice(
                         allocator,
-                        mesh_helper.calculateNormals(arena.allocator(), result.points, result.quads),
+                        mesh_helper.calculateNormals(arena.allocator(), vertices, input_data.polygons),
                     ),
                 };
             });

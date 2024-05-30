@@ -31,7 +31,7 @@ nodes: []const struct {
 meshes: []const struct {
     name: []const u8,
     polygons: []const Face,
-    frame_to_vertices: []const []const Point,
+    frame_to_vertices: []const []const u8, // hexidecimal-encoding of Point type
     // shapeKeys: []struct { name: []const u8, vertices: []const Point },
     // vertexGroups: []const struct {
     //     name: []const u8,

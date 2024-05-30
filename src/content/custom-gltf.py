@@ -55,30 +55,39 @@ for object in bpy.data.objects:
     #         )
     #     armatures.append({"name": armature.name, "bones": bones})
     if object.type == "MESH":
-        mesh = object.data
-        bpy.context.view_layer.objects.active = object
-        for modifier in object.modifiers:
-            if modifier.show_render:
-                bpy.ops.object.modifier_apply(modifier=modifier.name)
-        # apply mesh modifiers if they are enabled in the render
-        # mesh.transform(mesh.matrix_world)
+        bpy.context.view_layer.objects.active = object  
+
+        # Only activate modifiers that are set to show in render (we are that render)
+        modifiers_to_remove = [mod for mod in object.modifiers if not mod.show_render]
+        for mod in modifiers_to_remove:
+            object.modifiers.remove(mod)
+
+        depsgraph = bpy.context.evaluated_depsgraph_get()
+        object_eval = object.evaluated_get(depsgraph)
+        mesh = bpy.data.meshes.new_from_object(object_eval)
+
         polygons = []
         for polygon in mesh.polygons:
             polygonRes = []
             for index in polygon.vertices:
                 polygonRes.append(index)
             polygons.append(polygonRes)
+
         frame_to_vertices = []
-        for frame in range(bpy.context.scene.frame_start, bpy.context.scene.frame_end): 
-            vertices = []
-            for vertex in mesh.vertices:
-                vertices.append([vertex.co.x, vertex.co.y, -vertex.co.z, 1])
+        for frame in range(bpy.context.scene.frame_start, bpy.context.scene.frame_end):  
+            bpy.context.scene.frame_set(frame)
+
+            depsgraph = bpy.context.evaluated_depsgraph_get()
+            object_eval = object.evaluated_get(depsgraph)
+            mesh = bpy.data.meshes.new_from_object(object_eval)  
+
             vertex_strings = [] 
             for vertex in mesh.vertices:
-                vertex_array = [vertex.co.x, vertex.co.y, -vertex.co.z, 1] 
+                vertex_array = [vertex.co.x, vertex.co.y, -vertex.co.z] 
                 vertex_string = ''.join(''.join(format(byte, '02x') for byte in struct.pack('<f', value)) for value in vertex_array)
                 vertex_strings.append(vertex_string)
             frame_to_vertices.append(''.join(vertex_strings))
+
         # Extract armature weighting
         # vertexGroups = {}
         # for vertexGroup in object.vertex_groups:

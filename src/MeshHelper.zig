@@ -5,6 +5,21 @@ const Point = spec.Point;
 const Quad = spec.Quad;
 const Face = spec.Face;
 
+pub fn decodeVertexDataFromHexidecimal(allocator: std.mem.Allocator, string: []const u8) []const spec.Point {
+    var result = std.ArrayList(Point).init(allocator);
+    var i: u32 = 0;
+    while (i < string.len) {
+        result.append(Point{
+            std.fmt.parseFloat(f32, string[i + 0 .. i + 4]) catch unreachable,
+            std.fmt.parseFloat(f32, string[i + 4 .. i + 8]) catch unreachable,
+            std.fmt.parseFloat(f32, string[i + 8 .. i + 12]) catch unreachable,
+            1,
+        }) catch unreachable;
+        i += 4;
+    }
+    return result.items;
+}
+
 pub fn flipYZ(allocator: std.mem.Allocator, points: []const spec.Point) []const Point {
     var flipped = std.ArrayList(Point).init(allocator);
     for (points) |point| {
@@ -40,7 +55,7 @@ pub fn Polygon(comptime poly_selection: enum { Quad, Face }) type {
 
             var vertexToPoly = std.AutoHashMap(u32, std.ArrayList(*const Poly)).init(arena.allocator());
             for (polygons) |*polygon| {
-                for (polygon) |vertex| {
+                for (polygon.*) |vertex| {
                     var polysList = if (vertexToPoly.get(vertex)) |existing|
                         existing
                     else
@@ -55,10 +70,10 @@ pub fn Polygon(comptime poly_selection: enum { Quad, Face }) type {
                     var average_normal = Point{ 0, 0, 0, 0 };
                     for (local_polys.items) |poly| {
                         var poly_normal = Point{ 0, 0, 0, 0 };
-                        for (poly[1..], 1..) |_, j| {
+                        for (poly.*[1..], 1..) |_, j| {
                             poly_normal -= zmath.cross3(
-                                points[poly[j - 1]] - points[poly[0]],
-                                points[poly[j]] - points[poly[0]],
+                                points[poly.*[j - 1]] - points[poly.*[0]],
+                                points[poly.*[j]] - points[poly.*[0]],
                             );
                         }
                         average_normal += zmath.normalize3(poly_normal) / @as(
