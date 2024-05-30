@@ -8,6 +8,7 @@ const subdiv = @import("./subdiv.zig");
 const MeshHelper = @import("./MeshHelper.zig");
 const MeshSpec = @import("./MeshSpec.zig");
 const zmath = @import("./zmath/main.zig");
+const wasm_entry = @import("./wasm_entry.zig");
 
 const MyNodeGraph = graph_runtime.NodeGraph(
     NodeDefinitions,
@@ -37,21 +38,22 @@ pub const interface = struct {
         const json_data = @embedFile("content/Cat.blend.json");
         const mesh_input_data = std.json.parseFromSlice(MeshSpec, allocator, json_data, .{}) catch |err| {
             // std.debug.print("Failed to parse JSON: {}", .{err});
+            wasm_entry.dumpDebugLog(std.fmt.allocPrint(allocator, "Failed to parse JSON: {}", .{err}) catch unreachable);
             return err;
         };
         var meshes = std.ArrayList(Mesh).init(allocator);
         var arena = std.heap.ArenaAllocator.init(allocator);
         defer arena.deinit();
         for (mesh_input_data.value.meshes) |input_data| {
-            const flipped_vertices = MeshHelper.flipYZ(arena.allocator(), input_data.vertices);
+            const flipped_vertices = MeshHelper.flipYZ(arena.allocator(), input_data.frame_to_vertices[0]);
             try meshes.append(mesh: {
                 const input_vertices = flipped_vertices; // input_data.vertices
-                const result = try subdiv.Polygon(.Face).cmcSubdiv(arena.allocator(), input_vertices, input_data.polygons);
-                // var subdiv_count: u32 = 0;
-                // while (subdiv_count < 1) {
-                //     result = try subdiv.Polygon(.Quad).cmcSubdiv(arena.allocator(), result.points, result.quads);
-                //     subdiv_count += 1;
-                // }
+                var result = try subdiv.Polygon(.Face).cmcSubdiv(arena.allocator(), input_vertices, input_data.polygons);
+                var subdiv_count: u32 = 0;
+                while (subdiv_count < 1) {
+                    result = try subdiv.Polygon(.Quad).cmcSubdiv(arena.allocator(), result.points, result.quads);
+                    subdiv_count += 1;
+                }
                 const mesh_helper = MeshHelper.Polygon(.Quad);
                 break :mesh .{
                     .label = input_data.name,

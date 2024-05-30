@@ -54,6 +54,10 @@ const ExportMeshes = struct {
                 .cwd = try std.process.getCwdAlloc(self.allocator),
             });
             std.debug.print("stdout: {s}\n", .{res.stdout});
+            if (res.stderr.len > 0) {
+                std.debug.print("stderr: {s}\n", .{res.stderr});
+                return error.ExportFailed;
+            }
             const ns = timer.read();
             std.debug.print("Process took {d} ms\n", .{@as(f64, @floatFromInt(ns)) / 1_000_000});
             export_count += 1;
