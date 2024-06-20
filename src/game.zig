@@ -1,7 +1,6 @@
 const std = @import("std");
 const graph_runtime = @import("./graph_runtime.zig");
-const NodeDefinitions = @import("./node_graph_blueprint_nodes.zig");
-const node_graph_blueprint = @import("./interactive_node_builder_blueprint.zig").node_graph_blueprint;
+const node_graph_blueprint = @import("./interactive_node_builder_blueprint.zig");
 const typeDefinitions = @import("./type_definitions.zig");
 
 const subdiv = @import("./subdiv.zig");
@@ -9,11 +8,7 @@ const MeshHelper = @import("./MeshHelper.zig");
 const MeshSpec = @import("./MeshSpec.zig");
 const zmath = @import("./zmath/main.zig");
 const wasm_entry = @import("./wasm_entry.zig");
-
-const MyNodeGraph = graph_runtime.NodeGraph(
-    NodeDefinitions,
-    node_graph_blueprint,
-);
+const utils = @import("./utils.zig");
 
 pub const Mesh = struct {
     label: []const u8,
@@ -81,26 +76,81 @@ pub const interface = struct {
         };
     }
 
+    const Axis = struct {
+        x: f32,
+        y: f32,
+        z: f32,
+    };
+    const OrbitCamera = struct {
+        position: zmath.Vec,
+        rotation: zmath.Vec,
+        track_distance: f32,
+    };
+    const MyNodeGraph = graph_runtime.NodeGraph(
+        struct {
+            allocator: std.mem.Allocator,
+            pub fn game(self: @This(), input: struct {
+                game_time_seconds: f32,
+                orbit_speed: f32,
+                input: struct { mouse_delta: zmath.Vec },
+                orbit_camera: OrbitCamera,
+            }) struct {
+                orbit_camera: OrbitCamera,
+                world_matrix: zmath.Mat,
+            } {
+                const orbit_camera = utils.copyWith(input.orbit_camera, .{
+                    .rotation = input.orbit_camera.rotation +
+                        input.input.mouse_delta *
+                        @as(zmath.Vec, @splat(input.orbit_speed)),
+                });
+                _ = self;
+                return .{
+                    .orbit_camera = orbit_camera,
+                    .world_matrix = zmath.mul(
+                        zmath.mul(
+                            zmath.translationV(orbit_camera.position),
+                            zmath.matFromRollPitchYawV(orbit_camera.rotation),
+                        ),
+                        zmath.perspectiveFovLh(
+                            0.25 * 3.14159,
+                            @as(f32, @floatFromInt(1920)) / @as(f32, @floatFromInt(1080)),
+                            0.1,
+                            500.0,
+                        ),
+                    ),
+                };
+            }
+        },
+        node_graph_blueprint.Blueprint{
+            .nodes = &[_]node_graph_blueprint.NodeGraphBlueprintEntry{
+                .{
+                    .name = "game",
+                    .function = "game",
+                    .input_links = &[_]node_graph_blueprint.InputLink{
+                        .{ .field = "game_time_seconds", .source = .{ .input_field = "game_time_seconds" } },
+                        .{ .field = "orbit_speed", .source = .{ .input_field = "orbit_speed" } },
+                        .{ .field = "input", .source = .{ .input_field = "input" } },
+                        .{ .field = "orbit_camera", .source = .{ .store_field = "orbit_camera" } },
+                    },
+                },
+            },
+            .store = &[_]node_graph_blueprint.SystemSink{
+                .{ .output_node = "game", .output_field = "orbit_camera", .system_field = "orbit_camera" },
+            },
+            .output = &[_]node_graph_blueprint.SystemSink{
+                .{ .output_node = "game", .output_field = "orbit_camera", .system_field = "orbit_camera" },
+            },
+        },
+    );
+
     var previous_outputs_hash: u32 = 0;
     var my_node_graph = MyNodeGraph{
         .allocator = std.heap.page_allocator,
-        .store = .{
-            .blueprint = .{
-                .nodes = &.{},
-                .output = &.{},
-                .store = &.{},
-            },
-            .node_dimensions = &.{},
-            .interaction_state = .{
-                .node_selection = &.{},
-            },
-            .camera = .{},
-            .context_menu = .{
-                .open = false,
-                .location = .{ .x = 0, .y = 0 },
-                .options = &.{},
-            },
-        },
+        .store = .{ .orbit_camera = .{
+            .position = .{ 0, 0, 0, 1 },
+            .rotation = .{ 0, 0, 0, 1 },
+            .track_distance = 10,
+        } },
     };
 
     pub fn callNodeGraph(
@@ -110,12 +160,13 @@ pub const interface = struct {
     } {
         const outputs = try my_node_graph.update(inputs);
         // const send_outputs = true;
-        const send_outputs = blk: {
-            var hasher = std.hash.Adler32.init();
-            std.hash.autoHashStrat(&hasher, outputs, .DeepRecursive);
-            defer previous_outputs_hash = hasher.final();
-            break :blk hasher.final() != previous_outputs_hash;
-        };
+        const send_outputs = true;
+        // blk: {
+        //     var hasher = std.hash.Adler32.init();
+        //     std.hash.autoHashStrat(&hasher, outputs, .DeepRecursive);
+        //     defer previous_outputs_hash = hasher.final();
+        //     break :blk hasher.final() != previous_outputs_hash;
+        // };
         return .{
             .outputs = if (send_outputs) outputs else null,
         };

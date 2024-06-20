@@ -1,7 +1,6 @@
 const std = @import("std");
 const Blueprint = @import("./interactive_node_builder_blueprint.zig").Blueprint;
 const NodeDefinitions = @import("./node_graph_blueprint_nodes.zig");
-const node_graph_blueprint = @import("./interactive_node_builder_blueprint.zig").node_graph_blueprint;
 const utils = @import("./utils.zig");
 
 const Input = struct {
@@ -273,7 +272,7 @@ pub fn NodeGraph(comptime node_definitions: anytype, comptime graph: Blueprint) 
             self.arena = next_arena;
 
             // Copy over new store values...
-            inline for (node_graph_blueprint.store) |store_defn| {
+            inline for (graph.store) |store_defn| {
                 const node_result = @field(nodes_outputs, store_defn.output_node);
                 const result = @field(node_result, store_defn.output_field);
                 @field(self.store, store_defn.system_field) =
@@ -282,7 +281,7 @@ pub fn NodeGraph(comptime node_definitions: anytype, comptime graph: Blueprint) 
 
             // Output from system from select nodes...
             var system_outputs: SystemOutputs = undefined;
-            inline for (node_graph_blueprint.output) |output_defn| {
+            inline for (graph.output) |output_defn| {
                 const node_outputs = @field(nodes_outputs, output_defn.output_node);
                 const result = @field(node_outputs, output_defn.output_field);
                 @field(system_outputs, output_defn.system_field) =
@@ -300,6 +299,7 @@ pub fn NodeGraph(comptime node_definitions: anytype, comptime graph: Blueprint) 
 
 test "Build" {
     const allocator = std.heap.page_allocator;
+    const node_graph_blueprint = @import("./interactive_node_builder_blueprint.zig").node_graph_blueprint;
     const MyNodeGraph = NodeGraph(
         NodeDefinitions,
         node_graph_blueprint,

@@ -211,7 +211,7 @@ export function App() {
       }}></div>
       <div class={classes.nodeGraph} >
         <div style={{ color: "red" }}>{
-          resourcesLoadTime + " " + JSON.stringify(sliceToArray.Float32Array(resources.meshes[0].position))
+          resourcesLoadTime
         }</div>
         {
           // graphOutputs.context_menu.open
