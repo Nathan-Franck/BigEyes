@@ -54,15 +54,9 @@ const resourcesLoadTime = Date.now() - startLoadResources;
 
 const keyboard_modifiers = { alt: false, control: false, super: false, shift: false };
 const nodeGraph = NodeGraph({
-  keyboard_modifiers,
-  recieved_blueprint: {
-    nodes: [
-      { function: "test", input_links: [], name: "TestA" },
-      { function: "test", input_links: [], name: "TestB" },
-    ],
-    output: [],
-    store: [],
-  },
+  game_time_seconds: 0,
+  input: { mouse_delta: [0, 0, 0, 0]},
+  orbit_speed: 1,
 },);
 
 
@@ -174,15 +168,15 @@ export function App() {
 
   // Given the refs to all the nodes, we can move these around based on the nodeGraph data 
   {
-    const positions = graphOutputs.node_coords;
-    for(const { node, data: position } of positions) {
-      const button = nodeReferences.current[sliceToString(node)];
-      if (button && "innerHTML" in button) {
-        button.style.position = "absolute";
-        button.style.left = `${position.x}px`;
-        button.style.top = `${position.y}px`;
-      }
-    }
+    // const positions = graphOutputs.node_coords;
+    // for(const { node, data: position } of positions) {
+    //   const button = nodeReferences.current[sliceToString(node)];
+    //   if (button && "innerHTML" in button) {
+    //     button.style.position = "absolute";
+    //     button.style.left = `${position.x}px`;
+    //     button.style.top = `${position.y}px`;
+    //   }
+    // }
   }
 
   const lastTargetRef = useRef<HTMLElement | null>(null);
