@@ -19,7 +19,7 @@ const ExportMeshes = struct {
         };
         return self;
     }
-    fn exportMeshes(step: *std.Build.Step, prog_node: *std.Progress.Node) !void {
+    fn exportMeshes(step: *std.Build.Step, prog_node: std.Progress.Node) !void {
         _ = prog_node;
         const self = @as(*ExportMeshes, @fieldParentPtr("step", step));
 
@@ -42,7 +42,7 @@ const ExportMeshes = struct {
 
             std.debug.print("Working on {s}", .{file});
             var timer = try std.time.Timer.start();
-            const res = try std.ChildProcess.run(.{
+            const res = try std.process.Child.run(.{
                 .allocator = self.allocator,
                 .argv = &[_][]const u8{
                     "blender",
@@ -133,7 +133,7 @@ pub fn build(
     {
         var exe = b.addExecutable(.{
             .target = b.resolveTargetQuery(.{ .cpu_arch = .wasm32, .os_tag = .freestanding }),
-            .optimize = .ReleaseFast,
+            .optimize = optimize,
             .name = "game",
             .root_source_file = .{ .cwd_relative = "src/wasm_entry.zig" },
         });

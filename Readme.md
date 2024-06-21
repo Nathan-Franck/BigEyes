@@ -9,12 +9,18 @@ Can 3D toon graphics be easy?
 
 ### Building
 
-Requires Zig 0.11
-> Currently on zig version 0.12.0-dev.3381+7057bffc1
+Requires Zig 0.14
+> Currently on zig version 0.14.0-dev.105+f7d72ce88
 
 ```
-git submodule update 
-zig build run
+zig build wasm
+```
+
+### Release Build
+
+The game won't run fast unless you build the wasm bundle on ReleaseFast, though this takes much longer to build
+```
+zig build wasm -Doptimize=ReleaseFast
 ```
 
 ### Custom Blender Export
@@ -23,17 +29,14 @@ zig build run
 ```
 blender triangle_wgpu_content/cube.blend --background --python .\tools\custom-gltf.py
 ```
-
-### Blender View Script
-
-* Load the camera_stream_addon.py as a module in Blender
-* This allows the game scene to read the current blender camera state when previewing models in-engine! TODO - all kinds of state?
+This is automatically executed from the build script!
 
 ### Zig->Typescript Node Types
-`zig run src/typeDefinitions.zig`
+`zig run src/tool_game_build_type_definitions.zig`
 
 ### Future Development Directions
 
+- Cat animations!
 - Forest rendering would be really nice to try out, just to satisfy my personal interests
   - Just go full 3D since that can look the coolest, with a dense forest
   - Use that cool algorithm that I already know about

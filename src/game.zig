@@ -112,7 +112,7 @@ pub const interface = struct {
                             zmath.matFromRollPitchYawV(orbit_camera.rotation),
                         ),
                         zmath.perspectiveFovLh(
-                            0.25 * 3.14159,
+                            0.25 * 3.14159 * 1.0,
                             @as(f32, @floatFromInt(1920)) / @as(f32, @floatFromInt(1080)),
                             0.1,
                             500.0,
