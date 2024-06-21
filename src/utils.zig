@@ -41,7 +41,7 @@ pub fn deepClone(
         .Array => |a| blk: {
             var elements: [a.len]a.child = undefined;
             var allocator_used = false;
-            for (T, 0..) |elem, idx| {
+            for (source, 0..) |elem, idx| {
                 const result = try deepClone(a.child, allocator, elem);
                 allocator_used = allocator_used or result.allocator_used;
                 elements[idx] = result.value;

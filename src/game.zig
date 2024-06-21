@@ -28,7 +28,7 @@ const hexColors = [_][3]f32{
 };
 
 pub const interface = struct {
-    pub fn getResources() !struct { world_matrix: zmath.Mat, meshes: []Mesh } {
+    pub fn getResources() !struct { meshes: []Mesh } {
         const allocator = std.heap.page_allocator;
         const json_data = @embedFile("content/Cat.blend.json");
         const mesh_input_data = std.json.parseFromSlice(MeshSpec, allocator, json_data, .{}) catch |err| {
@@ -40,7 +40,7 @@ pub const interface = struct {
         var arena = std.heap.ArenaAllocator.init(allocator);
         defer arena.deinit();
         for (mesh_input_data.value.meshes) |input_data| {
-            const vertices = MeshHelper.decodeVertexDataFromHexidecimal(arena.allocator(), input_data.frame_to_vertices[0]);
+            const vertices = MeshHelper.decodeVertexDataFromHexidecimal(arena.allocator(), input_data.frame_to_vertices[10]);
             const flipped_vertices = MeshHelper.flipYZ(arena.allocator(), vertices);
             try meshes.append(mesh: {
                 const input_vertices = flipped_vertices; // input_data.vertices
@@ -63,15 +63,6 @@ pub const interface = struct {
             });
         }
         return .{
-            .world_matrix = zmath.mul(
-                zmath.translationV(zmath.loadArr3(.{ 0, 0, 15 })),
-                zmath.perspectiveFovLh(
-                    0.25 * 3.14159,
-                    @as(f32, @floatFromInt(1920)) / @as(f32, @floatFromInt(1080)),
-                    0.1,
-                    500.0,
-                ),
-            ),
             .meshes = meshes.items,
         };
     }
@@ -139,6 +130,7 @@ pub const interface = struct {
             },
             .output = &[_]node_graph_blueprint.SystemSink{
                 .{ .output_node = "game", .output_field = "orbit_camera", .system_field = "orbit_camera" },
+                .{ .output_node = "game", .output_field = "world_matrix", .system_field = "world_matrix" },
             },
         },
     );
@@ -147,7 +139,7 @@ pub const interface = struct {
     var my_node_graph = MyNodeGraph{
         .allocator = std.heap.page_allocator,
         .store = .{ .orbit_camera = .{
-            .position = .{ 0, 0, 0, 1 },
+            .position = .{ 0, 0, 15, 1 },
             .rotation = .{ 0, 0, 0, 1 },
             .track_distance = 10,
         } },

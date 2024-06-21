@@ -2,7 +2,7 @@ import './app.css'
 import { NodeGraph } from './nodeGraph';
 import { declareStyle } from './declareStyle';
 import { useEffect, useRef, useState } from 'preact/hooks'
-import { sliceToArray, sliceToString, callWasm } from './zigWasmInterface';
+import { sliceToArray, callWasm } from './zigWasmInterface';
 import { Mat4, ShaderBuilder } from './shaderBuilder';
 
 const { classes, encodedStyle } = declareStyle({
@@ -53,6 +53,7 @@ const resourcesLoadTime = Date.now() - startLoadResources;
 // https://stackoverflow.com/questions/6604192/showing-console-errors-and-alerts-in-a-div-inside-the-page
 
 const keyboard_modifiers = { alt: false, control: false, super: false, shift: false };
+
 const nodeGraph = NodeGraph({
   game_time_seconds: 0,
   input: { mouse_delta: [0, 0, 0, 0]},
@@ -62,11 +63,11 @@ const nodeGraph = NodeGraph({
 
 export function App() {
   const { graphOutputs, callGraph } = nodeGraph.useState();
+
   if ("error" in graphOutputs)
     return <div>Error: {graphOutputs.error}</div>
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const nodeReferences = useRef<Record<string, HTMLButtonElement>>({});
 
   // useEffect(() => {
   //   callGraph({
@@ -162,7 +163,7 @@ export function App() {
       position: ShaderBuilder.createBuffer(gl, sliceToArray.Float32Array(resources.meshes[0].position)),
       normals: ShaderBuilder.createBuffer(gl, sliceToArray.Float32Array(resources.meshes[0].normals)),
       item_position: ShaderBuilder.createBuffer(gl, new Float32Array([0, 0, 0])),
-      perspectiveMatrix: resources.world_matrix.flatMap(row => row) as Mat4,
+      perspectiveMatrix: graphOutputs.world_matrix.flatMap(row => row) as Mat4,
     });
   });
 
@@ -179,78 +180,21 @@ export function App() {
     // }
   }
 
-  const lastTargetRef = useRef<HTMLElement | null>(null);
-
   return (
     <>
       <style>{encodedStyle}</style>
       <div class={classes.nodeGraphBackground} onClick={event => {
-        lastTargetRef.current = event.target as HTMLElement;
-        const clickPosition = {
-          x: event.clientX,
-          y: event.clientY,
-        };
-        callGraph({
-          keyboard_modifiers, event: {
-            mouse_event: {
-              mouse_down: {
-                button: event.button == 0
-                  ? "right" /**temp for touch testing **/
-                  : event.button == 1 ? "middle" : "right",
-                location: clickPosition,
-              }
-            }
-          }
-        });
+        console.log("Click! TODO: Orbit interaction on the graph using callGraph")
+        // callGraph({
+        //   game_time_seconds: Date.now() / 1000,
+        //   orbit_speed: 10,
+        //   input: { }
+        // });
       }}></div>
       <div class={classes.nodeGraph} >
         <div style={{ color: "red" }}>{
           resourcesLoadTime
         }</div>
-        {
-          // graphOutputs.context_menu.open
-          //   ? <div class={classes.contextMenu} ref={contextMenuRef}>{
-          //     graphOutputs.context_menu.options.map((option, index) => <>
-          //       {index > 0 ? <div class={classes.contextMenuSeperator} /> : null}
-          //       < button class={classes.contextMenuItem} onClick={() => callGraph({
-          //         keyboard_modifiers,
-          //         event: {
-          //           context_event: {
-          //             option_selected: sliceToString(option)
-          //           }
-          //         }
-          //       })}>{sliceToString(option)}</button>
-          //     </>)
-          //   }</div>
-          //   : null
-        }
-        {
-          // graphOutputs.blueprint.nodes.map(node => <button
-          //   ref={elem => {
-          //     if (elem != null)
-          //       nodeReferences.current[sliceToString(node.name)] = elem
-          //   }}
-          //   class={classes.node}
-          //   onClick={event => callGraph({
-          //     keyboard_modifiers,
-          //     event: {
-          //       external_node_event: {
-          //         mouse_event: {
-          //           mouse_down: {
-          //             button: event.button == 0
-          //               ? "right" /**temp for touch testing **/
-          //               : event.button == 1
-          //                 ? "middle"
-          //                 : "right",
-          //             location: { x: event.x, y: event.y }
-          //           },
-          //         },
-          //         node_name: sliceToString(node.name),
-          //       }
-          //     }
-          //   })
-          //   }>{sliceToString(node.name)}</button>)
-        }
       </div>
       <canvas ref={canvasRef} class={classes.canvas} id="canvas" width={windowSize.width} height={windowSize.height}></canvas>
     </>
