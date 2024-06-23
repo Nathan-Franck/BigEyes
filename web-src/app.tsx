@@ -56,7 +56,7 @@ const keyboard_modifiers = { alt: false, control: false, super: false, shift: fa
 
 const nodeGraph = NodeGraph({
   game_time_seconds: 0,
-  input: { mouse_delta: [0, 0, 0, 0]},
+  input: { mouse_delta: [0, 0, 0, 0] },
   orbit_speed: 1,
 },);
 
@@ -180,23 +180,21 @@ export function App() {
     // }
   }
 
+  console.log("Trying to make a canvas that I can click!")
+
   return (
     <>
       <style>{encodedStyle}</style>
-      <div class={classes.nodeGraphBackground} onClick={event => {
-        console.log("Click! TODO: Orbit interaction on the graph using callGraph")
-        // callGraph({
-        //   game_time_seconds: Date.now() / 1000,
-        //   orbit_speed: 10,
-        //   input: { }
-        // });
+      <div style={{ width: "100%", height: "100%", zIndex: 1, position: "absolute", left: 0, top: 0 }} onMouseMove={event =>{
+        console.log(`Recieved event - ${JSON.stringify(event.type)}`);
+        callGraph({
+          game_time_seconds: Date.now() / 1000,
+          input: { mouse_delta: [event.clientX, event.clientY, 0, 0]},
+          orbit_speed: 0.00001,
+        })
       }}></div>
-      <div class={classes.nodeGraph} >
-        <div style={{ color: "red" }}>{
-          resourcesLoadTime
-        }</div>
-      </div>
-      <canvas ref={canvasRef} class={classes.canvas} id="canvas" width={windowSize.width} height={windowSize.height}></canvas>
+      <canvas ref={canvasRef} class={classes.canvas} id="canvas" width={windowSize.width} height={windowSize.height} onMouseEnter={event =>
+        console.log("HI")}>canvas</canvas>
     </>
   )
 }
