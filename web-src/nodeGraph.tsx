@@ -19,6 +19,7 @@ export function NodeGraph(initial_inputs: Inputs) {
   }
 
   return {
+    call,
     useState: () => {
       const [outputs, setOutputs] = useState(initial_outputs);
       return {
