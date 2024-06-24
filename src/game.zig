@@ -101,7 +101,10 @@ pub const interface = struct {
                         zmath.mul(
                             zmath.translationV(orbit_camera.position),
                             zmath.mul(
-                                zmath.matFromRollPitchYawV(orbit_camera.rotation),
+                                zmath.mul(
+                                    zmath.matFromRollPitchYaw(0, orbit_camera.rotation[0], 0),
+                                    zmath.matFromRollPitchYaw(orbit_camera.rotation[1], 0, 0),
+                                ),
                                 zmath.translationV(zmath.loadArr3(.{ 0.0, 0.0, orbit_camera.track_distance })),
                             ),
                         ),
@@ -109,7 +112,7 @@ pub const interface = struct {
                             0.25 * 3.14156,
                             @as(f32, @floatFromInt(1920)) / @as(f32, @floatFromInt(1080)),
                             0.1,
-                            500.0,
+                            500,
                         ),
                     ),
                 };
