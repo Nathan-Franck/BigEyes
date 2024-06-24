@@ -44,20 +44,20 @@ pub const interface = struct {
             const flipped_vertices = MeshHelper.flipYZ(arena.allocator(), vertices);
             try meshes.append(mesh: {
                 const input_vertices = flipped_vertices; // input_data.vertices
-                var result = try subdiv.Polygon(.Face).cmcSubdiv(arena.allocator(), input_vertices, input_data.polygons);
+                var mesh_result = try subdiv.Polygon(.Face).cmcSubdiv(arena.allocator(), input_vertices, input_data.polygons);
                 var subdiv_count: u32 = 0;
                 while (subdiv_count < 1) {
-                    result = try subdiv.Polygon(.Quad).cmcSubdiv(arena.allocator(), result.points, result.quads);
+                    mesh_result = try subdiv.Polygon(.Quad).cmcSubdiv(arena.allocator(), mesh_result.points, mesh_result.quads);
                     subdiv_count += 1;
                 }
                 const mesh_helper = MeshHelper.Polygon(.Quad);
                 break :mesh .{
                     .label = input_data.name,
-                    .indices = mesh_helper.toTriangleIndices(allocator, result.quads),
-                    .position = MeshHelper.pointsToFloatSlice(allocator, result.points),
+                    .indices = mesh_helper.toTriangleIndices(allocator, mesh_result.quads),
+                    .position = MeshHelper.pointsToFloatSlice(allocator, mesh_result.points),
                     .normals = MeshHelper.pointsToFloatSlice(
                         allocator,
-                        mesh_helper.calculateNormals(arena.allocator(), result.points, result.quads),
+                        mesh_helper.calculateNormals(arena.allocator(), mesh_result.points, mesh_result.quads),
                     ),
                 };
             });
@@ -89,7 +89,7 @@ pub const interface = struct {
                 orbit_camera: OrbitCamera,
                 world_matrix: zmath.Mat,
             } {
-                const orbit_camera = utils.copyWith(input.orbit_camera, .{
+                const orbit_camera: OrbitCamera = utils.copyWith(input.orbit_camera, .{
                     .rotation = input.orbit_camera.rotation +
                         input.input.mouse_delta *
                         @as(zmath.Vec, @splat(input.orbit_speed)),
@@ -100,10 +100,13 @@ pub const interface = struct {
                     .world_matrix = zmath.mul(
                         zmath.mul(
                             zmath.translationV(orbit_camera.position),
-                            zmath.matFromRollPitchYawV(orbit_camera.rotation),
+                            zmath.mul(
+                                zmath.matFromRollPitchYawV(orbit_camera.rotation),
+                                zmath.translationV(zmath.loadArr3(.{ 0.0, 0.0, orbit_camera.track_distance })),
+                            ),
                         ),
                         zmath.perspectiveFovLh(
-                            0.25 * 3.14159,
+                            0.25 * 3.14156,
                             @as(f32, @floatFromInt(1920)) / @as(f32, @floatFromInt(1080)),
                             0.1,
                             500.0,
@@ -139,9 +142,9 @@ pub const interface = struct {
     var my_node_graph = MyNodeGraph{
         .allocator = std.heap.page_allocator,
         .store = .{ .orbit_camera = .{
-            .position = .{ 0, 0, 15, 1 },
+            .position = .{ 0, 0, 0, 1 },
             .rotation = .{ 0, 0, 0, 1 },
-            .track_distance = 10,
+            .track_distance = 15,
         } },
     };
 

@@ -154,11 +154,13 @@ export function App() {
 
 
   return (<>
-    <style > {encodedStyle}</style >
+    <style>{encodedStyle}</style >
     <div style={{ width: "100%", height: "100%", zIndex: 1, position: "absolute", left: 0, top: 0 }} onMouseMove={event => {
       console.log(`Recieved event - ${JSON.stringify(event.type)}`);
       const currentMouse = { x: event.clientX, y: event.clientY };
-      const mouseDelta = lastMouse == null ? currentMouse : {x: currentMouse.x - lastMouse.x, y: currentMouse.y - lastMouse.y}
+      const mouseDelta = lastMouse == null
+        ? currentMouse
+        : { x: currentMouse.x - lastMouse.x, y: currentMouse.y - lastMouse.y }
       lastMouse = currentMouse;
       graphInputs = {
         game_time_seconds: Date.now() / 1000,
