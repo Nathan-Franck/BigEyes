@@ -182,7 +182,7 @@ pub fn DeclsToEnum(comptime container: type) type {
             .value = i,
         }};
     }
-    return @Type(.{ .Enum = .{
+    return @Type(std.builtin.Type{ .Enum = .{
         .tag_type = u32,
         .fields = enum_fields,
         .decls = &.{},

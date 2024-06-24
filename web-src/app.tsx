@@ -60,7 +60,7 @@ const nodeGraph = NodeGraph({
   orbit_speed: 1,
 },);
 let graphInputs: Parameters<typeof nodeGraph["call"]>[0] | null = null;
-let lastMouse: { x: number, y: number } | null = null;
+let lastMousePosition: { x: number, y: number } | null = null;
 
 export function App() {
 
@@ -155,19 +155,22 @@ export function App() {
 
   return (<>
     <style>{encodedStyle}</style >
-    <div style={{ width: "100%", height: "100%", zIndex: 1, position: "absolute", left: 0, top: 0 }} onMouseMove={event => {
-      console.log(`Recieved event - ${JSON.stringify(event.type)}`);
-      const currentMouse = { x: event.clientX, y: event.clientY };
-      const mouseDelta = lastMouse == null
-        ? currentMouse
-        : { x: currentMouse.x - lastMouse.x, y: currentMouse.y - lastMouse.y }
-      lastMouse = currentMouse;
-      graphInputs = {
-        game_time_seconds: Date.now() / 1000,
-        input: { mouse_delta: [mouseDelta.x, mouseDelta.y, 0, 0] },
-        orbit_speed: 0.001,
-      };
-    }}></div>
+    <div
+      style={{ width: "100%", height: "100%", zIndex: 1, position: "absolute", left: 0, top: 0 }}
+      onMouseMove={event => {
+        const currentMouse = { x: event.clientX, y: event.clientY };
+        const mouseDelta = lastMousePosition == null
+          ? currentMouse
+          : { x: currentMouse.x - lastMousePosition.x, y: currentMouse.y - lastMousePosition.y }
+        lastMousePosition = currentMouse;
+        console.log(event.buttons)
+        if (event.buttons)
+          graphInputs = {
+            game_time_seconds: Date.now() / 1000,
+            input: { mouse_delta: [mouseDelta.x, mouseDelta.y, 0, 0] },
+            orbit_speed: 0.001,
+          };
+      }}></div>
     <canvas ref={canvasRef} class={classes.canvas} id="canvas" width={windowSize.width} height={windowSize.height}></canvas>
   </>)
 }
