@@ -54,12 +54,8 @@ const resourcesLoadTime = Date.now() - startLoadResources;
 
 const keyboard_modifiers = { alt: false, control: false, super: false, shift: false };
 
-const nodeGraph = NodeGraph({
-  game_time_seconds: 0,
-  input: { mouse_delta: [0, 0, 0, 0] },
-  orbit_speed: 1,
-},);
-let graphInputs: Parameters<typeof nodeGraph["call"]>[0] | null = null;
+let graphInputs: Parameters<typeof nodeGraph["call"]>[0] | null = { };
+const nodeGraph = NodeGraph(graphInputs);
 let lastMousePosition: { x: number, y: number } | null = null;
 
 export function App() {
@@ -115,7 +111,6 @@ export function App() {
     let running = true;
     const gameLoopIteration = () => {
       try {
-
         if (graphInputs == null)
           return;
         const graphOutputs = nodeGraph.call(graphInputs);
@@ -163,12 +158,10 @@ export function App() {
           ? currentMouse
           : { x: currentMouse.x - lastMousePosition.x, y: currentMouse.y - lastMousePosition.y }
         lastMousePosition = currentMouse;
-        console.log(event.buttons)
         if (event.buttons)
           graphInputs = {
             game_time_seconds: Date.now() / 1000,
             input: { mouse_delta: [mouseDelta.x, mouseDelta.y, 0, 0] },
-            orbit_speed: 0.001,
           };
       }}></div>
     <canvas ref={canvasRef} class={classes.canvas} id="canvas" width={windowSize.width} height={windowSize.height}></canvas>

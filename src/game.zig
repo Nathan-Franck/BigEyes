@@ -81,22 +81,27 @@ pub const interface = struct {
         struct {
             allocator: std.mem.Allocator,
             pub fn game(self: @This(), input: struct {
-                game_time_seconds: f32,
+                game_time_seconds: ?f32,
+                input: ?struct { mouse_delta: zmath.Vec },
                 orbit_speed: f32,
-                input: struct { mouse_delta: zmath.Vec },
                 orbit_camera: OrbitCamera,
             }) struct {
                 orbit_camera: OrbitCamera,
+                orbit_speed: f32,
                 world_matrix: zmath.Mat,
             } {
-                const orbit_camera: OrbitCamera = utils.copyWith(input.orbit_camera, .{
-                    .rotation = input.orbit_camera.rotation +
-                        input.input.mouse_delta *
-                        @as(zmath.Vec, @splat(input.orbit_speed)),
-                });
+                const orbit_camera: OrbitCamera = if (input.input) |found_input|
+                    utils.copyWith(input.orbit_camera, .{
+                        .rotation = input.orbit_camera.rotation +
+                            found_input.mouse_delta *
+                            @as(zmath.Vec, @splat(input.orbit_speed)),
+                    })
+                else
+                    input.orbit_camera;
                 _ = self;
                 return .{
                     .orbit_camera = orbit_camera,
+                    .orbit_speed = input.orbit_speed,
                     .world_matrix = zmath.mul(
                         zmath.mul(
                             zmath.translationV(orbit_camera.position),
@@ -109,7 +114,7 @@ pub const interface = struct {
                             ),
                         ),
                         zmath.perspectiveFovLh(
-                            0.25 * 3.14156,
+                            0.25 * 3.141569,
                             @as(f32, @floatFromInt(1920)) / @as(f32, @floatFromInt(1080)),
                             0.1,
                             500,
@@ -125,7 +130,7 @@ pub const interface = struct {
                     .function = "game",
                     .input_links = &[_]node_graph_blueprint.InputLink{
                         .{ .field = "game_time_seconds", .source = .{ .input_field = "game_time_seconds" } },
-                        .{ .field = "orbit_speed", .source = .{ .input_field = "orbit_speed" } },
+                        .{ .field = "orbit_speed", .source = .{ .store_field = "orbit_speed" } },
                         .{ .field = "input", .source = .{ .input_field = "input" } },
                         .{ .field = "orbit_camera", .source = .{ .store_field = "orbit_camera" } },
                     },
@@ -133,6 +138,7 @@ pub const interface = struct {
             },
             .store = &[_]node_graph_blueprint.SystemSink{
                 .{ .output_node = "game", .output_field = "orbit_camera", .system_field = "orbit_camera" },
+                .{ .output_node = "game", .output_field = "orbit_speed", .system_field = "orbit_speed" },
             },
             .output = &[_]node_graph_blueprint.SystemSink{
                 .{ .output_node = "game", .output_field = "orbit_camera", .system_field = "orbit_camera" },
@@ -144,11 +150,14 @@ pub const interface = struct {
     var previous_outputs_hash: u32 = 0;
     var my_node_graph = MyNodeGraph{
         .allocator = std.heap.page_allocator,
-        .store = .{ .orbit_camera = .{
-            .position = .{ 0, 0, 0, 1 },
-            .rotation = .{ 0, 0, 0, 1 },
-            .track_distance = 15,
-        } },
+        .store = .{
+            .orbit_speed = 0.01,
+            .orbit_camera = .{
+                .position = .{ 0, 0, 0, 1 },
+                .rotation = .{ 0, 0, 0, 1 },
+                .track_distance = 20,
+            },
+        },
     };
 
     pub fn callNodeGraph(
