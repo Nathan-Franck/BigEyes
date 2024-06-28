@@ -80,28 +80,36 @@ pub const interface = struct {
     const MyNodeGraph = graph_runtime.NodeGraph(
         struct {
             allocator: std.mem.Allocator,
+            pub const Settings = struct {
+                orbit_speed: f32,
+            };
+            pub const ChangeSettingsOutput = struct { settings: Settings };
+            pub fn changeSettings(input: struct { settings: Settings }) ChangeSettingsOutput {
+                // TODO - User is able to change some settings on sliders?
+                return .{
+                    .settings = input.settings,
+                };
+            }
             pub fn game(self: @This(), input: struct {
+                settings: Settings,
                 game_time_seconds: ?f32,
                 input: ?struct { mouse_delta: zmath.Vec },
-                orbit_speed: f32,
                 orbit_camera: OrbitCamera,
             }) struct {
                 orbit_camera: OrbitCamera,
-                orbit_speed: f32,
                 world_matrix: zmath.Mat,
             } {
                 const orbit_camera: OrbitCamera = if (input.input) |found_input|
                     utils.copyWith(input.orbit_camera, .{
                         .rotation = input.orbit_camera.rotation +
                             found_input.mouse_delta *
-                            @as(zmath.Vec, @splat(input.orbit_speed)),
+                            @as(zmath.Vec, @splat(input.settings.orbit_speed)),
                     })
                 else
                     input.orbit_camera;
                 _ = self;
                 return .{
                     .orbit_camera = orbit_camera,
-                    .orbit_speed = input.orbit_speed,
                     .world_matrix = zmath.mul(
                         zmath.mul(
                             zmath.translationV(orbit_camera.position),
@@ -130,15 +138,22 @@ pub const interface = struct {
                     .function = "game",
                     .input_links = &[_]node_graph_blueprint.InputLink{
                         .{ .field = "game_time_seconds", .source = .{ .input_field = "game_time_seconds" } },
-                        .{ .field = "orbit_speed", .source = .{ .store_field = "orbit_speed" } },
                         .{ .field = "input", .source = .{ .input_field = "input" } },
+                        .{ .field = "settings", .source = .{ .node = .{ .name = "changeSettings", .field = "settings" } } },
                         .{ .field = "orbit_camera", .source = .{ .store_field = "orbit_camera" } },
+                    },
+                },
+                .{
+                    .name = "changeSettings",
+                    .function = "changeSettings",
+                    .input_links = &[_]node_graph_blueprint.InputLink{
+                        .{ .field = "settings", .source = .{ .store_field = "settings" } },
                     },
                 },
             },
             .store = &[_]node_graph_blueprint.SystemSink{
                 .{ .output_node = "game", .output_field = "orbit_camera", .system_field = "orbit_camera" },
-                .{ .output_node = "game", .output_field = "orbit_speed", .system_field = "orbit_speed" },
+                .{ .output_node = "changeSettings", .output_field = "settings", .system_field = "settings" },
             },
             .output = &[_]node_graph_blueprint.SystemSink{
                 .{ .output_node = "game", .output_field = "orbit_camera", .system_field = "orbit_camera" },
@@ -151,7 +166,9 @@ pub const interface = struct {
     var my_node_graph = MyNodeGraph{
         .allocator = std.heap.page_allocator,
         .store = .{
-            .orbit_speed = 0.01,
+            .settings = .{
+                .orbit_speed = 0.01,
+            },
             .orbit_camera = .{
                 .position = .{ 0, 0, 0, 1 },
                 .rotation = .{ 0, 0, 0, 1 },
