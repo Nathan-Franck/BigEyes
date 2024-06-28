@@ -111,8 +111,6 @@ export function App() {
     let running = true;
     const gameLoopIteration = () => {
       try {
-        if (graphInputs == null)
-          return;
         const graphOutputs = nodeGraph.call(graphInputs);
         if (graphOutputs == null || "error" in graphOutputs)
           return;
