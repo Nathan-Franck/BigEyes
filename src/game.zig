@@ -91,12 +91,6 @@ pub const interface = struct {
                     resolution_update: PixelPoint,
                 },
             }) !struct { settings: Settings } {
-                // TODO - User is able to change some settings on sliders?
-                wasm_entry.dumpDebugLog(try std.fmt.allocPrint(
-                    self.allocator,
-                    "Settings are this --- {d}",
-                    .{props.settings.orbit_speed},
-                ));
                 var settings = props.settings;
                 if (props.user_changes) |c| {
                     switch (c) {
