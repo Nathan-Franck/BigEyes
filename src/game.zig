@@ -77,27 +77,40 @@ pub const interface = struct {
         rotation: zmath.Vec,
         track_distance: f32,
     };
+    const PixelPoint = struct { x: u32, y: u32 };
     const MyNodeGraph = graph_runtime.NodeGraph(
         struct {
             allocator: std.mem.Allocator,
             pub const Settings = struct {
                 orbit_speed: f32,
+                render_resolution: PixelPoint,
             };
-            pub fn changeSettings(self: @This(), input: struct {
+            pub fn changeSettings(self: @This(), props: struct {
                 settings: Settings,
-                user_changes: ?struct {},
+                user_changes: ?union(enum) {
+                    resolution_update: PixelPoint,
+                },
             }) !struct { settings: Settings } {
                 // TODO - User is able to change some settings on sliders?
                 wasm_entry.dumpDebugLog(try std.fmt.allocPrint(
                     self.allocator,
                     "Settings are this --- {d}",
-                    .{input.settings.orbit_speed},
+                    .{props.settings.orbit_speed},
                 ));
+                var settings = props.settings;
+                if (props.user_changes) |c| {
+                    switch (c) {
+                        .resolution_update => |resolution| {
+                            settings.render_resolution = resolution;
+                        },
+                    }
+                }
+
                 return .{
-                    .settings = input.settings,
+                    .settings = settings,
                 };
             }
-            pub fn game(self: @This(), input: struct {
+            pub fn game(self: @This(), props: struct {
                 settings: Settings,
                 game_time_seconds: ?f32,
                 input: ?struct { mouse_delta: zmath.Vec },
@@ -106,15 +119,15 @@ pub const interface = struct {
                 orbit_camera: OrbitCamera,
                 world_matrix: zmath.Mat,
             } {
-                wasm_entry.dumpDebugLog(try std.fmt.allocPrint(self.allocator, "{}", .{input.settings.orbit_speed}));
-                const orbit_camera: OrbitCamera = if (input.input) |found_input|
-                    utils.copyWith(input.orbit_camera, .{
-                        .rotation = input.orbit_camera.rotation +
+                wasm_entry.dumpDebugLog(try std.fmt.allocPrint(self.allocator, "{}", .{props.settings.orbit_speed}));
+                const orbit_camera: OrbitCamera = if (props.input) |found_input|
+                    utils.copyWith(props.orbit_camera, .{
+                        .rotation = props.orbit_camera.rotation +
                             found_input.mouse_delta *
-                            @as(zmath.Vec, @splat(-input.settings.orbit_speed)),
+                            @as(zmath.Vec, @splat(-props.settings.orbit_speed)),
                     })
                 else
-                    input.orbit_camera;
+                    props.orbit_camera;
                 return .{
                     .orbit_camera = orbit_camera,
                     .world_matrix = zmath.mul(
@@ -130,7 +143,8 @@ pub const interface = struct {
                         ),
                         zmath.perspectiveFovLh(
                             0.25 * 3.141569,
-                            @as(f32, @floatFromInt(1920)) / @as(f32, @floatFromInt(1080)),
+                            @as(f32, @floatFromInt(props.settings.render_resolution.x)) /
+                                @as(f32, @floatFromInt(props.settings.render_resolution.y)),
                             0.1,
                             500,
                         ),
@@ -176,6 +190,7 @@ pub const interface = struct {
         .store = .{
             .settings = .{
                 .orbit_speed = 0.01,
+                .render_resolution = .{ .x = 0, .y = 0 },
             },
             .orbit_camera = .{
                 .position = .{ 0, 0, 0, 1 },

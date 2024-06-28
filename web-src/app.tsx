@@ -50,14 +50,14 @@ const resources = callWasm("getResources");
 // TODO - Get the error messages from the console showing up
 // https://stackoverflow.com/questions/6604192/showing-console-errors-and-alerts-in-a-div-inside-the-page
 
-let graphInputs: Parameters<typeof nodeGraph["call"]>[0] = {};
+let graphInputs: Parameters<typeof nodeGraph["call"]>[0] = { user_changes: { resolution_update: { x: window.innerWidth, y: window.innerHeight } } };
 let updateRender: ((graphOutputs: NonNullable<GraphOutputs>) => () => void) | null = null
 
 function updateGraph(newInputs: typeof graphInputs) {
   graphInputs = newInputs;
-      const graphOutputs = nodeGraph.call(graphInputs);
-      if (graphOutputs == null || "error" in graphOutputs)
-        return;
+  const graphOutputs = nodeGraph.call(graphInputs);
+  if (graphOutputs == null || "error" in graphOutputs)
+    return;
   if (updateRender != null)
     requestAnimationFrame(updateRender(graphOutputs));
 }
@@ -74,6 +74,7 @@ export function App() {
   useEffect(() => {
     const resizeHandler = () => {
       setWindowSize({ width: window.innerWidth, height: window.innerHeight });
+      updateGraph({ user_changes: { resolution_update: { x: window.innerWidth, y: window.innerHeight } } });
     };
     window.addEventListener('resize', resizeHandler);
     return () => {
