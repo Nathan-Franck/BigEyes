@@ -73,7 +73,7 @@ export function App() {
 
   useEffect(() => {
     const resizeHandler = () => {
-      setWindowSize({ width: window.innerWidth, height: window.innerHeight });
+      setWindowSize({ width: canvasRef.current?.width, height: canvasRef.current?.height });
       updateGraph({ user_changes: { resolution_update: { x: window.innerWidth, y: window.innerHeight } } });
     };
     window.addEventListener('resize', resizeHandler);
