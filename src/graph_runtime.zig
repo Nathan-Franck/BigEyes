@@ -203,7 +203,7 @@ pub fn NodeGraph(comptime node_definitions: anytype, comptime graph: Blueprint) 
                 }) |field|
                     if (std.mem.eql(u8, field.name, store_field.output_field)) break field.type else continue
                 else
-                    @compileError("Field not found " ++ store_field.output_field ++ " in " ++ node_id);
+                    @compileError("Field not found " ++ store_field.system_field ++ " in " ++ node_id);
                 system_store_fields = system_store_fields ++ .{.{
                     .name = name[0.. :0],
                     .type = field_type,

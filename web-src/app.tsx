@@ -1,5 +1,5 @@
 import './app.css'
-import { NodeGraph } from './nodeGraph';
+import { NodeGraph, GraphOutputs } from './nodeGraph';
 import { declareStyle } from './declareStyle';
 import { useEffect, useRef, useState } from 'preact/hooks'
 import { sliceToArray, callWasm } from './zigWasmInterface';
@@ -45,16 +45,23 @@ const { classes, encodedStyle } = declareStyle({
   },
 });
 
-const startLoadResources = Date.now();
 const resources = callWasm("getResources");
-const resourcesLoadTime = Date.now() - startLoadResources;
 
 // TODO - Get the error messages from the console showing up
 // https://stackoverflow.com/questions/6604192/showing-console-errors-and-alerts-in-a-div-inside-the-page
 
-const keyboard_modifiers = { alt: false, control: false, super: false, shift: false };
+let graphInputs: Parameters<typeof nodeGraph["call"]>[0] = {};
+let updateRender: ((graphOutputs: NonNullable<GraphOutputs>) => () => void) | null = null
 
-let graphInputs: Parameters<typeof nodeGraph["call"]>[0] | null = { };
+function updateGraph(newInputs: typeof graphInputs) {
+  graphInputs = newInputs;
+      const graphOutputs = nodeGraph.call(graphInputs);
+      if (graphOutputs == null || "error" in graphOutputs)
+        return;
+  if (updateRender != null)
+    requestAnimationFrame(updateRender(graphOutputs));
+}
+
 const nodeGraph = NodeGraph(graphInputs);
 let lastMousePosition: { x: number, y: number } | null = null;
 
@@ -108,41 +115,27 @@ export function App() {
       `,
     });
 
-    let running = true;
-    const gameLoopIteration = () => {
-      try {
-        const graphOutputs = nodeGraph.call(graphInputs);
-        if (graphOutputs == null || "error" in graphOutputs)
-          return;
-        graphInputs = null;
-
-        {
-          gl.clearColor(0, 0, 0, 1);
-          gl.clear(gl.COLOR_BUFFER_BIT);
-          gl.viewport(0, 0, windowSize.width, windowSize.height);
-          gl.enable(gl.BLEND);
-          gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
-          gl.enable(gl.DEPTH_TEST);
-          // gl.disable(gl.CULL_FACE);
-        }
-
-        ShaderBuilder.renderMaterial(gl, coolMesh, {
-          indices: ShaderBuilder.createElementBuffer(gl, sliceToArray.Uint32Array(resources.meshes[0].indices)),
-          position: ShaderBuilder.createBuffer(gl, sliceToArray.Float32Array(resources.meshes[0].position)),
-          normals: ShaderBuilder.createBuffer(gl, sliceToArray.Float32Array(resources.meshes[0].normals)),
-          item_position: ShaderBuilder.createBuffer(gl, new Float32Array([0, 0, 0])),
-          perspectiveMatrix: graphOutputs.world_matrix.flatMap(row => row) as Mat4,
-        });
-      } finally {
-        if (running)
-          requestAnimationFrame(gameLoopIteration);
+    updateRender = (graphOutputs) => () => {
+      {
+        gl.clearColor(0, 0, 0, 1);
+        gl.clear(gl.COLOR_BUFFER_BIT);
+        gl.viewport(0, 0, windowSize.width, windowSize.height);
+        gl.enable(gl.BLEND);
+        gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+        gl.enable(gl.DEPTH_TEST);
+        // gl.disable(gl.CULL_FACE);
       }
+
+      ShaderBuilder.renderMaterial(gl, coolMesh, {
+        indices: ShaderBuilder.createElementBuffer(gl, sliceToArray.Uint32Array(resources.meshes[0].indices)),
+        position: ShaderBuilder.createBuffer(gl, sliceToArray.Float32Array(resources.meshes[0].position)),
+        normals: ShaderBuilder.createBuffer(gl, sliceToArray.Float32Array(resources.meshes[0].normals)),
+        item_position: ShaderBuilder.createBuffer(gl, new Float32Array([0, 0, 0])),
+        perspectiveMatrix: graphOutputs.world_matrix.flatMap(row => row) as Mat4,
+      });
     }
 
-    gameLoopIteration()
-    return () => {
-      running = false;
-    }
+    updateGraph({ game_time_seconds: 0 });
   }, []);
 
 
@@ -157,10 +150,10 @@ export function App() {
           : { x: currentMouse.x - lastMousePosition.x, y: currentMouse.y - lastMousePosition.y }
         lastMousePosition = currentMouse;
         if (event.buttons)
-          graphInputs = {
+          updateGraph({
             game_time_seconds: Date.now() / 1000,
             input: { mouse_delta: [mouseDelta.x, mouseDelta.y, 0, 0] },
-          };
+          });
       }}></div>
     <canvas ref={canvasRef} class={classes.canvas} id="canvas" width={windowSize.width} height={windowSize.height}></canvas>
   </>)

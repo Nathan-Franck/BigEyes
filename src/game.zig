@@ -83,9 +83,16 @@ pub const interface = struct {
             pub const Settings = struct {
                 orbit_speed: f32,
             };
-            pub const ChangeSettingsOutput = struct { settings: Settings };
-            pub fn changeSettings(input: struct { settings: Settings }) ChangeSettingsOutput {
+            pub fn changeSettings(self: @This(), input: struct {
+                settings: Settings,
+                user_changes: ?struct {},
+            }) !struct { settings: Settings } {
                 // TODO - User is able to change some settings on sliders?
+                wasm_entry.dumpDebugLog(try std.fmt.allocPrint(
+                    self.allocator,
+                    "Settings are this --- {d}",
+                    .{input.settings.orbit_speed},
+                ));
                 return .{
                     .settings = input.settings,
                 };
@@ -95,19 +102,19 @@ pub const interface = struct {
                 game_time_seconds: ?f32,
                 input: ?struct { mouse_delta: zmath.Vec },
                 orbit_camera: OrbitCamera,
-            }) struct {
+            }) !struct {
                 orbit_camera: OrbitCamera,
                 world_matrix: zmath.Mat,
             } {
+                wasm_entry.dumpDebugLog(try std.fmt.allocPrint(self.allocator, "{}", .{input.settings.orbit_speed}));
                 const orbit_camera: OrbitCamera = if (input.input) |found_input|
                     utils.copyWith(input.orbit_camera, .{
                         .rotation = input.orbit_camera.rotation +
                             found_input.mouse_delta *
-                            @as(zmath.Vec, @splat(input.settings.orbit_speed)),
+                            @as(zmath.Vec, @splat(-input.settings.orbit_speed)),
                     })
                 else
                     input.orbit_camera;
-                _ = self;
                 return .{
                     .orbit_camera = orbit_camera,
                     .world_matrix = zmath.mul(
@@ -147,6 +154,7 @@ pub const interface = struct {
                     .name = "changeSettings",
                     .function = "changeSettings",
                     .input_links = &[_]node_graph_blueprint.InputLink{
+                        .{ .field = "user_changes", .source = .{ .input_field = "user_changes" } },
                         .{ .field = "settings", .source = .{ .store_field = "settings" } },
                     },
                 },
