@@ -91,6 +91,7 @@ pub const interface = struct {
                     resolution_update: PixelPoint,
                 },
             }) !struct { settings: Settings } {
+                _ = self;
                 var settings = props.settings;
                 if (props.user_changes) |c| {
                     switch (c) {
