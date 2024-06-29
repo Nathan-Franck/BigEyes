@@ -18,6 +18,17 @@ pub const Mesh = struct {
     normals: []const f32,
 };
 
+pub const BakedAnimationMesh = struct {
+    pub const Frame = struct {
+        normal: []const f32,
+        position: []const f32,
+    };
+    label: []const u8,
+    indices: []const u32,
+    frames: []const Frame,
+    frame_rate: u32,
+};
+
 const hexColors = [_][3]f32{
     .{ 1.0, 0.0, 0.0 },
     .{ 0.0, 1.0, 0.0 },
@@ -28,45 +39,6 @@ const hexColors = [_][3]f32{
 };
 
 pub const interface = struct {
-    pub fn getResources() !struct { meshes: []Mesh } {
-        const allocator = std.heap.page_allocator;
-        const json_data = @embedFile("content/Cat.blend.json");
-        const mesh_input_data = std.json.parseFromSlice(MeshSpec, allocator, json_data, .{}) catch |err| {
-            // std.debug.print("Failed to parse JSON: {}", .{err});
-            wasm_entry.dumpDebugLog(std.fmt.allocPrint(allocator, "Failed to parse JSON: {}", .{err}) catch unreachable);
-            return err;
-        };
-        var meshes = std.ArrayList(Mesh).init(allocator);
-        var arena = std.heap.ArenaAllocator.init(allocator);
-        defer arena.deinit();
-        for (mesh_input_data.value.meshes) |input_data| {
-            const vertices = MeshHelper.decodeVertexDataFromHexidecimal(arena.allocator(), input_data.frame_to_vertices[10]);
-            const flipped_vertices = MeshHelper.flipYZ(arena.allocator(), vertices);
-            try meshes.append(mesh: {
-                const input_vertices = flipped_vertices; // input_data.vertices
-                var mesh_result = try subdiv.Polygon(.Face).cmcSubdiv(arena.allocator(), input_vertices, input_data.polygons);
-                var subdiv_count: u32 = 0;
-                while (subdiv_count < 1) {
-                    mesh_result = try subdiv.Polygon(.Quad).cmcSubdiv(arena.allocator(), mesh_result.points, mesh_result.quads);
-                    subdiv_count += 1;
-                }
-                const mesh_helper = MeshHelper.Polygon(.Quad);
-                break :mesh .{
-                    .label = input_data.name,
-                    .indices = mesh_helper.toTriangleIndices(allocator, mesh_result.quads),
-                    .position = MeshHelper.pointsToFloatSlice(allocator, mesh_result.points),
-                    .normals = MeshHelper.pointsToFloatSlice(
-                        allocator,
-                        mesh_helper.calculateNormals(arena.allocator(), mesh_result.points, mesh_result.quads),
-                    ),
-                };
-            });
-        }
-        return .{
-            .meshes = meshes.items,
-        };
-    }
-
     const Axis = struct {
         x: f32,
         y: f32,
@@ -105,9 +77,91 @@ pub const interface = struct {
                     .settings = settings,
                 };
             }
+            pub const Resources = struct {
+                cat: BakedAnimationMesh,
+            };
+
+            pub fn getResources(self: @This(), props: struct {
+                load_the_data: bool,
+            }) !struct {
+                resources: Resources,
+            } {
+                const allocator = self.allocator;
+                _ = props;
+
+                const max_subdiv = 1;
+
+                const json_data = @embedFile("content/Cat.blend.json");
+                const mesh_input_data = std.json.parseFromSlice(MeshSpec, allocator, json_data, .{}) catch |err| {
+                    // std.debug.print("Failed to parse JSON: {}", .{err});
+                    wasm_entry.dumpDebugLog(std.fmt.allocPrint(allocator, "Failed to parse JSON: {}", .{err}) catch unreachable);
+                    return err;
+                };
+                var arena = std.heap.ArenaAllocator.init(allocator);
+                defer arena.deinit();
+                const mesh_helper = MeshHelper.Polygon(.Quad);
+                const input_data = mesh_input_data.value.meshes[0];
+                const quads_by_subdiv = blk: {
+                    const encoded_vertices = input_data.frame_to_vertices[0];
+                    const input_vertices = MeshHelper.flipYZ(
+                        arena.allocator(),
+                        MeshHelper.decodeVertexDataFromHexidecimal(
+                            arena.allocator(),
+                            encoded_vertices,
+                        ),
+                    );
+                    var quads_by_subdiv: [max_subdiv + 1][]const subdiv.Quad = undefined;
+                    var mesh_result = try subdiv.Polygon(.Face).cmcSubdiv(arena.allocator(), input_vertices, input_data.polygons);
+                    quads_by_subdiv[0] = mesh_result.quads;
+                    var subdiv_count: u32 = 0;
+                    while (subdiv_count < max_subdiv) {
+                        mesh_result = try subdiv.Polygon(.Quad).cmcSubdiv(arena.allocator(), mesh_result.points, mesh_result.quads);
+                        subdiv_count += 1;
+                        quads_by_subdiv[subdiv_count] = mesh_result.quads;
+                    }
+                    break :blk quads_by_subdiv;
+                };
+                var frames = std.ArrayList(BakedAnimationMesh.Frame).init(self.allocator);
+                for (input_data.frame_to_vertices) |encoded_vertices| {
+                    try frames.append(blk: {
+                        const input_vertices = MeshHelper.flipYZ(
+                            self.allocator,
+                            MeshHelper.decodeVertexDataFromHexidecimal(
+                                arena.allocator(),
+                                encoded_vertices,
+                            ),
+                        );
+                        var mesh_result = try subdiv.Polygon(.Face).cmcSubdivOnlyPoints(self.allocator, input_vertices, input_data.polygons);
+                        var subdiv_count: u32 = 0;
+                        while (subdiv_count < max_subdiv) {
+                            mesh_result = try subdiv.Polygon(.Quad).cmcSubdivOnlyPoints(self.allocator, mesh_result, quads_by_subdiv[subdiv_count]);
+                            subdiv_count += 1;
+                        }
+                        break :blk BakedAnimationMesh.Frame{
+                            .position = MeshHelper.pointsToFloatSlice(allocator, mesh_result),
+                            .normal = MeshHelper.pointsToFloatSlice(
+                                allocator,
+                                mesh_helper.calculateNormals(arena.allocator(), mesh_result, quads_by_subdiv[quads_by_subdiv.len - 1]),
+                            ),
+                        };
+                    });
+                }
+
+                return .{
+                    .resources = .{
+                        .cat = .{
+                            .label = input_data.name,
+                            .indices = mesh_helper.toTriangleIndices(self.allocator, quads_by_subdiv[quads_by_subdiv.len - 1]),
+                            .frames = frames.items,
+                            .frame_rate = 24,
+                        },
+                    },
+                };
+            }
             pub fn game(self: @This(), props: struct {
                 settings: Settings,
                 game_time_seconds: ?f32,
+                resources: Resources,
                 input: ?struct { mouse_delta: zmath.Vec },
                 orbit_camera: OrbitCamera,
             }) !struct {
@@ -150,11 +204,19 @@ pub const interface = struct {
         node_graph_blueprint.Blueprint{
             .nodes = &[_]node_graph_blueprint.NodeGraphBlueprintEntry{
                 .{
+                    .name = "getResources",
+                    .function = "getResources",
+                    .input_links = &[_]node_graph_blueprint.InputLink{
+                        .{ .field = "load_the_data", .source = .{ .input_field = "load_the_data" } },
+                    },
+                },
+                .{
                     .name = "game",
                     .function = "game",
                     .input_links = &[_]node_graph_blueprint.InputLink{
                         .{ .field = "game_time_seconds", .source = .{ .input_field = "game_time_seconds" } },
                         .{ .field = "input", .source = .{ .input_field = "input" } },
+                        .{ .field = "resources", .source = .{ .node = .{ .name = "getResources", .field = "resources" } } },
                         .{ .field = "settings", .source = .{ .node = .{ .name = "changeSettings", .field = "settings" } } },
                         .{ .field = "orbit_camera", .source = .{ .store_field = "orbit_camera" } },
                     },
