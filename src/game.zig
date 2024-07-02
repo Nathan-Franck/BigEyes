@@ -148,18 +148,21 @@ pub const interface = struct {
                             .label = input_data.name,
                             .indices = mesh_helper.toTriangleIndices(self.allocator, quads_by_subdiv[quads_by_subdiv.len - 1]),
                             .frames = frames.items,
-                            .frame_rate = 23,
+                            .frame_rate = 24,
                         },
                     },
                 };
             }
-            pub fn game(self: @This(), props: struct {
-                settings: Settings,
-                resources: Resources,
-                game_time_seconds: f32,
-                input: ?struct { mouse_delta: zmath.Vec },
-                orbit_camera: OrbitCamera,
-            }) !struct {
+            pub fn game(
+                self: @This(),
+                props: struct {
+                    settings: Settings,
+                    resources: Resources,
+                    game_time_ms: f32, // WHY IS THIS NOT ACCEPTING INTEGERS
+                    input: ?struct { mouse_delta: zmath.Vec },
+                    orbit_camera: OrbitCamera,
+                },
+            ) !struct {
                 orbit_camera: OrbitCamera,
                 current_cat_mesh: Mesh,
                 world_matrix: zmath.Mat,
@@ -174,10 +177,12 @@ pub const interface = struct {
                     })
                 else
                     props.orbit_camera;
-                const current_frame_index = @as(u32, @intFromFloat(
-                    props.game_time_seconds / @as(f32, @floatFromInt(props.resources.cat.frame_rate)),
-                ));
-                const current_frame = props.resources.cat.frames[current_frame_index % props.resources.cat.frames.len];
+                // const current_frame_index = @mod(
+                //     props.game_time_ms * props.resources.cat.frame_rate / 1000,
+                //     props.resources.cat.frames.len,
+                // );
+                const current_frame_index = 0;
+                const current_frame = props.resources.cat.frames[current_frame_index];
                 return .{
                     .orbit_camera = orbit_camera,
                     .current_cat_mesh = Mesh{
@@ -221,7 +226,7 @@ pub const interface = struct {
                     .name = "game",
                     .function = "game",
                     .input_links = &[_]node_graph_blueprint.InputLink{
-                        .{ .field = "game_time_seconds", .source = .{ .input_field = "game_time_seconds" } },
+                        .{ .field = "game_time_ms", .source = .{ .input_field = "game_time_ms" } },
                         .{ .field = "input", .source = .{ .input_field = "input" } },
                         .{ .field = "resources", .source = .{ .node = .{ .name = "getResources", .field = "resources" } } },
                         .{ .field = "settings", .source = .{ .node = .{ .name = "changeSettings", .field = "settings" } } },

@@ -48,7 +48,7 @@ const { classes, encodedStyle } = declareStyle({
 // TODO - Get the error messages from the console showing up
 // https://stackoverflow.com/questions/6604192/showing-console-errors-and-alerts-in-a-div-inside-the-page
 
-let graphInputs: Parameters<typeof nodeGraph["call"]>[0] = { load_the_data: true, game_time_seconds: 0, user_changes: { resolution_update: { x: window.innerWidth, y: window.innerHeight } } };
+let graphInputs: Parameters<typeof nodeGraph["call"]>[0] = { load_the_data: true, game_time_ms: 0, user_changes: { resolution_update: { x: window.innerWidth, y: window.innerHeight } } };
 let updateRender: ((graphOutputs: NonNullable<GraphOutputs>) => () => void) | null = null
 
 function updateGraph(newInputs: typeof graphInputs) {
@@ -74,7 +74,7 @@ export function App() {
       setWindowSize({ width: canvasRef.current?.width || 0, height: canvasRef.current?.height || 0 });
       updateGraph({
         load_the_data: true,
-        game_time_seconds: Date.now() / 1000.0,
+        game_time_ms: Date.now(),
         user_changes: { resolution_update: { x: window.innerWidth, y: window.innerHeight } }
       });
     };
@@ -136,7 +136,7 @@ export function App() {
       });
     }
 
-    updateGraph({ game_time_seconds: 0, load_the_data: true });
+    updateGraph({ game_time_ms: Date.now(), load_the_data: true });
   }, []);
 
 
@@ -150,12 +150,14 @@ export function App() {
           ? currentMouse
           : { x: currentMouse.x - lastMousePosition.x, y: currentMouse.y - lastMousePosition.y }
         lastMousePosition = currentMouse;
-        if (event.buttons)
+        if (event.buttons) {
+          console.log(Date.now());
           updateGraph({
             load_the_data: true,
-            game_time_seconds: Date.now() / 1000,
+            game_time_ms: Date.now(),
             input: { mouse_delta: [mouseDelta.x, mouseDelta.y, 0, 0] },
           });
+        }
       }}></div>
     <canvas ref={canvasRef} class={classes.canvas} id="canvas" width={windowSize.width} height={windowSize.height}></canvas>
   </>)

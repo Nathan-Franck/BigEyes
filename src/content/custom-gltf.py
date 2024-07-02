@@ -151,6 +151,7 @@ with open(
         {
             # "actions": actions,
             # "armatures": armatures,
+            "framerate": bpy.context.scene.render.fps
             "nodes": nodes,
             "meshes": meshes,
         },
