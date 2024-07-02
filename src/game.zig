@@ -15,7 +15,7 @@ pub const Mesh = struct {
     indices: []const u32,
     position: []const f32,
     // color: []f32,
-    normals: []const f32,
+    normal: []const f32,
 };
 
 pub const BakedAnimationMesh = struct {
@@ -39,11 +39,6 @@ const hexColors = [_][3]f32{
 };
 
 pub const interface = struct {
-    const Axis = struct {
-        x: f32,
-        y: f32,
-        z: f32,
-    };
     const OrbitCamera = struct {
         position: zmath.Vec,
         rotation: zmath.Vec,
@@ -153,22 +148,24 @@ pub const interface = struct {
                             .label = input_data.name,
                             .indices = mesh_helper.toTriangleIndices(self.allocator, quads_by_subdiv[quads_by_subdiv.len - 1]),
                             .frames = frames.items,
-                            .frame_rate = 24,
+                            .frame_rate = 23,
                         },
                     },
                 };
             }
             pub fn game(self: @This(), props: struct {
                 settings: Settings,
-                game_time_seconds: ?f32,
                 resources: Resources,
+                game_time_seconds: f32,
                 input: ?struct { mouse_delta: zmath.Vec },
                 orbit_camera: OrbitCamera,
             }) !struct {
                 orbit_camera: OrbitCamera,
+                current_cat_mesh: Mesh,
                 world_matrix: zmath.Mat,
             } {
-                wasm_entry.dumpDebugLog(try std.fmt.allocPrint(self.allocator, "{}", .{props.settings.orbit_speed}));
+                _ = self;
+
                 const orbit_camera: OrbitCamera = if (props.input) |found_input|
                     utils.copyWith(props.orbit_camera, .{
                         .rotation = props.orbit_camera.rotation +
@@ -177,8 +174,18 @@ pub const interface = struct {
                     })
                 else
                     props.orbit_camera;
+                const current_frame_index = @as(u32, @intFromFloat(
+                    props.game_time_seconds / @as(f32, @floatFromInt(props.resources.cat.frame_rate)),
+                ));
+                const current_frame = props.resources.cat.frames[current_frame_index % props.resources.cat.frames.len];
                 return .{
                     .orbit_camera = orbit_camera,
+                    .current_cat_mesh = Mesh{
+                        .label = "cat",
+                        .indices = props.resources.cat.indices,
+                        .position = current_frame.position,
+                        .normal = current_frame.normal,
+                    },
                     .world_matrix = zmath.mul(
                         zmath.mul(
                             zmath.translationV(orbit_camera.position),
@@ -235,6 +242,7 @@ pub const interface = struct {
                 .{ .output_node = "changeSettings", .output_field = "settings", .system_field = "settings" },
             },
             .output = &[_]node_graph_blueprint.SystemSink{
+                .{ .output_node = "game", .output_field = "current_cat_mesh", .system_field = "current_cat_mesh" },
                 .{ .output_node = "game", .output_field = "orbit_camera", .system_field = "orbit_camera" },
                 .{ .output_node = "game", .output_field = "world_matrix", .system_field = "world_matrix" },
             },

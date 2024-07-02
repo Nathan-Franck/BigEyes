@@ -1,7 +1,9 @@
 zig-cache
+.zig-cache
 zig-out
 bin
 *.blend.json
+*.blend1
 
 # Logs
 logs

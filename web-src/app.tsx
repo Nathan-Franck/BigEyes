@@ -2,7 +2,7 @@ import './app.css'
 import { NodeGraph, GraphOutputs } from './nodeGraph';
 import { declareStyle } from './declareStyle';
 import { useEffect, useRef, useState } from 'preact/hooks'
-import { sliceToArray, callWasm } from './zigWasmInterface';
+import { sliceToArray } from './zigWasmInterface';
 import { Mat4, ShaderBuilder } from './shaderBuilder';
 
 const { classes, encodedStyle } = declareStyle({
@@ -45,12 +45,10 @@ const { classes, encodedStyle } = declareStyle({
   },
 });
 
-const resources = callWasm("getResources");
-
 // TODO - Get the error messages from the console showing up
 // https://stackoverflow.com/questions/6604192/showing-console-errors-and-alerts-in-a-div-inside-the-page
 
-let graphInputs: Parameters<typeof nodeGraph["call"]>[0] = { user_changes: { resolution_update: { x: window.innerWidth, y: window.innerHeight } } };
+let graphInputs: Parameters<typeof nodeGraph["call"]>[0] = { load_the_data: true, game_time_seconds: 0, user_changes: { resolution_update: { x: window.innerWidth, y: window.innerHeight } } };
 let updateRender: ((graphOutputs: NonNullable<GraphOutputs>) => () => void) | null = null
 
 function updateGraph(newInputs: typeof graphInputs) {
@@ -74,7 +72,11 @@ export function App() {
   useEffect(() => {
     const resizeHandler = () => {
       setWindowSize({ width: canvasRef.current?.width || 0, height: canvasRef.current?.height || 0 });
-      updateGraph({ user_changes: { resolution_update: { x: window.innerWidth, y: window.innerHeight } } });
+      updateGraph({
+        load_the_data: true,
+        game_time_seconds: Date.now() / 1000.0,
+        user_changes: { resolution_update: { x: window.innerWidth, y: window.innerHeight } }
+      });
     };
     window.addEventListener('resize', resizeHandler);
     return () => {
@@ -88,8 +90,6 @@ export function App() {
     const canvas = canvasRef.current;
     const gl = canvas.getContext('webgl2');
     if (!gl)
-      return;
-    if ("error" in resources)
       return;
     const coolMesh = ShaderBuilder.generateMaterial(gl, {
       mode: 'TRIANGLES',
@@ -128,15 +128,15 @@ export function App() {
       }
 
       ShaderBuilder.renderMaterial(gl, coolMesh, {
-        indices: ShaderBuilder.createElementBuffer(gl, sliceToArray.Uint32Array(resources.meshes[0].indices)),
-        position: ShaderBuilder.createBuffer(gl, sliceToArray.Float32Array(resources.meshes[0].position)),
-        normals: ShaderBuilder.createBuffer(gl, sliceToArray.Float32Array(resources.meshes[0].normals)),
+        indices: ShaderBuilder.createElementBuffer(gl, sliceToArray.Uint32Array(graphOutputs.current_cat_mesh.indices)),
+        position: ShaderBuilder.createBuffer(gl, sliceToArray.Float32Array(graphOutputs.current_cat_mesh.position)),
+        normals: ShaderBuilder.createBuffer(gl, sliceToArray.Float32Array(graphOutputs.current_cat_mesh.normal)),
         item_position: ShaderBuilder.createBuffer(gl, new Float32Array([0, 0, 0])),
         perspectiveMatrix: graphOutputs.world_matrix.flatMap(row => row) as Mat4,
       });
     }
 
-    updateGraph({ game_time_seconds: 0 });
+    updateGraph({ game_time_seconds: 0, load_the_data: true });
   }, []);
 
 
@@ -152,6 +152,7 @@ export function App() {
         lastMousePosition = currentMouse;
         if (event.buttons)
           updateGraph({
+            load_the_data: true,
             game_time_seconds: Date.now() / 1000,
             input: { mouse_delta: [mouseDelta.x, mouseDelta.y, 0, 0] },
           });
