@@ -137,6 +137,17 @@ export function App() {
     }
 
     updateGraph({ game_time_ms: Date.now(), load_the_data: true });
+
+    let animationRunning = true;
+    const intervalID = setInterval(() => {
+      if (!animationRunning)
+        clearInterval(intervalID);
+      if (document.hasFocus())
+        requestAnimationFrame(() => 
+        updateGraph({ game_time_ms: Date.now(), load_the_data: true }) );
+    }, 1000.0 / 24.0);
+
+    return () => animationRunning = false
   }, []);
 
 
@@ -151,7 +162,6 @@ export function App() {
           : { x: currentMouse.x - lastMousePosition.x, y: currentMouse.y - lastMousePosition.y }
         lastMousePosition = currentMouse;
         if (event.buttons) {
-          console.log(Date.now());
           updateGraph({
             load_the_data: true,
             game_time_ms: Date.now(),

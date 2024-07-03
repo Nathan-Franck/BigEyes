@@ -164,7 +164,7 @@ pub const interface = struct {
                 current_cat_mesh: Mesh,
                 world_matrix: zm.Mat,
             } {
-                // _ = self;
+                _ = self;
 
                 const orbit_camera: OrbitCamera = if (props.input) |found_input|
                     utils.copyWith(props.orbit_camera, .{
@@ -179,7 +179,6 @@ pub const interface = struct {
                     props.resources.cat.frames.len,
                 );
                 const current_frame = props.resources.cat.frames[@intCast(current_frame_index)];
-                wasm_entry.dumpDebugLog(try std.fmt.allocPrint(self.allocator, "Current framey - {}", .{props.game_time_ms}));
                 return .{
                     .orbit_camera = orbit_camera,
                     .current_cat_mesh = Mesh{
@@ -272,7 +271,6 @@ pub const interface = struct {
     ) !struct {
         outputs: ?MyNodeGraph.SystemOutputs,
     } {
-        wasm_entry.dumpDebugLog(try std.fmt.allocPrint(std.heap.page_allocator, "recieved: {}", .{inputs}));
         const outputs = try my_node_graph.update(inputs);
         // const send_outputs = true;
         const send_outputs = true;

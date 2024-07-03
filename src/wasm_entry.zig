@@ -79,7 +79,6 @@ fn callWithJsonErr(name_ptr: [*]const u8, name_len: usize, args_ptr: [*]const u8
         inline else => |fn_name| {
             const func = @field(game, @tagName(fn_name));
             var diagnostics = std.json.Diagnostics{};
-            dumpDebugLog(try std.fmt.allocPrint(allocator, "input text - {s}", .{args_string}));
             var scanner = std.json.Scanner.initCompleteInput(allocator, args_string);
             defer scanner.deinit();
             scanner.enableDiagnostics(&diagnostics);
