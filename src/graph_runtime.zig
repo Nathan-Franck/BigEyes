@@ -228,6 +228,7 @@ pub fn NodeGraph(comptime node_definitions: anytype, comptime graph: Blueprint) 
             var next_arena = std.heap.ArenaAllocator.init(self.allocator);
             const nodes = node_definitions{ .allocator = next_arena.allocator() };
             var hash_arena = std.heap.ArenaAllocator.init(self.allocator);
+            defer hash_arena.deinit();
 
             // Process all nodes...
             inline for (node_order) |node_index| {
