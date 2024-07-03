@@ -222,14 +222,20 @@ pub fn NodeGraph(comptime node_definitions: anytype, comptime graph: Blueprint) 
         allocator: std.mem.Allocator,
         arena: ?std.heap.ArenaAllocator = null,
         store: SystemStore,
+        nodes_outputs: NodeOutputs = undefined,
+        node_last_hash: [graph.nodes.len]u32 = .{0} ** graph.nodes.len,
         pub fn update(self: *Self, inputs: SystemInputs) !SystemOutputs {
 
             // Use the previous arena if it exists, otherwise create a new one.
-            var arena = if (self.arena) |arena| arena else std.heap.ArenaAllocator.init(self.allocator);
+            var arena = if (self.arena) |arena|
+                arena
+            else
+                std.heap.ArenaAllocator.init(self.allocator);
             const nodes = node_definitions{ .allocator = arena.allocator() };
 
+            var hash_arena = std.heap.ArenaAllocator.init(self.allocator);
+
             // Process all nodes...
-            var nodes_outputs: NodeOutputs = undefined;
             inline for (node_order) |node_index| {
                 const node = graph.nodes[node_index];
                 const node_defn = @field(node_definitions, node.name);
@@ -244,7 +250,7 @@ pub fn NodeGraph(comptime node_definitions: anytype, comptime graph: Blueprint) 
                         @field(node_inputs, link.field) = @field(self.store, store_field);
                     },
                     .node => |node_blueprint| {
-                        const node_outputs = @field(nodes_outputs, node_blueprint.name);
+                        const node_outputs = @field(self.nodes_outputs, node_blueprint.name);
                         const node_output = @field(node_outputs, node_blueprint.field);
                         const InputType = @TypeOf(node_output);
                         const OutputType = @TypeOf(@field(node_inputs, link.field));
@@ -252,18 +258,35 @@ pub fn NodeGraph(comptime node_definitions: anytype, comptime graph: Blueprint) 
                             AttemptEventCast(InputType, OutputType, node_output);
                     },
                 };
-                const node_output = @call(
-                    .auto,
-                    @field(node_definitions, node.function),
-                    if (@typeInfo(@TypeOf(@field(node_definitions, node.function))).Fn.params.len == 2)
-                        .{ nodes, node_inputs }
-                    else
-                        .{node_inputs},
-                );
+                const inputs_changed = blk: {
+                    var hasher = std.hash.Adler32.init();
+                    const hashable_inputs = utils.deepHashableStruct(@TypeOf(node_inputs), 1000, hash_arena.allocator(), node_inputs);
+                    defer _ = hash_arena.reset(.retain_capacity);
+                    std.hash.autoHashStrat(&hasher, hashable_inputs, .DeepRecursive);
+                    defer self.node_last_hash[node_index] = hasher.final();
+                    break :blk hasher.final() != self.node_last_hash[node_index];
+                };
 
-                @field(nodes_outputs, node.name) = switch (@typeInfo(@TypeOf(node_output))) {
-                    else => node_output,
-                    .ErrorUnion => try node_output,
+                @field(self.nodes_outputs, node.name) = if (!inputs_changed)
+                    (try utils.deepClone(
+                        @TypeOf(@field(self.nodes_outputs, node.name)),
+                        arena.allocator(),
+                        @field(self.nodes_outputs, node.name),
+                    )).value
+                else blk: {
+                    const node_output =
+                        @call(
+                        .auto,
+                        @field(node_definitions, node.function),
+                        if (@typeInfo(@TypeOf(@field(node_definitions, node.function))).Fn.params.len == 2)
+                            .{ nodes, node_inputs }
+                        else
+                            .{node_inputs},
+                    );
+                    break :blk switch (@typeInfo(@TypeOf(node_output))) {
+                        else => node_output,
+                        .ErrorUnion => try node_output,
+                    };
                 };
             }
 
@@ -273,7 +296,7 @@ pub fn NodeGraph(comptime node_definitions: anytype, comptime graph: Blueprint) 
 
             // Copy over new store values...
             inline for (graph.store) |store_defn| {
-                const node_result = @field(nodes_outputs, store_defn.output_node);
+                const node_result = @field(self.nodes_outputs, store_defn.output_node);
                 const result = @field(node_result, store_defn.output_field);
                 @field(self.store, store_defn.system_field) =
                     (try utils.deepClone(@TypeOf(result), next_arena.allocator(), result)).value;
@@ -282,7 +305,7 @@ pub fn NodeGraph(comptime node_definitions: anytype, comptime graph: Blueprint) 
             // Output from system from select nodes...
             var system_outputs: SystemOutputs = undefined;
             inline for (graph.output) |output_defn| {
-                const node_outputs = @field(nodes_outputs, output_defn.output_node);
+                const node_outputs = @field(self.nodes_outputs, output_defn.output_node);
                 const result = @field(node_outputs, output_defn.output_field);
                 @field(system_outputs, output_defn.system_field) =
                     (try utils.deepClone(@TypeOf(result), next_arena.allocator(), result)).value;

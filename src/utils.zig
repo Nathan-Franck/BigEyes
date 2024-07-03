@@ -154,3 +154,132 @@ test "fieldNamesToStrings" {
     try std.testing.expect(std.mem.eql(u8, result[0], "a"));
     try std.testing.expect(std.mem.eql(u8, result[1], "b"));
 }
+
+pub fn deepHashableStruct(t: type, quantization: u32, allocator: std.mem.Allocator, data: t) !DeepHashableStruct(t).type {
+    if (!DeepHashableStruct(t).changed) {
+        return data;
+    }
+    return switch (@typeInfo(t)) {
+        else => data,
+        .Float => @intFromFloat(data * @as(t, @floatFromInt(quantization))),
+        .ErrorUnion => try deepHashableStruct(try data),
+        .Optional => |op| if (data) |non_null_data| try deepHashableStruct(op.child, quantization, allocator, non_null_data) else null,
+        .Union => |u| blk: {
+            inline for (u.fields, 0..) |field, i| if (i == @intFromEnum(data)) {
+                break :blk @unionInit(
+                    DeepHashableStruct(t).type,
+                    field.name,
+                    try deepHashableStruct(field.type, quantization, allocator, @field(data, field.name)),
+                );
+            };
+            @panic("awful bonus");
+        },
+        .Struct => |s| blk: {
+            var new_data: DeepHashableStruct(t).type = undefined;
+            inline for (s.fields) |field| {
+                const result = try deepHashableStruct(field.type, quantization, allocator, @field(data, field.name));
+                @field(new_data, field.name) = result;
+            }
+            break :blk new_data;
+        },
+        .Array => |a| blk: {
+            var elements: [a.len]DeepHashableStruct(a.child).type = undefined;
+            for (data, 0..) |elem, idx| {
+                elements[idx] = try deepHashableStruct(a.child, quantization, allocator, elem);
+            }
+            break :blk elements;
+        },
+        .Vector => |a| blk: {
+            var elements: @Vector(a.len, DeepHashableStruct(a.child).type) = undefined;
+            for (0..a.len) |idx| {
+                elements[idx] = try deepHashableStruct(a.child, quantization, allocator, data[idx]);
+            }
+            break :blk elements;
+        },
+        .Pointer => |p| blk: {
+            var elements = std.ArrayList(DeepHashableStruct(p.child).type).init(allocator);
+            for (data) |elem| {
+                try elements.append(try deepHashableStruct(p.child, quantization, allocator, elem));
+            }
+            break :blk elements.items;
+        },
+    };
+}
+
+pub fn TypedArrayReference(type_enum: type) type {
+    return struct {
+        type: type_enum,
+        ptr: usize,
+        len: usize,
+    };
+}
+
+pub fn DeepHashableStruct(t: type) struct { type: type, changed: bool = false } {
+    return switch (@typeInfo(t)) {
+        else => .{ .type = t },
+        .Float => .{ .type = u64, .changed = true },
+        .ErrorUnion => |eu| DeepHashableStruct(eu.payload),
+        .Optional => |op| blk: {
+            const result = DeepHashableStruct(op.child);
+            break :blk if (!result.changed) .{ .type = t } else .{ .changed = true, .type = ?result.type };
+        },
+        .Union => |u| blk: {
+            var fields: []const std.builtin.Type.UnionField = &.{};
+            var changed = false;
+            for (u.fields) |field| {
+                const new_field = DeepHashableStruct(field.type);
+                changed = changed or new_field.changed;
+                fields = fields ++ .{copyWith(field, .{
+                    .type = new_field.type,
+                })};
+            }
+            break :blk if (!changed)
+                .{ .type = t }
+            else
+                .{ .changed = true, .type = @Type(.{ .Union = copyWith(u, .{ .fields = fields }) }) };
+        },
+        .Struct => |s| blk: {
+            var fields: []const std.builtin.Type.StructField = &.{};
+            var changed = false;
+            for (s.fields) |field| {
+                const new_field = DeepHashableStruct(field.type);
+                changed = changed or new_field.changed;
+                fields = fields ++ .{std.builtin.Type.StructField{
+                    .is_comptime = field.is_comptime,
+                    .name = field.name,
+                    .type = new_field.type,
+                    .alignment = @alignOf(new_field.type),
+                    .default_value = if (new_field.type == field.type)
+                        field.default_value
+                    else
+                        null,
+                }};
+            }
+            break :blk if (!changed)
+                .{ .type = t }
+            else
+                .{ .changed = true, .type = @Type(.{ .Struct = copyWith(s, .{ .decls = &[_]std.builtin.Type.Declaration{}, .fields = fields }) }) };
+        },
+        .Vector => |a| blk: {
+            const child = DeepHashableStruct(a.child);
+            break :blk if (!child.changed)
+                .{ .type = t }
+            else
+                .{ .changed = true, .type = @Type(.{ .Vector = .{ .len = a.len, .child = child.type } }) };
+        },
+        .Array => |a| blk: {
+            const child = DeepHashableStruct(a.child);
+            break :blk if (!child.changed)
+                .{ .type = t }
+            else
+                .{ .changed = true, .type = @Type(.{ .Array = .{ .len = a.len, .sentinel = a.sentinel, .child = child.type } }) };
+        },
+        .Pointer => |p| blk: {
+            const child = DeepHashableStruct(p.child);
+            break :blk if (!child.changed)
+                .{ .type = t }
+            else
+                .{ .changed = true, .type = @Type(.{ .Pointer = copyWith(p, .{ .child = child.type }) }) };
+        },
+    };
+}
