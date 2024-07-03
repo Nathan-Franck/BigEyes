@@ -220,19 +220,13 @@ pub fn NodeGraph(comptime node_definitions: anytype, comptime graph: Blueprint) 
             } });
         };
         allocator: std.mem.Allocator,
-        arena: ?std.heap.ArenaAllocator = null,
+        previous_arena: ?std.heap.ArenaAllocator = null,
         store: SystemStore,
         nodes_outputs: NodeOutputs = undefined,
         node_last_hash: [graph.nodes.len]u32 = .{0} ** graph.nodes.len,
         pub fn update(self: *Self, inputs: SystemInputs) !SystemOutputs {
-
-            // Use the previous arena if it exists, otherwise create a new one.
-            var arena = if (self.arena) |arena|
-                arena
-            else
-                std.heap.ArenaAllocator.init(self.allocator);
-            const nodes = node_definitions{ .allocator = arena.allocator() };
-
+            var next_arena = std.heap.ArenaAllocator.init(self.allocator);
+            const nodes = node_definitions{ .allocator = next_arena.allocator() };
             var hash_arena = std.heap.ArenaAllocator.init(self.allocator);
 
             // Process all nodes...
@@ -260,17 +254,20 @@ pub fn NodeGraph(comptime node_definitions: anytype, comptime graph: Blueprint) 
                 };
                 const inputs_changed = blk: {
                     var hasher = std.hash.Adler32.init();
+
                     const hashable_inputs = utils.deepHashableStruct(@TypeOf(node_inputs), 1000, hash_arena.allocator(), node_inputs);
                     defer _ = hash_arena.reset(.retain_capacity);
+
                     std.hash.autoHashStrat(&hasher, hashable_inputs, .DeepRecursive);
                     defer self.node_last_hash[node_index] = hasher.final();
+
                     break :blk hasher.final() != self.node_last_hash[node_index];
                 };
 
                 @field(self.nodes_outputs, node.name) = if (!inputs_changed)
                     (try utils.deepClone(
                         @TypeOf(@field(self.nodes_outputs, node.name)),
-                        arena.allocator(),
+                        next_arena.allocator(),
                         @field(self.nodes_outputs, node.name),
                     )).value
                 else blk: {
@@ -290,10 +287,6 @@ pub fn NodeGraph(comptime node_definitions: anytype, comptime graph: Blueprint) 
                 };
             }
 
-            // Start the next arena!
-            var next_arena = std.heap.ArenaAllocator.init(self.allocator);
-            self.arena = next_arena;
-
             // Copy over new store values...
             inline for (graph.store) |store_defn| {
                 const node_result = @field(self.nodes_outputs, store_defn.output_node);
@@ -312,7 +305,9 @@ pub fn NodeGraph(comptime node_definitions: anytype, comptime graph: Blueprint) 
             }
 
             // Free the previous arena!
-            arena.deinit();
+            if (self.previous_arena) |previous_arena|
+                previous_arena.deinit();
+            self.previous_arena = next_arena;
 
             return system_outputs;
         }
