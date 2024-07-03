@@ -79,12 +79,13 @@ fn callWithJsonErr(name_ptr: [*]const u8, name_len: usize, args_ptr: [*]const u8
         inline else => |fn_name| {
             const func = @field(game, @tagName(fn_name));
             var diagnostics = std.json.Diagnostics{};
+            dumpDebugLog(try std.fmt.allocPrint(allocator, "input text - {s}", .{args_string}));
             var scanner = std.json.Scanner.initCompleteInput(allocator, args_string);
             defer scanner.deinit();
             scanner.enableDiagnostics(&diagnostics);
 
             const args = std.json.parseFromTokenSource(Args(func), allocator, &scanner, .{}) catch |err| {
-                dumpError(try std.fmt.allocPrint(allocator, "Something in here isn't parsing right: {s}", .{args_string[0..@intCast(diagnostics.getByteOffset())]}));
+                dumpDebugLog(try std.fmt.allocPrint(allocator, "Something in here isn't parsing right: {s}", .{args_string[0..@intCast(diagnostics.getByteOffset())]}));
                 return err;
             };
             const result = try @call(.auto, func, args.value);

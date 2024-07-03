@@ -6,7 +6,7 @@ const typeDefinitions = @import("./type_definitions.zig");
 const subdiv = @import("./subdiv.zig");
 const MeshHelper = @import("./MeshHelper.zig");
 const MeshSpec = @import("./MeshSpec.zig");
-const zmath = @import("./zmath/main.zig");
+const zm = @import("./zmath/main.zig");
 const wasm_entry = @import("./wasm_entry.zig");
 const utils = @import("./utils.zig");
 
@@ -40,8 +40,8 @@ const hexColors = [_][3]f32{
 
 pub const interface = struct {
     const OrbitCamera = struct {
-        position: zmath.Vec,
-        rotation: zmath.Vec,
+        position: zm.Vec,
+        rotation: zm.Vec,
         track_distance: f32,
     };
     const PixelPoint = struct { x: u32, y: u32 };
@@ -153,36 +153,33 @@ pub const interface = struct {
                     },
                 };
             }
-            pub fn game(
-                self: @This(),
-                props: struct {
-                    settings: Settings,
-                    resources: Resources,
-                    game_time_ms: f32, // WHY IS THIS NOT ACCEPTING INTEGERS
-                    input: ?struct { mouse_delta: zmath.Vec },
-                    orbit_camera: OrbitCamera,
-                },
-            ) !struct {
+            pub fn game(self: @This(), props: struct {
+                settings: Settings,
+                resources: Resources,
+                game_time_ms: u64,
+                input: ?struct { mouse_delta: zm.Vec },
+                orbit_camera: OrbitCamera,
+            }) !struct {
                 orbit_camera: OrbitCamera,
                 current_cat_mesh: Mesh,
-                world_matrix: zmath.Mat,
+                world_matrix: zm.Mat,
             } {
-                _ = self;
+                // _ = self;
 
                 const orbit_camera: OrbitCamera = if (props.input) |found_input|
                     utils.copyWith(props.orbit_camera, .{
                         .rotation = props.orbit_camera.rotation +
                             found_input.mouse_delta *
-                            @as(zmath.Vec, @splat(-props.settings.orbit_speed)),
+                            @as(zm.Vec, @splat(-props.settings.orbit_speed)),
                     })
                 else
                     props.orbit_camera;
-                // const current_frame_index = @mod(
-                //     props.game_time_ms * props.resources.cat.frame_rate / 1000,
-                //     props.resources.cat.frames.len,
-                // );
-                const current_frame_index = 0;
-                const current_frame = props.resources.cat.frames[current_frame_index];
+                const current_frame_index = @mod(
+                    props.game_time_ms * props.resources.cat.frame_rate / 1000,
+                    props.resources.cat.frames.len,
+                );
+                const current_frame = props.resources.cat.frames[@intCast(current_frame_index)];
+                wasm_entry.dumpDebugLog(try std.fmt.allocPrint(self.allocator, "Current framey - {}", .{props.game_time_ms}));
                 return .{
                     .orbit_camera = orbit_camera,
                     .current_cat_mesh = Mesh{
@@ -191,18 +188,18 @@ pub const interface = struct {
                         .position = current_frame.position,
                         .normal = current_frame.normal,
                     },
-                    .world_matrix = zmath.mul(
-                        zmath.mul(
-                            zmath.translationV(orbit_camera.position),
-                            zmath.mul(
-                                zmath.mul(
-                                    zmath.matFromRollPitchYaw(0, orbit_camera.rotation[0], 0),
-                                    zmath.matFromRollPitchYaw(orbit_camera.rotation[1], 0, 0),
+                    .world_matrix = zm.mul(
+                        zm.mul(
+                            zm.translationV(orbit_camera.position),
+                            zm.mul(
+                                zm.mul(
+                                    zm.matFromRollPitchYaw(0, orbit_camera.rotation[0], 0),
+                                    zm.matFromRollPitchYaw(orbit_camera.rotation[1], 0, 0),
                                 ),
-                                zmath.translationV(zmath.loadArr3(.{ 0.0, 0.0, orbit_camera.track_distance })),
+                                zm.translationV(zm.loadArr3(.{ 0.0, 0.0, orbit_camera.track_distance })),
                             ),
                         ),
-                        zmath.perspectiveFovLh(
+                        zm.perspectiveFovLh(
                             0.25 * 3.141569,
                             @as(f32, @floatFromInt(props.settings.render_resolution.x)) /
                                 @as(f32, @floatFromInt(props.settings.render_resolution.y)),
@@ -275,6 +272,7 @@ pub const interface = struct {
     ) !struct {
         outputs: ?MyNodeGraph.SystemOutputs,
     } {
+        wasm_entry.dumpDebugLog(try std.fmt.allocPrint(std.heap.page_allocator, "recieved: {}", .{inputs}));
         const outputs = try my_node_graph.update(inputs);
         // const send_outputs = true;
         const send_outputs = true;
