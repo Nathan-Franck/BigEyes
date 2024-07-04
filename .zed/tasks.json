@@ -1,0 +1,19 @@
+// Static tasks configuration.
+//
+// Example:
+[
+  {
+    "label": "Build zig",
+    "command": "time zig build wasm",
+    "use_new_terminal": false,
+    "allow_concurrent_runs": false,
+    "reveal": "always"
+  },
+  {
+    "label": "Run web server",
+    "command": "bun dev",
+    "use_new_terminal": true,
+    "allow_concurrent_runs": false,
+    "reveal": "always"
+  }
+]
