@@ -2,6 +2,7 @@ const std = @import("std");
 const Blueprint = @import("./interactive_node_builder_blueprint.zig").Blueprint;
 const NodeDefinitions = @import("./node_graph_blueprint_nodes.zig");
 const utils = @import("./utils.zig");
+const wasm_entry = @import("./wasm_entry.zig");
 
 const Input = struct {
     name: []const u8,
@@ -63,44 +64,23 @@ pub fn NodeGraph(comptime node_definitions: anytype, comptime graph: Blueprint) 
         } });
     };
     const NodesDirtyFlags = build_type: {
-        const node_outputs_dummy: NodeOutputs = undefined;
-        comptime var node_dirty_flag_fields: []const std.builtin.Type.StructField = &.{};
+        comptime var fields: []const std.builtin.Type.StructField = &.{};
         inline for (graph.nodes) |node| {
-            const node_defn = @TypeOf(@field(node_outputs_dummy, node.name));
-            const dirty_flag_fields = build_sub_type: {
-                comptime var dirty_flag_fields: []const std.builtin.Type.StructField = &.{};
-                inline for (@typeInfo(node_defn).Struct.fields) |field| {
-                    dirty_flag_fields = comptime dirty_flag_fields ++ .{.{
-                        .name = field.name,
-                        .type = bool,
-                        .default_value = null,
-                        .is_comptime = false,
-                        .alignment = @alignOf(bool),
-                    }};
-                }
-                break :build_sub_type @Type(std.builtin.Type{ .Struct = .{
-                    .layout = .auto,
-                    .fields = dirty_flag_fields,
-                    .decls = &.{},
-                    .is_tuple = false,
-                } });
-            };
-            node_dirty_flag_fields = comptime node_dirty_flag_fields ++ .{.{
+            fields = comptime fields ++ .{.{
                 .name = node.name[0.. :0],
-                .type = dirty_flag_fields,
+                .type = bool,
                 .default_value = null,
                 .is_comptime = false,
-                .alignment = @alignOf(dirty_flag_fields),
+                .alignment = @alignOf(bool),
             }};
         }
         break :build_type @Type(std.builtin.Type{ .Struct = .{
             .layout = .auto,
-            .fields = node_dirty_flag_fields,
+            .fields = fields,
             .decls = &.{},
             .is_tuple = false,
         } });
     };
-
     const node_order = precalculate: {
         var max_node_priority: u16 = 0;
         var node_priorities = [_]u16{0} ** graph.nodes.len;
@@ -156,7 +136,7 @@ pub fn NodeGraph(comptime node_definitions: anytype, comptime graph: Blueprint) 
     const Graph = struct {
         const Self = @This();
         pub const SystemInputs = build_type: {
-            var system_input_fields: []const std.builtin.Type.StructField = &.{};
+            var fields: []const std.builtin.Type.StructField = &.{};
             for (graph.nodes) |node|
                 for (node.input_links) |link| switch (link.source) {
                     else => {},
@@ -166,7 +146,7 @@ pub fn NodeGraph(comptime node_definitions: anytype, comptime graph: Blueprint) 
                             if (std.mem.eql(u8, field.name, input_field)) break field.type else continue
                         else
                             @panic("fancy serve"); // TODO: Provide a useful compiler error about how blueprint and node defn's disagree.
-                        system_input_fields = system_input_fields ++ for (system_input_fields) |system_input|
+                        fields = fields ++ for (fields) |system_input|
                             if (std.mem.eql(u8, system_input.name, input_field)) break .{} else continue
                         else
                             .{std.builtin.Type.StructField{
@@ -186,13 +166,38 @@ pub fn NodeGraph(comptime node_definitions: anytype, comptime graph: Blueprint) 
                 };
             break :build_type @Type(.{ .Struct = .{
                 .layout = .auto,
-                .fields = system_input_fields,
+                .fields = fields,
+                .decls = &.{},
+                .is_tuple = false,
+            } });
+        };
+        pub const SystemInputsDirtyFlags = build_type: {
+            var fields: []const std.builtin.Type.StructField = &.{};
+            for (graph.nodes) |node|
+                for (node.input_links) |link| switch (link.source) {
+                    else => {},
+                    .input_field => |input_field| {
+                        fields = fields ++ for (fields) |system_input_dirty|
+                            if (std.mem.eql(u8, system_input_dirty.name, input_field)) break .{} else continue
+                        else
+                            .{std.builtin.Type.StructField{
+                                .name = input_field[0.. :0],
+                                .type = bool,
+                                .default_value = null,
+                                .is_comptime = false,
+                                .alignment = @alignOf(bool),
+                            }};
+                    },
+                };
+            break :build_type @Type(.{ .Struct = .{
+                .layout = .auto,
+                .fields = fields,
                 .decls = &.{},
                 .is_tuple = false,
             } });
         };
         pub const SystemOutputs = build_type: {
-            var system_output_fields: []const std.builtin.Type.StructField = &.{};
+            var fields: []const std.builtin.Type.StructField = &.{};
             for (graph.output) |output_defn| {
                 const name = output_defn.system_field;
                 const node_id = output_defn.output_node;
@@ -209,7 +214,7 @@ pub fn NodeGraph(comptime node_definitions: anytype, comptime graph: Blueprint) 
                     if (std.mem.eql(u8, field.name, output_defn.system_field)) break field.type else continue
                 else
                     @panic("arced virus"); // TODO: Provide a useful compiler error about how blueprint and node defn's disagree.
-                system_output_fields = system_output_fields ++ .{.{
+                fields = fields ++ .{.{
                     .name = name[0.. :0],
                     .type = field_type,
                     .default_value = null,
@@ -219,7 +224,7 @@ pub fn NodeGraph(comptime node_definitions: anytype, comptime graph: Blueprint) 
             }
             break :build_type @Type(.{ .Struct = .{
                 .layout = .auto,
-                .fields = system_output_fields,
+                .fields = fields,
                 .decls = &.{},
                 .is_tuple = false,
             } });
@@ -261,9 +266,10 @@ pub fn NodeGraph(comptime node_definitions: anytype, comptime graph: Blueprint) 
         allocator: std.mem.Allocator,
         store: SystemStore,
         store_arena: std.heap.ArenaAllocator,
+        system_inputs: ?SystemInputs,
+        nodes_arenas: [graph.nodes.len]std.heap.ArenaAllocator,
         nodes_outputs: NodeOutputs,
         nodes_dirty_flags: NodesDirtyFlags,
-        nodes_arenas: [graph.nodes.len]std.heap.ArenaAllocator,
         pub fn init(props: struct {
             allocator: std.mem.Allocator,
             store: SystemStore,
@@ -272,8 +278,9 @@ pub fn NodeGraph(comptime node_definitions: anytype, comptime graph: Blueprint) 
                 .allocator = props.allocator,
                 .store = props.store,
                 .store_arena = std.heap.ArenaAllocator.init(props.allocator),
-                .nodes_outputs = undefined,
+                .system_inputs = null,
                 .nodes_arenas = undefined,
+                .nodes_outputs = undefined,
                 .nodes_dirty_flags = undefined,
             };
             for (graph.nodes, 0..) |_, index| {
@@ -283,6 +290,17 @@ pub fn NodeGraph(comptime node_definitions: anytype, comptime graph: Blueprint) 
         }
         pub fn update(self: *Self, inputs: SystemInputs) !SystemOutputs {
 
+            // Check inputs for changes...
+            var inputs_dirty: SystemInputsDirtyFlags = undefined;
+            inline for (@typeInfo(SystemInputs).Struct.fields) |field| {
+                const field_name = field.name;
+                @field(inputs_dirty, field_name) = if (self.system_inputs) |previous_inputs|
+                    !std.meta.eql(@field(inputs, field_name), @field(previous_inputs, field_name))
+                else
+                    true;
+            }
+            self.system_inputs = inputs;
+
             // Process all nodes...
             inline for (node_order) |node_index| {
                 const node = graph.nodes[node_index];
@@ -290,9 +308,14 @@ pub fn NodeGraph(comptime node_definitions: anytype, comptime graph: Blueprint) 
                 const node_params = @typeInfo(@TypeOf(node_defn)).Fn.params;
                 const NodeInputs = node_params[node_params.len - 1].type.?;
                 var node_inputs: NodeInputs = undefined;
+                var dirty = false;
                 inline for (node.input_links) |link| switch (link.source) {
                     .input_field => |input_field| {
                         @field(node_inputs, link.field) = @field(inputs, input_field);
+                        if (@field(inputs_dirty, input_field)) {
+                            wasm_entry.dumpDebugLog(try std.fmt.allocPrint(self.allocator, "Found a dirty field! {s}", .{input_field}));
+                            dirty = true;
+                        }
                     },
                     .store_field => |store_field| {
                         @field(node_inputs, link.field) = @field(self.store, store_field);
@@ -304,11 +327,15 @@ pub fn NodeGraph(comptime node_definitions: anytype, comptime graph: Blueprint) 
                         const OutputType = @TypeOf(@field(node_inputs, link.field));
                         @field(node_inputs, link.field) =
                             AttemptEventCast(InputType, OutputType, node_output);
+                        if (@field(self.nodes_dirty_flags, node_blueprint.name)) {
+                            dirty = true;
+                        }
                     },
                 };
 
-                const inputs_changed = true; // TODO - dirty checks from inputs!
-                @field(self.nodes_outputs, node.name) = if (!inputs_changed)
+                @field(self.nodes_dirty_flags, node.name) = dirty;
+
+                @field(self.nodes_outputs, node.name) = if (!dirty)
                     @field(self.nodes_outputs, node.name)
                 else blk: {
                     _ = self.nodes_arenas[node_index].reset(.retain_capacity);
