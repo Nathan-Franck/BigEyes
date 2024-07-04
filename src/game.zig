@@ -52,13 +52,12 @@ pub const interface = struct {
                 orbit_speed: f32,
                 render_resolution: PixelPoint,
             };
-            pub fn changeSettings(self: @This(), props: struct {
+            pub fn changeSettings(props: struct {
                 settings: Settings,
                 user_changes: ?union(enum) {
                     resolution_update: PixelPoint,
                 },
             }) !struct { settings: Settings } {
-                _ = self;
                 var settings = props.settings;
                 if (props.user_changes) |c| {
                     switch (c) {
@@ -76,12 +75,12 @@ pub const interface = struct {
                 cat: BakedAnimationMesh,
             };
 
-            pub fn getResources(self: @This(), props: struct {
+            pub fn getResources(arena: *std.heap.ArenaAllocator, props: struct {
                 load_the_data: bool,
             }) !struct {
                 resources: Resources,
             } {
-                const allocator = self.allocator;
+                const allocator = arena.allocator();
                 _ = props;
 
                 const max_subdiv = 1;
@@ -92,8 +91,6 @@ pub const interface = struct {
                     wasm_entry.dumpDebugLog(std.fmt.allocPrint(allocator, "Failed to parse JSON: {}", .{err}) catch unreachable);
                     return err;
                 };
-                var arena = std.heap.ArenaAllocator.init(allocator);
-                defer arena.deinit();
                 const mesh_helper = MeshHelper.Polygon(.Quad);
                 const input_data = mesh_input_data.value.meshes[0];
                 const quads_by_subdiv = blk: {
@@ -116,20 +113,20 @@ pub const interface = struct {
                     }
                     break :blk quads_by_subdiv;
                 };
-                var frames = std.ArrayList(BakedAnimationMesh.Frame).init(self.allocator);
+                var frames = std.ArrayList(BakedAnimationMesh.Frame).init(allocator);
                 for (input_data.frame_to_vertices) |encoded_vertices| {
                     try frames.append(blk: {
                         const input_vertices = MeshHelper.flipYZ(
-                            self.allocator,
+                            allocator,
                             MeshHelper.decodeVertexDataFromHexidecimal(
                                 arena.allocator(),
                                 encoded_vertices,
                             ),
                         );
-                        var mesh_result = try subdiv.Polygon(.Face).cmcSubdivOnlyPoints(self.allocator, input_vertices, input_data.polygons);
+                        var mesh_result = try subdiv.Polygon(.Face).cmcSubdivOnlyPoints(allocator, input_vertices, input_data.polygons);
                         var subdiv_count: u32 = 0;
                         while (subdiv_count < max_subdiv) {
-                            mesh_result = try subdiv.Polygon(.Quad).cmcSubdivOnlyPoints(self.allocator, mesh_result, quads_by_subdiv[subdiv_count]);
+                            mesh_result = try subdiv.Polygon(.Quad).cmcSubdivOnlyPoints(allocator, mesh_result, quads_by_subdiv[subdiv_count]);
                             subdiv_count += 1;
                         }
                         break :blk BakedAnimationMesh.Frame{
@@ -146,14 +143,15 @@ pub const interface = struct {
                     .resources = .{
                         .cat = .{
                             .label = input_data.name,
-                            .indices = mesh_helper.toTriangleIndices(self.allocator, quads_by_subdiv[quads_by_subdiv.len - 1]),
+                            .indices = mesh_helper.toTriangleIndices(allocator, quads_by_subdiv[quads_by_subdiv.len - 1]),
                             .frames = frames.items,
                             .frame_rate = 24,
                         },
                     },
                 };
             }
-            pub fn game(self: @This(), props: struct {
+
+            pub fn game(arena: *std.heap.ArenaAllocator, props: struct {
                 settings: Settings,
                 resources: Resources,
                 game_time_ms: u64,
@@ -164,7 +162,7 @@ pub const interface = struct {
                 current_cat_mesh: Mesh,
                 world_matrix: zm.Mat,
             } {
-                _ = self;
+                _ = arena;
 
                 const orbit_camera: OrbitCamera = if (props.input) |found_input|
                     utils.copyWith(props.orbit_camera, .{

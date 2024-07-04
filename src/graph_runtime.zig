@@ -62,6 +62,45 @@ pub fn NodeGraph(comptime node_definitions: anytype, comptime graph: Blueprint) 
             .is_tuple = false,
         } });
     };
+    const NodesDirtyFlags = build_type: {
+        const node_outputs_dummy: NodeOutputs = undefined;
+        comptime var node_dirty_flag_fields: []const std.builtin.Type.StructField = &.{};
+        inline for (graph.nodes) |node| {
+            const node_defn = @TypeOf(@field(node_outputs_dummy, node.name));
+            const dirty_flag_fields = build_sub_type: {
+                comptime var dirty_flag_fields: []const std.builtin.Type.StructField = &.{};
+                inline for (@typeInfo(node_defn).Struct.fields) |field| {
+                    dirty_flag_fields = comptime dirty_flag_fields ++ .{.{
+                        .name = field.name,
+                        .type = bool,
+                        .default_value = null,
+                        .is_comptime = false,
+                        .alignment = @alignOf(bool),
+                    }};
+                }
+                break :build_sub_type @Type(std.builtin.Type{ .Struct = .{
+                    .layout = .auto,
+                    .fields = dirty_flag_fields,
+                    .decls = &.{},
+                    .is_tuple = false,
+                } });
+            };
+            node_dirty_flag_fields = comptime node_dirty_flag_fields ++ .{.{
+                .name = node.name[0.. :0],
+                .type = dirty_flag_fields,
+                .default_value = null,
+                .is_comptime = false,
+                .alignment = @alignOf(dirty_flag_fields),
+            }};
+        }
+        break :build_type @Type(std.builtin.Type{ .Struct = .{
+            .layout = .auto,
+            .fields = node_dirty_flag_fields,
+            .decls = &.{},
+            .is_tuple = false,
+        } });
+    };
+
     const node_order = precalculate: {
         var max_node_priority: u16 = 0;
         var node_priorities = [_]u16{0} ** graph.nodes.len;
@@ -223,7 +262,8 @@ pub fn NodeGraph(comptime node_definitions: anytype, comptime graph: Blueprint) 
         store: SystemStore,
         store_arena: std.heap.ArenaAllocator,
         nodes_outputs: NodeOutputs,
-        node_arenas: [graph.nodes.len]std.heap.ArenaAllocator,
+        nodes_dirty_flags: NodesDirtyFlags,
+        nodes_arenas: [graph.nodes.len]std.heap.ArenaAllocator,
         pub fn init(props: struct {
             allocator: std.mem.Allocator,
             store: SystemStore,
@@ -233,10 +273,11 @@ pub fn NodeGraph(comptime node_definitions: anytype, comptime graph: Blueprint) 
                 .store = props.store,
                 .store_arena = std.heap.ArenaAllocator.init(props.allocator),
                 .nodes_outputs = undefined,
-                .node_arenas = undefined,
+                .nodes_arenas = undefined,
+                .nodes_dirty_flags = undefined,
             };
             for (graph.nodes, 0..) |_, index| {
-                self.node_arenas[index] = std.heap.ArenaAllocator.init(props.allocator);
+                self.nodes_arenas[index] = std.heap.ArenaAllocator.init(props.allocator);
             }
             return self;
         }
@@ -266,21 +307,23 @@ pub fn NodeGraph(comptime node_definitions: anytype, comptime graph: Blueprint) 
                     },
                 };
 
-                const inputs_changed = true;
+                const inputs_changed = true; // TODO - dirty checks from inputs!
                 @field(self.nodes_outputs, node.name) = if (!inputs_changed)
                     @field(self.nodes_outputs, node.name)
                 else blk: {
-                    _ = self.node_arenas[node_index].reset(.retain_capacity);
+                    _ = self.nodes_arenas[node_index].reset(.retain_capacity);
                     const node_output = @call(
                         .auto,
                         @field(node_definitions, node.function),
-                        if (@typeInfo(@TypeOf(@field(node_definitions, node.function))).Fn.params.len == 2)
+                        if (@typeInfo(@TypeOf(@field(node_definitions, node.function))).Fn.params.len == 1)
                             .{
-                                node_definitions{ .allocator = self.node_arenas[node_index].allocator() },
                                 node_inputs,
                             }
                         else
-                            .{node_inputs},
+                            .{
+                                &self.nodes_arenas[node_index],
+                                node_inputs,
+                            },
                     );
                     break :blk switch (@typeInfo(@TypeOf(node_output))) {
                         else => node_output,
