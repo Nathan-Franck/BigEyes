@@ -251,7 +251,7 @@ pub const interface = struct {
     );
 
     var previous_outputs_hash: u32 = 0;
-    var my_node_graph = MyNodeGraph{
+    var my_node_graph = MyNodeGraph.init(.{
         .allocator = std.heap.page_allocator,
         .store = .{
             .settings = .{
@@ -264,7 +264,7 @@ pub const interface = struct {
                 .track_distance = 20,
             },
         },
-    };
+    }) catch unreachable;
 
     pub fn callNodeGraph(
         inputs: MyNodeGraph.SystemInputs,

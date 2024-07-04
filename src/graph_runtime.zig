@@ -220,15 +220,27 @@ pub fn NodeGraph(comptime node_definitions: anytype, comptime graph: Blueprint) 
             } });
         };
         allocator: std.mem.Allocator,
-        previous_arena: ?std.heap.ArenaAllocator = null,
         store: SystemStore,
-        nodes_outputs: NodeOutputs = undefined,
-        node_last_hash: [graph.nodes.len]u32 = .{0} ** graph.nodes.len,
+        store_arena: std.heap.ArenaAllocator,
+        nodes_outputs: NodeOutputs,
+        node_arenas: [graph.nodes.len]std.heap.ArenaAllocator,
+        pub fn init(props: struct {
+            allocator: std.mem.Allocator,
+            store: SystemStore,
+        }) !Self {
+            var self = Self{
+                .allocator = props.allocator,
+                .store = props.store,
+                .store_arena = std.heap.ArenaAllocator.init(props.allocator),
+                .nodes_outputs = undefined,
+                .node_arenas = undefined,
+            };
+            for (graph.nodes, 0..) |_, index| {
+                self.node_arenas[index] = std.heap.ArenaAllocator.init(props.allocator);
+            }
+            return self;
+        }
         pub fn update(self: *Self, inputs: SystemInputs) !SystemOutputs {
-            var next_arena = std.heap.ArenaAllocator.init(self.allocator);
-            const nodes = node_definitions{ .allocator = next_arena.allocator() };
-            var hash_arena = std.heap.ArenaAllocator.init(self.allocator);
-            defer hash_arena.deinit();
 
             // Process all nodes...
             inline for (node_order) |node_index| {
@@ -253,31 +265,20 @@ pub fn NodeGraph(comptime node_definitions: anytype, comptime graph: Blueprint) 
                             AttemptEventCast(InputType, OutputType, node_output);
                     },
                 };
-                const inputs_changed = blk: {
-                    var hasher = std.hash.Adler32.init();
 
-                    const hashable_inputs = utils.deepHashableStruct(@TypeOf(node_inputs), 1000, hash_arena.allocator(), node_inputs);
-                    defer _ = hash_arena.reset(.retain_capacity);
-
-                    std.hash.autoHashStrat(&hasher, hashable_inputs, .DeepRecursive);
-                    defer self.node_last_hash[node_index] = hasher.final();
-
-                    break :blk hasher.final() != self.node_last_hash[node_index];
-                };
-
+                const inputs_changed = true;
                 @field(self.nodes_outputs, node.name) = if (!inputs_changed)
-                    (try utils.deepClone(
-                        @TypeOf(@field(self.nodes_outputs, node.name)),
-                        next_arena.allocator(),
-                        @field(self.nodes_outputs, node.name),
-                    )).value
+                    @field(self.nodes_outputs, node.name)
                 else blk: {
-                    const node_output =
-                        @call(
+                    _ = self.node_arenas[node_index].reset(.retain_capacity);
+                    const node_output = @call(
                         .auto,
                         @field(node_definitions, node.function),
                         if (@typeInfo(@TypeOf(@field(node_definitions, node.function))).Fn.params.len == 2)
-                            .{ nodes, node_inputs }
+                            .{
+                                node_definitions{ .allocator = self.node_arenas[node_index].allocator() },
+                                node_inputs,
+                            }
                         else
                             .{node_inputs},
                     );
@@ -288,12 +289,14 @@ pub fn NodeGraph(comptime node_definitions: anytype, comptime graph: Blueprint) 
                 };
             }
 
+            _ = self.store_arena.reset(.retain_capacity);
+
             // Copy over new store values...
             inline for (graph.store) |store_defn| {
                 const node_result = @field(self.nodes_outputs, store_defn.output_node);
                 const result = @field(node_result, store_defn.output_field);
                 @field(self.store, store_defn.system_field) =
-                    (try utils.deepClone(@TypeOf(result), next_arena.allocator(), result)).value;
+                    (try utils.deepClone(@TypeOf(result), self.store_arena.allocator(), result)).value;
             }
 
             // Output from system from select nodes...
@@ -302,13 +305,8 @@ pub fn NodeGraph(comptime node_definitions: anytype, comptime graph: Blueprint) 
                 const node_outputs = @field(self.nodes_outputs, output_defn.output_node);
                 const result = @field(node_outputs, output_defn.output_field);
                 @field(system_outputs, output_defn.system_field) =
-                    (try utils.deepClone(@TypeOf(result), next_arena.allocator(), result)).value;
+                    (try utils.deepClone(@TypeOf(result), self.store_arena.allocator(), result)).value;
             }
-
-            // Free the previous arena!
-            if (self.previous_arena) |previous_arena|
-                previous_arena.deinit();
-            self.previous_arena = next_arena;
 
             return system_outputs;
         }
@@ -323,7 +321,7 @@ test "Build" {
         NodeDefinitions,
         node_graph_blueprint,
     );
-    var my_node_graph = MyNodeGraph{
+    var my_node_graph = MyNodeGraph.init(.{
         .allocator = allocator,
         .store = .{
             .node_dimensions = &.{},
@@ -336,7 +334,7 @@ test "Build" {
             .context_menu = .{ .open = false, .location = .{ .x = 0, .y = 0 } },
             .interaction_state = .{ .node_selection = &.{} },
         },
-    };
+    });
     _ = try my_node_graph.update(.{
         .recieved_blueprint = node_graph_blueprint,
         .keyboard_modifiers = .{
@@ -350,14 +348,4 @@ test "Build" {
     // Next will be to validate that multiple steps are working in-tandem with each other...
     try std.testing.expect(my_node_graph.store.blueprint.nodes.len > 0);
     try std.testing.expect(my_node_graph.store.blueprint.store.len > 0);
-    // try std.testing.expect(result_commands.render_event.?.something_changed == true);
-
-    // const my_enum = enum {
-    //     hello,
-    //     goodbye,
-    // };
-    // const my_state = struct {
-    //     test_me: my_enum,
-    // };
-    // std.debug.print("\n{s}\n", .{try std.json.stringifyAlloc(allocator, my_state{ .test_me = .hello }, .{})});
 }
