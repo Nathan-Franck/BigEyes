@@ -205,13 +205,20 @@ pub fn NodeGraph(comptime node_definitions: anytype, comptime graph: Blueprint) 
                     if (std.mem.eql(u8, node.name, node_id)) break node else continue
                 else
                     @compileError("Node not found " ++ node_id);
-                const node_outputs = @typeInfo(@TypeOf(@field(node_definitions, node.name))).Fn.return_type.?;
-                const non_error_outputs = switch (@typeInfo(node_outputs)) {
-                    else => node_outputs,
+                const function_definition = @typeInfo(@TypeOf(@field(node_definitions, node.name))).Fn;
+                const node_outputs_from_return_type = function_definition.return_type.?;
+                const node_inputs_maybe_pointer_outputs = function_definition.params[function_definition.params.len - 1].type.?;
+                const non_error_outputs = switch (@typeInfo(node_outputs_from_return_type)) {
+                    else => node_outputs_from_return_type,
                     .ErrorUnion => |error_union| error_union.payload,
                 };
                 const field_type = for (@typeInfo(non_error_outputs).Struct.fields) |field|
                     if (std.mem.eql(u8, field.name, output_defn.system_field)) break field.type else continue
+                else for (@typeInfo(node_inputs_maybe_pointer_outputs).Struct.fields) |field|
+                    if (std.mem.eql(u8, field.name, output_defn.system_field) and switch (@typeInfo(field.type)) {
+                        .Pointer => true,
+                        else => false,
+                    }) break field.type else continue
                 else
                     @panic("arced virus"); // TODO: Provide a useful compiler error about how blueprint and node defn's disagree.
                 fields = fields ++ .{.{

@@ -156,9 +156,9 @@ pub const interface = struct {
                 resources: Resources,
                 game_time_ms: u64,
                 input: ?struct { mouse_delta: zm.Vec },
-                orbit_camera: OrbitCamera,
+                orbit_camera: *OrbitCamera,
             }) !struct {
-                orbit_camera: OrbitCamera,
+                // orbit_camera: OrbitCamera,
                 current_cat_mesh: Mesh,
                 world_matrix: zm.Mat,
             } {
