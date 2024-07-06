@@ -1,6 +1,5 @@
 const std = @import("std");
-const Blueprint = @import("./interactive_node_builder_blueprint.zig").Blueprint;
-const NodeDefinitions = @import("./node_graph_blueprint_nodes.zig");
+const node_graph_blueprint = @import("./interactive_node_builder_blueprint.zig");
 const utils = @import("./utils.zig");
 const wasm_entry = @import("./wasm_entry.zig");
 
@@ -38,7 +37,7 @@ fn AttemptEventCast(InputType: type, OutputType: type, value: InputType) OutputT
     } else null;
 }
 
-pub fn NodeGraph(comptime node_definitions: anytype, comptime graph: Blueprint) type {
+pub fn NodeGraph(comptime node_definitions: anytype, comptime graph: node_graph_blueprint.Blueprint) type {
     const NodeOutputs = build_type: {
         comptime var node_output_fields: []const std.builtin.Type.StructField = &.{};
         inline for (graph.nodes) |node| {
@@ -205,22 +204,7 @@ pub fn NodeGraph(comptime node_definitions: anytype, comptime graph: Blueprint) 
                     if (std.mem.eql(u8, node.name, node_id)) break node else continue
                 else
                     @compileError("Node not found " ++ node_id);
-                const function_definition = @typeInfo(@TypeOf(@field(node_definitions, node.name))).Fn;
-                const node_outputs_from_return_type = function_definition.return_type.?;
-                const node_inputs_maybe_pointer_outputs = function_definition.params[function_definition.params.len - 1].type.?;
-                const non_error_outputs = switch (@typeInfo(node_outputs_from_return_type)) {
-                    else => node_outputs_from_return_type,
-                    .ErrorUnion => |error_union| error_union.payload,
-                };
-                const field_type = for (@typeInfo(non_error_outputs).Struct.fields) |field|
-                    if (std.mem.eql(u8, field.name, output_defn.system_field)) break field.type else continue
-                else for (@typeInfo(node_inputs_maybe_pointer_outputs).Struct.fields) |field|
-                    if (std.mem.eql(u8, field.name, output_defn.system_field) and switch (@typeInfo(field.type)) {
-                        .Pointer => true,
-                        else => false,
-                    }) break field.type else continue
-                else
-                    @panic("arced virus"); // TODO: Provide a useful compiler error about how blueprint and node defn's disagree.
+                const field_type = getOutputFieldTypeFromNode(node, output_defn.output_field);
                 fields = fields ++ .{.{
                     .name = name[0.. :0],
                     .type = field_type,
@@ -246,15 +230,7 @@ pub fn NodeGraph(comptime node_definitions: anytype, comptime graph: Blueprint) 
                     if (std.mem.eql(u8, node.name, node_id)) break node else continue
                 else
                     @compileError("Node not found " ++ node_id);
-                const node_outputs = @typeInfo(@TypeOf(@field(node_definitions, node.name))).Fn.return_type.?;
-                const field_type = for (switch (@typeInfo(node_outputs)) {
-                    .ErrorUnion => |error_union| @typeInfo(error_union.payload).Struct.fields,
-                    .Struct => |the_struct| the_struct.fields,
-                    else => @compileError("Invalid output type, expected struct or error union with a struct"),
-                }) |field|
-                    if (std.mem.eql(u8, field.name, store_field.output_field)) break field.type else continue
-                else
-                    @compileError("Field not found " ++ store_field.system_field ++ " in " ++ node_id);
+                const field_type = getOutputFieldTypeFromNode(node, store_field.output_field);
                 system_store_fields = system_store_fields ++ .{.{
                     .name = name[0.. :0],
                     .type = field_type,
@@ -270,6 +246,28 @@ pub fn NodeGraph(comptime node_definitions: anytype, comptime graph: Blueprint) 
                 .is_tuple = false,
             } });
         };
+        fn getOutputFieldTypeFromNode(node: node_graph_blueprint.NodeGraphBlueprintEntry, field_name: []const u8) type {
+            const function_definition = @typeInfo(@TypeOf(@field(node_definitions, node.name))).Fn;
+            const node_outputs_from_return_type = function_definition.return_type.?;
+            const node_inputs_maybe_pointer_outputs = function_definition.params[function_definition.params.len - 1].type.?;
+            const non_error_outputs = switch (@typeInfo(node_outputs_from_return_type)) {
+                else => node_outputs_from_return_type,
+                .ErrorUnion => |error_union| error_union.payload,
+            };
+            const field_type = for (@typeInfo(non_error_outputs).Struct.fields) |field|
+                if (std.mem.eql(u8, field.name, field_name)) break field.type else continue
+            else for (@typeInfo(node_inputs_maybe_pointer_outputs).Struct.fields) |field|
+                if (std.mem.eql(u8, field.name, field_name)) {
+                    switch (@typeInfo(field.type)) {
+                        .Pointer => |pointer| break pointer.child,
+                        else => continue,
+                    }
+                } else continue
+            else
+                @panic("arced virus"); // TODO: Provide a useful compiler error about how blueprint and node defn's disagree.
+            @compileLog(field_type);
+            return field_type;
+        }
         allocator: std.mem.Allocator,
         store: SystemStore,
         store_arena: std.heap.ArenaAllocator,
@@ -392,8 +390,8 @@ pub fn NodeGraph(comptime node_definitions: anytype, comptime graph: Blueprint) 
 }
 
 test "Build" {
+    const NodeDefinitions = @import("./node_graph_blueprint_nodes.zig");
     const allocator = std.heap.page_allocator;
-    const node_graph_blueprint = @import("./interactive_node_builder_blueprint.zig").node_graph_blueprint;
     const MyNodeGraph = NodeGraph(
         NodeDefinitions,
         node_graph_blueprint,

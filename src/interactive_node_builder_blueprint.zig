@@ -1,10 +1,12 @@
+pub const NodeLink = struct {
+    name: []const u8,
+    field: []const u8,
+};
+
 pub const InputLink = struct {
     field: []const u8,
     source: union(enum) {
-        node: struct {
-            name: []const u8,
-            field: []const u8,
-        },
+        node: NodeLink,
         input_field: []const u8,
         store_field: []const u8,
     },
