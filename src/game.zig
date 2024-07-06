@@ -156,29 +156,24 @@ pub const interface = struct {
                 resources: Resources,
                 game_time_ms: u64,
                 input: ?struct { mouse_delta: zm.Vec },
+
                 orbit_camera: *OrbitCamera,
             }) !struct {
-                // orbit_camera: OrbitCamera,
                 current_cat_mesh: Mesh,
                 world_matrix: zm.Mat,
             } {
                 _ = arena;
-
-                const orbit_camera: OrbitCamera = if (props.input) |found_input|
-                    utils.copyWith(props.orbit_camera, .{
-                        .rotation = props.orbit_camera.rotation +
-                            found_input.mouse_delta *
-                            @as(zm.Vec, @splat(-props.settings.orbit_speed)),
-                    })
-                else
-                    props.orbit_camera;
+                if (props.input) |found_input| {
+                    props.orbit_camera.*.rotation = props.orbit_camera.rotation +
+                        found_input.mouse_delta *
+                        @as(zm.Vec, @splat(-props.settings.orbit_speed));
+                }
                 const current_frame_index = @mod(
                     props.game_time_ms * props.resources.cat.frame_rate / 1000,
                     props.resources.cat.frames.len,
                 );
                 const current_frame = props.resources.cat.frames[@intCast(current_frame_index)];
                 return .{
-                    .orbit_camera = orbit_camera,
                     .current_cat_mesh = Mesh{
                         .label = "cat",
                         .indices = props.resources.cat.indices,
@@ -187,13 +182,13 @@ pub const interface = struct {
                     },
                     .world_matrix = zm.mul(
                         zm.mul(
-                            zm.translationV(orbit_camera.position),
+                            zm.translationV(props.orbit_camera.position),
                             zm.mul(
                                 zm.mul(
-                                    zm.matFromRollPitchYaw(0, orbit_camera.rotation[0], 0),
-                                    zm.matFromRollPitchYaw(orbit_camera.rotation[1], 0, 0),
+                                    zm.matFromRollPitchYaw(0, props.orbit_camera.rotation[0], 0),
+                                    zm.matFromRollPitchYaw(props.orbit_camera.rotation[1], 0, 0),
                                 ),
-                                zm.translationV(zm.loadArr3(.{ 0.0, 0.0, orbit_camera.track_distance })),
+                                zm.translationV(zm.loadArr3(.{ 0.0, 0.0, props.orbit_camera.track_distance })),
                             ),
                         ),
                         zm.perspectiveFovLh(
