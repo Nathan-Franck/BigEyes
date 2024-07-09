@@ -265,16 +265,8 @@ pub const interface = struct {
         outputs: ?MyNodeGraph.SystemOutputs,
     } {
         const outputs = try my_node_graph.update(inputs);
-        // const send_outputs = true;
-        const send_outputs = true;
-        // blk: {
-        //     var hasher = std.hash.Adler32.init();
-        //     std.hash.autoHashStrat(&hasher, outputs, .DeepRecursive);
-        //     defer previous_outputs_hash = hasher.final();
-        //     break :blk hasher.final() != previous_outputs_hash;
-        // };
         return .{
-            .outputs = if (send_outputs) outputs else null,
+            .outputs = outputs,
         };
     }
 };

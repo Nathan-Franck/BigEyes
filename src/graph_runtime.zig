@@ -265,7 +265,6 @@ pub fn NodeGraph(comptime node_definitions: anytype, comptime graph: node_graph_
                 } else continue
             else
                 @panic("arced virus"); // TODO: Provide a useful compiler error about how blueprint and node defn's disagree.
-            @compileLog(field_type);
             return field_type;
         }
         allocator: std.mem.Allocator,
@@ -314,29 +313,41 @@ pub fn NodeGraph(comptime node_definitions: anytype, comptime graph: node_graph_
                 const NodeInputs = node_params[node_params.len - 1].type.?;
                 var node_inputs: NodeInputs = undefined;
                 var dirty = false;
-                inline for (node.input_links) |link| switch (link.source) {
-                    .input_field => |input_field| {
-                        @field(node_inputs, link.field) = @field(inputs, input_field);
-                        if (@field(inputs_dirty, input_field)) {
-                            wasm_entry.dumpDebugLog(try std.fmt.allocPrint(self.allocator, "Found a dirty field! {s}", .{input_field}));
-                            dirty = true;
-                        }
-                    },
-                    .store_field => |store_field| {
-                        @field(node_inputs, link.field) = @field(self.store, store_field);
-                    },
-                    .node => |node_blueprint| {
-                        const node_outputs = @field(self.nodes_outputs, node_blueprint.name);
-                        const node_output = @field(node_outputs, node_blueprint.field);
-                        const InputType = @TypeOf(node_output);
-                        const OutputType = @TypeOf(@field(node_inputs, link.field));
-                        @field(node_inputs, link.field) =
-                            AttemptEventCast(InputType, OutputType, node_output);
-                        if (@field(self.nodes_dirty_flags, node_blueprint.name)) {
-                            dirty = true;
-                        }
-                    },
-                };
+                comptime var mutable_inputs: []const []const u8 = &.{};
+                inline for (node.input_links) |link| {
+                    const node_input_field = switch (link.source) {
+                        .input_field => |input_field| node_input: {
+                            if (@field(inputs_dirty, input_field)) {
+                                dirty = true;
+                            }
+                            break :node_input @field(inputs, input_field);
+                        },
+                        .store_field => |store_field| @field(self.store, store_field),
+                        .node => |node_blueprint| input_field: {
+                            const node_outputs = @field(self.nodes_outputs, node_blueprint.name);
+                            const node_output = @field(node_outputs, node_blueprint.field);
+                            const InputType = @TypeOf(node_output);
+                            const OutputType = @TypeOf(@field(node_inputs, link.field));
+                            if (@field(self.nodes_dirty_flags, node_blueprint.name)) {
+                                dirty = true;
+                            }
+                            break :input_field AttemptEventCast(InputType, OutputType, node_output);
+                        },
+                    };
+                    const target_input_field = &@field(node_inputs, link.field);
+                    target_input_field.* = switch (@typeInfo(@TypeOf(target_input_field.*))) {
+                        .Pointer => |pointer| mutable_input: {
+                            var mutable_input = (try utils.deepClone(
+                                pointer.child,
+                                self.nodes_arenas[node_index].allocator(),
+                                node_input_field,
+                            )).value;
+                            mutable_inputs = mutable_inputs ++ .{link.field};
+                            break :mutable_input &mutable_input;
+                        },
+                        else => node_input_field,
+                    };
+                }
 
                 @field(self.nodes_dirty_flags, node.name) = dirty;
 
