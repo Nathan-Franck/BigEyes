@@ -42,14 +42,37 @@ pub fn NodeGraph(comptime node_definitions: anytype, comptime graph: node_graph_
         comptime var node_output_fields: []const std.builtin.Type.StructField = &.{};
         inline for (graph.nodes) |node| {
             const node_defn = @field(node_definitions, node.name);
-            const node_outputs = @typeInfo(@TypeOf(node_defn)).Fn.return_type.?;
+            const function_definition = @typeInfo(@TypeOf(node_defn)).Fn;
+            const node_outputs = function_definition.return_type.?;
+            const node_inputs = function_definition.params;
             const non_error_outputs = switch (@typeInfo(node_outputs)) {
                 else => node_outputs,
                 .ErrorUnion => |error_union| error_union.payload,
             };
+            comptime var output_fields: []const std.builtin.Type.StructField = @typeInfo(non_error_outputs).Struct.fields;
+            for (@typeInfo(node_inputs[node_inputs.len - 1].type.?).Struct.fields) |input_field| {
+                switch (@typeInfo(input_field.type)) {
+                    .Pointer => |pointer| {
+                        output_fields = comptime output_fields ++ .{.{
+                            .name = input_field.name,
+                            .type = pointer.child,
+                            .default_value = null,
+                            .is_comptime = false,
+                            .alignment = @alignOf(input_field.type),
+                        }};
+                    },
+                    else => {},
+                }
+            }
+            const non_error_outputs_and_pointers = @Type(std.builtin.Type{ .Struct = .{
+                .layout = .auto,
+                .fields = output_fields,
+                .decls = &.{},
+                .is_tuple = false,
+            } });
             node_output_fields = comptime node_output_fields ++ .{.{
                 .name = node.name[0.. :0],
-                .type = non_error_outputs,
+                .type = non_error_outputs_and_pointers,
                 .default_value = null,
                 .is_comptime = false,
                 .alignment = @alignOf(non_error_outputs),
@@ -351,11 +374,13 @@ pub fn NodeGraph(comptime node_definitions: anytype, comptime graph: node_graph_
 
                 @field(self.nodes_dirty_flags, node.name) = dirty;
 
-                @field(self.nodes_outputs, node.name) = if (!dirty)
-                    @field(self.nodes_outputs, node.name)
+                const target = &@field(self.nodes_outputs, node.name);
+                target.* = if (!dirty)
+                    target.*
                 else blk: {
                     _ = self.nodes_arenas[node_index].reset(.retain_capacity);
-                    const node_output = @call(
+                    var node_output: @TypeOf(target.*) = undefined;
+                    const function_output = @call(
                         .auto,
                         @field(node_definitions, node.function),
                         if (@typeInfo(@TypeOf(@field(node_definitions, node.function))).Fn.params.len == 1)
@@ -368,10 +393,11 @@ pub fn NodeGraph(comptime node_definitions: anytype, comptime graph: node_graph_
                                 node_inputs,
                             },
                     );
-                    break :blk switch (@typeInfo(@TypeOf(node_output))) {
-                        else => node_output,
-                        .ErrorUnion => try node_output,
-                    };
+                    node_output = utils.copyWith(node_output, switch (@typeInfo(@TypeOf(function_output))) {
+                        else => function_output,
+                        .ErrorUnion => try function_output,
+                    });
+                    break :blk node_output;
                 };
             }
 
