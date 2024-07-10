@@ -336,7 +336,29 @@ pub fn NodeGraph(comptime node_definitions: anytype, comptime graph: node_graph_
                 const NodeInputs = node_params[node_params.len - 1].type.?;
                 var node_inputs: NodeInputs = undefined;
                 var dirty = false;
-                comptime var mutable_inputs: []const []const u8 = &.{};
+                var mutable_fields: my_type: {
+                    var mutable_fields: []const std.builtin.Type.StructField = &.{};
+                    for (node.input_links) |link| {
+                        switch (@typeInfo(@TypeOf(@field(node_inputs, link.field)))) {
+                            .Pointer => |pointer| {
+                                mutable_fields = mutable_fields ++ .{.{
+                                    .name = link.field[0.. :0],
+                                    .type = pointer.child,
+                                    .default_value = null,
+                                    .is_comptime = false,
+                                    .alignment = @alignOf(pointer.child),
+                                }};
+                            },
+                            else => {},
+                        }
+                    }
+                    break :my_type @Type(.{ .Struct = .{
+                        .layout = .auto,
+                        .fields = mutable_fields,
+                        .decls = &.{},
+                        .is_tuple = false,
+                    } });
+                } = undefined;
                 inline for (node.input_links) |link| {
                     const node_input_field = switch (link.source) {
                         .input_field => |input_field| node_input: {
@@ -360,13 +382,13 @@ pub fn NodeGraph(comptime node_definitions: anytype, comptime graph: node_graph_
                     const target_input_field = &@field(node_inputs, link.field);
                     target_input_field.* = switch (@typeInfo(@TypeOf(target_input_field.*))) {
                         .Pointer => |pointer| mutable_input: {
-                            var mutable_input = (try utils.deepClone(
+                            const mutable_input = &@field(mutable_fields, link.field);
+                            mutable_input.* = (try utils.deepClone(
                                 pointer.child,
                                 self.nodes_arenas[node_index].allocator(),
                                 node_input_field,
                             )).value;
-                            mutable_inputs = mutable_inputs ++ .{link.field};
-                            break :mutable_input &mutable_input;
+                            break :mutable_input mutable_input;
                         },
                         else => node_input_field,
                     };
@@ -380,10 +402,7 @@ pub fn NodeGraph(comptime node_definitions: anytype, comptime graph: node_graph_
                 else blk: {
                     _ = self.nodes_arenas[node_index].reset(.retain_capacity);
                     var node_output: @TypeOf(target.*) = undefined;
-                    inline for (mutable_inputs) |field_name| {
-                        wasm_entry.dumpDebugLog(try std.fmt.allocPrint(self.allocator, "{s}", .{field_name}));
-                        @field(node_output, field_name) = @field(node_inputs, field_name).*;
-                    }
+                    node_output = utils.copyWith(node_output, mutable_fields);
                     const function_output = @call(
                         .auto,
                         @field(node_definitions, node.function),
