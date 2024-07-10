@@ -380,6 +380,10 @@ pub fn NodeGraph(comptime node_definitions: anytype, comptime graph: node_graph_
                 else blk: {
                     _ = self.nodes_arenas[node_index].reset(.retain_capacity);
                     var node_output: @TypeOf(target.*) = undefined;
+                    inline for (mutable_inputs) |field_name| {
+                        wasm_entry.dumpDebugLog(try std.fmt.allocPrint(self.allocator, "{s}", .{field_name}));
+                        @field(node_output, field_name) = @field(node_inputs, field_name).*;
+                    }
                     const function_output = @call(
                         .auto,
                         @field(node_definitions, node.function),

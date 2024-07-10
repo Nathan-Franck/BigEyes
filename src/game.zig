@@ -164,9 +164,9 @@ pub const interface = struct {
             } {
                 _ = arena;
                 if (props.input) |found_input| {
-                    props.orbit_camera.*.rotation = props.orbit_camera.rotation +
+                    props.orbit_camera.* = utils.copyWith(props.orbit_camera.*, .{ .rotation = props.orbit_camera.rotation +
                         found_input.mouse_delta *
-                        @as(zm.Vec, @splat(-props.settings.orbit_speed));
+                        @as(zm.Vec, @splat(-props.settings.orbit_speed)) });
                 }
                 const current_frame_index = @mod(
                     props.game_time_ms * props.resources.cat.frame_rate / 1000,
