@@ -31,7 +31,7 @@ pub fn copyWith(source_data: anytype, field_changes: anytype) @TypeOf(source_dat
 pub fn deepClone(
     T: type,
     allocator: std.mem.Allocator,
-    source: T,
+    source: anytype,
 ) !struct {
     value: T,
     allocator_used: bool = false,

@@ -64,6 +64,7 @@ pub const interface = struct {
                         .{ .field = "resources", .source = .{ .node = .{ .name = "getResources", .field = "resources" } } },
                         .{ .field = "settings", .source = .{ .node = .{ .name = "changeSettings", .field = "settings" } } },
                         .{ .field = "orbit_camera", .source = .{ .store_field = "orbit_camera" } },
+                        .{ .field = "some_numbers", .source = .{ .store_field = "some_numbers" } },
                     },
                 },
                 .{
@@ -77,11 +78,13 @@ pub const interface = struct {
             },
             .store = &[_]node_graph_blueprint.SystemSink{
                 .{ .output_node = "game", .output_field = "orbit_camera", .system_field = "orbit_camera" },
+                .{ .output_node = "game", .output_field = "some_numbers", .system_field = "some_numbers" },
                 .{ .output_node = "changeSettings", .output_field = "settings", .system_field = "settings" },
             },
             .output = &[_]node_graph_blueprint.SystemSink{
                 .{ .output_node = "game", .output_field = "current_cat_mesh", .system_field = "current_cat_mesh" },
                 .{ .output_node = "game", .output_field = "orbit_camera", .system_field = "orbit_camera" },
+                .{ .output_node = "game", .output_field = "some_numbers", .system_field = "some_numbers" },
                 .{ .output_node = "game", .output_field = "world_matrix", .system_field = "world_matrix" },
             },
         },
@@ -198,6 +201,7 @@ pub const interface = struct {
                 input: ?struct { mouse_delta: zm.Vec },
 
                 orbit_camera: *OrbitCamera,
+                some_numbers: []u32,
             }) !struct {
                 current_cat_mesh: Mesh,
                 world_matrix: zm.Mat,
@@ -213,6 +217,7 @@ pub const interface = struct {
                     props.resources.cat.frames.len,
                 );
                 const current_frame = props.resources.cat.frames[@intCast(current_frame_index)];
+                props.some_numbers[0] += 1;
                 return .{
                     .current_cat_mesh = Mesh{
                         .label = "cat",
@@ -256,6 +261,7 @@ pub const interface = struct {
                 .rotation = .{ 0, 0, 0, 1 },
                 .track_distance = 20,
             },
+            .some_numbers = &.{ 0, 1, 2 },
         },
     }) catch unreachable;
 

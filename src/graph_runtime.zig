@@ -68,14 +68,13 @@ pub fn NodeGraph(
                                     }};
                             },
                             .Slice => {
-                                if (!pointer.is_const)
-                                    output_fields = comptime output_fields ++ .{.{
-                                        .name = input_field.name,
-                                        .type = []const pointer.child,
-                                        .default_value = null,
-                                        .is_comptime = false,
-                                        .alignment = @alignOf(input_field.type),
-                                    }};
+                                output_fields = comptime output_fields ++ .{.{
+                                    .name = input_field.name,
+                                    .type = []const pointer.child,
+                                    .default_value = null,
+                                    .is_comptime = false,
+                                    .alignment = @alignOf(input_field.type),
+                                }};
                             },
                             else => {},
                         }
@@ -238,24 +237,20 @@ pub fn NodeGraph(
             } });
         };
         fn getOutputFieldTypeFromNode(node: node_graph_blueprint.NodeGraphBlueprintEntry, field_name: []const u8) type {
-            const function_definition = @typeInfo(@TypeOf(@field(node_definitions, node.name))).Fn;
-            const node_outputs_from_return_type = function_definition.return_type.?;
-            const node_inputs_maybe_pointer_outputs = function_definition.params[function_definition.params.len - 1].type.?;
-            const non_error_outputs = switch (@typeInfo(node_outputs_from_return_type)) {
-                else => node_outputs_from_return_type,
-                .ErrorUnion => |error_union| error_union.payload,
-            };
-            const field_type = for (@typeInfo(non_error_outputs).Struct.fields) |field|
-                if (std.mem.eql(u8, field.name, field_name)) break field.type else continue
-            else for (@typeInfo(node_inputs_maybe_pointer_outputs).Struct.fields) |field|
-                if (std.mem.eql(u8, field.name, field_name)) {
-                    switch (@typeInfo(field.type)) {
-                        .Pointer => |pointer| break pointer.child,
-                        else => continue,
-                    }
-                } else continue
+            const node_outputs = for (@typeInfo(NodeOutputs).Struct.fields) |field|
+                if (std.mem.eql(u8, field.name, node.name))
+                    break field.type
+                else
+                    continue
             else
-                @panic("arced virus"); // TODO: Provide a useful compiler error about how blueprint and node defn's disagree.
+                unreachable;
+            const field_type = for (@typeInfo(node_outputs).Struct.fields) |field|
+                if (std.mem.eql(u8, field.name, field_name))
+                    break field.type
+                else
+                    continue
+            else
+                unreachable;
             return field_type;
         }
         pub const SystemOutputs = build_type: {
@@ -414,14 +409,28 @@ pub fn NodeGraph(
                     };
                     const target_input_field = &@field(node_inputs, link.field);
                     target_input_field.* = switch (@typeInfo(@TypeOf(target_input_field.*))) {
-                        .Pointer => |pointer| mutable_input: {
-                            const mutable_input = &@field(mutable_fields, link.field);
-                            mutable_input.* = (try utils.deepClone(
-                                pointer.child,
-                                self.nodes_arenas[node_index].allocator(),
-                                node_input_field,
-                            )).value;
-                            break :mutable_input mutable_input;
+                        .Pointer => |pointer| switch (pointer.size) {
+                            .One => mutable_input: {
+                                const mutable_input = &@field(mutable_fields, link.field);
+                                mutable_input.* = (try utils.deepClone(
+                                    pointer.child,
+                                    self.nodes_arenas[node_index].allocator(),
+                                    node_input_field,
+                                )).value;
+
+                                break :mutable_input mutable_input;
+                            },
+                            .Slice => mutable_input: {
+                                const mutable_input = &@field(mutable_fields, link.field);
+                                mutable_input.* = (try utils.deepClone(
+                                    @TypeOf(mutable_input.*),
+                                    self.nodes_arenas[node_index].allocator(),
+                                    node_input_field,
+                                )).value;
+
+                                break :mutable_input mutable_input.*;
+                            },
+                            else => unreachable,
                         },
                         else => node_input_field,
                     };

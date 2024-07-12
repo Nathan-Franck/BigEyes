@@ -104,7 +104,6 @@ export function App() {
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
     gl.enable(gl.DEPTH_TEST);
-    // gl.disable(gl.CULL_FACE);
 
     const coolMesh = ShaderBuilder.generateMaterial(gl, {
       mode: "TRIANGLES",
@@ -137,6 +136,8 @@ export function App() {
         gl.clearColor(0, 0, 0, 1);
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
       }
+
+      console.log(sliceToArray.Uint32Array(graphOutputs.some_numbers));
 
       ShaderBuilder.renderMaterial(gl, coolMesh, {
         indices: ShaderBuilder.createElementBuffer(
