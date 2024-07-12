@@ -217,7 +217,7 @@ pub fn ContextMenuInteraction(input: struct {
     } else default;
 }
 
-pub fn NodeInteraction(self: @This(), input: struct {
+pub fn NodeInteraction(arena: *std.heap.ArenaAllocator, input: struct {
     keyboard_modifiers: KeyboardModifiers,
     interaction_state: InteractionState,
     blueprint: Blueprint,
@@ -251,10 +251,10 @@ pub fn NodeInteraction(self: @This(), input: struct {
                             u8,
                             item,
                             node_event.node_name,
-                        )) break index) else null) |index| try std.mem.concat(self.allocator, []const u8, &.{
+                        )) break index) else null) |index| try std.mem.concat(arena.allocator(), []const u8, &.{
                             selection[0..index],
                             selection[index + 1 ..],
-                        }) else try std.mem.concat(self.allocator, []const u8, &.{
+                        }) else try std.mem.concat(arena.allocator(), []const u8, &.{
                             selection,
                             &.{node_event.node_name},
                         }),
@@ -266,24 +266,24 @@ pub fn NodeInteraction(self: @This(), input: struct {
             .external_node_event => |node_event| switch (node_event.mouse_event) {
                 else => default,
                 .mouse_down => .{ .blueprint = input.blueprint, .interaction_state = utils.copyWith(input.interaction_state, .{
-                    .node_selection = try std.mem.concat(self.allocator, []const u8, &.{&.{node_event.node_name}}),
+                    .node_selection = try std.mem.concat(arena.allocator(), []const u8, &.{&.{node_event.node_name}}),
                 }) },
             },
             .node_event => |node_event| switch (node_event) {
                 .create => @panic("drear size"), // TODO: Implement new node creation.
                 .copy => |copy| .{ .blueprint = input.blueprint, .interaction_state = utils.copyWith(input.interaction_state, .{
-                    .clipboard = try selectionToNodes(self.allocator, input.blueprint.nodes, if (selection.len > 0) selection else &.{copy.node_name}),
+                    .clipboard = try selectionToNodes(arena.allocator(), input.blueprint.nodes, if (selection.len > 0) selection else &.{copy.node_name}),
                 }) },
                 .paste => if (input.interaction_state.clipboard) |clipboard| .{ .interaction_state = input.interaction_state, .blueprint = utils.copyWith(input.blueprint, .{
-                    .nodes = try pasteNodesUnique(self.allocator, input.blueprint.nodes, clipboard),
+                    .nodes = try pasteNodesUnique(arena.allocator(), input.blueprint.nodes, clipboard),
                 }) } else default,
                 .duplicate => |duplicate| .{
                     .interaction_state = input.interaction_state,
                     .blueprint = utils.copyWith(input.blueprint, .{
                         .nodes = concat: {
                             const to_duplicate = if (selection.len > 0) selection else &.{duplicate.node_name};
-                            const new_nodes = try selectionToNodes(self.allocator, input.blueprint.nodes, to_duplicate);
-                            break :concat try pasteNodesUnique(self.allocator, input.blueprint.nodes, new_nodes);
+                            const new_nodes = try selectionToNodes(arena.allocator(), input.blueprint.nodes, to_duplicate);
+                            break :concat try pasteNodesUnique(arena.allocator(), input.blueprint.nodes, new_nodes);
                         },
                     }),
                 },
@@ -292,7 +292,7 @@ pub fn NodeInteraction(self: @This(), input: struct {
                     .blueprint = utils.copyWith(input.blueprint, .{
                         .nodes = filter: {
                             const to_remove = if (selection.len > 0) selection else &.{delete.node_name};
-                            var result = std.ArrayList(NodeGraphBlueprintEntry).init(self.allocator);
+                            var result = std.ArrayList(NodeGraphBlueprintEntry).init(arena.allocator());
                             for (input.blueprint.nodes) |node|
                                 if (selection: {
                                     for (to_remove) |item|
@@ -327,7 +327,7 @@ fn NodeData(T: type) type {
 }
 
 pub fn NodeFormatting(
-    self: @This(),
+    arena: *std.heap.ArenaAllocator,
     input: struct {
         blueprint: Blueprint,
         node_dimensions: []const NodeData(PixelDimensions),
@@ -338,8 +338,8 @@ pub fn NodeFormatting(
     node_coords: []const NodeData(PixelCoord),
     node_dimensions: []const NodeData(PixelDimensions),
 } {
-    var node_coords = std.ArrayList(NodeData(PixelCoord)).init(self.allocator);
-    var node_dimensions = std.ArrayList(NodeData(PixelDimensions)).init(self.allocator);
+    var node_coords = std.ArrayList(NodeData(PixelCoord)).init(arena.allocator());
+    var node_dimensions = std.ArrayList(NodeData(PixelDimensions)).init(arena.allocator());
     try node_dimensions.appendSlice(input.node_dimensions);
     if (input.post_render_event) |post_render_event| {
         switch (post_render_event) {
@@ -471,7 +471,8 @@ test "delete node from context menu" {
             .selected_node = "test",
         },
     });
-    const second_output = try instance.NodeInteraction(.{
+    var arena = std.heap.ArenaAllocator.init(allocator);
+    const second_output = try instance.NodeInteraction(&arena, .{
         .event = utils_node.eventTransform(utils_node.NodeInputEventType(NodeInteraction), first_output.event),
         .interaction_state = .{
             .node_selection = &.{"test"},

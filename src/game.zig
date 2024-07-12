@@ -46,12 +46,51 @@ pub const interface = struct {
     };
     const PixelPoint = struct { x: u32, y: u32 };
     const MyNodeGraph = graph_runtime.NodeGraph(
+        node_graph_blueprint.Blueprint{
+            .nodes = &[_]node_graph_blueprint.NodeGraphBlueprintEntry{
+                .{
+                    .name = "getResources",
+                    .function = "getResources",
+                    .input_links = &[_]node_graph_blueprint.InputLink{
+                        .{ .field = "load_the_data", .source = .{ .input_field = "load_the_data" } },
+                    },
+                },
+                .{
+                    .name = "game",
+                    .function = "game",
+                    .input_links = &[_]node_graph_blueprint.InputLink{
+                        .{ .field = "game_time_ms", .source = .{ .input_field = "game_time_ms" } },
+                        .{ .field = "input", .source = .{ .input_field = "input" } },
+                        .{ .field = "resources", .source = .{ .node = .{ .name = "getResources", .field = "resources" } } },
+                        .{ .field = "settings", .source = .{ .node = .{ .name = "changeSettings", .field = "settings" } } },
+                        .{ .field = "orbit_camera", .source = .{ .store_field = "orbit_camera" } },
+                    },
+                },
+                .{
+                    .name = "changeSettings",
+                    .function = "changeSettings",
+                    .input_links = &[_]node_graph_blueprint.InputLink{
+                        .{ .field = "user_changes", .source = .{ .input_field = "user_changes" } },
+                        .{ .field = "settings", .source = .{ .store_field = "settings" } },
+                    },
+                },
+            },
+            .store = &[_]node_graph_blueprint.SystemSink{
+                .{ .output_node = "game", .output_field = "orbit_camera", .system_field = "orbit_camera" },
+                .{ .output_node = "changeSettings", .output_field = "settings", .system_field = "settings" },
+            },
+            .output = &[_]node_graph_blueprint.SystemSink{
+                .{ .output_node = "game", .output_field = "current_cat_mesh", .system_field = "current_cat_mesh" },
+                .{ .output_node = "game", .output_field = "orbit_camera", .system_field = "orbit_camera" },
+                .{ .output_node = "game", .output_field = "world_matrix", .system_field = "world_matrix" },
+            },
+        },
         struct {
-            allocator: std.mem.Allocator,
             pub const Settings = struct {
                 orbit_speed: f32,
                 render_resolution: PixelPoint,
             };
+
             pub fn changeSettings(props: struct {
                 settings: Settings,
                 user_changes: ?union(enum) {
@@ -71,6 +110,7 @@ pub const interface = struct {
                     .settings = settings,
                 };
             }
+
             pub const Resources = struct {
                 cat: BakedAnimationMesh,
             };
@@ -164,12 +204,9 @@ pub const interface = struct {
             } {
                 _ = arena;
                 if (props.input) |found_input| {
-                    props.orbit_camera.* = utils.copyWith(
-                        props.orbit_camera.*,
-                        .{ .rotation = props.orbit_camera.rotation +
-                            found_input.mouse_delta *
-                            @as(zm.Vec, @splat(-props.settings.orbit_speed)) },
-                    );
+                    props.orbit_camera.rotation = props.orbit_camera.rotation +
+                        found_input.mouse_delta *
+                        @as(zm.Vec, @splat(-props.settings.orbit_speed));
                 }
                 const current_frame_index = @mod(
                     props.game_time_ms * props.resources.cat.frame_rate / 1000,
@@ -205,48 +242,8 @@ pub const interface = struct {
                 };
             }
         },
-        node_graph_blueprint.Blueprint{
-            .nodes = &[_]node_graph_blueprint.NodeGraphBlueprintEntry{
-                .{
-                    .name = "getResources",
-                    .function = "getResources",
-                    .input_links = &[_]node_graph_blueprint.InputLink{
-                        .{ .field = "load_the_data", .source = .{ .input_field = "load_the_data" } },
-                    },
-                },
-                .{
-                    .name = "game",
-                    .function = "game",
-                    .input_links = &[_]node_graph_blueprint.InputLink{
-                        .{ .field = "game_time_ms", .source = .{ .input_field = "game_time_ms" } },
-                        .{ .field = "input", .source = .{ .input_field = "input" } },
-                        .{ .field = "resources", .source = .{ .node = .{ .name = "getResources", .field = "resources" } } },
-                        .{ .field = "settings", .source = .{ .node = .{ .name = "changeSettings", .field = "settings" } } },
-                        .{ .field = "orbit_camera", .source = .{ .store_field = "orbit_camera" } },
-                    },
-                },
-                .{
-                    .name = "changeSettings",
-                    .function = "changeSettings",
-                    .input_links = &[_]node_graph_blueprint.InputLink{
-                        .{ .field = "user_changes", .source = .{ .input_field = "user_changes" } },
-                        .{ .field = "settings", .source = .{ .store_field = "settings" } },
-                    },
-                },
-            },
-            .store = &[_]node_graph_blueprint.SystemSink{
-                .{ .output_node = "game", .output_field = "orbit_camera", .system_field = "orbit_camera" },
-                .{ .output_node = "changeSettings", .output_field = "settings", .system_field = "settings" },
-            },
-            .output = &[_]node_graph_blueprint.SystemSink{
-                .{ .output_node = "game", .output_field = "current_cat_mesh", .system_field = "current_cat_mesh" },
-                .{ .output_node = "game", .output_field = "orbit_camera", .system_field = "orbit_camera" },
-                .{ .output_node = "game", .output_field = "world_matrix", .system_field = "world_matrix" },
-            },
-        },
     );
 
-    var previous_outputs_hash: u32 = 0;
     var my_node_graph = MyNodeGraph.init(.{
         .allocator = std.heap.page_allocator,
         .store = .{

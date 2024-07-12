@@ -37,7 +37,10 @@ fn AttemptEventCast(InputType: type, OutputType: type, value: InputType) OutputT
     } else null;
 }
 
-pub fn NodeGraph(comptime node_definitions: anytype, comptime graph: node_graph_blueprint.Blueprint) type {
+pub fn NodeGraph(
+    comptime graph: node_graph_blueprint.Blueprint,
+    comptime node_definitions: anytype,
+) type {
     const NodeOutputs = build_type: {
         comptime var node_output_fields: []const std.builtin.Type.StructField = &.{};
         inline for (graph.nodes) |node| {
@@ -484,8 +487,8 @@ test "Build" {
     const NodeDefinitions = @import("./node_graph_blueprint_nodes.zig");
     const allocator = std.heap.page_allocator;
     const MyNodeGraph = NodeGraph(
-        NodeDefinitions,
         node_graph_blueprint.node_graph_blueprint,
+        NodeDefinitions,
     );
     var my_node_graph = try MyNodeGraph.init(.{
         .allocator = allocator,
