@@ -29,6 +29,15 @@ pub const BakedAnimationMesh = struct {
     frame_rate: u32,
 };
 
+pub const SubdivAnimationMesh = struct {
+    label: []const u8,
+    polygons: []const subdiv.Face,
+    quads_by_subdiv: []const []const subdiv.Quad,
+    indices: []const u32,
+    frames: []const []const zm.Vec,
+    frame_rate: u32,
+};
+
 const hexColors = [_][3]f32{
     .{ 1.0, 0.0, 0.0 },
     .{ 0.0, 1.0, 0.0 },
@@ -115,8 +124,10 @@ pub const interface = struct {
             }
 
             pub const Resources = struct {
-                cat: BakedAnimationMesh,
+                cat: SubdivAnimationMesh,
             };
+
+            const mesh_helper = MeshHelper.Polygon(.Quad);
 
             pub fn getResources(arena: *std.heap.ArenaAllocator, props: struct {
                 load_the_data: bool,
@@ -126,15 +137,12 @@ pub const interface = struct {
                 const allocator = arena.allocator();
                 _ = props;
 
-                const max_subdiv = 1;
-
                 const json_data = @embedFile("content/Cat.blend.json");
                 const mesh_input_data = std.json.parseFromSlice(MeshSpec, allocator, json_data, .{}) catch |err| {
                     // std.debug.print("Failed to parse JSON: {}", .{err});
                     wasm_entry.dumpDebugLog(std.fmt.allocPrint(allocator, "Failed to parse JSON: {}", .{err}) catch unreachable);
                     return err;
                 };
-                const mesh_helper = MeshHelper.Polygon(.Quad);
                 const input_data = mesh_input_data.value.meshes[0];
                 const quads_by_subdiv = blk: {
                     const encoded_vertices = input_data.frame_to_vertices[0];
@@ -156,43 +164,32 @@ pub const interface = struct {
                     }
                     break :blk quads_by_subdiv;
                 };
-                var frames = std.ArrayList(BakedAnimationMesh.Frame).init(allocator);
+                var frames = std.ArrayList([]const zm.Vec).init(allocator);
                 for (input_data.frame_to_vertices) |encoded_vertices| {
-                    try frames.append(blk: {
-                        const input_vertices = MeshHelper.flipYZ(
-                            allocator,
-                            MeshHelper.decodeVertexDataFromHexidecimal(
-                                arena.allocator(),
-                                encoded_vertices,
-                            ),
-                        );
-                        var mesh_result = try subdiv.Polygon(.Face).cmcSubdivOnlyPoints(allocator, input_vertices, input_data.polygons);
-                        var subdiv_count: u32 = 0;
-                        while (subdiv_count < max_subdiv) {
-                            mesh_result = try subdiv.Polygon(.Quad).cmcSubdivOnlyPoints(allocator, mesh_result, quads_by_subdiv[subdiv_count]);
-                            subdiv_count += 1;
-                        }
-                        break :blk BakedAnimationMesh.Frame{
-                            .position = MeshHelper.pointsToFloatSlice(allocator, mesh_result),
-                            .normal = MeshHelper.pointsToFloatSlice(
-                                allocator,
-                                mesh_helper.calculateNormals(arena.allocator(), mesh_result, quads_by_subdiv[quads_by_subdiv.len - 1]),
-                            ),
-                        };
-                    });
+                    try frames.append(MeshHelper.flipYZ(
+                        allocator,
+                        MeshHelper.decodeVertexDataFromHexidecimal(
+                            arena.allocator(),
+                            encoded_vertices,
+                        ),
+                    ));
                 }
 
                 return .{
                     .resources = .{
-                        .cat = .{
+                        .cat = SubdivAnimationMesh{
                             .label = input_data.name,
                             .indices = mesh_helper.toTriangleIndices(allocator, quads_by_subdiv[quads_by_subdiv.len - 1]),
+                            .quads_by_subdiv = &quads_by_subdiv,
+                            .polygons = input_data.polygons,
                             .frames = frames.items,
                             .frame_rate = 24,
                         },
                     },
                 };
             }
+
+            const max_subdiv = 1;
 
             pub fn game(arena: *std.heap.ArenaAllocator, props: struct {
                 settings: Settings,
@@ -206,7 +203,6 @@ pub const interface = struct {
                 current_cat_mesh: Mesh,
                 world_matrix: zm.Mat,
             } {
-                _ = arena;
                 if (props.input) |found_input| {
                     props.orbit_camera.rotation = props.orbit_camera.rotation +
                         found_input.mouse_delta *
@@ -217,14 +213,30 @@ pub const interface = struct {
                     props.resources.cat.frames.len,
                 );
                 const current_frame = props.resources.cat.frames[@intCast(current_frame_index)];
-                props.some_numbers[0] += 1;
-                return .{
-                    .current_cat_mesh = Mesh{
+                const current_cat_mesh = subdiv_mesh: {
+                    const allocator = arena.allocator();
+                    const input_vertices = current_frame;
+                    const input_data = props.resources.cat;
+                    const quads_by_subdiv = props.resources.cat.quads_by_subdiv;
+                    var mesh_result = try subdiv.Polygon(.Face).cmcSubdivOnlyPoints(allocator, input_vertices, input_data.polygons);
+                    var subdiv_count: u32 = 0;
+                    while (subdiv_count < max_subdiv) {
+                        mesh_result = try subdiv.Polygon(.Quad).cmcSubdivOnlyPoints(allocator, mesh_result, quads_by_subdiv[subdiv_count]);
+                        subdiv_count += 1;
+                    }
+                    break :subdiv_mesh Mesh{
                         .label = "cat",
                         .indices = props.resources.cat.indices,
-                        .position = current_frame.position,
-                        .normal = current_frame.normal,
-                    },
+                        .position = MeshHelper.pointsToFloatSlice(allocator, mesh_result),
+                        .normal = MeshHelper.pointsToFloatSlice(
+                            allocator,
+                            mesh_helper.calculateNormals(arena.allocator(), mesh_result, quads_by_subdiv[quads_by_subdiv.len - 1]),
+                        ),
+                    };
+                };
+                props.some_numbers[0] += 1;
+                return .{
+                    .current_cat_mesh = current_cat_mesh,
                     .world_matrix = zm.mul(
                         zm.mul(
                             zm.translationV(props.orbit_camera.position),
