@@ -359,7 +359,7 @@ pub fn NodeGraph(
                                     .One => {
                                         mutable_fields = mutable_fields ++ .{.{
                                             .name = link.field[0.. :0],
-                                            .type = pointer.child,
+                                            .type = *const pointer.child,
                                             .default_value = null,
                                             .is_comptime = false,
                                             .alignment = @alignOf(pointer.child),
@@ -368,7 +368,7 @@ pub fn NodeGraph(
                                     .Slice => {
                                         mutable_fields = mutable_fields ++ .{.{
                                             .name = link.field[0.. :0],
-                                            .type = []pointer.child,
+                                            .type = []const pointer.child,
                                             .default_value = null,
                                             .is_comptime = false,
                                             .alignment = @alignOf(pointer.child),
@@ -409,30 +409,18 @@ pub fn NodeGraph(
                     };
                     const target_input_field = &@field(node_inputs, link.field);
                     target_input_field.* = switch (@typeInfo(@TypeOf(target_input_field.*))) {
+                        else => node_input_field,
                         .Pointer => |pointer| switch (pointer.size) {
-                            .One => mutable_input: {
-                                const mutable_input = &@field(mutable_fields, link.field);
-                                mutable_input.* = (try utils.deepClone(
-                                    pointer.child,
-                                    self.nodes_arenas[node_index].allocator(),
-                                    node_input_field,
-                                )).value;
-
-                                break :mutable_input mutable_input;
+                            .One => deferred_clone: {
+                                @field(mutable_fields, link.field) = &node_input_field;
+                                break :deferred_clone undefined;
                             },
-                            .Slice => mutable_input: {
-                                const mutable_input = &@field(mutable_fields, link.field);
-                                mutable_input.* = (try utils.deepClone(
-                                    @TypeOf(mutable_input.*),
-                                    self.nodes_arenas[node_index].allocator(),
-                                    node_input_field,
-                                )).value;
-
-                                break :mutable_input mutable_input.*;
+                            .Slice => deferred_clone: {
+                                @field(mutable_fields, link.field) = node_input_field;
+                                break :deferred_clone undefined;
                             },
                             else => unreachable,
                         },
-                        else => node_input_field,
                     };
                 }
 
@@ -443,6 +431,29 @@ pub fn NodeGraph(
                     target.*
                 else blk: {
                     _ = self.nodes_arenas[node_index].reset(.retain_capacity);
+
+                    // Duplicate data from inputs where the node is allowed to manipulate pointers ...
+                    // inline for (@typeInfo(@TypeOf(mutable_fields)).Struct.fields) |field| {
+                    //     const pointer = @typeInfo(field.type).Pointer;
+                    //     const input_to_clone = &@field(node_inputs, field.name);
+                    //     input_to_clone.* = switch (pointer.size) {
+                    //         .One => cloned: {
+                    //             var result = (try utils.deepClone(
+                    //                 pointer.child,
+                    //                 self.nodes_arenas[node_index].allocator(),
+                    //                 @field(mutable_fields, field.name).*,
+                    //             )).value;
+                    //             break :cloned &result;
+                    //         },
+                    //         .Slice => (try utils.deepClone(
+                    //             @TypeOf(input_to_clone.*),
+                    //             self.nodes_arenas[node_index].allocator(),
+                    //             @field(mutable_fields, field.name),
+                    //         )).value,
+                    //         else => unreachable,
+                    //     };
+                    // }
+
                     const function_output = @call(
                         .auto,
                         @field(node_definitions, node.function),
@@ -456,8 +467,17 @@ pub fn NodeGraph(
                                 node_inputs,
                             },
                     );
-                    const node_output = utils.copyWith(
-                        utils.copyWith(@as(@TypeOf(target.*), undefined), mutable_fields),
+                    var node_output: @TypeOf(target.*) = undefined;
+                    // inline for (@typeInfo(@TypeOf(mutable_fields)).Struct.fields) |mutable_field| {
+                    //     const pointer = @typeInfo(mutable_field.type).Pointer;
+                    //     @field(node_output, mutable_field.name) = switch (pointer.size) {
+                    //         else => unreachable,
+                    //         .One => @field(node_inputs, mutable_field.name).*,
+                    //         .Slice => @field(node_inputs, mutable_field.name),
+                    //     };
+                    // }
+                    node_output = utils.copyWith(
+                        node_output,
                         switch (@typeInfo(@TypeOf(function_output))) {
                             else => function_output,
                             .ErrorUnion => try function_output,

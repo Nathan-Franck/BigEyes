@@ -130,6 +130,20 @@ test "deepClone" {
         try std.testing.expect(std.mem.eql(i32, source, result.value));
     }
 
+    { // slice of slices
+        const Type = []const []const i32;
+        const source: Type = &.{&.{ 1, 2, 3 }};
+        const result = try deepClone(Type, std.heap.page_allocator, source);
+        try std.testing.expect(std.mem.eql(i32, source[0], result.value[0]));
+    }
+
+    { // array
+        const Type = []const [4]i32;
+        const source: Type = &.{.{ 1, 2, 3, 4 }};
+        const result = try deepClone(Type, std.heap.page_allocator, source);
+        try std.testing.expect(std.mem.eql(i32, &source[0], &result.value[0]));
+    }
+
     { // Struct with slices inside
         const Type = struct { a: []const i32, b: []const i32 };
         const source: Type = .{ .a = &.{ 1, 2, 3 }, .b = &.{ 4, 5, 6 } };
