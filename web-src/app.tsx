@@ -47,7 +47,6 @@ const { classes, encodedStyle } = declareStyle({
 // https://stackoverflow.com/questions/6604192/showing-console-errors-and-alerts-in-a-div-inside-the-page
 
 let graphInputs: Parameters<(typeof nodeGraph)["call"]>[0] = {
-  load_the_data: true,
   game_time_ms: 0,
   user_changes: {
     resolution_update: { x: window.innerWidth, y: window.innerHeight },
@@ -75,6 +74,8 @@ export function App() {
     height: window.innerHeight,
   });
 
+  const [subdivLevel, setSubdivLevel] = useState(1);
+
   useEffect(() => {
     const resizeHandler = () => {
       setWindowSize({
@@ -82,7 +83,6 @@ export function App() {
         height: canvasRef.current?.height || 0,
       });
       updateGraph({
-        load_the_data: true,
         game_time_ms: Date.now(),
         user_changes: {
           resolution_update: { x: window.innerWidth, y: window.innerHeight },
@@ -162,15 +162,13 @@ export function App() {
       });
     };
 
-    updateGraph({ game_time_ms: Date.now(), load_the_data: true });
+    updateGraph({ game_time_ms: Date.now() });
 
     let animationRunning = true;
     const intervalID = setInterval(() => {
       if (!animationRunning) clearInterval(intervalID);
       if (document.hasFocus())
-        requestAnimationFrame(() =>
-          updateGraph({ game_time_ms: Date.now(), load_the_data: true }),
-        );
+        requestAnimationFrame(() => updateGraph({ game_time_ms: Date.now() }));
     }, 1000.0 / 24.0);
 
     return () => (animationRunning = false);
@@ -200,13 +198,29 @@ export function App() {
           lastMousePosition = currentMouse;
           if (event.buttons) {
             updateGraph({
-              load_the_data: true,
               game_time_ms: Date.now(),
               input: { mouse_delta: [mouseDelta.x, mouseDelta.y, 0, 0] },
             });
           }
         }}
-      ></div>
+      >
+        // Slider in the top-left to set subdiv level from 1-3
+        <input
+          type="range"
+          min="0"
+          max="2"
+          value={subdivLevel}
+          onChange={(event) => {
+            setSubdivLevel(parseInt(event.target!.value));
+            updateGraph({
+              game_time_ms: Date.now(),
+              user_changes: {
+                subdiv_level_update: parseInt(event.target!.value),
+              },
+            });
+          }}
+        ></input>
+      </div>
       <canvas
         ref={canvasRef}
         class={classes.canvas}

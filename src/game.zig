@@ -61,17 +61,17 @@ pub const interface = struct {
                     .name = "getResources",
                     .function = "getResources",
                     .input_links = &[_]node_graph_blueprint.InputLink{
-                        .{ .field = "load_the_data", .source = .{ .input_field = "load_the_data" } },
+                        .{ .field = "settings", .source = .{ .node = .{ .name = "changeSettings", .field = "settings" } } },
                     },
                 },
                 .{
                     .name = "game",
                     .function = "game",
                     .input_links = &[_]node_graph_blueprint.InputLink{
-                        .{ .field = "game_time_ms", .source = .{ .input_field = "game_time_ms" } },
-                        .{ .field = "input", .source = .{ .input_field = "input" } },
                         .{ .field = "resources", .source = .{ .node = .{ .name = "getResources", .field = "resources" } } },
                         .{ .field = "settings", .source = .{ .node = .{ .name = "changeSettings", .field = "settings" } } },
+                        .{ .field = "game_time_ms", .source = .{ .input_field = "game_time_ms" } },
+                        .{ .field = "input", .source = .{ .input_field = "input" } },
                         .{ .field = "orbit_camera", .source = .{ .store_field = "orbit_camera" } },
                         .{ .field = "some_numbers", .source = .{ .store_field = "some_numbers" } },
                     },
@@ -100,6 +100,7 @@ pub const interface = struct {
         struct {
             pub const Settings = struct {
                 orbit_speed: f32,
+                subdiv_level: u8,
                 render_resolution: PixelPoint,
             };
 
@@ -107,6 +108,7 @@ pub const interface = struct {
                 settings: Settings,
                 user_changes: ?union(enum) {
                     resolution_update: PixelPoint,
+                    subdiv_level_update: u8,
                 },
             }) !struct { settings: Settings } {
                 var settings = props.settings;
@@ -114,6 +116,9 @@ pub const interface = struct {
                     switch (c) {
                         .resolution_update => |resolution| {
                             settings.render_resolution = resolution;
+                        },
+                        .subdiv_level_update => |level| {
+                            settings.subdiv_level = level;
                         },
                     }
                 }
@@ -130,12 +135,11 @@ pub const interface = struct {
             const mesh_helper = MeshHelper.Polygon(.Quad);
 
             pub fn getResources(arena: *std.heap.ArenaAllocator, props: struct {
-                load_the_data: bool,
+                settings: Settings,
             }) !struct {
                 resources: Resources,
             } {
                 const allocator = arena.allocator();
-                _ = props;
 
                 const json_data = @embedFile("content/Cat.blend.json");
                 const mesh_input_data = std.json.parseFromSlice(MeshSpec, allocator, json_data, .{}) catch |err| {
@@ -153,12 +157,11 @@ pub const interface = struct {
                             encoded_vertices,
                         ),
                     );
-                    // var quads_by_subdiv: [max_subdiv + 1][]const subdiv.Quad = undefined;
                     var quads_by_subdiv = std.ArrayList([]const subdiv.Quad).init(allocator);
                     var mesh_result = try subdiv.Polygon(.Face).cmcSubdiv(arena.allocator(), input_vertices, input_data.polygons);
                     try quads_by_subdiv.append(mesh_result.quads);
                     var subdiv_count: u32 = 0;
-                    while (subdiv_count < max_subdiv) {
+                    while (subdiv_count < props.settings.subdiv_level) {
                         mesh_result = try subdiv.Polygon(.Quad).cmcSubdiv(arena.allocator(), mesh_result.points, mesh_result.quads);
                         subdiv_count += 1;
                         try quads_by_subdiv.append(mesh_result.quads);
@@ -190,8 +193,6 @@ pub const interface = struct {
                 };
             }
 
-            const max_subdiv = 1;
-
             pub fn game(arena: *std.heap.ArenaAllocator, props: struct {
                 settings: Settings,
                 resources: Resources,
@@ -221,7 +222,7 @@ pub const interface = struct {
                     const quads_by_subdiv = props.resources.cat.quads_by_subdiv;
                     var mesh_result = try subdiv.Polygon(.Face).cmcSubdivOnlyPoints(allocator, input_vertices, input_data.polygons);
                     var subdiv_count: u32 = 0;
-                    while (subdiv_count < max_subdiv) {
+                    while (subdiv_count < props.settings.subdiv_level) {
                         mesh_result = try subdiv.Polygon(.Quad).cmcSubdivOnlyPoints(allocator, mesh_result, quads_by_subdiv[subdiv_count]);
                         subdiv_count += 1;
                     }
@@ -268,6 +269,7 @@ pub const interface = struct {
             .settings = .{
                 .orbit_speed = 0.01,
                 .render_resolution = .{ .x = 0, .y = 0 },
+                .subdiv_level = 1,
             },
             .orbit_camera = .{
                 .position = .{ 0, 0, 0, 1 },
