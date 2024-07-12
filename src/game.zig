@@ -118,6 +118,8 @@ pub const interface = struct {
                 cat: BakedAnimationMesh,
             };
 
+            const max_subdiv = 1;
+
             pub fn getResources(arena: *std.heap.ArenaAllocator, props: struct {
                 load_the_data: bool,
             }) !struct {
@@ -125,8 +127,6 @@ pub const interface = struct {
             } {
                 const allocator = arena.allocator();
                 _ = props;
-
-                const max_subdiv = 1;
 
                 const json_data = @embedFile("content/Cat.blend.json");
                 const mesh_input_data = std.json.parseFromSlice(MeshSpec, allocator, json_data, .{}) catch |err| {

@@ -433,26 +433,26 @@ pub fn NodeGraph(
                     _ = self.nodes_arenas[node_index].reset(.retain_capacity);
 
                     // Duplicate data from inputs where the node is allowed to manipulate pointers ...
-                    // inline for (@typeInfo(@TypeOf(mutable_fields)).Struct.fields) |field| {
-                    //     const pointer = @typeInfo(field.type).Pointer;
-                    //     const input_to_clone = &@field(node_inputs, field.name);
-                    //     input_to_clone.* = switch (pointer.size) {
-                    //         .One => cloned: {
-                    //             var result = (try utils.deepClone(
-                    //                 pointer.child,
-                    //                 self.nodes_arenas[node_index].allocator(),
-                    //                 @field(mutable_fields, field.name).*,
-                    //             )).value;
-                    //             break :cloned &result;
-                    //         },
-                    //         .Slice => (try utils.deepClone(
-                    //             @TypeOf(input_to_clone.*),
-                    //             self.nodes_arenas[node_index].allocator(),
-                    //             @field(mutable_fields, field.name),
-                    //         )).value,
-                    //         else => unreachable,
-                    //     };
-                    // }
+                    inline for (@typeInfo(@TypeOf(mutable_fields)).Struct.fields) |field| {
+                        const pointer = @typeInfo(field.type).Pointer;
+                        const input_to_clone = &@field(node_inputs, field.name);
+                        input_to_clone.* = switch (pointer.size) {
+                            .One => cloned: {
+                                var result = (try utils.deepClone(
+                                    pointer.child,
+                                    self.nodes_arenas[node_index].allocator(),
+                                    @field(mutable_fields, field.name).*,
+                                )).value;
+                                break :cloned &result;
+                            },
+                            .Slice => (try utils.deepClone(
+                                @TypeOf(input_to_clone.*),
+                                self.nodes_arenas[node_index].allocator(),
+                                @field(mutable_fields, field.name),
+                            )).value,
+                            else => unreachable,
+                        };
+                    }
 
                     const function_output = @call(
                         .auto,
@@ -468,14 +468,14 @@ pub fn NodeGraph(
                             },
                     );
                     var node_output: @TypeOf(target.*) = undefined;
-                    // inline for (@typeInfo(@TypeOf(mutable_fields)).Struct.fields) |mutable_field| {
-                    //     const pointer = @typeInfo(mutable_field.type).Pointer;
-                    //     @field(node_output, mutable_field.name) = switch (pointer.size) {
-                    //         else => unreachable,
-                    //         .One => @field(node_inputs, mutable_field.name).*,
-                    //         .Slice => @field(node_inputs, mutable_field.name),
-                    //     };
-                    // }
+                    inline for (@typeInfo(@TypeOf(mutable_fields)).Struct.fields) |mutable_field| {
+                        const pointer = @typeInfo(mutable_field.type).Pointer;
+                        @field(node_output, mutable_field.name) = switch (pointer.size) {
+                            else => unreachable,
+                            .One => @field(node_inputs, mutable_field.name).*,
+                            .Slice => @field(node_inputs, mutable_field.name),
+                        };
+                    }
                     node_output = utils.copyWith(
                         node_output,
                         switch (@typeInfo(@TypeOf(function_output))) {
