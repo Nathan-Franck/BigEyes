@@ -1,5 +1,12 @@
 [
   {
+    "label": "Build wasm debug binary",
+    "command": "time zig build wasm -Doptimize=Debug",
+    "use_new_terminal": false,
+    "allow_concurrent_runs": false,
+    "reveal": "always"
+  },
+  {
     "label": "Build wasm release binary",
     "command": "time zig build wasm -Doptimize=ReleaseFast",
     "use_new_terminal": false,

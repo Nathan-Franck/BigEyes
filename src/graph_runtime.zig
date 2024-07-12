@@ -53,13 +53,29 @@ pub fn NodeGraph(comptime node_definitions: anytype, comptime graph: node_graph_
             for (@typeInfo(node_inputs[node_inputs.len - 1].type.?).Struct.fields) |input_field| {
                 switch (@typeInfo(input_field.type)) {
                     .Pointer => |pointer| {
-                        output_fields = comptime output_fields ++ .{.{
-                            .name = input_field.name,
-                            .type = pointer.child,
-                            .default_value = null,
-                            .is_comptime = false,
-                            .alignment = @alignOf(input_field.type),
-                        }};
+                        switch (pointer.size) {
+                            .One => {
+                                if (!pointer.is_const)
+                                    output_fields = comptime output_fields ++ .{.{
+                                        .name = input_field.name,
+                                        .type = pointer.child,
+                                        .default_value = null,
+                                        .is_comptime = false,
+                                        .alignment = @alignOf(input_field.type),
+                                    }};
+                            },
+                            .Slice => {
+                                if (!pointer.is_const)
+                                    output_fields = comptime output_fields ++ .{.{
+                                        .name = input_field.name,
+                                        .type = []const pointer.child,
+                                        .default_value = null,
+                                        .is_comptime = false,
+                                        .alignment = @alignOf(input_field.type),
+                                    }};
+                            },
+                            else => {},
+                        }
                     },
                     else => {},
                 }
@@ -218,6 +234,27 @@ pub fn NodeGraph(comptime node_definitions: anytype, comptime graph: node_graph_
                 .is_tuple = false,
             } });
         };
+        fn getOutputFieldTypeFromNode(node: node_graph_blueprint.NodeGraphBlueprintEntry, field_name: []const u8) type {
+            const function_definition = @typeInfo(@TypeOf(@field(node_definitions, node.name))).Fn;
+            const node_outputs_from_return_type = function_definition.return_type.?;
+            const node_inputs_maybe_pointer_outputs = function_definition.params[function_definition.params.len - 1].type.?;
+            const non_error_outputs = switch (@typeInfo(node_outputs_from_return_type)) {
+                else => node_outputs_from_return_type,
+                .ErrorUnion => |error_union| error_union.payload,
+            };
+            const field_type = for (@typeInfo(non_error_outputs).Struct.fields) |field|
+                if (std.mem.eql(u8, field.name, field_name)) break field.type else continue
+            else for (@typeInfo(node_inputs_maybe_pointer_outputs).Struct.fields) |field|
+                if (std.mem.eql(u8, field.name, field_name)) {
+                    switch (@typeInfo(field.type)) {
+                        .Pointer => |pointer| break pointer.child,
+                        else => continue,
+                    }
+                } else continue
+            else
+                @panic("arced virus"); // TODO: Provide a useful compiler error about how blueprint and node defn's disagree.
+            return field_type;
+        }
         pub const SystemOutputs = build_type: {
             var fields: []const std.builtin.Type.StructField = &.{};
             for (graph.output) |output_defn| {
@@ -269,27 +306,6 @@ pub fn NodeGraph(comptime node_definitions: anytype, comptime graph: node_graph_
                 .is_tuple = false,
             } });
         };
-        fn getOutputFieldTypeFromNode(node: node_graph_blueprint.NodeGraphBlueprintEntry, field_name: []const u8) type {
-            const function_definition = @typeInfo(@TypeOf(@field(node_definitions, node.name))).Fn;
-            const node_outputs_from_return_type = function_definition.return_type.?;
-            const node_inputs_maybe_pointer_outputs = function_definition.params[function_definition.params.len - 1].type.?;
-            const non_error_outputs = switch (@typeInfo(node_outputs_from_return_type)) {
-                else => node_outputs_from_return_type,
-                .ErrorUnion => |error_union| error_union.payload,
-            };
-            const field_type = for (@typeInfo(non_error_outputs).Struct.fields) |field|
-                if (std.mem.eql(u8, field.name, field_name)) break field.type else continue
-            else for (@typeInfo(node_inputs_maybe_pointer_outputs).Struct.fields) |field|
-                if (std.mem.eql(u8, field.name, field_name)) {
-                    switch (@typeInfo(field.type)) {
-                        .Pointer => |pointer| break pointer.child,
-                        else => continue,
-                    }
-                } else continue
-            else
-                @panic("arced virus"); // TODO: Provide a useful compiler error about how blueprint and node defn's disagree.
-            return field_type;
-        }
         allocator: std.mem.Allocator,
         store: SystemStore,
         store_arena: std.heap.ArenaAllocator,
@@ -336,23 +352,37 @@ pub fn NodeGraph(comptime node_definitions: anytype, comptime graph: node_graph_
                 const NodeInputs = node_params[node_params.len - 1].type.?;
                 var node_inputs: NodeInputs = undefined;
                 var dirty = false;
-                var mutable_fields: my_type: {
+                var mutable_fields: build_type: {
                     var mutable_fields: []const std.builtin.Type.StructField = &.{};
                     for (node.input_links) |link| {
                         switch (@typeInfo(@TypeOf(@field(node_inputs, link.field)))) {
                             .Pointer => |pointer| {
-                                mutable_fields = mutable_fields ++ .{.{
-                                    .name = link.field[0.. :0],
-                                    .type = pointer.child,
-                                    .default_value = null,
-                                    .is_comptime = false,
-                                    .alignment = @alignOf(pointer.child),
-                                }};
+                                switch (pointer.size) {
+                                    .One => {
+                                        mutable_fields = mutable_fields ++ .{.{
+                                            .name = link.field[0.. :0],
+                                            .type = pointer.child,
+                                            .default_value = null,
+                                            .is_comptime = false,
+                                            .alignment = @alignOf(pointer.child),
+                                        }};
+                                    },
+                                    .Slice => {
+                                        mutable_fields = mutable_fields ++ .{.{
+                                            .name = link.field[0.. :0],
+                                            .type = []pointer.child,
+                                            .default_value = null,
+                                            .is_comptime = false,
+                                            .alignment = @alignOf(pointer.child),
+                                        }};
+                                    },
+                                    else => {},
+                                }
                             },
                             else => {},
                         }
                     }
-                    break :my_type @Type(.{ .Struct = .{
+                    break :build_type @Type(.{ .Struct = .{
                         .layout = .auto,
                         .fields = mutable_fields,
                         .decls = &.{},
@@ -401,8 +431,6 @@ pub fn NodeGraph(comptime node_definitions: anytype, comptime graph: node_graph_
                     target.*
                 else blk: {
                     _ = self.nodes_arenas[node_index].reset(.retain_capacity);
-                    var node_output: @TypeOf(target.*) = undefined;
-                    node_output = utils.copyWith(node_output, mutable_fields);
                     const function_output = @call(
                         .auto,
                         @field(node_definitions, node.function),
@@ -416,10 +444,13 @@ pub fn NodeGraph(comptime node_definitions: anytype, comptime graph: node_graph_
                                 node_inputs,
                             },
                     );
-                    node_output = utils.copyWith(node_output, switch (@typeInfo(@TypeOf(function_output))) {
-                        else => function_output,
-                        .ErrorUnion => try function_output,
-                    });
+                    const node_output = utils.copyWith(
+                        utils.copyWith(@as(@TypeOf(target.*), undefined), mutable_fields),
+                        switch (@typeInfo(@TypeOf(function_output))) {
+                            else => function_output,
+                            .ErrorUnion => try function_output,
+                        },
+                    );
                     break :blk node_output;
                 };
             }
@@ -454,9 +485,9 @@ test "Build" {
     const allocator = std.heap.page_allocator;
     const MyNodeGraph = NodeGraph(
         NodeDefinitions,
-        node_graph_blueprint,
+        node_graph_blueprint.node_graph_blueprint,
     );
-    var my_node_graph = MyNodeGraph.init(.{
+    var my_node_graph = try MyNodeGraph.init(.{
         .allocator = allocator,
         .store = .{
             .node_dimensions = &.{},
@@ -471,7 +502,7 @@ test "Build" {
         },
     });
     _ = try my_node_graph.update(.{
-        .recieved_blueprint = node_graph_blueprint,
+        .recieved_blueprint = node_graph_blueprint.node_graph_blueprint,
         .keyboard_modifiers = .{
             .shift = false,
             .alt = false,

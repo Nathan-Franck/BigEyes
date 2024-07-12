@@ -164,9 +164,12 @@ pub const interface = struct {
             } {
                 _ = arena;
                 if (props.input) |found_input| {
-                    props.orbit_camera.* = utils.copyWith(props.orbit_camera.*, .{ .rotation = props.orbit_camera.rotation +
-                        found_input.mouse_delta *
-                        @as(zm.Vec, @splat(-props.settings.orbit_speed)) });
+                    props.orbit_camera.* = utils.copyWith(
+                        props.orbit_camera.*,
+                        .{ .rotation = props.orbit_camera.rotation +
+                            found_input.mouse_delta *
+                            @as(zm.Vec, @splat(-props.settings.orbit_speed)) },
+                    );
                 }
                 const current_frame_index = @mod(
                     props.game_time_ms * props.resources.cat.frame_rate / 1000,
@@ -192,7 +195,7 @@ pub const interface = struct {
                             ),
                         ),
                         zm.perspectiveFovLh(
-                            0.25 * 3.141569,
+                            0.25 * 3.14151,
                             @as(f32, @floatFromInt(props.settings.render_resolution.x)) /
                                 @as(f32, @floatFromInt(props.settings.render_resolution.y)),
                             0.1,
