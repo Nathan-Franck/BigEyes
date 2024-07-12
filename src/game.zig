@@ -237,7 +237,7 @@ pub const interface = struct {
                             ),
                         ),
                         zm.perspectiveFovLh(
-                            0.25 * 3.14151,
+                            0.25 * 3.14159,
                             @as(f32, @floatFromInt(props.settings.render_resolution.x)) /
                                 @as(f32, @floatFromInt(props.settings.render_resolution.y)),
                             0.1,

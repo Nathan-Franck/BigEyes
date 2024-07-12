@@ -20,6 +20,7 @@ pub const Quad = [4]u32;
 //         scale: [3]f32,
 //     },
 // },
+framerate: u32,
 nodes: []const struct {
     name: []const u8,
     type: []const u8,
