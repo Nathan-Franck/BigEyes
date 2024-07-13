@@ -59,20 +59,20 @@ pub fn Polygon(comptime poly_selection: enum { Quad, Face }) type {
             var arena = std.heap.ArenaAllocator.init(allocator);
             defer arena.deinit();
 
-            var vertexToPoly = std.AutoHashMap(u32, std.ArrayList(*const Poly)).init(arena.allocator());
+            // var vertexToPoly = std.AutoHashMap(u32, *std.ArrayList(*const Poly)).init(arena.allocator());
+            var vertexToPoly = arena.allocator().alloc(std.ArrayList(*const Poly), points.len) catch unreachable;
+            for (vertexToPoly) |*list| {
+                list.* = std.ArrayList(*const Poly).init(arena.allocator());
+            }
             for (polygons) |*polygon| {
                 for (polygon.*) |vertex| {
-                    var polysList = if (vertexToPoly.get(vertex)) |existing|
-                        existing
-                    else
-                        std.ArrayList(*const Poly).init(arena.allocator());
-                    polysList.append(polygon) catch unreachable;
-                    vertexToPoly.put(vertex, polysList) catch unreachable;
+                    vertexToPoly[vertex].append(polygon) catch unreachable;
                 }
             }
             var normals = std.ArrayList(Point).init(allocator);
             for (points, 0..) |_, i| {
-                normals.append(if (vertexToPoly.get(@intCast(i))) |local_polys| average_normal: {
+                normals.append(average_normal: {
+                    const local_polys = vertexToPoly[@intCast(i)];
                     var average_normal = Point{ 0, 0, 0, 0 };
                     for (local_polys.items) |poly| {
                         var poly_normal = Point{ 0, 0, 0, 0 };
@@ -88,7 +88,7 @@ pub fn Polygon(comptime poly_selection: enum { Quad, Face }) type {
                         );
                     }
                     break :average_normal average_normal;
-                } else Point{ 0, 0, 0, 0 }) catch unreachable;
+                }) catch unreachable;
             }
             return normals.items;
         }

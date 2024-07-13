@@ -1,14 +1,21 @@
 [
   {
     "label": "Build wasm debug binary",
-    "command": "time zig build wasm -Doptimize=Debug",
+    "command": "time zig build wasm -Doptimize=Debug -freference-trace",
     "use_new_terminal": false,
     "allow_concurrent_runs": false,
     "reveal": "always"
   },
   {
     "label": "Build wasm release binary",
-    "command": "time zig build wasm -Doptimize=ReleaseFast",
+    "command": "time zig build wasm -Doptimize=ReleaseSmall -freference-trace",
+    "use_new_terminal": false,
+    "allow_concurrent_runs": false,
+    "reveal": "always"
+  },
+  {
+    "label": "Build wasm release fast binary",
+    "command": "time zig build wasm -Doptimize=ReleaseFast -freference-trace",
     "use_new_terminal": false,
     "allow_concurrent_runs": false,
     "reveal": "always"

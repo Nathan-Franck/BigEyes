@@ -18,17 +18,6 @@ pub const Mesh = struct {
     normal: []const f32,
 };
 
-pub const BakedAnimationMesh = struct {
-    pub const Frame = struct {
-        normal: []const f32,
-        position: []const f32,
-    };
-    label: []const u8,
-    indices: []const u32,
-    frames: []const Frame,
-    frame_rate: u32,
-};
-
 pub const SubdivAnimationMesh = struct {
     label: []const u8,
     polygons: []const subdiv.Face,
@@ -141,13 +130,13 @@ pub const interface = struct {
             } {
                 const allocator = arena.allocator();
 
-                const json_data = @embedFile("content/Cat.blend.json");
-                const mesh_input_data = std.json.parseFromSlice(MeshSpec, allocator, json_data, .{}) catch |err| {
-                    // std.debug.print("Failed to parse JSON: {}", .{err});
-                    wasm_entry.dumpDebugLog(std.fmt.allocPrint(allocator, "Failed to parse JSON: {}", .{err}) catch unreachable);
-                    return err;
+                const mesh_input_data = blk: {
+                    const json_data = @embedFile("content/Cat.blend.json");
+                    // var comptime_buffer: [json_data.len]u8 = undefined;
+                    // var comptime_allocator = std.heap.FixedBufferAllocator.init(comptime_buffer[0..]);
+                    break :blk std.json.parseFromSliceLeaky(MeshSpec, allocator, json_data, .{}) catch unreachable;
                 };
-                const input_data = mesh_input_data.value.meshes[0];
+                const input_data = mesh_input_data.meshes[0];
                 const quads_by_subdiv = blk: {
                     const encoded_vertices = input_data.frame_to_vertices[0];
                     const input_vertices = MeshHelper.flipYZ(

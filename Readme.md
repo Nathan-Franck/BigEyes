@@ -26,6 +26,7 @@ zig build wasm -Doptimize=ReleaseFast
 ### Custom Blender Export
 
 * Ensure your blender is in the path
+** Flatpak version currently doesn't work
 ```
 blender triangle_wgpu_content/cube.blend --background --python .\tools\custom-gltf.py
 ```

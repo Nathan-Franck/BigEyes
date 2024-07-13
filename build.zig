@@ -114,10 +114,10 @@ pub fn build(
     const optimize = b.standardOptimizeOption(.{});
 
     const export_meshes = ExportMeshes.create(b, &.{
-        "boss",
-        "cube",
+        // "boss",
+        // "cube",
         "Cat",
-        "RockLevel",
+        // "RockLevel",
     });
 
     // Tests (default)

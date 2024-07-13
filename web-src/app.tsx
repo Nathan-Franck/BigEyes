@@ -6,6 +6,15 @@ import { sliceToArray } from "./zigWasmInterface";
 import { Mat4, ShaderBuilder } from "./shaderBuilder";
 
 const { classes, encodedStyle } = declareStyle({
+  stats: {
+    position: "absolute",
+    top: "0px",
+    left: "0px",
+    color: "#fff",
+    backgroundColor: "#000",
+    padding: "5px",
+    borderRadius: "5px",
+  },
   nodeGraph: {},
   nodeGraphBackground: {
     backgroundColor: "#555",
@@ -60,7 +69,7 @@ function updateGraph(newInputs: typeof graphInputs) {
   graphInputs = newInputs;
   const graphOutputs = nodeGraph.call(graphInputs);
   if (graphOutputs == null || "error" in graphOutputs) return;
-  if (updateRender != null) requestAnimationFrame(updateRender(graphOutputs));
+  if (updateRender != null) updateRender(graphOutputs)();
 }
 
 const nodeGraph = NodeGraph(graphInputs);
@@ -75,6 +84,7 @@ export function App() {
   });
 
   const [subdivLevel, setSubdivLevel] = useState(1);
+  const [stats, setStats] = useState({ polygonCount: 0, framerate: 0 });
 
   useEffect(() => {
     const resizeHandler = () => {
@@ -131,15 +141,7 @@ export function App() {
     });
 
     updateRender = (graphOutputs) => () => {
-      {
-        gl.viewport(0, 0, windowSize.width, windowSize.height);
-        gl.clearColor(0, 0, 0, 1);
-        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-      }
-
-      console.log(sliceToArray.Uint32Array(graphOutputs.some_numbers));
-
-      ShaderBuilder.renderMaterial(gl, coolMesh, {
+      const buffers = {
         indices: ShaderBuilder.createElementBuffer(
           gl,
           sliceToArray.Uint32Array(graphOutputs.current_cat_mesh.indices),
@@ -159,6 +161,19 @@ export function App() {
         perspectiveMatrix: graphOutputs.world_matrix.flatMap(
           (row) => row,
         ) as Mat4,
+      };
+      requestAnimationFrame(() => {
+        setStats({
+          polygonCount: buffers.indices.length / 3,
+          framerate: 1000.0 / (Date.now() - graphInputs.game_time_ms),
+        });
+        {
+          gl.viewport(0, 0, windowSize.width, windowSize.height);
+          gl.clearColor(0, 0, 0, 1);
+          gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+        }
+
+        ShaderBuilder.renderMaterial(gl, coolMesh, buffers);
       });
     };
 
@@ -167,8 +182,7 @@ export function App() {
     let animationRunning = true;
     const intervalID = setInterval(() => {
       if (!animationRunning) clearInterval(intervalID);
-      if (document.hasFocus())
-        requestAnimationFrame(() => updateGraph({ game_time_ms: Date.now() }));
+      if (document.hasFocus()) updateGraph({ game_time_ms: Date.now() });
     }, 1000.0 / 24.0);
 
     return () => (animationRunning = false);
@@ -204,11 +218,11 @@ export function App() {
           }
         }}
       >
-        // Slider in the top-left to set subdiv level from 1-3
+        // Select a subdivision detail between 0-3
         <input
           type="range"
           min="0"
-          max="2"
+          max="3"
           value={subdivLevel}
           onChange={(event) => {
             setSubdivLevel(parseInt(event.target!.value));
@@ -220,6 +234,11 @@ export function App() {
             });
           }}
         ></input>
+        <div class={classes.stats}>
+          <div>subdiv_level - {subdivLevel}</div>
+          <div>polygon_count - {stats.polygonCount}</div>
+          <div>frame_rate - {"" + Math.round(stats.framerate)}</div>
+        </div>
       </div>
       <canvas
         ref={canvasRef}

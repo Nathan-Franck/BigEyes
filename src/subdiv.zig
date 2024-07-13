@@ -261,12 +261,9 @@ pub fn Polygon(comptime poly_selection: enum {
                 try facePointNums.append(@as(u32, @intCast(nextPointNum)));
                 nextPointNum += 1;
             }
-            var edgePointNums = std.AutoHashMap([2]u32, u32).init(allocator);
-            for (edgesFaces, 0..) |edgeFace, edgeNum| {
-                const point1, const point2 = edgeFace.points;
+            for (edgesFaces, 0..) |_, edgeNum| {
                 const edgePoint = edgePoints[edgeNum];
                 try newPoints.append(edgePoint);
-                try edgePointNums.put(switchNums([2]u32{ point1, point2 }), @as(u32, @intCast(nextPointNum)));
                 nextPointNum += 1;
             }
             return newPoints.items;

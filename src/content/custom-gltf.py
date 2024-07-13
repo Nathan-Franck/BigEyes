@@ -55,7 +55,7 @@ for object in bpy.data.objects:
     #         )
     #     armatures.append({"name": armature.name, "bones": bones})
     if object.type == "MESH":
-        bpy.context.view_layer.objects.active = object  
+        bpy.context.view_layer.objects.active = object
 
         # Only activate modifiers that are set to show in render (we are that render)
         modifiers_to_remove = [mod for mod in object.modifiers if not mod.show_render]
@@ -74,16 +74,16 @@ for object in bpy.data.objects:
             polygons.append(polygonRes)
 
         frame_to_vertices = []
-        for frame in range(bpy.context.scene.frame_start, bpy.context.scene.frame_end):  
+        for frame in range(bpy.context.scene.frame_start, bpy.context.scene.frame_end):
             bpy.context.scene.frame_set(frame)
 
             depsgraph = bpy.context.evaluated_depsgraph_get()
             object_eval = object.evaluated_get(depsgraph)
-            mesh = bpy.data.meshes.new_from_object(object_eval)  
+            mesh = bpy.data.meshes.new_from_object(object_eval)
 
-            vertex_strings = [] 
+            vertex_strings = []
             for vertex in mesh.vertices:
-                vertex_array = [vertex.co.x, vertex.co.y, -vertex.co.z] 
+                vertex_array = [vertex.co.x, vertex.co.y, -vertex.co.z]
                 vertex_string = ''.join(''.join(format(byte, '02x') for byte in struct.pack('<f', value)) for value in vertex_array)
                 vertex_strings.append(vertex_string)
             frame_to_vertices.append(''.join(vertex_strings))
@@ -151,12 +151,12 @@ with open(
         {
             # "actions": actions,
             # "armatures": armatures,
-            "framerate": bpy.context.scene.render.fps
+            "framerate": bpy.context.scene.render.fps,
             "nodes": nodes,
             "meshes": meshes,
         },
         file,
-        indent=4,
+        # indent=4,
     )
 print(
     "Export of "
