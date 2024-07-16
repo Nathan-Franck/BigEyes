@@ -115,7 +115,7 @@ export function App() {
     gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
     gl.enable(gl.DEPTH_TEST);
 
-    const coolMesh = ShaderBuilder.generateMaterial(gl, {
+    const catMeshMaterial = ShaderBuilder.generateMaterial(gl, {
       mode: "TRIANGLES",
       globals: {
         indices: { type: "element" },
@@ -124,8 +124,8 @@ export function App() {
         normal: { type: "varying", unit: "vec3" },
         item_position: { type: "attribute", unit: "vec3", instanced: true },
         perspectiveMatrix: { type: "uniform", unit: "mat4", count: 1 },
-        out_diffuse: { type: "output", unit: "vec4" },
-        out_normal: { type: "output", unit: "vec4" },
+        // out_diffuse: { type: "output", unit: "vec4" },
+        // out_normal: { type: "output", unit: "vec4" },
       },
       vertSource: `
         precision highp float;
@@ -147,7 +147,7 @@ export function App() {
     });
 
     updateRender = (graphOutputs) => () => {
-      const buffers = {
+      const buffers: ShaderBuilder.MaterialBinds<typeof catMeshMaterial> = {
         indices: ShaderBuilder.createElementBuffer(
           gl,
           sliceToArray.Uint32Array(graphOutputs.current_cat_mesh.indices),
@@ -167,18 +167,13 @@ export function App() {
         perspectiveMatrix: graphOutputs.world_matrix.flatMap(
           (row) => row,
         ) as Mat4,
-        out_diffuse: ShaderBuilder.createFrameBuffer(
-          gl,
-          windowSize.width,
-          windowSize.height,
-          true,
-        ),
-        out_normal: ShaderBuilder.createFrameBuffer(
-          gl,
-          windowSize.width,
-          windowSize.height,
-          true,
-        ),
+        // outputs: ShaderBuilder.createMRTFrameBuffer(
+        //   gl,
+        //   windowSize.width,
+        //   windowSize.height,
+        //   true,
+        //   { out_diffuse: "vec4", out_normal: "vec4" },
+        // ),
       };
       requestAnimationFrame(() => {
         setStats({
@@ -191,7 +186,7 @@ export function App() {
           gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
         }
 
-        ShaderBuilder.renderMaterial(gl, coolMesh, buffers);
+        ShaderBuilder.renderMaterial(gl, catMeshMaterial, buffers);
       });
     };
 

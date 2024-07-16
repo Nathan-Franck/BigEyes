@@ -126,86 +126,38 @@ export type SizedBuffer = {
   buffer: WebGLBuffer;
   length: number;
 };
-export type FrameBuffer = {
-  type: "framebuffer";
-  frameBuffer: WebGLFramebuffer;
-  texture: WebGLTexture;
-  width: number;
-  height: number;
-  depth: boolean;
-};
 export type ElementBuffer = {
   type: "element";
   buffer: WebGLBuffer;
   length: number;
   glType: "UNSIGNED_SHORT" | "UNSIGNED_INT";
 };
+
+type UnitStringToTypeLookup = {
+  float: number;
+  vec2: Vec2;
+  vec3: Vec3;
+  vec4: Vec4;
+  mat4: Mat4;
+  sampler2D: Texture;
+};
+
 export type Binds<T> = {
-  readonly [key in AllowedKeys<
-    T,
-    { type: "uniform"; unit: "float"; count: 1 }
-  >]: number;
+  [key in keyof T as T[key] extends Attribute ? key : never]: SizedBuffer;
 } & {
-  readonly [key in AllowedKeys<
-    T,
-    { type: "uniform"; unit: "vec2"; count: 1 }
-  >]: Vec2;
+  [key in keyof T as T[key] extends Element ? key : never]: ElementBuffer;
 } & {
-  readonly [key in AllowedKeys<
-    T,
-    { type: "uniform"; unit: "vec3"; count: 1 }
-  >]: Vec3;
-} & {
-  readonly [key in AllowedKeys<
-    T,
-    { type: "uniform"; unit: "vec4"; count: 1 }
-  >]: Vec4;
-} & {
-  readonly [key in AllowedKeys<
-    T,
-    { type: "uniform"; unit: "mat4"; count: 1 }
-  >]: Mat4;
-} & {
-  readonly [key in AllowedKeys<
-    T,
-    { type: "uniform"; unit: "sampler2D"; count: 1 }
-  >]: Texture;
-} & {
-  readonly [key in AllowedKeys<
-    T,
-    { type: "uniform"; unit: "float"; count: UniformSizes }
-  >]: readonly number[];
-} & {
-  readonly [key in AllowedKeys<
-    T,
-    { type: "uniform"; unit: "vec2"; count: UniformSizes }
-  >]: readonly Vec2[];
-} & {
-  readonly [key in AllowedKeys<
-    T,
-    { type: "uniform"; unit: "vec3"; count: UniformSizes }
-  >]: readonly Vec3[];
-} & {
-  readonly [key in AllowedKeys<
-    T,
-    { type: "uniform"; unit: "vec4"; count: UniformSizes }
-  >]: readonly Vec4[];
-} & {
-  readonly [key in AllowedKeys<
-    T,
-    { type: "uniform"; unit: "mat4"; count: UniformSizes }
-  >]: readonly Mat4[];
-} & {
-  readonly [key in AllowedKeys<
-    T,
-    { type: "uniform"; unit: "sampler2D"; count: UniformSizes }
-  >]: readonly Texture[];
-} & {
-  readonly [key in AllowedKeys<T, Attribute>]: SizedBuffer;
-} & {
-  readonly [key in AllowedKeys<T, Element>]: ElementBuffer;
-} & {
-  readonly [key in AllowedKeys<T, Output>]: FrameBuffer;
+  [key in keyof T as T[key] extends Uniform
+    ? key
+    : never]: T[key] extends Uniform & { unit: infer Unit; count: infer Count }
+    ? Unit extends GLSLUniformUnit
+      ? Count extends 1
+        ? UnitStringToTypeLookup[Unit]
+        : Count extends UniformSizes
+          ? Array<UnitStringToTypeLookup[Unit]>
+          : never
+      : never
+    : never;
 };
 
 export type ShaderGlobals = {
@@ -262,6 +214,10 @@ export namespace ShaderBuilder {
   export type Material<T extends ShaderGlobals> = {
     readonly program: WebGLProgram;
   } & Environment<T>;
+
+  export type MaterialBinds<T extends { globals: ShaderGlobals }> = Parameters<
+    typeof ShaderBuilder.renderMaterial<T["globals"]>
+  >[2];
 
   export function generateMaterial<T extends ShaderGlobals>(
     gl: WebGL2RenderingContext,
@@ -420,12 +376,12 @@ export namespace ShaderBuilder {
     return { type: "attribute", buffer, length: data.length };
   }
 
-  export function createMRTFrameBuffer<T extends string[]>(
+  export function createMRTFrameBuffer<T extends Record<string, GLSLUnit>>(
     gl: WebGL2RenderingContext,
     width: number,
     height: number,
     depth: boolean,
-    keys: T,
+    textures: T,
   ) {}
 
   export function createFrameBuffer(
@@ -497,7 +453,6 @@ export namespace ShaderBuilder {
       texture,
       width,
       height,
-      depth,
     };
   }
 
