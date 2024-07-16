@@ -108,7 +108,7 @@ export function App() {
   useEffect(() => {
     if (!canvasRef.current) return;
     const canvas = canvasRef.current;
-    const gl = canvas.getContext("webgl2");
+    const gl = canvas.getContext("webgl2", { antialias: false });
     if (!gl) return;
 
     gl.enable(gl.BLEND);
@@ -124,6 +124,8 @@ export function App() {
         normal: { type: "varying", unit: "vec3" },
         item_position: { type: "attribute", unit: "vec3", instanced: true },
         perspectiveMatrix: { type: "uniform", unit: "mat4", count: 1 },
+        out_diffuse: { type: "output", unit: "vec4" },
+        out_normal: { type: "output", unit: "vec4" },
       },
       vertSource: `
         precision highp float;
@@ -135,7 +137,11 @@ export function App() {
       fragSource: `
         precision highp float;
         void main(void) {
-          gl_FragColor = vec4(normal * 0.5 + 0.5, 1);
+          // gl_FragColor = vec4(normal * 0.5 + 0.5, 1);
+          // Super simple lighting from the sun at a diagonal
+          vec3 lightDir = normalize(vec3(1, 1, 1));
+          float lightIntensity = max(dot(normal, lightDir), 0.0);
+          gl_FragColor = vec4(vec3(0.5, 0.5, 0.5) + lightIntensity, 1);
         }
       `,
     });
@@ -161,6 +167,18 @@ export function App() {
         perspectiveMatrix: graphOutputs.world_matrix.flatMap(
           (row) => row,
         ) as Mat4,
+        out_diffuse: ShaderBuilder.createFrameBuffer(
+          gl,
+          windowSize.width,
+          windowSize.height,
+          true,
+        ),
+        out_normal: ShaderBuilder.createFrameBuffer(
+          gl,
+          windowSize.width,
+          windowSize.height,
+          true,
+        ),
       };
       requestAnimationFrame(() => {
         setStats({
