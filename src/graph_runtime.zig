@@ -1,7 +1,37 @@
 const std = @import("std");
-const node_graph_blueprint = @import("./interactive_node_builder_blueprint.zig");
 const utils = @import("./utils.zig");
-const wasm_entry = @import("./wasm_entry.zig");
+
+pub const NodeLink = struct {
+    name: []const u8,
+    field: []const u8,
+};
+
+pub const InputLink = struct {
+    field: []const u8,
+    source: union(enum) {
+        node: NodeLink,
+        input_field: []const u8,
+        store_field: []const u8,
+    },
+};
+
+pub const NodeGraphBlueprintEntry = struct {
+    name: []const u8,
+    function: []const u8,
+    input_links: []const InputLink,
+};
+
+pub const SystemSink = struct {
+    output_node: []const u8,
+    output_field: []const u8,
+    system_field: []const u8,
+};
+
+pub const Blueprint = struct {
+    nodes: []const NodeGraphBlueprintEntry,
+    store: []const SystemSink,
+    output: []const SystemSink,
+};
 
 const Input = struct {
     name: []const u8,
@@ -38,7 +68,7 @@ fn AttemptEventCast(InputType: type, OutputType: type, value: InputType) OutputT
 }
 
 pub fn NodeGraph(
-    comptime graph: node_graph_blueprint.Blueprint,
+    comptime graph: Blueprint,
     comptime node_definitions: anytype,
 ) type {
     const NodeOutputs = build_type: {
@@ -173,8 +203,36 @@ pub fn NodeGraph(
         }
         break :precalculate node_order;
     };
+    const type_building_util = struct {
+        fn getOutputFieldTypeFromNode(node: NodeGraphBlueprintEntry, field_name: []const u8) type {
+            const node_outputs = for (@typeInfo(NodeOutputs).Struct.fields) |field|
+                if (std.mem.eql(u8, field.name, node.name))
+                    break field.type
+                else
+                    continue
+            else
+                unreachable;
+            const field_type = for (@typeInfo(node_outputs).Struct.fields) |field|
+                if (std.mem.eql(u8, field.name, field_name))
+                    break field.type
+                else
+                    continue
+            else
+                unreachable;
+            return field_type;
+        }
+    };
     const Graph = struct {
         const Self = @This();
+
+        allocator: std.mem.Allocator,
+        store: SystemStore,
+        store_arena: std.heap.ArenaAllocator,
+        system_inputs: ?SystemInputs,
+        nodes_arenas: [graph.nodes.len]std.heap.ArenaAllocator,
+        nodes_outputs: NodeOutputs,
+        nodes_dirty_flags: NodesDirtyFlags,
+
         pub const SystemInputs = build_type: {
             var fields: []const std.builtin.Type.StructField = &.{};
             for (graph.nodes) |node|
@@ -211,6 +269,7 @@ pub fn NodeGraph(
                 .is_tuple = false,
             } });
         };
+
         pub const SystemInputsDirtyFlags = build_type: {
             var fields: []const std.builtin.Type.StructField = &.{};
             for (graph.nodes) |node|
@@ -236,23 +295,7 @@ pub fn NodeGraph(
                 .is_tuple = false,
             } });
         };
-        fn getOutputFieldTypeFromNode(node: node_graph_blueprint.NodeGraphBlueprintEntry, field_name: []const u8) type {
-            const node_outputs = for (@typeInfo(NodeOutputs).Struct.fields) |field|
-                if (std.mem.eql(u8, field.name, node.name))
-                    break field.type
-                else
-                    continue
-            else
-                unreachable;
-            const field_type = for (@typeInfo(node_outputs).Struct.fields) |field|
-                if (std.mem.eql(u8, field.name, field_name))
-                    break field.type
-                else
-                    continue
-            else
-                unreachable;
-            return field_type;
-        }
+
         pub const SystemOutputs = build_type: {
             var fields: []const std.builtin.Type.StructField = &.{};
             for (graph.output) |output_defn| {
@@ -262,7 +305,7 @@ pub fn NodeGraph(
                     if (std.mem.eql(u8, node.name, node_id)) break node else continue
                 else
                     @compileError("Node not found " ++ node_id);
-                const field_type = getOutputFieldTypeFromNode(node, output_defn.output_field);
+                const field_type = type_building_util.getOutputFieldTypeFromNode(node, output_defn.output_field);
                 fields = fields ++ .{.{
                     .name = name[0.. :0],
                     .type = field_type,
@@ -278,6 +321,7 @@ pub fn NodeGraph(
                 .is_tuple = false,
             } });
         };
+
         pub const SystemStore = build_type: {
             const store_fields = graph.store;
             var system_store_fields: []const std.builtin.Type.StructField = &.{};
@@ -288,7 +332,7 @@ pub fn NodeGraph(
                     if (std.mem.eql(u8, node.name, node_id)) break node else continue
                 else
                     @compileError("Node not found " ++ node_id);
-                const field_type = getOutputFieldTypeFromNode(node, store_field.output_field);
+                const field_type = type_building_util.getOutputFieldTypeFromNode(node, store_field.output_field);
                 system_store_fields = system_store_fields ++ .{.{
                     .name = name[0.. :0],
                     .type = field_type,
@@ -304,13 +348,7 @@ pub fn NodeGraph(
                 .is_tuple = false,
             } });
         };
-        allocator: std.mem.Allocator,
-        store: SystemStore,
-        store_arena: std.heap.ArenaAllocator,
-        system_inputs: ?SystemInputs,
-        nodes_arenas: [graph.nodes.len]std.heap.ArenaAllocator,
-        nodes_outputs: NodeOutputs,
-        nodes_dirty_flags: NodesDirtyFlags,
+
         pub fn init(props: struct {
             allocator: std.mem.Allocator,
             store: SystemStore,
@@ -329,6 +367,7 @@ pub fn NodeGraph(
             }
             return self;
         }
+
         pub fn update(self: *Self, inputs: SystemInputs) !SystemOutputs {
 
             // Check inputs for changes...
@@ -514,6 +553,7 @@ pub fn NodeGraph(
 
 test "Build" {
     const NodeDefinitions = @import("./node_graph_blueprint_nodes.zig");
+    const node_graph_blueprint = @import("./node_graph_blueprint_nodes.zig");
     const allocator = std.heap.page_allocator;
     const MyNodeGraph = NodeGraph(
         node_graph_blueprint.node_graph_blueprint,
