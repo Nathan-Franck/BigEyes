@@ -110,7 +110,6 @@ pub const interface = struct {
             .output = &[_]graph.SystemSink{
                 .{ .output_node = "game", .output_field = "current_cat_mesh", .system_field = "current_cat_mesh" },
                 .{ .output_node = "game", .output_field = "orbit_camera", .system_field = "orbit_camera" },
-                // .{ .output_node = "game", .output_field = "some_numbers", .system_field = "some_numbers" },
                 .{ .output_node = "game", .output_field = "world_matrix", .system_field = "world_matrix" },
             },
         },
@@ -216,15 +215,18 @@ pub const interface = struct {
                 };
             }
 
-            pub fn game(arena: *std.heap.ArenaAllocator, props: struct {
-                settings: Settings,
-                resources: Resources,
-                game_time_ms: u64,
-                input: ?struct { mouse_delta: zm.Vec },
+            pub fn game(
+                arena: *std.heap.ArenaAllocator,
+                props: struct {
+                    settings: Settings,
+                    resources: Resources,
+                    game_time_ms: u64,
+                    input: ?struct { mouse_delta: zm.Vec },
 
-                orbit_camera: *OrbitCamera,
-                some_numbers: *std.ArrayList(u32),
-            }) !struct {
+                    orbit_camera: *OrbitCamera,
+                    some_numbers: *std.ArrayList(u32),
+                },
+            ) !struct {
                 current_cat_mesh: Mesh,
                 world_matrix: zm.Mat,
             } {
@@ -260,6 +262,7 @@ pub const interface = struct {
                     };
                 };
                 props.some_numbers.items[0] += 1;
+                wasm_entry.dumpDebugLog(try std.fmt.allocPrint(arena.allocator(), "{any}", .{props.some_numbers.items}));
                 return .{
                     .current_cat_mesh = current_cat_mesh,
                     .world_matrix = zm.mul(

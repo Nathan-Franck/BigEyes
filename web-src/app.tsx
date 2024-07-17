@@ -2,7 +2,7 @@ import "./app.css";
 import { NodeGraph, GraphOutputs } from "./nodeGraph";
 import { declareStyle } from "./declareStyle";
 import { useEffect, useRef, useState } from "preact/hooks";
-import { sliceToArray } from "./zigWasmInterface";
+import { callWasm, sliceToArray } from "./zigWasmInterface";
 import { Mat4, ShaderBuilder } from "./shaderBuilder";
 
 const { classes, encodedStyle } = declareStyle({
@@ -71,6 +71,8 @@ function updateGraph(newInputs: typeof graphInputs) {
   if (graphOutputs == null || "error" in graphOutputs) return;
   if (updateRender != null) updateRender(graphOutputs)();
 }
+
+callWasm("init");
 
 const nodeGraph = NodeGraph(graphInputs);
 let lastMousePosition: { x: number; y: number } | null = null;
