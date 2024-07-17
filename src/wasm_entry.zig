@@ -87,7 +87,11 @@ fn callWithJsonErr(name_ptr: [*]const u8, name_len: usize, args_ptr: [*]const u8
                 dumpDebugLog(try std.fmt.allocPrint(allocator, "Something in here isn't parsing right: {s}", .{args_string[0..@intCast(diagnostics.getByteOffset())]}));
                 return err;
             };
-            const result = try @call(.auto, func, args.value);
+            const result = switch (@typeInfo(@typeInfo(@TypeOf(func)).Fn.return_type.?)) {
+                .ErrorUnion => try @call(.auto, func, args.value),
+                else => @call(.auto, func, args.value),
+            };
+
             if (@TypeOf(result) != void) {
                 const converted_result = try type_definitions.deepTypedArrayReferences(@TypeOf(result), allocator, result);
                 dumpMessage(try std.json.stringifyAlloc(allocator, converted_result, .{}));

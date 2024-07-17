@@ -1,34 +1,6 @@
-pub const NodeLink = struct {
-    name: []const u8,
-    field: []const u8,
-};
-
-pub const InputLink = struct {
-    field: []const u8,
-    source: union(enum) {
-        node: NodeLink,
-        input_field: []const u8,
-        store_field: []const u8,
-    },
-};
-
-pub const NodeGraphBlueprintEntry = struct {
-    name: []const u8,
-    function: []const u8,
-    input_links: []const InputLink,
-};
-
-pub const SystemSink = struct {
-    output_node: []const u8,
-    output_field: []const u8,
-    system_field: []const u8,
-};
-
-pub const Blueprint = struct {
-    nodes: []const NodeGraphBlueprintEntry,
-    store: []const SystemSink,
-    output: []const SystemSink,
-};
+const graph_runtime = @import("graph_runtime.zig");
+const Blueprint = graph_runtime.Blueprint;
+const InputLink = graph_runtime.InputLink;
 
 pub const node_graph_blueprint: Blueprint = .{
     .nodes = &.{

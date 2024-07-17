@@ -1,10 +1,9 @@
 const std = @import("std");
-const graph_runtime = @import("./graph_runtime.zig");
-const node_graph_blueprint = @import("./interactive_node_builder_blueprint.zig");
+const graph = @import("./graph_runtime.zig");
 const typeDefinitions = @import("./type_definitions.zig");
 
 const subdiv = @import("./subdiv.zig");
-const MeshHelper = @import("./MeshHelper.zig");
+const mesh_helper = @import("./MeshHelper.zig");
 const MeshSpec = @import("./MeshSpec.zig");
 const zm = @import("./zmath/main.zig");
 const wasm_entry = @import("./wasm_entry.zig");
@@ -37,26 +36,55 @@ const hexColors = [_][3]f32{
 };
 
 pub const interface = struct {
-    const OrbitCamera = struct {
-        position: zm.Vec,
-        rotation: zm.Vec,
-        track_distance: f32,
-    };
-    const PixelPoint = struct { x: u32, y: u32 };
-    const MyNodeGraph = graph_runtime.NodeGraph(
-        node_graph_blueprint.Blueprint{
-            .nodes = &[_]node_graph_blueprint.NodeGraphBlueprintEntry{
+    var node_graph: NodeGraph = undefined;
+
+    pub fn init() void {
+        node_graph = try NodeGraph.init(.{
+            .allocator = std.heap.page_allocator,
+            .store = .{
+                .settings = .{
+                    .orbit_speed = 0.01,
+                    .render_resolution = .{ .x = 0, .y = 0 },
+                    .subdiv_level = 1,
+                },
+                .orbit_camera = .{
+                    .position = .{ 0, 0, 0, 1 },
+                    .rotation = .{ 0, 0, 0, 1 },
+                    .track_distance = 20,
+                },
+                .some_numbers = blk: {
+                    var some_numbers = std.ArrayList(u32).init(std.heap.page_allocator);
+                    some_numbers.appendSlice(&.{ 0, 1, 2 }) catch unreachable;
+                    break :blk some_numbers;
+                },
+            },
+        });
+    }
+
+    pub fn updateNodeGraph(
+        inputs: NodeGraph.SystemInputs,
+    ) !struct {
+        outputs: NodeGraph.SystemOutputs,
+    } {
+        return .{
+            .outputs = try node_graph.update(inputs),
+        };
+    }
+
+    const NodeGraph = graph.NodeGraph(
+        graph.Blueprint{
+            .nodes = &[_]graph.NodeGraphBlueprintEntry{
                 .{
                     .name = "getResources",
                     .function = "getResources",
-                    .input_links = &[_]node_graph_blueprint.InputLink{
+                    .input_links = &[_]graph.InputLink{
                         .{ .field = "settings", .source = .{ .node = .{ .name = "changeSettings", .field = "settings" } } },
                     },
                 },
                 .{
                     .name = "game",
                     .function = "game",
-                    .input_links = &[_]node_graph_blueprint.InputLink{
+                    .input_links = &[_]graph.InputLink{
                         .{ .field = "resources", .source = .{ .node = .{ .name = "getResources", .field = "resources" } } },
                         .{ .field = "settings", .source = .{ .node = .{ .name = "changeSettings", .field = "settings" } } },
                         .{ .field = "game_time_ms", .source = .{ .input_field = "game_time_ms" } },
@@ -68,25 +96,38 @@ pub const interface = struct {
                 .{
                     .name = "changeSettings",
                     .function = "changeSettings",
-                    .input_links = &[_]node_graph_blueprint.InputLink{
+                    .input_links = &[_]graph.InputLink{
                         .{ .field = "user_changes", .source = .{ .input_field = "user_changes" } },
                         .{ .field = "settings", .source = .{ .store_field = "settings" } },
                     },
                 },
             },
-            .store = &[_]node_graph_blueprint.SystemSink{
+            .store = &[_]graph.SystemSink{
                 .{ .output_node = "game", .output_field = "orbit_camera", .system_field = "orbit_camera" },
                 .{ .output_node = "game", .output_field = "some_numbers", .system_field = "some_numbers" },
                 .{ .output_node = "changeSettings", .output_field = "settings", .system_field = "settings" },
             },
-            .output = &[_]node_graph_blueprint.SystemSink{
+            .output = &[_]graph.SystemSink{
                 .{ .output_node = "game", .output_field = "current_cat_mesh", .system_field = "current_cat_mesh" },
                 .{ .output_node = "game", .output_field = "orbit_camera", .system_field = "orbit_camera" },
-                .{ .output_node = "game", .output_field = "some_numbers", .system_field = "some_numbers" },
                 .{ .output_node = "game", .output_field = "world_matrix", .system_field = "world_matrix" },
             },
         },
         struct {
+            const QuadMeshHelper = mesh_helper.Polygon(.Quad);
+
+            const PixelPoint = struct { x: u32, y: u32 };
+
+            const OrbitCamera = struct {
+                position: zm.Vec,
+                rotation: zm.Vec,
+                track_distance: f32,
+            };
+
+            pub const Resources = struct {
+                cat: SubdivAnimationMesh,
+            };
+
             pub const Settings = struct {
                 orbit_speed: f32,
                 subdiv_level: u8,
@@ -117,12 +158,6 @@ pub const interface = struct {
                 };
             }
 
-            pub const Resources = struct {
-                cat: SubdivAnimationMesh,
-            };
-
-            const mesh_helper = MeshHelper.Polygon(.Quad);
-
             pub fn getResources(arena: *std.heap.ArenaAllocator, props: struct {
                 settings: Settings,
             }) !struct {
@@ -132,16 +167,14 @@ pub const interface = struct {
 
                 const mesh_input_data = blk: {
                     const json_data = @embedFile("content/Cat.blend.json");
-                    // var comptime_buffer: [json_data.len]u8 = undefined;
-                    // var comptime_allocator = std.heap.FixedBufferAllocator.init(comptime_buffer[0..]);
                     break :blk std.json.parseFromSliceLeaky(MeshSpec, allocator, json_data, .{}) catch unreachable;
                 };
                 const input_data = mesh_input_data.meshes[0];
                 const quads_by_subdiv = blk: {
                     const encoded_vertices = input_data.frame_to_vertices[0];
-                    const input_vertices = MeshHelper.flipYZ(
+                    const input_vertices = mesh_helper.flipYZ(
                         arena.allocator(),
-                        MeshHelper.decodeVertexDataFromHexidecimal(
+                        mesh_helper.decodeVertexDataFromHexidecimal(
                             arena.allocator(),
                             encoded_vertices,
                         ),
@@ -159,9 +192,9 @@ pub const interface = struct {
                 };
                 var frames = std.ArrayList([]const zm.Vec).init(allocator);
                 for (input_data.frame_to_vertices) |encoded_vertices| {
-                    try frames.append(MeshHelper.flipYZ(
+                    try frames.append(mesh_helper.flipYZ(
                         allocator,
-                        MeshHelper.decodeVertexDataFromHexidecimal(
+                        mesh_helper.decodeVertexDataFromHexidecimal(
                             arena.allocator(),
                             encoded_vertices,
                         ),
@@ -172,7 +205,7 @@ pub const interface = struct {
                     .resources = .{
                         .cat = SubdivAnimationMesh{
                             .label = input_data.name,
-                            .indices = mesh_helper.toTriangleIndices(allocator, quads_by_subdiv[quads_by_subdiv.len - 1]),
+                            .indices = QuadMeshHelper.toTriangleIndices(allocator, quads_by_subdiv[quads_by_subdiv.len - 1]),
                             .quads_by_subdiv = quads_by_subdiv,
                             .polygons = input_data.polygons,
                             .frames = frames.items,
@@ -182,15 +215,18 @@ pub const interface = struct {
                 };
             }
 
-            pub fn game(arena: *std.heap.ArenaAllocator, props: struct {
-                settings: Settings,
-                resources: Resources,
-                game_time_ms: u64,
-                input: ?struct { mouse_delta: zm.Vec },
+            pub fn game(
+                arena: *std.heap.ArenaAllocator,
+                props: struct {
+                    settings: Settings,
+                    resources: Resources,
+                    game_time_ms: u64,
+                    input: ?struct { mouse_delta: zm.Vec },
 
-                orbit_camera: *OrbitCamera,
-                some_numbers: []u32,
-            }) !struct {
+                    orbit_camera: *OrbitCamera,
+                    some_numbers: *std.ArrayList(u32),
+                },
+            ) !struct {
                 current_cat_mesh: Mesh,
                 world_matrix: zm.Mat,
             } {
@@ -218,14 +254,15 @@ pub const interface = struct {
                     break :subdiv_mesh Mesh{
                         .label = "cat",
                         .indices = props.resources.cat.indices,
-                        .position = MeshHelper.pointsToFloatSlice(allocator, mesh_result),
-                        .normal = MeshHelper.pointsToFloatSlice(
+                        .position = mesh_helper.pointsToFloatSlice(allocator, mesh_result),
+                        .normal = mesh_helper.pointsToFloatSlice(
                             allocator,
-                            mesh_helper.calculateNormals(arena.allocator(), mesh_result, quads_by_subdiv[quads_by_subdiv.len - 1]),
+                            QuadMeshHelper.calculateNormals(arena.allocator(), mesh_result, quads_by_subdiv[quads_by_subdiv.len - 1]),
                         ),
                     };
                 };
-                props.some_numbers[0] += 1;
+                props.some_numbers.items[0] += 1;
+                wasm_entry.dumpDebugLog(try std.fmt.allocPrint(arena.allocator(), "{any}", .{props.some_numbers.items}));
                 return .{
                     .current_cat_mesh = current_cat_mesh,
                     .world_matrix = zm.mul(
@@ -251,34 +288,6 @@ pub const interface = struct {
             }
         },
     );
-
-    var my_node_graph = MyNodeGraph.init(.{
-        .allocator = std.heap.page_allocator,
-        .store = .{
-            .settings = .{
-                .orbit_speed = 0.01,
-                .render_resolution = .{ .x = 0, .y = 0 },
-                .subdiv_level = 1,
-            },
-            .orbit_camera = .{
-                .position = .{ 0, 0, 0, 1 },
-                .rotation = .{ 0, 0, 0, 1 },
-                .track_distance = 20,
-            },
-            .some_numbers = &.{ 0, 1, 2 },
-        },
-    }) catch unreachable;
-
-    pub fn callNodeGraph(
-        inputs: MyNodeGraph.SystemInputs,
-    ) !struct {
-        outputs: ?MyNodeGraph.SystemOutputs,
-    } {
-        const outputs = try my_node_graph.update(inputs);
-        return .{
-            .outputs = outputs,
-        };
-    }
 };
 
 pub const InterfaceEnum = DeclsToEnum(interface);

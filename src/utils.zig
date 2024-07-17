@@ -28,14 +28,18 @@ pub fn copyWith(source_data: anytype, field_changes: anytype) @TypeOf(source_dat
     }
 }
 
+fn DeepCloneResult(T: type) type {
+    return struct {
+        value: T,
+        allocator_used: bool,
+    };
+}
+
 pub fn deepClone(
     T: type,
     allocator: std.mem.Allocator,
     source: anytype,
-) !struct {
-    value: T,
-    allocator_used: bool = false,
-} {
+) !DeepCloneResult(T) {
     return switch (@typeInfo(T)) {
         else => .{ .value = source, .allocator_used = false },
         .Array => |a| blk: {
@@ -53,6 +57,20 @@ pub fn deepClone(
             }
         },
         .Struct => |struct_info| blk: {
+            // Solution to clone ArrayLists and HashMaps, and who knows what else!
+            if (@hasDecl(T, "cloneWithAllocator")) {
+                break :blk .{
+                    .value = try source.cloneWithAllocator(allocator),
+                    .allocator_used = true,
+                };
+            } else if (@hasDecl(T, "clone")) {
+                break :blk .{
+                    .value = try copyWith(source, .{ .allocator = allocator }).clone(),
+                    .allocator_used = true,
+                };
+            }
+
+            // Resume regular cloning...
             var result: T = undefined;
             var allocator_used = false;
             inline for (struct_info.fields) |field| {
@@ -101,7 +119,7 @@ pub fn deepClone(
                 break :blk .{ .value = elements.items, .allocator_used = true };
             },
             else => {
-                unreachable;
+                @compileError(std.fmt.comptimePrint("Unsupported pointer type {any}", .{pointer_info.child}));
             },
         },
         .Optional => |optional_info| blk: {
@@ -123,21 +141,21 @@ test "deepClone" {
         try std.testing.expect(std.meta.eql(source, result.value));
     }
 
-    { // slice
+    { // Slice
         const Type = []const i32;
         const source: Type = &.{ 1, 2, 3 };
         const result = try deepClone(Type, std.heap.page_allocator, source);
         try std.testing.expect(std.mem.eql(i32, source, result.value));
     }
 
-    { // slice of slices
+    { // Slice of slices
         const Type = []const []const i32;
         const source: Type = &.{&.{ 1, 2, 3 }};
         const result = try deepClone(Type, std.heap.page_allocator, source);
         try std.testing.expect(std.mem.eql(i32, source[0], result.value[0]));
     }
 
-    { // array
+    { // Array
         const Type = []const [4]i32;
         const source: Type = &.{.{ 1, 2, 3, 4 }};
         const result = try deepClone(Type, std.heap.page_allocator, source);
@@ -149,6 +167,30 @@ test "deepClone" {
         const source: Type = .{ .a = &.{ 1, 2, 3 }, .b = &.{ 4, 5, 6 } };
         const result = try deepClone(Type, std.heap.page_allocator, source);
         try std.testing.expect(std.mem.eql(i32, source.a, result.value.a));
+    }
+
+    { // Hashmap
+        var thinger = std.AutoHashMap(u32, u32).init(std.heap.page_allocator);
+        try thinger.put(1, 2);
+        try thinger.put(3, 4);
+        const result = try deepClone(@TypeOf(thinger), std.heap.page_allocator, thinger);
+        try std.testing.expect(thinger.get(1) == result.value.get(1));
+    }
+
+    { // Hashmap
+        var thinger = std.AutoArrayHashMap(u32, u32).init(std.heap.page_allocator);
+        try thinger.put(1, 2);
+        try thinger.put(3, 4);
+        const result = try deepClone(@TypeOf(thinger), std.heap.page_allocator, thinger);
+        try std.testing.expect(thinger.get(1) == result.value.get(1));
+    }
+
+    { // ArrayList
+        var thinger = std.ArrayList(u32).init(std.heap.page_allocator);
+        try thinger.append(1);
+        try thinger.append(3);
+        const result = try deepClone(@TypeOf(thinger), std.heap.page_allocator, thinger);
+        try std.testing.expect(std.mem.eql(u32, thinger.items, result.value.items));
     }
 }
 
@@ -296,4 +338,61 @@ pub fn DeepHashableStruct(t: type) struct { type: type, changed: bool = false } 
                 .{ .changed = true, .type = @Type(.{ .Pointer = copyWith(p, .{ .child = child.type }) }) };
         },
     };
+}
+
+/// Find the smallest number in a slice of numbers and return the value and the index.
+/// Uses SIMD to process multiple numbers at once.
+pub fn findSmallestNumberAndIndex(T: type, numbers: []const T) struct { value: T, index: usize } {
+    const vec_len = 32;
+    const Vec = @Vector(vec_len, T);
+    const IndexVec = @Vector(vec_len, usize);
+
+    const max_value = switch (@typeInfo(T)) {
+        .Float => std.math.floatMax(T),
+        .Int => std.math.maxInt(T),
+        else => @compileError("Invalid type"),
+    };
+
+    var min_vec: Vec = @splat(max_value);
+    var min_index_vec: IndexVec = @splat(@as(usize, 0));
+
+    var i: usize = 0;
+    while (i < numbers.len) : (i += vec_len) {
+        var current_vec: Vec = @splat(max_value);
+        var index_vec: IndexVec = undefined;
+        for (i..@min(i + vec_len, numbers.len)) |j| {
+            current_vec[j - i] = numbers[j];
+            index_vec[j - i] = @intCast(j);
+        }
+        const mask = current_vec < min_vec;
+        min_vec = @select(T, mask, current_vec, min_vec);
+        min_index_vec = @select(usize, mask, index_vec, min_index_vec);
+    }
+
+    // Find the minimum value and its index from the vectors
+    const min_value = @reduce(.Min, min_vec);
+    const min_index = @reduce(.Min, @select(
+        usize,
+        min_vec == @as(Vec, @splat(min_value)),
+        min_index_vec,
+        @as(IndexVec, @splat(std.math.maxInt(usize))),
+    ));
+
+    return .{ .value = min_value, .index = min_index };
+}
+
+test "smallest and index" {
+    {
+        const numbers = [_]i32{ 5, 2, 8, 2, 9, 3, 9, 7, 4, 6, 1 };
+        const result = findSmallestNumberAndIndex(i32, &numbers);
+        try std.testing.expectEqual(result.value, 1);
+        try std.testing.expectEqual(result.index, 10);
+    }
+
+    {
+        const numbers = [_]f32{ 61.0, 34.0, 40.0, 22.0, 95.0, 51.0, 79.0, 83.0 };
+        const result = findSmallestNumberAndIndex(f32, &numbers);
+        try std.testing.expectEqual(result.value, 22);
+        try std.testing.expectEqual(result.index, 3);
+    }
 }
