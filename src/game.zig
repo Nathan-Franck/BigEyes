@@ -261,7 +261,7 @@ pub const interface = struct {
                         ),
                     };
                 };
-                props.some_numbers.items[0] += 1;
+                try props.some_numbers.append(props.some_numbers.items[props.some_numbers.items.len - 1] + 1);
                 wasm_entry.dumpDebugLog(try std.fmt.allocPrint(arena.allocator(), "{any}", .{props.some_numbers.items}));
                 return .{
                     .current_cat_mesh = current_cat_mesh,
