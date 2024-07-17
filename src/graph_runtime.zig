@@ -203,25 +203,6 @@ pub fn NodeGraph(
         }
         break :precalculate node_order;
     };
-    const type_building_util = struct {
-        fn getOutputFieldTypeFromNode(node: NodeGraphBlueprintEntry, field_name: []const u8) type {
-            const node_outputs = for (@typeInfo(NodeOutputs).Struct.fields) |field|
-                if (std.mem.eql(u8, field.name, node.name))
-                    break field.type
-                else
-                    continue
-            else
-                unreachable;
-            const field_type = for (@typeInfo(node_outputs).Struct.fields) |field|
-                if (std.mem.eql(u8, field.name, field_name))
-                    break field.type
-                else
-                    continue
-            else
-                unreachable;
-            return field_type;
-        }
-    };
     const Graph = struct {
         const Self = @This();
 
@@ -305,7 +286,7 @@ pub fn NodeGraph(
                     if (std.mem.eql(u8, node.name, node_id)) break node else continue
                 else
                     @compileError("Node not found " ++ node_id);
-                const field_type = type_building_util.getOutputFieldTypeFromNode(node, output_defn.output_field);
+                const field_type = getOutputFieldTypeFromNode(node, output_defn.output_field);
                 fields = fields ++ .{.{
                     .name = name[0.. :0],
                     .type = field_type,
@@ -332,7 +313,7 @@ pub fn NodeGraph(
                     if (std.mem.eql(u8, node.name, node_id)) break node else continue
                 else
                     @compileError("Node not found " ++ node_id);
-                const field_type = type_building_util.getOutputFieldTypeFromNode(node, store_field.output_field);
+                const field_type = getOutputFieldTypeFromNode(node, store_field.output_field);
                 system_store_fields = system_store_fields ++ .{.{
                     .name = name[0.. :0],
                     .type = field_type,
@@ -366,6 +347,24 @@ pub fn NodeGraph(
                 self.nodes_arenas[index] = std.heap.ArenaAllocator.init(props.allocator);
             }
             return self;
+        }
+
+        fn getOutputFieldTypeFromNode(node: NodeGraphBlueprintEntry, field_name: []const u8) type {
+            const node_outputs = for (@typeInfo(NodeOutputs).Struct.fields) |field|
+                if (std.mem.eql(u8, field.name, node.name))
+                    break field.type
+                else
+                    continue
+            else
+                @compileError("Node not found " ++ node.name);
+            const field_type = for (@typeInfo(node_outputs).Struct.fields) |field|
+                if (std.mem.eql(u8, field.name, field_name))
+                    break field.type
+                else
+                    continue
+            else
+                @compileError("Field not found " ++ field_name ++ " in node " ++ node.name);
+            return field_type;
         }
 
         pub fn update(self: *Self, inputs: SystemInputs) !SystemOutputs {

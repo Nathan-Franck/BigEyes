@@ -36,7 +36,42 @@ const hexColors = [_][3]f32{
 };
 
 pub const interface = struct {
-    const MyNodeGraph = graph.NodeGraph(
+    var node_graph: NodeGraph = undefined;
+
+    pub fn init() void {
+        node_graph = try NodeGraph.init(.{
+            .allocator = std.heap.page_allocator,
+            .store = .{
+                .settings = .{
+                    .orbit_speed = 0.01,
+                    .render_resolution = .{ .x = 0, .y = 0 },
+                    .subdiv_level = 1,
+                },
+                .orbit_camera = .{
+                    .position = .{ 0, 0, 0, 1 },
+                    .rotation = .{ 0, 0, 0, 1 },
+                    .track_distance = 20,
+                },
+                .some_numbers = blk: {
+                    var some_numbers = std.ArrayList(u32).init(std.heap.page_allocator);
+                    some_numbers.appendSlice(&.{ 0, 1, 2 }) catch unreachable;
+                    break :blk some_numbers;
+                },
+            },
+        });
+    }
+
+    pub fn updateNodeGraph(
+        inputs: NodeGraph.SystemInputs,
+    ) !struct {
+        outputs: NodeGraph.SystemOutputs,
+    } {
+        return .{
+            .outputs = try node_graph.update(inputs),
+        };
+    }
+
+    const NodeGraph = graph.NodeGraph(
         graph.Blueprint{
             .nodes = &[_]graph.NodeGraphBlueprintEntry{
                 .{
@@ -75,7 +110,7 @@ pub const interface = struct {
             .output = &[_]graph.SystemSink{
                 .{ .output_node = "game", .output_field = "current_cat_mesh", .system_field = "current_cat_mesh" },
                 .{ .output_node = "game", .output_field = "orbit_camera", .system_field = "orbit_camera" },
-                .{ .output_node = "game", .output_field = "some_numbers", .system_field = "some_numbers" },
+                // .{ .output_node = "game", .output_field = "some_numbers", .system_field = "some_numbers" },
                 .{ .output_node = "game", .output_field = "world_matrix", .system_field = "world_matrix" },
             },
         },
@@ -188,7 +223,7 @@ pub const interface = struct {
                 input: ?struct { mouse_delta: zm.Vec },
 
                 orbit_camera: *OrbitCamera,
-                some_numbers: []u32,
+                some_numbers: *std.ArrayList(u32),
             }) !struct {
                 current_cat_mesh: Mesh,
                 world_matrix: zm.Mat,
@@ -224,7 +259,7 @@ pub const interface = struct {
                         ),
                     };
                 };
-                props.some_numbers[0] += 1;
+                props.some_numbers.items[0] += 1;
                 return .{
                     .current_cat_mesh = current_cat_mesh,
                     .world_matrix = zm.mul(
@@ -250,34 +285,6 @@ pub const interface = struct {
             }
         },
     );
-
-    var my_node_graph = MyNodeGraph.init(.{
-        .allocator = std.heap.page_allocator,
-        .store = .{
-            .settings = .{
-                .orbit_speed = 0.01,
-                .render_resolution = .{ .x = 0, .y = 0 },
-                .subdiv_level = 1,
-            },
-            .orbit_camera = .{
-                .position = .{ 0, 0, 0, 1 },
-                .rotation = .{ 0, 0, 0, 1 },
-                .track_distance = 20,
-            },
-            .some_numbers = &.{ 0, 1, 2 },
-        },
-    }) catch unreachable;
-
-    pub fn callNodeGraph(
-        inputs: MyNodeGraph.SystemInputs,
-    ) !struct {
-        outputs: ?MyNodeGraph.SystemOutputs,
-    } {
-        const outputs = try my_node_graph.update(inputs);
-        return .{
-            .outputs = outputs,
-        };
-    }
 };
 
 pub const InterfaceEnum = DeclsToEnum(interface);
