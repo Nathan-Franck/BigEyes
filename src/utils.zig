@@ -53,6 +53,20 @@ pub fn deepClone(
             }
         },
         .Struct => |struct_info| blk: {
+            // Solution to clone ArrayLists and HashMaps, and who knows what else!
+            if (@hasDecl(T, "cloneWithAllocator")) {
+                break :blk .{
+                    .value = try source.cloneWithAllocator(allocator),
+                    .allocator_used = true,
+                };
+            } else if (@hasDecl(T, "clone")) {
+                break :blk .{
+                    .value = try copyWith(source, .{ .allocator = allocator }).clone(),
+                    .allocator_used = true,
+                };
+            }
+
+            // Resume regular cloning...
             var result: T = undefined;
             var allocator_used = false;
             inline for (struct_info.fields) |field| {
@@ -123,21 +137,21 @@ test "deepClone" {
         try std.testing.expect(std.meta.eql(source, result.value));
     }
 
-    { // slice
+    { // Slice
         const Type = []const i32;
         const source: Type = &.{ 1, 2, 3 };
         const result = try deepClone(Type, std.heap.page_allocator, source);
         try std.testing.expect(std.mem.eql(i32, source, result.value));
     }
 
-    { // slice of slices
+    { // Slice of slices
         const Type = []const []const i32;
         const source: Type = &.{&.{ 1, 2, 3 }};
         const result = try deepClone(Type, std.heap.page_allocator, source);
         try std.testing.expect(std.mem.eql(i32, source[0], result.value[0]));
     }
 
-    { // array
+    { // Array
         const Type = []const [4]i32;
         const source: Type = &.{.{ 1, 2, 3, 4 }};
         const result = try deepClone(Type, std.heap.page_allocator, source);
@@ -151,30 +165,29 @@ test "deepClone" {
         try std.testing.expect(std.mem.eql(i32, source.a, result.value.a));
     }
 
-    // { // Hashmap
-    //     // ERROR: can't copy the arbitrary sized pointer in the hashmap
-    //     var thinger = std.AutoHashMap(u32, u32).init(std.heap.page_allocator);
-    //     try thinger.put(1, 2);
-    //     try thinger.put(3, 4);
-    //     const result = try deepClone(@TypeOf(thinger), std.heap.page_allocator, thinger);
-    //     try std.testing.expect(thinger.capacity == result.value.capacity);
-    // }
+    { // Hashmap
+        var thinger = std.AutoHashMap(u32, u32).init(std.heap.page_allocator);
+        try thinger.put(1, 2);
+        try thinger.put(3, 4);
+        const result = try deepClone(@TypeOf(thinger), std.heap.page_allocator, thinger);
+        try std.testing.expect(thinger.get(1) == result.value.get(1));
+    }
 
-    // { // Hashmap attempt #2
-    //     // ERROR: can't copy the arbitrary sized pointer in the hashmap
-    //     var thinger = std.AutoArrayHashMap(u32, u32).init(std.heap.page_allocator);
-    //     try thinger.put(1, 2);
-    //     try thinger.put(3, 4);
-    //     const result = try deepClone(@TypeOf(thinger), std.heap.page_allocator, thinger);
-    //     try std.testing.expect(thinger.capacity == result.value.capacity);
-    // }
-    // { // ArrayList
-    //     var thinger = std.ArrayList(u32).init(std.heap.page_allocator);
-    //     try thinger.append(1);
-    //     try thinger.append(3);
-    //     const result = try deepClone(@TypeOf(thinger), std.heap.page_allocator, thinger);
-    //     try std.testing.expect(thinger.capacity == result.value.capacity);
-    // }
+    { // Hashmap
+        var thinger = std.AutoArrayHashMap(u32, u32).init(std.heap.page_allocator);
+        try thinger.put(1, 2);
+        try thinger.put(3, 4);
+        const result = try deepClone(@TypeOf(thinger), std.heap.page_allocator, thinger);
+        try std.testing.expect(thinger.get(1) == result.value.get(1));
+    }
+
+    { // ArrayList
+        var thinger = std.ArrayList(u32).init(std.heap.page_allocator);
+        try thinger.append(1);
+        try thinger.append(3);
+        const result = try deepClone(@TypeOf(thinger), std.heap.page_allocator, thinger);
+        try std.testing.expect(std.mem.eql(u32, thinger.items, result.value.items));
+    }
 }
 
 /// Takes any type that has fields and returns a list of the field names as strings.
