@@ -3,7 +3,7 @@ const graph = @import("./graph_runtime.zig");
 const typeDefinitions = @import("./type_definitions.zig");
 
 const subdiv = @import("./subdiv.zig");
-const mesh_helper = @import("./MeshHelper.zig");
+const mesh_helper = @import("./mesh_helper.zig");
 const MeshSpec = @import("./MeshSpec.zig");
 const zm = @import("./zmath/main.zig");
 const wasm_entry = @import("./wasm_entry.zig");
@@ -34,6 +34,45 @@ const hexColors = [_][3]f32{
     .{ 1.0, 0.0, 1.0 },
     .{ 0.0, 1.0, 1.0 },
 };
+
+pub const InterfaceEnum = DeclsToEnum(interface);
+
+pub fn DeclsToEnum(comptime container: type) type {
+    const info = @typeInfo(container);
+    var enum_fields: []const std.builtin.Type.EnumField = &.{};
+    for (info.Struct.decls, 0..) |struct_decl, i| {
+        enum_fields = enum_fields ++ &[_]std.builtin.Type.EnumField{.{
+            .name = struct_decl.name,
+            .value = i,
+        }};
+    }
+    return @Type(std.builtin.Type{ .Enum = .{
+        .tag_type = u32,
+        .fields = enum_fields,
+        .decls = &.{},
+        .is_exhaustive = true,
+    } });
+}
+
+pub fn Args(comptime func: anytype) type {
+    const ParamInfo = @typeInfo(@TypeOf(func)).Fn.params;
+    var fields: []const std.builtin.Type.StructField = &.{};
+    for (ParamInfo, 0..) |param_info, i| {
+        fields = fields ++ &[_]std.builtin.Type.StructField{.{
+            .name = std.fmt.comptimePrint("{d}", .{i}),
+            .type = param_info.type.?,
+            .default_value = null,
+            .is_comptime = false,
+            .alignment = @alignOf(param_info.type.?),
+        }};
+    }
+    return @Type(.{ .Struct = .{
+        .layout = .auto,
+        .fields = fields,
+        .decls = &.{},
+        .is_tuple = true,
+    } });
+}
 
 pub const interface = struct {
     var node_graph: NodeGraph = undefined;
@@ -289,42 +328,3 @@ pub const interface = struct {
         },
     );
 };
-
-pub const InterfaceEnum = DeclsToEnum(interface);
-
-pub fn DeclsToEnum(comptime container: type) type {
-    const info = @typeInfo(container);
-    var enum_fields: []const std.builtin.Type.EnumField = &.{};
-    for (info.Struct.decls, 0..) |struct_decl, i| {
-        enum_fields = enum_fields ++ &[_]std.builtin.Type.EnumField{.{
-            .name = struct_decl.name,
-            .value = i,
-        }};
-    }
-    return @Type(std.builtin.Type{ .Enum = .{
-        .tag_type = u32,
-        .fields = enum_fields,
-        .decls = &.{},
-        .is_exhaustive = true,
-    } });
-}
-
-pub fn Args(comptime func: anytype) type {
-    const ParamInfo = @typeInfo(@TypeOf(func)).Fn.params;
-    var fields: []const std.builtin.Type.StructField = &.{};
-    for (ParamInfo, 0..) |param_info, i| {
-        fields = fields ++ &[_]std.builtin.Type.StructField{.{
-            .name = std.fmt.comptimePrint("{d}", .{i}),
-            .type = param_info.type.?,
-            .default_value = null,
-            .is_comptime = false,
-            .alignment = @alignOf(param_info.type.?),
-        }};
-    }
-    return @Type(.{ .Struct = .{
-        .layout = .auto,
-        .fields = fields,
-        .decls = &.{},
-        .is_tuple = true,
-    } });
-}

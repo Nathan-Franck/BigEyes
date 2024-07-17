@@ -1,4 +1,4 @@
-const graph_runtime = @import("graph_runtime.zig");
+const graph_runtime = @import("../graph_runtime.zig");
 const Blueprint = graph_runtime.Blueprint;
 const InputLink = graph_runtime.InputLink;
 

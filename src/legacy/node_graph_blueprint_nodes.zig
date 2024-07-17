@@ -1,8 +1,8 @@
 const std = @import("std");
-const NodeGraphBlueprintEntry = @import("./interactive_node_builder_blueprint.zig").NodeGraphBlueprintEntry;
-const Blueprint = @import("./interactive_node_builder_blueprint.zig").Blueprint;
-const utils = @import("./utils.zig");
-const utils_node = @import("./utils_node.zig");
+const NodeGraphBlueprintEntry = @import("../graph_runtime.zig").NodeGraphBlueprintEntry;
+const Blueprint = @import("../graph_runtime.zig").Blueprint;
+const utils = @import("../utils.zig");
+const utils_node = @import("../utils_node.zig");
 
 allocator: std.mem.Allocator,
 

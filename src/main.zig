@@ -5,7 +5,7 @@ const zgpu = @import("zgpu");
 const wgpu = zgpu.wgpu;
 const zgui = @import("zgui");
 const zmath = @import("zmath");
-const Vertex = @import("./MeshLoader.zig").Vertex;
+const Vertex = @import("./mesh_loader.zig").Vertex;
 
 const subdiv = @import("./subdiv.zig");
 
@@ -131,7 +131,7 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !DemoState {
     var arena = std.heap.ArenaAllocator.init(allocator);
     defer arena.deinit();
 
-    const meshes = try @import("./MeshLoader.zig").getMeshes(arena.allocator());
+    const meshes = try @import("./mesh_loader.zig").getMeshes(arena.allocator());
 
     var models = std.ArrayList(Model).init(allocator);
     for (meshes.items) |mesh| {

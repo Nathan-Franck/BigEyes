@@ -1,6 +1,6 @@
 const std = @import("std");
 const subdiv = @import("./subdiv.zig");
-const MeshHelper = @import("./MeshHelper.zig");
+const mesh_helper = @import("./mesh_helper.zig");
 const MeshSpec = @import("./MeshSpec.zig");
 
 pub const Vertex = struct {
@@ -33,13 +33,13 @@ pub fn getMeshes(allocator: std.mem.Allocator) !std.ArrayList(Mesh) {
     var meshes = std.ArrayList(Mesh).init(allocator);
     const perform_subdiv_pass = false;
     for (mesh_input_data.value.meshes) |input_data| {
-        const flipped_vertices = MeshHelper.flipYZ(allocator, input_data.vertices);
+        const flipped_vertices = mesh_helper.flipYZ(allocator, input_data.vertices);
         try meshes.append(mesh: {
             if (!perform_subdiv_pass) {
                 break :mesh .{
                     .label = input_data.name,
                     .vertices = vertices: {
-                        const normals = MeshHelper.Polygon(.Face).calculateNormals(allocator, flipped_vertices, input_data.polygons);
+                        const normals = mesh_helper.Polygon(.Face).calculateNormals(allocator, flipped_vertices, input_data.polygons);
                         var vertices = std.ArrayList(Vertex).init(allocator);
                         for (flipped_vertices, 0..) |point, i| {
                             try vertices.append(Vertex{
@@ -50,7 +50,7 @@ pub fn getMeshes(allocator: std.mem.Allocator) !std.ArrayList(Mesh) {
                         }
                         break :vertices vertices.items;
                     },
-                    .indices = MeshHelper.Polygon(.Face).toTriangles(allocator, input_data.polygons),
+                    .indices = mesh_helper.Polygon(.Face).toTriangles(allocator, input_data.polygons),
                 };
             } else {
                 var result = try subdiv.Polygon(.Face).cmcSubdiv(allocator, flipped_vertices, input_data.polygons);
@@ -60,7 +60,7 @@ pub fn getMeshes(allocator: std.mem.Allocator) !std.ArrayList(Mesh) {
                     subdiv_count += 1;
                 }
                 const vertices = vertices: {
-                    const normals = MeshHelper.Polygon(.Quad).calculateNormals(allocator, result.points, result.quads);
+                    const normals = mesh_helper.Polygon(.Quad).calculateNormals(allocator, result.points, result.quads);
                     var vertices = std.ArrayList(Vertex).init(allocator);
                     for (result.points, 0..) |point, i| {
                         try vertices.append(Vertex{
@@ -74,7 +74,7 @@ pub fn getMeshes(allocator: std.mem.Allocator) !std.ArrayList(Mesh) {
                 break :mesh .{
                     .label = input_data.name,
                     .vertices = vertices,
-                    .indices = MeshHelper.Polygon(.Quad).toTriangles(allocator, result.quads),
+                    .indices = mesh_helper.Polygon(.Quad).toTriangles(allocator, result.quads),
                 };
             }
         });

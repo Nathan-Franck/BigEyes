@@ -386,8 +386,10 @@ pub fn NodeGraph(
                 const node_defn = @field(node_definitions, node.name);
                 const node_params = @typeInfo(@TypeOf(node_defn)).Fn.params;
                 const NodeInputs = node_params[node_params.len - 1].type.?;
+
                 var node_inputs: NodeInputs = undefined;
                 var dirty = false;
+
                 var mutable_fields: build_type: {
                     var mutable_fields: []const std.builtin.Type.StructField = &.{};
                     for (node.input_links) |link| {
@@ -425,6 +427,7 @@ pub fn NodeGraph(
                         .is_tuple = false,
                     } });
                 } = undefined;
+
                 inline for (node.input_links) |link| {
                     const node_input_field = switch (link.source) {
                         .input_field => |input_field| node_input: {
@@ -551,8 +554,8 @@ pub fn NodeGraph(
 }
 
 test "Build" {
-    const NodeDefinitions = @import("./node_graph_blueprint_nodes.zig");
-    const node_graph_blueprint = @import("./node_graph_blueprint_nodes.zig");
+    const NodeDefinitions = @import("./legacy/node_graph_blueprint_nodes.zig");
+    const node_graph_blueprint = @import("./legacy/interactive_node_builder_blueprint.zig");
     const allocator = std.heap.page_allocator;
     const MyNodeGraph = NodeGraph(
         node_graph_blueprint.node_graph_blueprint,
