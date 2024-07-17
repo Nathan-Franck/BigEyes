@@ -28,14 +28,18 @@ pub fn copyWith(source_data: anytype, field_changes: anytype) @TypeOf(source_dat
     }
 }
 
+fn DeepCloneResult(T: type) type {
+    return struct {
+        value: T,
+        allocator_used: bool,
+    };
+}
+
 pub fn deepClone(
     T: type,
     allocator: std.mem.Allocator,
     source: anytype,
-) !struct {
-    value: T,
-    allocator_used: bool = false,
-} {
+) !DeepCloneResult(T) {
     return switch (@typeInfo(T)) {
         else => .{ .value = source, .allocator_used = false },
         .Array => |a| blk: {
@@ -335,6 +339,9 @@ pub fn DeepHashableStruct(t: type) struct { type: type, changed: bool = false } 
         },
     };
 }
+
+/// Find the smallest number in a slice of numbers and return the value and the index.
+/// Uses SIMD to process multiple numbers at once.
 pub fn findSmallestNumberAndIndex(T: type, numbers: []const T) struct { value: T, index: usize } {
     const vec_len = 32;
     const Vec = @Vector(vec_len, T);
