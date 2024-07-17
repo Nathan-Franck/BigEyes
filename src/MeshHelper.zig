@@ -59,7 +59,6 @@ pub fn Polygon(comptime poly_selection: enum { Quad, Face }) type {
             var arena = std.heap.ArenaAllocator.init(allocator);
             defer arena.deinit();
 
-            // var vertexToPoly = std.AutoHashMap(u32, *std.ArrayList(*const Poly)).init(arena.allocator());
             var vertexToPoly = arena.allocator().alloc(std.ArrayList(*const Poly), points.len) catch unreachable;
             for (vertexToPoly) |*list| {
                 list.* = std.ArrayList(*const Poly).init(arena.allocator());
