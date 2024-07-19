@@ -51,7 +51,7 @@ pub fn Polygon(comptime poly_selection: enum { Quad, Face }) type {
         .Face => Face,
     };
     return struct {
-        pub fn calculateNormals(
+        pub noinline fn calculateNormals(
             allocator: std.mem.Allocator,
             points: []const Point,
             polygons: []const Poly,
@@ -59,34 +59,42 @@ pub fn Polygon(comptime poly_selection: enum { Quad, Face }) type {
             var arena = std.heap.ArenaAllocator.init(allocator);
             defer arena.deinit();
 
-            var vertexToPoly = arena.allocator().alloc(std.ArrayList(*const Poly), points.len) catch unreachable;
-            for (vertexToPoly) |*list| {
-                list.* = std.ArrayList(*const Poly).init(arena.allocator());
+            const max_polys_per_vertex = 4;
+            var vertex_to_poly = arena.allocator().alloc([max_polys_per_vertex]*const Poly, points.len) catch unreachable;
+            const vertex_to_poly_len = arena.allocator().alloc(u8, points.len) catch unreachable;
+            for (vertex_to_poly_len) |*len| {
+                len.* = 0;
             }
             for (polygons) |*polygon| {
                 for (polygon.*) |vertex| {
-                    vertexToPoly[vertex].append(polygon) catch unreachable;
+                    const len = vertex_to_poly_len[vertex];
+                    if (len < max_polys_per_vertex) {
+                        vertex_to_poly[vertex][len] = polygon;
+                        vertex_to_poly_len[vertex] += 1;
+                    }
                 }
             }
             var normals = std.ArrayList(Point).init(allocator);
-            for (points, 0..) |_, i| {
+            for (0..points.len) |i| {
                 normals.append(average_normal: {
-                    const local_polys = vertexToPoly[@intCast(i)];
+                    const local_polys = vertex_to_poly[i];
+                    const len = vertex_to_poly_len[i];
                     var average_normal = Point{ 0, 0, 0, 0 };
-                    for (local_polys.items) |poly| {
+                    for (0..len) |poly_index| {
                         var poly_normal = Point{ 0, 0, 0, 0 };
-                        for (poly.*[1..], 1..) |_, j| {
+                        const poly = local_polys[poly_index];
+                        for (1..poly.len) |j| {
                             poly_normal -= zmath.cross3(
                                 points[poly.*[j - 1]] - points[poly.*[0]],
                                 points[poly.*[j]] - points[poly.*[0]],
                             );
                         }
-                        average_normal += zmath.normalize3(poly_normal) / @as(
-                            @Vector(4, f32),
-                            @splat(@floatFromInt(local_polys.items.len)),
-                        );
+                        average_normal += zmath.normalize3(poly_normal);
                     }
-                    break :average_normal average_normal;
+                    break :average_normal average_normal / @as(
+                        @Vector(4, f32),
+                        @splat(@floatFromInt(vertex_to_poly_len[i])),
+                    );
                 }) catch unreachable;
             }
             return normals.items;
