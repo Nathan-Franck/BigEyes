@@ -504,7 +504,7 @@ pub fn NodeGraph(
                             }
                         else
                             .{
-                                &self.nodes_arenas[node_index],
+                                self.nodes_arenas[node_index].allocator(),
                                 node_inputs,
                             },
                     );

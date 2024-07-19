@@ -174,36 +174,30 @@ pub const interface = struct {
             };
 
             pub fn changeSettings(props: struct {
-                settings: Settings,
+                settings: *Settings,
                 user_changes: ?union(enum) {
                     resolution_update: PixelPoint,
                     subdiv_level_update: u8,
                 },
-            }) !struct { settings: Settings } {
-                var settings = props.settings;
+            }) !struct {} {
                 if (props.user_changes) |c| {
                     switch (c) {
                         .resolution_update => |resolution| {
-                            settings.render_resolution = resolution;
+                            props.settings.render_resolution = resolution;
                         },
                         .subdiv_level_update => |level| {
-                            settings.subdiv_level = level;
+                            props.settings.subdiv_level = level;
                         },
                     }
                 }
-
-                return .{
-                    .settings = settings,
-                };
+                return .{};
             }
 
-            pub fn getResources(arena: *std.heap.ArenaAllocator, props: struct {
+            pub fn getResources(allocator: std.mem.Allocator, props: struct {
                 settings: Settings,
             }) !struct {
                 resources: Resources,
             } {
-                const allocator = arena.allocator();
-
                 const mesh_input_data = blk: {
                     const json_data = @embedFile("content/Cat.blend.json");
                     break :blk std.json.parseFromSliceLeaky(MeshSpec, allocator, json_data, .{}) catch unreachable;
@@ -212,18 +206,18 @@ pub const interface = struct {
                 const quads_by_subdiv = blk: {
                     const encoded_vertices = input_data.frame_to_vertices[0];
                     const input_vertices = mesh_helper.flipYZ(
-                        arena.allocator(),
+                        allocator,
                         mesh_helper.decodeVertexDataFromHexidecimal(
-                            arena.allocator(),
+                            allocator,
                             encoded_vertices,
                         ),
                     );
                     var quads_by_subdiv = std.ArrayList([]const subdiv.Quad).init(allocator);
-                    var mesh_result = try subdiv.Polygon(.Face).cmcSubdiv(arena.allocator(), input_vertices, input_data.polygons);
+                    var mesh_result = try subdiv.Polygon(.Face).cmcSubdiv(allocator, input_vertices, input_data.polygons);
                     try quads_by_subdiv.append(mesh_result.quads);
                     var subdiv_count: u32 = 0;
                     while (subdiv_count < props.settings.subdiv_level) {
-                        mesh_result = try subdiv.Polygon(.Quad).cmcSubdiv(arena.allocator(), mesh_result.points, mesh_result.quads);
+                        mesh_result = try subdiv.Polygon(.Quad).cmcSubdiv(allocator, mesh_result.points, mesh_result.quads);
                         subdiv_count += 1;
                         try quads_by_subdiv.append(mesh_result.quads);
                     }
@@ -234,7 +228,7 @@ pub const interface = struct {
                     try frames.append(mesh_helper.flipYZ(
                         allocator,
                         mesh_helper.decodeVertexDataFromHexidecimal(
-                            arena.allocator(),
+                            allocator,
                             encoded_vertices,
                         ),
                     ));
@@ -255,7 +249,7 @@ pub const interface = struct {
             }
 
             pub fn game(
-                arena: *std.heap.ArenaAllocator,
+                allocator: std.mem.Allocator,
                 props: struct {
                     settings: Settings,
                     resources: Resources,
@@ -274,34 +268,32 @@ pub const interface = struct {
                         found_input.mouse_delta *
                         @as(zm.Vec, @splat(-props.settings.orbit_speed));
                 }
+
+                const source_mesh = props.resources.cat;
                 const current_frame_index = @mod(
-                    props.game_time_ms * props.resources.cat.frame_rate / 1000,
-                    props.resources.cat.frames.len,
+                    props.game_time_ms * source_mesh.frame_rate / 1000,
+                    source_mesh.frames.len,
                 );
-                const current_frame = props.resources.cat.frames[@intCast(current_frame_index)];
+                const current_frame = source_mesh.frames[@intCast(current_frame_index)];
                 const current_cat_mesh = subdiv_mesh: {
-                    const allocator = arena.allocator();
-                    const input_vertices = current_frame;
-                    const input_data = props.resources.cat;
-                    const quads_by_subdiv = props.resources.cat.quads_by_subdiv;
-                    var mesh_result = try subdiv.Polygon(.Face).cmcSubdivOnlyPoints(allocator, input_vertices, input_data.polygons);
+                    var mesh_result = try subdiv.Polygon(.Face).cmcSubdivOnlyPoints(allocator, current_frame, source_mesh.polygons);
                     var subdiv_count: u32 = 0;
                     while (subdiv_count < props.settings.subdiv_level) {
-                        mesh_result = try subdiv.Polygon(.Quad).cmcSubdivOnlyPoints(allocator, mesh_result, quads_by_subdiv[subdiv_count]);
+                        mesh_result = try subdiv.Polygon(.Quad).cmcSubdivOnlyPoints(allocator, mesh_result, source_mesh.quads_by_subdiv[subdiv_count]);
                         subdiv_count += 1;
                     }
                     break :subdiv_mesh Mesh{
                         .label = "cat",
-                        .indices = props.resources.cat.indices,
+                        .indices = source_mesh.indices,
                         .position = mesh_helper.pointsToFloatSlice(allocator, mesh_result),
                         .normal = mesh_helper.pointsToFloatSlice(
                             allocator,
-                            QuadMeshHelper.calculateNormals(arena.allocator(), mesh_result, quads_by_subdiv[quads_by_subdiv.len - 1]),
+                            QuadMeshHelper.calculateNormals(allocator, mesh_result, source_mesh.quads_by_subdiv[source_mesh.quads_by_subdiv.len - 1]),
                         ),
                     };
                 };
                 try props.some_numbers.append(props.some_numbers.items[props.some_numbers.items.len - 1] + 1);
-                wasm_entry.dumpDebugLog(try std.fmt.allocPrint(arena.allocator(), "{any}", .{props.some_numbers.items}));
+                wasm_entry.dumpDebugLog(try std.fmt.allocPrint(allocator, "{any}", .{props.some_numbers.items}));
                 return .{
                     .current_cat_mesh = current_cat_mesh,
                     .world_matrix = zm.mul(

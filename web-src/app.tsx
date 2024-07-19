@@ -165,10 +165,6 @@ export function App() {
         ) as Mat4,
       };
       requestAnimationFrame(() => {
-        setStats({
-          polygonCount: buffers.indices.length / 3,
-          framerate: 1000.0 / (Date.now() - graphInputs.game_time_ms),
-        });
         {
           gl.viewport(0, 0, windowSize.width, windowSize.height);
           gl.clearColor(0, 0, 0, 1);
@@ -176,6 +172,11 @@ export function App() {
         }
 
         ShaderBuilder.renderMaterial(gl, coolMesh, buffers);
+
+        setStats({
+          polygonCount: buffers.indices.length / 3,
+          framerate: 1000.0 / (Date.now() - graphInputs.game_time_ms),
+        });
       });
     };
 
@@ -224,7 +225,7 @@ export function App() {
         <input
           type="range"
           min="0"
-          max="3"
+          max="4"
           value={subdivLevel}
           onChange={(event) => {
             setSubdivLevel(parseInt(event.target!.value));
