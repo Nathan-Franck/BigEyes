@@ -7,15 +7,24 @@ pub const Triangle = struct {
     b: zm.Vec,
     c: zm.Vec,
 };
+
 pub const Ray = struct {
     position: zm.Vec,
     normal: zm.Vec,
 };
+
+pub const Bounds = struct {
+    min: Vec,
+    max: Vec,
+};
+
 const epsilon = 0.00001;
+
 pub fn dot(a: zm.Vec, b: zm.Vec) f32 {
     const mult = a * b;
     return mult[0] + mult[1] + mult[2];
 }
+
 pub fn rayTriangleIntersection(ray: Ray, triangle: Triangle) ?struct { distance: f32 } {
     const edge1 = triangle.b - triangle.a;
     const edge2 = triangle.c - triangle.a;
@@ -40,6 +49,48 @@ pub fn rayTriangleIntersection(ray: Ray, triangle: Triangle) ?struct { distance:
         return .{ .distance = t };
     }
     return null;
+}
+
+test "Ray Triangle Intersection" {
+    const ray = Ray{
+        .position = Vec{ 0.5, 0.5, -10, 0 },
+        .normal = Vec{ 0, 0, 1, 0 },
+    };
+    const triangle = Triangle{
+        .a = Vec{ 0, 0, 0, 0 },
+        .b = Vec{ 1, 0, 0, 0 },
+        .c = Vec{ 0, 1, 0, 0 },
+    };
+    const result = rayTriangleIntersection(ray, triangle);
+    try std.testing.expectEqualDeep(10.0, result.?.distance);
+}
+
+pub fn rayBoundsIntersection(ray: Ray, bounds: Bounds) ?struct { entry_distance: f32, exit_distance: f32 } {
+    const t1 = (bounds.min - ray.position) / ray.normal;
+    const t2 = (bounds.max - ray.position) / ray.normal;
+    const tmin = @max(@min(t1, t2), @as(Vec, @splat(0)));
+    const tmax = @min(@max(t1, t2), @as(Vec, @splat(std.math.inf(f32))));
+    if (@reduce(.Or, tmax < tmin)) {
+        return null;
+    }
+    std.debug.print("tmin: {any}, tmax: {any}\n", .{ tmin, tmax });
+    const entry_distance = @reduce(.Max, tmin);
+    const exit_distance = @reduce(.Min, tmax);
+    return .{ .entry_distance = entry_distance, .exit_distance = exit_distance };
+}
+
+test "Ray Bounds Intersection" {
+    const ray = Ray{
+        .position = Vec{ 0, 0, -2, 0 },
+        .normal = Vec{ 0, 0, 1, 0 },
+    };
+    const bounds = Bounds{
+        .min = Vec{ -1, -1, -1, 0 },
+        .max = Vec{ 1, 1, 1, 0 },
+    };
+    const result = rayBoundsIntersection(ray, bounds);
+    try std.testing.expectEqualDeep(1.0, result.?.entry_distance);
+    try std.testing.expectEqualDeep(3.0, result.?.exit_distance);
 }
 
 pub const GridTraversal = struct {
