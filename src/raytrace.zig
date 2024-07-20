@@ -2,12 +2,7 @@ const zm = @import("zmath/main.zig");
 const std = @import("std");
 const Vec = zm.Vec;
 
-pub const Triangle = struct {
-    a: zm.Vec,
-    b: zm.Vec,
-    c: zm.Vec,
-};
-
+pub const Triangle = [3]zm.Vec;
 pub const Ray = struct {
     position: zm.Vec,
     normal: zm.Vec,
@@ -16,6 +11,15 @@ pub const Ray = struct {
 pub const Bounds = struct {
     min: Vec,
     max: Vec,
+    pub fn initEncompass(points: []const Vec) Bounds {
+        var min = Vec{ std.math.inf(f32), std.math.inf(f32), std.math.inf(f32), 0 };
+        var max = Vec{ -std.math.inf(f32), -std.math.inf(f32), -std.math.inf(f32), 0 };
+        for (points) |point| {
+            min = @min(min, point);
+            max = @max(max, point);
+        }
+        return Bounds{ .min = min, .max = max };
+    }
 };
 
 const epsilon = 0.00001;
@@ -26,15 +30,15 @@ pub fn dot(a: zm.Vec, b: zm.Vec) f32 {
 }
 
 pub fn rayTriangleIntersection(ray: Ray, triangle: Triangle) ?struct { distance: f32 } {
-    const edge1 = triangle.b - triangle.a;
-    const edge2 = triangle.c - triangle.a;
+    const edge1 = triangle[1] - triangle[0];
+    const edge2 = triangle[2] - triangle[0];
     const h = zm.cross3(ray.normal, edge2);
     const a = dot(edge1, h);
     if (a > -epsilon and a < epsilon) {
         return null;
     }
     const f = 1.0 / a;
-    const s = ray.position - triangle.a;
+    const s = ray.position - triangle[0];
     const u = f * dot(s, h);
     if (u < 0.0 or u > 1.0) {
         return null;
@@ -57,9 +61,9 @@ test "Ray Triangle Intersection" {
         .normal = Vec{ 0, 0, 1, 0 },
     };
     const triangle = Triangle{
-        .a = Vec{ 0, 0, 0, 0 },
-        .b = Vec{ 1, 0, 0, 0 },
-        .c = Vec{ 0, 1, 0, 0 },
+        Vec{ 0, 0, 0, 0 },
+        Vec{ 1, 0, 0, 0 },
+        Vec{ 0, 1, 0, 0 },
     };
     const result = rayTriangleIntersection(ray, triangle);
     try std.testing.expectEqualDeep(10.0, result.?.distance);
@@ -73,7 +77,6 @@ pub fn rayBoundsIntersection(ray: Ray, bounds: Bounds) ?struct { entry_distance:
     if (@reduce(.Or, tmax < tmin)) {
         return null;
     }
-    std.debug.print("tmin: {any}, tmax: {any}\n", .{ tmin, tmax });
     const entry_distance = @reduce(.Max, tmin);
     const exit_distance = @reduce(.Min, tmax);
     return .{ .entry_distance = entry_distance, .exit_distance = exit_distance };
@@ -150,8 +153,8 @@ pub const GridTraversal = struct {
     }
 };
 test "Grid Traversal Iterator" {
-    const start = Vec{ 0, 0, 0, 0 };
-    const end = Vec{ 5, 3, 2, 0 };
+    const start = Vec{ 0.5, 0.5, 0.5, 0 };
+    const end = Vec{ 2.5, 2.5, 2.5, 0 };
     var traversal = GridTraversal.init(start, end);
 
     while (traversal.next()) |cell| {

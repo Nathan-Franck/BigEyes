@@ -289,9 +289,9 @@ pub const interface = struct {
                         var list = std.ArrayList(raytrace.Triangle).init(allocator);
                         for (0..source_mesh.indices.len / 3) |triangle_index| {
                             try list.append(.{
-                                .a = positions[source_mesh.indices[triangle_index * 3 + 0]],
-                                .b = positions[source_mesh.indices[triangle_index * 3 + 1]],
-                                .c = positions[source_mesh.indices[triangle_index * 3 + 2]],
+                                positions[source_mesh.indices[triangle_index * 3 + 0]],
+                                positions[source_mesh.indices[triangle_index * 3 + 1]],
+                                positions[source_mesh.indices[triangle_index * 3 + 2]],
                             });
                         }
                         break :build list.items;
@@ -299,19 +299,33 @@ pub const interface = struct {
 
                     var colors = std.ArrayList(zm.Vec).init(allocator);
 
+                    var mesh_bounds = raytrace.Bounds.initEncompass(positions);
+                    const grid_width = 10;
+                    const array_size = grid_width * grid_width * grid_width;
+                    var bins: [array_size]?*std.ArrayList(*raytrace.Triangle) = .{null} ** array_size;
+                    for (triangles) |triangle| {
+                        const triangle_bounds = raytrace.Bounds.initEncompass(&triangle);
+                        _ = triangle_bounds;
+                    }
+                    _ = &bins;
+                    _ = &mesh_bounds;
+
                     for (positions, normals) |position, normal| {
                         var closest_distance = std.math.floatMax(f32);
-                        const ray = .{
-                            .position = position,
-                            .normal = normal,
-                        };
+                        _ = &closest_distance;
+                        _ = position;
+                        _ = normal;
+                        // const ray = .{
+                        //     .position = position,
+                        //     .normal = normal,
+                        // };
 
-                        for (triangles) |triangle|
-                            if (raytrace.rayTriangleIntersection(ray, triangle)) |hit| {
-                                if (hit.distance < closest_distance) {
-                                    closest_distance = hit.distance;
-                                }
-                            };
+                        // for (triangles) |triangle|
+                        //     if (raytrace.rayTriangleIntersection(ray, triangle)) |hit| {
+                        //         if (hit.distance < closest_distance) {
+                        //             closest_distance = hit.distance;
+                        //         }
+                        //     };
 
                         // const occlusion: f32 = if (closest_distance < 10000) 1.0 else 0.0;
                         try colors.append(if (closest_distance < 100)
