@@ -123,6 +123,8 @@ export function App() {
         indices: { type: "element" },
         position: { type: "attribute", unit: "vec3" },
         normals: { type: "attribute", unit: "vec3" },
+        colors: { type: "attribute", unit: "vec3" },
+        color: { type: "varying", unit: "vec3" },
         normal: { type: "varying", unit: "vec3" },
         item_position: { type: "attribute", unit: "vec3", instanced: true },
         perspectiveMatrix: { type: "uniform", unit: "mat4", count: 1 },
@@ -132,12 +134,14 @@ export function App() {
         void main(void) {
           gl_Position = perspectiveMatrix * vec4(item_position + position, 1);
           normal = normals;
+          color = colors;
         }
       `,
       fragSource: `
         precision highp float;
         void main(void) {
-          gl_FragColor = vec4(normal * 0.5 + 0.5, 1);
+          gl_FragColor = vec4(color, 1);
+          // gl_FragColor = vec4(normal * 0.5 + 0.5, 1);
         }
       `,
     });
@@ -155,6 +159,10 @@ export function App() {
         normals: ShaderBuilder.createBuffer(
           gl,
           sliceToArray.Float32Array(graphOutputs.current_cat_mesh.normal),
+        ),
+        colors: ShaderBuilder.createBuffer(
+          gl,
+          sliceToArray.Float32Array(graphOutputs.current_cat_mesh.color),
         ),
         item_position: ShaderBuilder.createBuffer(
           gl,

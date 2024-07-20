@@ -3,6 +3,7 @@ const graph = @import("./graph_runtime.zig");
 const typeDefinitions = @import("./type_definitions.zig");
 
 const subdiv = @import("./subdiv.zig");
+const raytrace = @import("./raytrace.zig");
 const mesh_helper = @import("./mesh_helper.zig");
 const MeshSpec = @import("./MeshSpec.zig");
 const zm = @import("./zmath/main.zig");
@@ -13,7 +14,7 @@ pub const Mesh = struct {
     label: []const u8,
     indices: []const u32,
     position: []const f32,
-    // color: []f32,
+    color: []const f32,
     normal: []const f32,
 };
 
@@ -91,11 +92,6 @@ pub const interface = struct {
                     .rotation = .{ 0, 0, 0, 1 },
                     .track_distance = 20,
                 },
-                .some_numbers = blk: {
-                    var some_numbers = std.ArrayList(u32).init(std.heap.page_allocator);
-                    some_numbers.appendSlice(&.{ 0, 1, 2 }) catch unreachable;
-                    break :blk some_numbers;
-                },
             },
         });
     }
@@ -129,7 +125,6 @@ pub const interface = struct {
                         .{ .field = "game_time_ms", .source = .{ .input_field = "game_time_ms" } },
                         .{ .field = "input", .source = .{ .input_field = "input" } },
                         .{ .field = "orbit_camera", .source = .{ .store_field = "orbit_camera" } },
-                        .{ .field = "some_numbers", .source = .{ .store_field = "some_numbers" } },
                     },
                 },
                 .{
@@ -143,7 +138,6 @@ pub const interface = struct {
             },
             .store = &[_]graph.SystemSink{
                 .{ .output_node = "game", .output_field = "orbit_camera", .system_field = "orbit_camera" },
-                .{ .output_node = "game", .output_field = "some_numbers", .system_field = "some_numbers" },
                 .{ .output_node = "changeSettings", .output_field = "settings", .system_field = "settings" },
             },
             .output = &[_]graph.SystemSink{
@@ -257,7 +251,6 @@ pub const interface = struct {
                     input: ?struct { mouse_delta: zm.Vec },
 
                     orbit_camera: *OrbitCamera,
-                    some_numbers: *std.ArrayList(u32),
                 },
             ) !struct {
                 current_cat_mesh: Mesh,
@@ -275,27 +268,72 @@ pub const interface = struct {
                     source_mesh.frames.len,
                 );
                 const current_frame = source_mesh.frames[@intCast(current_frame_index)];
-                const current_cat_mesh = subdiv_mesh: {
+                const subdiv_mesh = subdiv_mesh: {
                     var mesh_result = try subdiv.Polygon(.Face).cmcSubdivOnlyPoints(allocator, current_frame, source_mesh.polygons);
                     var subdiv_count: u32 = 0;
                     while (subdiv_count < props.settings.subdiv_level) {
                         mesh_result = try subdiv.Polygon(.Quad).cmcSubdivOnlyPoints(allocator, mesh_result, source_mesh.quads_by_subdiv[subdiv_count]);
                         subdiv_count += 1;
                     }
-                    break :subdiv_mesh Mesh{
-                        .label = "cat",
+                    break :subdiv_mesh .{
                         .indices = source_mesh.indices,
-                        .position = mesh_helper.pointsToFloatSlice(allocator, mesh_result),
-                        .normal = mesh_helper.pointsToFloatSlice(
-                            allocator,
-                            QuadMeshHelper.calculateNormals(allocator, mesh_result, source_mesh.quads_by_subdiv[source_mesh.quads_by_subdiv.len - 1]),
-                        ),
+                        .positions = mesh_result,
+                        .normals = QuadMeshHelper.calculateNormals(allocator, mesh_result, source_mesh.quads_by_subdiv[source_mesh.quads_by_subdiv.len - 1]),
                     };
                 };
-                try props.some_numbers.append(props.some_numbers.items[props.some_numbers.items.len - 1] + 1);
-                wasm_entry.dumpDebugLog(try std.fmt.allocPrint(allocator, "{any}", .{props.some_numbers.items}));
+                const color = occlude: {
+                    const positions = subdiv_mesh.positions;
+                    const normals = subdiv_mesh.normals;
+
+                    const triangles = build: {
+                        var list = std.ArrayList(raytrace.Triangle).init(allocator);
+                        for (0..source_mesh.indices.len / 3) |triangle_index| {
+                            try list.append(.{
+                                .a = positions[source_mesh.indices[triangle_index * 3 + 0]],
+                                .b = positions[source_mesh.indices[triangle_index * 3 + 1]],
+                                .c = positions[source_mesh.indices[triangle_index * 3 + 2]],
+                            });
+                        }
+                        break :build list.items;
+                    };
+
+                    var colors = std.ArrayList(zm.Vec).init(allocator);
+
+                    for (positions, normals) |position, normal| {
+                        var closest_distance = std.math.floatMax(f32);
+                        const ray = .{
+                            .position = position,
+                            .normal = normal,
+                        };
+
+                        for (triangles) |triangle|
+                            if (raytrace.rayTriangleIntersection(ray, triangle)) |hit| {
+                                if (hit.distance < closest_distance) {
+                                    closest_distance = hit.distance;
+                                }
+                            };
+
+                        // const occlusion: f32 = if (closest_distance < 10000) 1.0 else 0.0;
+                        try colors.append(if (closest_distance < 100)
+                            // zm.lerp(
+                            zm.Vec{ 1.0, 1.0, 1.0, 1.0 }
+                        else
+                            zm.Vec{ 1.0, 0.0, 0.0, 1.0 }
+                        // std.math.clamp(occlusion, 0, 1),
+                        );
+                    }
+                    break :occlude colors.items;
+                };
+
+                const final_mesh = Mesh{
+                    .label = "cat",
+                    .color = mesh_helper.pointsToFloatSlice(allocator, color),
+                    .indices = subdiv_mesh.indices,
+                    .normal = mesh_helper.pointsToFloatSlice(allocator, subdiv_mesh.normals),
+                    .position = mesh_helper.pointsToFloatSlice(allocator, subdiv_mesh.positions),
+                };
                 return .{
-                    .current_cat_mesh = current_cat_mesh,
+                    .current_cat_mesh = final_mesh,
                     .world_matrix = zm.mul(
                         zm.mul(
                             zm.translationV(props.orbit_camera.position),

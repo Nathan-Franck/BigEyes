@@ -59,7 +59,7 @@ pub fn Polygon(comptime poly_selection: enum { Quad, Face }) type {
             var arena = std.heap.ArenaAllocator.init(allocator);
             defer arena.deinit();
 
-            const max_polys_per_vertex = 4;
+            const max_polys_per_vertex = 8;
             var vertex_to_poly = arena.allocator().alloc([max_polys_per_vertex]*const Poly, points.len) catch unreachable;
             const vertex_to_poly_len = arena.allocator().alloc(u8, points.len) catch unreachable;
             for (vertex_to_poly_len) |*len| {
@@ -83,7 +83,7 @@ pub fn Polygon(comptime poly_selection: enum { Quad, Face }) type {
                     for (0..len) |poly_index| {
                         var poly_normal = Point{ 0, 0, 0, 0 };
                         const poly = local_polys[poly_index];
-                        for (1..poly.len) |j| {
+                        for (2..poly.len) |j| {
                             poly_normal -= zmath.cross3(
                                 points[poly.*[j - 1]] - points[poly.*[0]],
                                 points[poly.*[j]] - points[poly.*[0]],
