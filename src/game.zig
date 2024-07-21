@@ -303,6 +303,7 @@ pub const interface = struct {
                         .bounds = raytrace.Bounds.initEncompass(positions),
                     };
                     const bins = try grid_bounds.binTriangles(allocator, triangles);
+                    _ = bins;
 
                     for (positions, normals) |position, normal| {
                         var closest_distance = std.math.floatMax(f32);
@@ -313,28 +314,27 @@ pub const interface = struct {
                         };
                         const bounding_box_test = raytrace.rayBoundsIntersection(ray, grid_bounds.bounds);
                         if (bounding_box_test) |bounding_box_hit| {
-                            const start = grid_bounds.bounds.toBoundsSpace(ray.position);
-                            const end = grid_bounds.bounds.toBoundsSpace(
+                            const start = grid_bounds.transformPoint(ray.position);
+                            const end = grid_bounds.transformPoint(
                                 ray.position + ray.normal * @as(zm.Vec, @splat(bounding_box_hit.exit_distance)),
                             );
-                            _ = &bins;
-                            wasm_entry.dumpDebugLogFmt(std.heap.page_allocator, "{any} {any}", .{ start, end }) catch unreachable;
+                            // _ = &bins;
+                            // wasm_entry.dumpDebugLogFmt(std.heap.page_allocator, "{any} {any}", .{ start, end }) catch unreachable;
                             var traversal_iterator = raytrace.GridTraversal.init(start, end);
-                            _ = &traversal_iterator;
-                            // try wasm_entry.dumpDebugLogFmt(allocator, "{any} {any}", .{ start, end });
-                            // while (traversal_iterator.next()) |cell_coord| {
-                            // _ = cell_coord;
-                            //     const cell_index = raytrace.GridBounds(16).coordToIndex(cell_coord);
-                            //     try wasm_entry.dumpDebugLogFmt(allocator, "{any}", .{cell_index});
-                            //     const cell = bins[cell_index];
-                            //     if (cell) |cell_triangles| for (cell_triangles.items) |triangle| {
-                            //         if (raytrace.rayTriangleIntersection(ray, triangle.*)) |hit| {
-                            //             if (hit.distance < closest_distance) {
-                            //                 closest_distance = hit.distance;
-                            //             }
-                            //         }
-                            //     };
-                            // }
+                            // _ = &traversal_iterator;
+                            while (traversal_iterator.next()) |cell_coord| {
+                                _ = cell_coord;
+                                // const cell_index = raytrace.GridBounds(16).coordToIndex(cell_coord);
+                                // try wasm_entry.dumpDebugLogFmt(allocator, "{any}", .{cell_index});
+                                // const cell = bins[cell_index];
+                                // if (cell) |cell_triangles| for (cell_triangles.items) |triangle| {
+                                //     if (raytrace.rayTriangleIntersection(ray, triangle.*)) |hit| {
+                                //         if (hit.distance < closest_distance) {
+                                //             closest_distance = hit.distance;
+                                //         }
+                                //     }
+                                // };
+                            }
                         }
 
                         // for (triangles) |triangle|

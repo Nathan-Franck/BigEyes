@@ -105,17 +105,19 @@ test "Ray Bounds Intersection" {
     try std.testing.expectEqualDeep(3.0, result.?.exit_distance);
 }
 
-pub const GridTraversal = struct {
-    const Coord = @Vector(3, usize);
-    const IntDir = @Vector(3, i32);
+const Coord = @Vector(3, usize);
+const IntDir = @Vector(3, i32);
 
+pub const GridTraversal = struct {
     current: Coord,
     step: IntDir,
     tDelta: Vec,
     tMax: Vec,
     end: Coord,
 
-    pub fn init(start: Vec, end: Vec) GridTraversal {
+    pub fn init(uncapped_start: Vec, uncapped_end: Vec) GridTraversal {
+        const start = @max(uncapped_start, @as(Vec, @splat(0)));
+        const end = @max(uncapped_end, @as(Vec, @splat(0)));
         const dir = end - start;
 
         const step: IntDir = @as([4]i32, @select(
@@ -150,9 +152,11 @@ pub const GridTraversal = struct {
     }
 
     pub fn next(self: *GridTraversal) ?Coord {
-        if (@reduce(.And, @abs(self.current - self.end)) == 0) {
+        const wasm_entry = @import("./wasm_entry.zig");
+        if (@reduce(.And, @abs(@as(IntDir, @intCast(self.current)) - @as(IntDir, @intCast(self.end)))) == 0) {
             return null;
         }
+        wasm_entry.dumpDebugLogFmt(std.heap.page_allocator, "{any} {any}", .{ self.current, self.end }) catch unreachable;
 
         const result = self.current;
 
@@ -173,7 +177,9 @@ pub const GridTraversal = struct {
 
         const update = update_x + update_y + update_z;
 
+        wasm_entry.dumpDebugLogFmt(std.heap.page_allocator, "Done?", .{}) catch unreachable;
         self.current += @intCast(self.step * @as(IntDir, @as([4]i32, update)[0..3].*));
+        wasm_entry.dumpDebugLogFmt(std.heap.page_allocator, "Done!", .{}) catch unreachable;
         self.tMax += self.tDelta * @as(Vec, @floatFromInt(update));
 
         return result;
@@ -197,7 +203,7 @@ pub fn GridBounds(grid_width: usize) type {
         pub fn transformPoint(self: @This(), arg: zm.Vec) zm.Vec {
             return self.bounds.toBoundsSpace(arg) * @as(zm.Vec, @splat(width));
         }
-        pub fn coordToIndex(coord: @Vector(4, usize)) usize {
+        pub fn coordToIndex(coord: Coord) usize {
             return coord[0] + coord[1] * width + coord[2] * width * width;
         }
         pub fn binTriangles(self: @This(), allocator: std.mem.Allocator, triangles: []Triangle) ![array_size]?*std.ArrayList(*Triangle) {
@@ -209,7 +215,7 @@ pub fn GridBounds(grid_width: usize) type {
                 for (min[2]..max[2]) |z|
                     for (min[1]..max[1]) |y|
                         for (min[0]..max[0]) |x| {
-                            const index = coordToIndex(.{ x, y, z, 0 });
+                            const index = coordToIndex(.{ x, y, z });
                             var bin = if (bins[index]) |bin| bin else blk: {
                                 var bin = std.ArrayList(*Triangle).init(allocator);
                                 bins[index] = &bin;
