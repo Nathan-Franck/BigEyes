@@ -129,13 +129,26 @@ pub fn build(
         b.default_step.dependOn(test_step);
     }
 
+    // Check
+    {
+        const exe_check = b.addExecutable(.{
+            .target = b.resolveTargetQuery(.{ .cpu_arch = .wasm32, .os_tag = .freestanding }),
+            .optimize = optimize,
+            .name = "check_exe",
+            .root_source_file = b.path("src/wasm_entry.zig"),
+        });
+
+        const check = b.step("check", "Check if wasm compiles");
+        check.dependOn(&exe_check.step);
+    }
+
     // Wasm
     {
         var exe = b.addExecutable(.{
             .target = b.resolveTargetQuery(.{ .cpu_arch = .wasm32, .os_tag = .freestanding }),
             .optimize = optimize,
             .name = "game",
-            .root_source_file = .{ .cwd_relative = "src/wasm_entry.zig" },
+            .root_source_file = b.path("src/wasm_entry.zig"),
         });
 
         // Latest wasm hack - https://github.com/ringtailsoftware/zig-wasm-audio-framebuffer/blob/master/build.zig

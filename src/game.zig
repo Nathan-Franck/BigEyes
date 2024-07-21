@@ -299,26 +299,43 @@ pub const interface = struct {
 
                     var colors = std.ArrayList(zm.Vec).init(allocator);
 
-                    var mesh_bounds = raytrace.Bounds.initEncompass(positions);
-                    const grid_width = 10;
-                    const array_size = grid_width * grid_width * grid_width;
-                    var bins: [array_size]?*std.ArrayList(*raytrace.Triangle) = .{null} ** array_size;
-                    for (triangles) |triangle| {
-                        const triangle_bounds = raytrace.Bounds.initEncompass(&triangle);
-                        _ = triangle_bounds;
-                    }
-                    _ = &bins;
-                    _ = &mesh_bounds;
+                    const grid_bounds = raytrace.GridBounds(16){
+                        .bounds = raytrace.Bounds.initEncompass(positions),
+                    };
+                    const bins = try grid_bounds.binTriangles(allocator, triangles);
 
                     for (positions, normals) |position, normal| {
                         var closest_distance = std.math.floatMax(f32);
                         _ = &closest_distance;
-                        _ = position;
-                        _ = normal;
-                        // const ray = .{
-                        //     .position = position,
-                        //     .normal = normal,
-                        // };
+                        const ray = .{
+                            .position = position,
+                            .normal = normal,
+                        };
+                        const bounding_box_test = raytrace.rayBoundsIntersection(ray, grid_bounds.bounds);
+                        if (bounding_box_test) |bounding_box_hit| {
+                            const start = grid_bounds.bounds.toBoundsSpace(ray.position);
+                            const end = grid_bounds.bounds.toBoundsSpace(
+                                ray.position + ray.normal * @as(zm.Vec, @splat(bounding_box_hit.exit_distance)),
+                            );
+                            _ = &bins;
+                            wasm_entry.dumpDebugLogFmt(std.heap.page_allocator, "{any} {any}", .{ start, end }) catch unreachable;
+                            var traversal_iterator = raytrace.GridTraversal.init(start, end);
+                            _ = &traversal_iterator;
+                            // try wasm_entry.dumpDebugLogFmt(allocator, "{any} {any}", .{ start, end });
+                            // while (traversal_iterator.next()) |cell_coord| {
+                            // _ = cell_coord;
+                            //     const cell_index = raytrace.GridBounds(16).coordToIndex(cell_coord);
+                            //     try wasm_entry.dumpDebugLogFmt(allocator, "{any}", .{cell_index});
+                            //     const cell = bins[cell_index];
+                            //     if (cell) |cell_triangles| for (cell_triangles.items) |triangle| {
+                            //         if (raytrace.rayTriangleIntersection(ray, triangle.*)) |hit| {
+                            //             if (hit.distance < closest_distance) {
+                            //                 closest_distance = hit.distance;
+                            //             }
+                            //         }
+                            //     };
+                            // }
+                        }
 
                         // for (triangles) |triangle|
                         //     if (raytrace.rayTriangleIntersection(ray, triangle)) |hit| {

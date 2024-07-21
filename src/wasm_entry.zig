@@ -27,6 +27,9 @@ fn dumpError(source: []const u8) void {
 pub fn dumpDebugLog(source: []const u8) void {
     debugLogFromWasm(source.ptr, source.len);
 }
+pub fn dumpDebugLogFmt(allocator: std.mem.Allocator, comptime fmt: []const u8, args: anytype) !void {
+    dumpDebugLog(try std.fmt.allocPrint(allocator, fmt, args));
+}
 
 pub const InterfaceEnum = DeclsToEnum(game);
 

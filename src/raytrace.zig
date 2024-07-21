@@ -20,6 +20,15 @@ pub const Bounds = struct {
         }
         return Bounds{ .min = min, .max = max };
     }
+    pub fn size(self: Bounds) Vec {
+        return self.max - self.min;
+    }
+    pub fn scale(self: Bounds, factor: f32) Bounds {
+        return Bounds{ .min = self.min * factor, .max = self.max * factor };
+    }
+    pub fn toBoundsSpace(self: Bounds, point: Vec) Vec {
+        return (point - self.min) / self.size();
+    }
 };
 
 const epsilon = 0.00001;
@@ -97,33 +106,51 @@ test "Ray Bounds Intersection" {
 }
 
 pub const GridTraversal = struct {
-    current: Vec,
-    step: Vec,
+    const Coord = @Vector(3, usize);
+    const IntDir = @Vector(3, i32);
+
+    current: Coord,
+    step: IntDir,
     tDelta: Vec,
     tMax: Vec,
-    end: Vec,
+    end: Coord,
 
     pub fn init(start: Vec, end: Vec) GridTraversal {
         const dir = end - start;
 
-        const step = @select(f32, dir > @as(Vec, @splat(0)), @as(Vec, @splat(1)), @as(Vec, @splat(-1)));
+        const step: IntDir = @as([4]i32, @select(
+            i32,
+            dir > @as(Vec, @splat(0)),
+            @as(Vec, @splat(1)),
+            @as(Vec, @splat(-1)),
+        ))[0..3].*;
 
-        const tDelta = @select(f32, dir != @as(Vec, @splat(0)), @abs(@as(Vec, @splat(1)) / dir), @as(Vec, @splat(std.math.inf(f32))));
+        const tDelta = @select(
+            f32,
+            dir != @as(Vec, @splat(0)),
+            @abs(@as(Vec, @splat(1)) / dir),
+            @as(Vec, @splat(std.math.inf(f32))),
+        );
 
         const startFloor = @floor(start);
-        const tMax = @select(f32, step > @as(Vec, @splat(0)), (startFloor + @as(Vec, @splat(1)) - start) * tDelta, (start - startFloor) * tDelta);
+        const tMax = @select(
+            f32,
+            @as([3]i32, step) ++ .{0} > @as(@Vector(4, i32), @splat(0)),
+            (startFloor + @as(Vec, @splat(1)) - start) * tDelta,
+            (start - startFloor) * tDelta,
+        );
 
         return GridTraversal{
-            .current = @floor(start),
+            .current = @intFromFloat(@floor(@as(@Vector(3, f32), @as([4]f32, start)[0..3].*))),
+            .end = @intFromFloat(@floor(@as(@Vector(3, f32), @as([4]f32, end)[0..3].*))),
             .step = step,
             .tDelta = tDelta,
             .tMax = tMax,
-            .end = end,
         };
     }
 
-    pub fn next(self: *GridTraversal) ?Vec {
-        if (@reduce(.And, @abs(self.current - @floor(self.end)) < @as(Vec, @splat(epsilon)))) {
+    pub fn next(self: *GridTraversal) ?Coord {
+        if (@reduce(.And, @abs(self.current - self.end)) == 0) {
             return null;
         }
 
@@ -140,14 +167,14 @@ pub const GridTraversal = struct {
         const mask_z = @as(@Vector(4, bool), @splat(z_smallest));
 
         // Use boolean vectors in @select
-        const update_x = @select(f32, mask_x, @as(Vec, @Vector(4, f32){ 1, 0, 0, 0 }), @as(Vec, @splat(0)));
-        const update_y = @select(f32, mask_y, @as(Vec, @Vector(4, f32){ 0, 1, 0, 0 }), @as(Vec, @splat(0)));
-        const update_z = @select(f32, mask_z, @as(Vec, @Vector(4, f32){ 0, 0, 1, 0 }), @as(Vec, @splat(0)));
+        const update_x = @select(i32, mask_x, @as(Vec, @Vector(4, f32){ 1, 0, 0, 0 }), @as(Vec, @splat(0)));
+        const update_y = @select(i32, mask_y, @as(Vec, @Vector(4, f32){ 0, 1, 0, 0 }), @as(Vec, @splat(0)));
+        const update_z = @select(i32, mask_z, @as(Vec, @Vector(4, f32){ 0, 0, 1, 0 }), @as(Vec, @splat(0)));
 
         const update = update_x + update_y + update_z;
 
-        self.current += self.step * update;
-        self.tMax += self.tDelta * update;
+        self.current += @intCast(self.step * @as(IntDir, @as([4]i32, update)[0..3].*));
+        self.tMax += self.tDelta * @as(Vec, @floatFromInt(update));
 
         return result;
     }
@@ -160,4 +187,38 @@ test "Grid Traversal Iterator" {
     while (traversal.next()) |cell| {
         std.debug.print("Visiting cell: ({d}, {d}, {d})\n", .{ cell[0], cell[1], cell[2] });
     }
+}
+
+pub fn GridBounds(grid_width: usize) type {
+    return struct {
+        pub const width = grid_width;
+        pub const array_size = grid_width * grid_width * grid_width;
+        bounds: Bounds,
+        pub fn transformPoint(self: @This(), arg: zm.Vec) zm.Vec {
+            return self.bounds.toBoundsSpace(arg) * @as(zm.Vec, @splat(width));
+        }
+        pub fn coordToIndex(coord: @Vector(4, usize)) usize {
+            return coord[0] + coord[1] * width + coord[2] * width * width;
+        }
+        pub fn binTriangles(self: @This(), allocator: std.mem.Allocator, triangles: []Triangle) ![array_size]?*std.ArrayList(*Triangle) {
+            var bins: [array_size]?*std.ArrayList(*Triangle) = .{null} ** array_size;
+            for (triangles) |*triangle| {
+                const triangle_bounds = Bounds.initEncompass(triangle);
+                const min: @Vector(4, usize) = @intFromFloat(@floor(self.transformPoint(triangle_bounds.min)));
+                const max: @Vector(4, usize) = @intFromFloat(@ceil(self.transformPoint(triangle_bounds.max)));
+                for (min[2]..max[2]) |z|
+                    for (min[1]..max[1]) |y|
+                        for (min[0]..max[0]) |x| {
+                            const index = coordToIndex(.{ x, y, z, 0 });
+                            var bin = if (bins[index]) |bin| bin else blk: {
+                                var bin = std.ArrayList(*Triangle).init(allocator);
+                                bins[index] = &bin;
+                                break :blk &bin;
+                            };
+                            try bin.append(triangle);
+                        };
+            }
+            return bins;
+        }
+    };
 }
