@@ -303,8 +303,9 @@ pub const interface = struct {
                         .bounds = raytrace.Bounds.initEncompass(positions),
                     };
                     const bins = try grid_bounds.binTriangles(allocator, triangles);
-                    _ = bins;
+                    // _ = bins;
 
+                    // var hit_count: i32 = 0;
                     for (positions, normals) |position, normal| {
                         var closest_distance = std.math.floatMax(f32);
                         _ = &closest_distance;
@@ -323,26 +324,19 @@ pub const interface = struct {
                             var traversal_iterator = raytrace.GridTraversal.init(start, end);
                             // _ = &traversal_iterator;
                             while (traversal_iterator.next()) |cell_coord| {
-                                _ = cell_coord;
-                                // const cell_index = raytrace.GridBounds(16).coordToIndex(cell_coord);
-                                // try wasm_entry.dumpDebugLogFmt(allocator, "{any}", .{cell_index});
-                                // const cell = bins[cell_index];
-                                // if (cell) |cell_triangles| for (cell_triangles.items) |triangle| {
-                                //     if (raytrace.rayTriangleIntersection(ray, triangle.*)) |hit| {
-                                //         if (hit.distance < closest_distance) {
-                                //             closest_distance = hit.distance;
-                                //         }
-                                //     }
-                                // };
+                                // _ = cell_coord;
+                                const cell_index = raytrace.GridBounds(16).coordToIndex(cell_coord);
+                                const cell = bins[cell_index];
+                                if (cell) |cell_triangles| for (cell_triangles.items) |triangle| {
+                                    if (raytrace.rayTriangleIntersection(ray, triangle.*)) |hit| {
+                                        if (hit.distance < closest_distance) {
+                                            closest_distance = hit.distance;
+                                            // hit_count += 1;
+                                        }
+                                    }
+                                };
                             }
                         }
-
-                        // for (triangles) |triangle|
-                        //     if (raytrace.rayTriangleIntersection(ray, triangle)) |hit| {
-                        //         if (hit.distance < closest_distance) {
-                        //             closest_distance = hit.distance;
-                        //         }
-                        //     };
 
                         // const occlusion: f32 = if (closest_distance < 10000) 1.0 else 0.0;
                         try colors.append(if (closest_distance < 100)
@@ -353,6 +347,7 @@ pub const interface = struct {
                         // std.math.clamp(occlusion, 0, 1),
                         );
                     }
+                    // wasm_entry.dumpDebugLogFmt(allocator, "{any}", .{hit_count});
                     break :occlude colors.items;
                 };
 

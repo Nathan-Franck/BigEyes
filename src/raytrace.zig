@@ -81,8 +81,14 @@ test "Ray Triangle Intersection" {
 pub fn rayBoundsIntersection(ray: Ray, bounds: Bounds) ?struct { entry_distance: f32, exit_distance: f32 } {
     const t1 = (bounds.min - ray.position) / ray.normal;
     const t2 = (bounds.max - ray.position) / ray.normal;
-    const tmin = @max(@min(t1, t2), @as(Vec, @splat(0)));
-    const tmax = @min(@max(t1, t2), @as(Vec, @splat(std.math.inf(f32))));
+    const tmin: @Vector(3, f32) = @as([4]f32, @max(
+        @min(t1, t2),
+        @as(Vec, @splat(0)),
+    ))[0..3].*;
+    const tmax: @Vector(3, f32) = @as([4]f32, @min(
+        @max(t1, t2),
+        @as(Vec, @splat(std.math.inf(f32))),
+    ))[0..3].*;
     if (@reduce(.Or, tmax < tmin)) {
         return null;
     }
@@ -105,93 +111,118 @@ test "Ray Bounds Intersection" {
     try std.testing.expectEqualDeep(3.0, result.?.exit_distance);
 }
 
-const Coord = @Vector(3, usize);
-const IntDir = @Vector(3, i32);
+const GridCoord = @Vector(3, usize);
+const Coord = @Vector(4, i32);
 
 pub const GridTraversal = struct {
     current: Coord,
-    step: IntDir,
+    step: Coord,
     tDelta: Vec,
     tMax: Vec,
-    end: Coord,
+    end: GridCoord,
 
     pub fn init(uncapped_start: Vec, uncapped_end: Vec) GridTraversal {
         const start = @max(uncapped_start, @as(Vec, @splat(0)));
         const end = @max(uncapped_end, @as(Vec, @splat(0)));
         const dir = end - start;
 
-        const step: IntDir = @as([4]i32, @select(
+        const step: Coord = @select(
             i32,
             dir > @as(Vec, @splat(0)),
             @as(Vec, @splat(1)),
             @as(Vec, @splat(-1)),
-        ))[0..3].*;
-
-        const tDelta = @select(
-            f32,
-            dir != @as(Vec, @splat(0)),
-            @abs(@as(Vec, @splat(1)) / dir),
-            @as(Vec, @splat(std.math.inf(f32))),
         );
+
+        const tDelta =
+            @abs(@as(Vec, @splat(1)) / dir);
 
         const startFloor = @floor(start);
         const tMax = @select(
             f32,
-            @as([3]i32, step) ++ .{0} > @as(@Vector(4, i32), @splat(0)),
-            (startFloor + @as(Vec, @splat(1)) - start) * tDelta,
+            step < @as(Coord, @splat(0)),
             (start - startFloor) * tDelta,
+            (startFloor + @as(Vec, @splat(1)) - start) * tDelta,
         );
 
         return GridTraversal{
-            .current = @intFromFloat(@floor(@as(@Vector(3, f32), @as([4]f32, start)[0..3].*))),
-            .end = @intFromFloat(@floor(@as(@Vector(3, f32), @as([4]f32, end)[0..3].*))),
+            .current = @intFromFloat(@floor(start)),
+            .end = @as([4]u32, @as(
+                @Vector(4, u32),
+                @intFromFloat(@floor(end)),
+            ))[0..3].*,
             .step = step,
             .tDelta = tDelta,
-            .tMax = tMax,
+            .tMax = @select(
+                f32,
+                dir != @as(Vec, @splat(0)),
+                tMax,
+                @as(Vec, @splat(std.math.inf(f32))),
+            ),
         };
     }
 
-    pub fn next(self: *GridTraversal) ?Coord {
-        const wasm_entry = @import("./wasm_entry.zig");
-        if (@reduce(.And, @abs(@as(IntDir, @intCast(self.current)) - @as(IntDir, @intCast(self.end)))) == 0) {
+    pub fn next(self: *GridTraversal) ?GridCoord {
+        const result: GridCoord = @intCast(@as(
+            @Vector(3, i32),
+            @as([4]i32, self.current)[0..3].*,
+        ));
+
+        if (@reduce(.And, result == self.end)) {
             return null;
         }
-        wasm_entry.dumpDebugLogFmt(std.heap.page_allocator, "{any} {any}", .{ self.current, self.end }) catch unreachable;
 
-        const result = self.current;
-
-        // Calculate boolean comparisons directly from self.tMax
         const x_smallest = self.tMax[0] <= self.tMax[1] and self.tMax[0] <= self.tMax[2];
         const y_smallest = self.tMax[1] <= self.tMax[0] and self.tMax[1] <= self.tMax[2];
         const z_smallest = self.tMax[2] <= self.tMax[0] and self.tMax[2] <= self.tMax[1];
+        const smallest = @Vector(4, bool){ x_smallest, y_smallest, z_smallest, false };
 
-        // Cast to boolean vectors
-        const mask_x = @as(@Vector(4, bool), @splat(x_smallest));
-        const mask_y = @as(@Vector(4, bool), @splat(y_smallest));
-        const mask_z = @as(@Vector(4, bool), @splat(z_smallest));
+        self.tMax = @select(
+            f32,
+            smallest,
+            self.tMax + self.tDelta,
+            self.tMax,
+        );
 
-        // Use boolean vectors in @select
-        const update_x = @select(i32, mask_x, @as(Vec, @Vector(4, f32){ 1, 0, 0, 0 }), @as(Vec, @splat(0)));
-        const update_y = @select(i32, mask_y, @as(Vec, @Vector(4, f32){ 0, 1, 0, 0 }), @as(Vec, @splat(0)));
-        const update_z = @select(i32, mask_z, @as(Vec, @Vector(4, f32){ 0, 0, 1, 0 }), @as(Vec, @splat(0)));
-
-        const update = update_x + update_y + update_z;
-
-        wasm_entry.dumpDebugLogFmt(std.heap.page_allocator, "Done?", .{}) catch unreachable;
-        self.current += @intCast(self.step * @as(IntDir, @as([4]i32, update)[0..3].*));
-        wasm_entry.dumpDebugLogFmt(std.heap.page_allocator, "Done!", .{}) catch unreachable;
-        self.tMax += self.tDelta * @as(Vec, @floatFromInt(update));
+        self.current += @select(
+            i32,
+            smallest,
+            self.step,
+            Coord{ 0, 0, 0, 0 },
+        );
 
         return result;
     }
 };
-test "Grid Traversal Iterator" {
+test "Grid Traversal Iterator Straight Line" {
     const start = Vec{ 0.5, 0.5, 0.5, 0 };
-    const end = Vec{ 2.5, 2.5, 2.5, 0 };
+    const end = Vec{ 5.0, 0.5, 0.5, 0 };
     var traversal = GridTraversal.init(start, end);
 
+    var steps: u32 = 0;
+    while (traversal.next()) |_| {
+        steps += 1;
+        if (steps > 10) {
+            break;
+        }
+    }
+
+    try std.testing.expectEqual(traversal.current, Coord{ 5, 0, 0, 0 });
+}
+
+test "Grid Traversal Iterator Diagonal Line" {
+    const start = Vec{ 0, 0, 0, 0 };
+    const end = Vec{ 6, 2, 0, 0 };
+    var traversal = GridTraversal.init(start, end);
+    std.debug.print("{any}\n", .{traversal});
+
+    var steps: u32 = 0;
     while (traversal.next()) |cell| {
+        steps += 1;
+        if (steps > 10) {
+            break;
+        }
         std.debug.print("Visiting cell: ({d}, {d}, {d})\n", .{ cell[0], cell[1], cell[2] });
+        std.debug.print("{any}\n", .{traversal});
     }
 }
 
@@ -203,7 +234,7 @@ pub fn GridBounds(grid_width: usize) type {
         pub fn transformPoint(self: @This(), arg: zm.Vec) zm.Vec {
             return self.bounds.toBoundsSpace(arg) * @as(zm.Vec, @splat(width));
         }
-        pub fn coordToIndex(coord: Coord) usize {
+        pub fn coordToIndex(coord: GridCoord) usize {
             return coord[0] + coord[1] * width + coord[2] * width * width;
         }
         pub fn binTriangles(self: @This(), allocator: std.mem.Allocator, triangles: []Triangle) ![array_size]?*std.ArrayList(*Triangle) {
