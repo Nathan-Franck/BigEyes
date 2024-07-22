@@ -247,8 +247,12 @@ pub fn GridBounds(grid_width: usize) type {
         pub fn coordToIndex(coord: GridCoord) usize {
             return coord[0] + coord[1] * width + coord[2] * width * width;
         }
-        pub fn binTriangles(self: @This(), allocator: std.mem.Allocator, triangles: []Triangle) ![array_size]?*std.ArrayList(*Triangle) {
-            var bins: [array_size]?*std.ArrayList(*Triangle) = .{null} ** array_size;
+        pub noinline fn binTriangles(self: @This(), allocator: std.mem.Allocator, triangles: []Triangle) ![]const ?*std.ArrayList(*Triangle) {
+            // var bins: [array_size]?*std.ArrayList(*Triangle) = .{null} ** array_size;
+            var bins: []?*std.ArrayList(*Triangle) = (try allocator.alloc(?*std.ArrayList(*Triangle), array_size));
+            for (0..bins.len) |i|
+                bins[i] = null;
+
             for (triangles) |*triangle| {
                 const triangle_bounds = Bounds.initEncompass(triangle);
                 const min: @Vector(4, usize) = @intFromFloat(@floor(self.transformPoint(triangle_bounds.min)));
