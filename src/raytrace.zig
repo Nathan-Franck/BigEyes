@@ -38,7 +38,7 @@ pub fn dot(a: zm.Vec, b: zm.Vec) f32 {
     return mult[0] + mult[1] + mult[2];
 }
 
-pub fn rayTriangleIntersection(ray: Ray, triangle: Triangle) ?struct { distance: f32 } {
+pub noinline fn rayTriangleIntersection(ray: Ray, triangle: Triangle) ?struct { distance: f32 } {
     const edge1 = triangle[1] - triangle[0];
     const edge2 = triangle[2] - triangle[0];
     const h = zm.cross3(ray.normal, edge2);
@@ -119,9 +119,9 @@ pub const GridTraversal = struct {
     step: Coord,
     tDelta: Vec,
     tMax: Vec,
-    end: GridCoord,
+    end: Coord,
 
-    pub fn init(uncapped_start: Vec, uncapped_end: Vec) GridTraversal {
+    pub noinline fn init(uncapped_start: Vec, uncapped_end: Vec) GridTraversal {
         const start = @max(uncapped_start, @as(Vec, @splat(0)));
         const end = @max(uncapped_end, @as(Vec, @splat(0)));
         const dir = end - start;
@@ -145,28 +145,20 @@ pub const GridTraversal = struct {
 
         return GridTraversal{
             .current = @intFromFloat(@floor(start)),
-            .end = @as([4]u32, @as(
-                @Vector(4, u32),
-                @intFromFloat(@floor(end)),
-            ))[0..3].*,
+            .end = @intFromFloat(@floor(end)),
             .step = step,
             .tDelta = tDelta,
             .tMax = @select(
                 f32,
                 dir != @as(Vec, @splat(0)),
                 tMax,
-                @as(Vec, @splat(std.math.inf(f32))),
+                comptime @as(Vec, @splat(std.math.inf(f32))),
             ),
         };
     }
 
-    pub fn next(self: *GridTraversal) ?GridCoord {
-        const result: GridCoord = @intCast(@as(
-            @Vector(3, i32),
-            @as([4]i32, self.current)[0..3].*,
-        ));
-
-        if (@reduce(.And, result == self.end)) {
+    pub noinline fn next(self: *GridTraversal) ?GridCoord {
+        if (@reduce(.And, (self.current - self.end) * self.step >= @as(Coord, @splat(0)))) {
             return null;
         }
 
@@ -181,6 +173,11 @@ pub const GridTraversal = struct {
             self.tMax + self.tDelta,
             self.tMax,
         );
+
+        const result: GridCoord = @as([4]u32, @as(
+            @Vector(4, u32),
+            @intCast(self.current),
+        ))[0..3].*;
 
         self.current += @select(
             i32,
@@ -255,7 +252,7 @@ pub fn GridBounds(grid_width: usize) type {
             for (triangles) |*triangle| {
                 const triangle_bounds = Bounds.initEncompass(triangle);
                 const min: @Vector(4, usize) = @intFromFloat(@floor(self.transformPoint(triangle_bounds.min)));
-                const max: @Vector(4, usize) = @intFromFloat(@ceil(self.transformPoint(triangle_bounds.max)));
+                const max: @Vector(4, usize) = @intFromFloat(@floor(self.transformPoint(triangle_bounds.max)));
                 for (min[2]..max[2]) |z|
                     for (min[1]..max[1]) |y|
                         for (min[0]..max[0]) |x| {

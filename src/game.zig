@@ -299,13 +299,12 @@ pub const interface = struct {
 
                     var colors = std.ArrayList(zm.Vec).init(allocator);
 
-                    const grid_bounds = raytrace.GridBounds(16){
+                    const GridBounds = raytrace.GridBounds(50);
+                    const grid_bounds = GridBounds{
                         .bounds = raytrace.Bounds.initEncompass(positions),
                     };
                     const bins = try grid_bounds.binTriangles(allocator, triangles);
-                    // _ = bins;
 
-                    // var hit_count: i32 = 0;
                     for (positions, normals) |position, normal| {
                         var closest_distance = std.math.floatMax(f32);
                         _ = &closest_distance;
@@ -319,35 +318,28 @@ pub const interface = struct {
                             const end = grid_bounds.transformPoint(
                                 ray.position + ray.normal * @as(zm.Vec, @splat(bounding_box_hit.exit_distance)),
                             );
-                            // _ = &bins;
                             // wasm_entry.dumpDebugLogFmt(std.heap.page_allocator, "{any} {any}", .{ start, end }) catch unreachable;
                             var traversal_iterator = raytrace.GridTraversal.init(start, end);
                             // _ = &traversal_iterator;
                             while (traversal_iterator.next()) |cell_coord| {
                                 // _ = cell_coord;
-                                const cell_index = raytrace.GridBounds(16).coordToIndex(cell_coord);
+                                const cell_index = GridBounds.coordToIndex(cell_coord);
                                 const cell = bins[cell_index];
                                 if (cell) |cell_triangles| for (cell_triangles.items) |triangle| {
                                     if (raytrace.rayTriangleIntersection(ray, triangle.*)) |hit| {
                                         if (hit.distance < closest_distance) {
                                             closest_distance = hit.distance;
-                                            // hit_count += 1;
                                         }
                                     }
                                 };
                             }
                         }
 
-                        // const occlusion: f32 = if (closest_distance < 10000) 1.0 else 0.0;
                         try colors.append(if (closest_distance < 100)
-                            // zm.lerp(
                             zm.Vec{ 1.0, 1.0, 1.0, 1.0 }
                         else
-                            zm.Vec{ 1.0, 0.0, 0.0, 1.0 }
-                        // std.math.clamp(occlusion, 0, 1),
-                        );
+                            zm.Vec{ 1.0, 0.0, 0.0, 1.0 });
                     }
-                    // wasm_entry.dumpDebugLogFmt(allocator, "{any}", .{hit_count});
                     break :occlude colors.items;
                 };
 
