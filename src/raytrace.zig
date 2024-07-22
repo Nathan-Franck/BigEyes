@@ -33,35 +33,32 @@ pub const Bounds = struct {
 
 const epsilon = 0.00001;
 
-pub fn dot(a: zm.Vec, b: zm.Vec) f32 {
-    const mult = a * b;
-    return mult[0] + mult[1] + mult[2];
+pub inline fn dot(a: zm.Vec, b: zm.Vec) f32 {
+    return @reduce(.Add, a * b);
 }
 
-pub noinline fn rayTriangleIntersection(ray: Ray, triangle: Triangle) ?struct { distance: f32 } {
+pub fn rayTriangleIntersection(ray: Ray, triangle: Triangle) f32 {
     const edge1 = triangle[1] - triangle[0];
     const edge2 = triangle[2] - triangle[0];
     const h = zm.cross3(ray.normal, edge2);
     const a = dot(edge1, h);
-    if (a > -epsilon and a < epsilon) {
-        return null;
-    }
+
     const f = 1.0 / a;
     const s = ray.position - triangle[0];
     const u = f * dot(s, h);
-    if (u < 0.0 or u > 1.0) {
-        return null;
-    }
     const q = zm.cross3(s, edge1);
     const v = f * dot(ray.normal, q);
-    if (v < 0.0 or u + v > 1.0) {
-        return null;
-    }
     const t = f * dot(edge2, q);
-    if (t > epsilon) {
-        return .{ .distance = t };
-    }
-    return null;
+
+    // Combine all conditions into a single check
+    const valid: f32 = @floatFromInt(@as(u1, @bitCast(@abs(a) >= epsilon and
+        u >= 0.0 and
+        u <= 1.0 and
+        v >= 0.0 and
+        u + v <= 1.0 and
+        t > epsilon)));
+
+    return std.math.lerp(t, std.math.inf(f32), valid);
 }
 
 test "Ray Triangle Intersection" {
@@ -121,7 +118,7 @@ pub const GridTraversal = struct {
     tMax: Vec,
     end: Coord,
 
-    pub noinline fn init(uncapped_start: Vec, uncapped_end: Vec) GridTraversal {
+    pub fn init(uncapped_start: Vec, uncapped_end: Vec) GridTraversal {
         const start = @max(uncapped_start, @as(Vec, @splat(0)));
         const end = @max(uncapped_end, @as(Vec, @splat(0)));
         const dir = end - start;
@@ -157,7 +154,7 @@ pub const GridTraversal = struct {
         };
     }
 
-    pub noinline fn next(self: *GridTraversal) ?GridCoord {
+    pub fn next(self: *GridTraversal) ?GridCoord {
         if (@reduce(.And, (self.current - self.end) * self.step >= @as(Coord, @splat(0)))) {
             return null;
         }
@@ -189,6 +186,7 @@ pub const GridTraversal = struct {
         return result;
     }
 };
+
 test "Grid Traversal Iterator Straight Line" {
     const start = Vec{ 0.5, 0.5, 0.5, 0 };
     const end = Vec{ 5.0, 0.5, 0.5, 0 };
@@ -252,7 +250,7 @@ pub fn GridBounds(grid_width: usize) type {
             for (triangles) |*triangle| {
                 const triangle_bounds = Bounds.initEncompass(triangle);
                 const min: @Vector(4, usize) = @intFromFloat(@floor(self.transformPoint(triangle_bounds.min)));
-                const max: @Vector(4, usize) = @intFromFloat(@floor(self.transformPoint(triangle_bounds.max)));
+                const max: @Vector(4, usize) = @intFromFloat(@ceil(self.transformPoint(triangle_bounds.max)));
                 for (min[2]..max[2]) |z|
                     for (min[1]..max[1]) |y|
                         for (min[0]..max[0]) |x| {
@@ -263,6 +261,21 @@ pub fn GridBounds(grid_width: usize) type {
                                 break :blk &bin;
                             };
                             try bin.append(triangle);
+                        };
+            }
+            return bins;
+        }
+        pub fn voxelizeTriangles(self: @This(), triangles: []Triangle) [array_size]bool {
+            var bins: [array_size]bool = .{false} ** array_size;
+            for (triangles) |*triangle| {
+                const triangle_bounds = Bounds.initEncompass(triangle);
+                const min: @Vector(4, usize) = @intFromFloat(@floor(self.transformPoint(triangle_bounds.min)));
+                const max: @Vector(4, usize) = @intFromFloat(@ceil(self.transformPoint(triangle_bounds.max)));
+                for (min[2]..max[2]) |z|
+                    for (min[1]..max[1]) |y|
+                        for (min[0]..max[0]) |x| {
+                            const index = coordToIndex(.{ x, y, z });
+                            bins[index] = true;
                         };
             }
             return bins;

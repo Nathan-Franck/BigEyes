@@ -85,7 +85,7 @@ export function App() {
     height: window.innerHeight,
   });
 
-  const [subdivLevel, setSubdivLevel] = useState(1);
+  const [subdivLevel, setSubdivLevel] = useState(0);
   const [stats, setStats] = useState({ polygonCount: 0, framerate: 0 });
 
   useEffect(() => {

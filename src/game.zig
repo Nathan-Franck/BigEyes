@@ -85,7 +85,7 @@ pub const interface = struct {
                 .settings = .{
                     .orbit_speed = 0.01,
                     .render_resolution = .{ .x = 0, .y = 0 },
-                    .subdiv_level = 1,
+                    .subdiv_level = 0,
                 },
                 .orbit_camera = .{
                     .position = .{ 0, 0, 0, 1 },
@@ -299,11 +299,12 @@ pub const interface = struct {
 
                     var colors = std.ArrayList(zm.Vec).init(allocator);
 
-                    const GridBounds = raytrace.GridBounds(50);
+                    const GridBounds = raytrace.GridBounds(8);
                     const grid_bounds = GridBounds{
                         .bounds = raytrace.Bounds.initEncompass(positions),
                     };
                     const bins = try grid_bounds.binTriangles(allocator, triangles);
+                    // const voxels = grid_bounds.voxelizeTriangles(triangles);
 
                     for (positions, normals) |position, normal| {
                         var closest_distance = std.math.floatMax(f32);
@@ -324,13 +325,13 @@ pub const interface = struct {
                             while (traversal_iterator.next()) |cell_coord| {
                                 // _ = cell_coord;
                                 const cell_index = GridBounds.coordToIndex(cell_coord);
+                                // const voxel = voxels[cell_index];
+                                // if (voxel)
+                                //     closest_distance = 0;
                                 const cell = bins[cell_index];
                                 if (cell) |cell_triangles| for (cell_triangles.items) |triangle| {
-                                    if (raytrace.rayTriangleIntersection(ray, triangle.*)) |hit| {
-                                        if (hit.distance < closest_distance) {
-                                            closest_distance = hit.distance;
-                                        }
-                                    }
+                                    const hit_distance = raytrace.rayTriangleIntersection(ray, triangle.*);
+                                    closest_distance = @min(closest_distance, hit_distance);
                                 };
                             }
                         }
