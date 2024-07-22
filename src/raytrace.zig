@@ -156,7 +156,7 @@ pub const GridTraversal = struct {
         };
     }
 
-    pub fn next(self: *GridTraversal) ?GridCoord {
+    pub noinline fn next(self: *GridTraversal) ?GridCoord {
         if (@reduce(.And, (self.current - self.end) * self.step >= @as(Coord, @splat(0)))) {
             return null;
         }

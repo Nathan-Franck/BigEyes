@@ -242,6 +242,13 @@ pub const interface = struct {
                 };
             }
 
+            noinline fn raytraceCell(ray: raytrace.Ray, cell: ?*std.ArrayList(*raytrace.Triangle), closest_distance: *f32) void {
+                if (cell) |cell_triangles| for (cell_triangles.items) |triangle| {
+                    const hit_distance = raytrace.rayTriangleIntersection(ray, triangle.*);
+                    closest_distance.* = @min(closest_distance.*, hit_distance);
+                };
+            }
+
             pub fn game(
                 allocator: std.mem.Allocator,
                 props: struct {
@@ -299,16 +306,13 @@ pub const interface = struct {
 
                     var colors = std.ArrayList(zm.Vec).init(allocator);
 
-                    const GridBounds = raytrace.GridBounds(64);
+                    const GridBounds = raytrace.GridBounds(128);
                     const grid_bounds = GridBounds{
                         .bounds = raytrace.Bounds.initEncompass(positions),
                     };
                     const bins = try grid_bounds.binTriangles(allocator, triangles);
-                    // const voxels = grid_bounds.voxelizeTriangles(triangles);
-
                     for (positions, normals) |position, normal| {
                         var closest_distance = std.math.floatMax(f32);
-                        _ = &closest_distance;
                         const ray = .{
                             .position = position,
                             .normal = normal,
@@ -321,18 +325,10 @@ pub const interface = struct {
                             );
                             // wasm_entry.dumpDebugLogFmt(std.heap.page_allocator, "{any} {any}", .{ start, end }) catch unreachable;
                             var traversal_iterator = raytrace.GridTraversal.init(start, end);
-                            // _ = &traversal_iterator;
                             while (traversal_iterator.next()) |cell_coord| {
-                                // _ = cell_coord;
                                 const cell_index = GridBounds.coordToIndex(cell_coord);
-                                // const voxel = voxels[cell_index];
-                                // if (voxel)
-                                //     closest_distance = 0;
                                 const cell = bins[cell_index];
-                                if (cell) |cell_triangles| for (cell_triangles.items) |triangle| {
-                                    const hit_distance = raytrace.rayTriangleIntersection(ray, triangle.*);
-                                    closest_distance = @min(closest_distance, hit_distance);
-                                };
+                                raytraceCell(ray, cell, &closest_distance);
                             }
                         }
 
