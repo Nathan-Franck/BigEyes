@@ -133,8 +133,7 @@ pub const GridTraversal = struct {
             @as(Vec, @splat(-1)),
         );
 
-        const tDelta =
-            @abs(@as(Vec, @splat(1)) / dir);
+        const tDelta = @abs(@as(Vec, @splat(1)) / dir);
 
         const startFloor = @floor(start);
         const tMax = @select(
@@ -213,17 +212,31 @@ test "Grid Traversal Iterator Diagonal Line" {
     const start = Vec{ 0, 0, 0, 0 };
     const end = Vec{ 6, 2, 0, 0 };
     var traversal = GridTraversal.init(start, end);
-    std.debug.print("{any}\n", .{traversal});
 
     var steps: u32 = 0;
-    while (traversal.next()) |cell| {
+    while (traversal.next()) |_| {
         steps += 1;
         if (steps > 10) {
             break;
         }
-        std.debug.print("Visiting cell: ({d}, {d}, {d})\n", .{ cell[0], cell[1], cell[2] });
-        std.debug.print("{any}\n", .{traversal});
     }
+
+    try std.testing.expectEqual(traversal.current, Coord{ 6, 2, 0, 0 });
+}
+test "Grid Traversal Iterator Diagonal Line (Backwards)" {
+    const start = Vec{ 6, 2, 0, 0 };
+    const end = Vec{ 0, 0, 0, 0 };
+    var traversal = GridTraversal.init(start, end);
+
+    var steps: u32 = 0;
+    while (traversal.next()) |_| {
+        steps += 1;
+        if (steps > 10) {
+            break;
+        }
+    }
+
+    try std.testing.expectEqual(traversal.current, Coord{ 0, 0, 0, 0 });
 }
 
 pub fn GridBounds(grid_width: usize) type {
