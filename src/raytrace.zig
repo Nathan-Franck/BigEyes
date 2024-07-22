@@ -42,23 +42,25 @@ pub fn rayTriangleIntersection(ray: Ray, triangle: Triangle) f32 {
     const edge2 = triangle[2] - triangle[0];
     const h = zm.cross3(ray.normal, edge2);
     const a = dot(edge1, h);
-
+    if (a > -epsilon and a < epsilon) {
+        return std.math.inf(f32);
+    }
     const f = 1.0 / a;
     const s = ray.position - triangle[0];
     const u = f * dot(s, h);
+    if (u < 0.0 or u > 1.0) {
+        return std.math.inf(f32);
+    }
     const q = zm.cross3(s, edge1);
     const v = f * dot(ray.normal, q);
+    if (v < 0.0 or u + v > 1.0) {
+        return std.math.inf(f32);
+    }
     const t = f * dot(edge2, q);
-
-    // Combine all conditions into a single check
-    const valid: f32 = @floatFromInt(@as(u1, @bitCast(@abs(a) >= epsilon and
-        u >= 0.0 and
-        u <= 1.0 and
-        v >= 0.0 and
-        u + v <= 1.0 and
-        t > epsilon)));
-
-    return std.math.lerp(t, std.math.inf(f32), valid);
+    if (t > epsilon) {
+        return t;
+    }
+    return std.math.inf(f32);
 }
 
 test "Ray Triangle Intersection" {
