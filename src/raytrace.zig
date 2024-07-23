@@ -118,14 +118,92 @@ test "Ray Bounds Intersection" {
 const GridCoord = @Vector(3, usize);
 const Coord = @Vector(4, i32);
 
-pub const GridTraversal = struct {
+pub const GridTriangleTraversal = struct {
     current: Coord,
     step: Coord,
     tDelta: Vec,
     tMax: Vec,
     end: Coord,
 
-    pub fn init(uncapped_start: Vec, uncapped_end: Vec) GridTraversal {
+    pub fn init(uncapped_positions: [3]Vec) GridLineTraversal {
+        const capped_positions: [3]Vec = undefined;
+        for (uncapped_positions, 0..) |uncapped_position, i|
+            capped_positions[i] = @max(uncapped_position, @as(Vec, @splat(0)));
+
+        const dir = end - start;
+
+        const step: Coord = @select(
+            i32,
+            dir > @as(Vec, @splat(0)),
+            @as(Vec, @splat(1)),
+            @as(Vec, @splat(-1)),
+        );
+
+        const tDelta = @abs(@as(Vec, @splat(1)) / dir);
+
+        const startFloor = @floor(start);
+        const tMax = @select(
+            f32,
+            step < @as(Coord, @splat(0)),
+            (start - startFloor) * tDelta,
+            (startFloor + @as(Vec, @splat(1)) - start) * tDelta,
+        );
+
+        return GridLineTraversal{
+            .current = @intFromFloat(@floor(start)),
+            .end = @intFromFloat(@floor(end)),
+            .step = step,
+            .tDelta = tDelta,
+            .tMax = @select(
+                f32,
+                dir != @as(Vec, @splat(0)),
+                tMax,
+                comptime @as(Vec, @splat(std.math.inf(f32))),
+            ),
+        };
+    }
+
+    pub noinline fn next(self: *GridTriangleTraversal) ?GridCoord {
+        if (@reduce(.And, (self.current - self.end) * self.step >= @as(Coord, @splat(0)))) {
+            return null;
+        }
+
+        const x_smallest = self.tMax[0] <= self.tMax[1] and self.tMax[0] <= self.tMax[2];
+        const y_smallest = self.tMax[1] <= self.tMax[0] and self.tMax[1] <= self.tMax[2];
+        const z_smallest = self.tMax[2] <= self.tMax[0] and self.tMax[2] <= self.tMax[1];
+        const smallest = @Vector(4, bool){ x_smallest, y_smallest, z_smallest, false };
+
+        self.tMax = @select(
+            f32,
+            smallest,
+            self.tMax + self.tDelta,
+            self.tMax,
+        );
+
+        const result: GridCoord = @as([4]usize, @as(
+            @Vector(4, usize),
+            @intCast(self.current),
+        ))[0..3].*;
+
+        self.current += @select(
+            i32,
+            smallest,
+            self.step,
+            Coord{ 0, 0, 0, 0 },
+        );
+
+        return result;
+    }
+};
+
+pub const GridLineTraversal = struct {
+    current: Coord,
+    step: Coord,
+    tDelta: Vec,
+    tMax: Vec,
+    end: Coord,
+
+    pub fn init(uncapped_start: Vec, uncapped_end: Vec) GridLineTraversal {
         const start = @max(uncapped_start, @as(Vec, @splat(0)));
         const end = @max(uncapped_end, @as(Vec, @splat(0)));
         const dir = end - start;
@@ -147,7 +225,7 @@ pub const GridTraversal = struct {
             (startFloor + @as(Vec, @splat(1)) - start) * tDelta,
         );
 
-        return GridTraversal{
+        return GridLineTraversal{
             .current = @intFromFloat(@floor(start)),
             .end = @intFromFloat(@floor(end)),
             .step = step,
@@ -161,7 +239,7 @@ pub const GridTraversal = struct {
         };
     }
 
-    pub noinline fn next(self: *GridTraversal) ?GridCoord {
+    pub noinline fn next(self: *GridLineTraversal) ?GridCoord {
         if (@reduce(.And, (self.current - self.end) * self.step >= @as(Coord, @splat(0)))) {
             return null;
         }
@@ -197,7 +275,7 @@ pub const GridTraversal = struct {
 test "Grid Traversal Iterator Straight Line" {
     const start = Vec{ 0.5, 0.5, 0.5, 0 };
     const end = Vec{ 5.0, 0.5, 0.5, 0 };
-    var traversal = GridTraversal.init(start, end);
+    var traversal = GridLineTraversal.init(start, end);
 
     var steps: u32 = 0;
     while (traversal.next()) |_| {
@@ -213,7 +291,7 @@ test "Grid Traversal Iterator Straight Line" {
 test "Grid Traversal Iterator Diagonal Line" {
     const start = Vec{ 0, 0, 0, 0 };
     const end = Vec{ 6, 2, 0, 0 };
-    var traversal = GridTraversal.init(start, end);
+    var traversal = GridLineTraversal.init(start, end);
 
     var steps: u32 = 0;
     while (traversal.next()) |_| {
@@ -228,7 +306,7 @@ test "Grid Traversal Iterator Diagonal Line" {
 test "Grid Traversal Iterator Diagonal Line (Backwards)" {
     const start = Vec{ 6, 2, 0, 0 };
     const end = Vec{ 0, 0, 0, 0 };
-    var traversal = GridTraversal.init(start, end);
+    var traversal = GridLineTraversal.init(start, end);
 
     var steps: u32 = 0;
     while (traversal.next()) |_| {
@@ -267,7 +345,7 @@ test "Triangle in a Bin" {
             const end = grid_bounds.transformPoint(
                 ray.position + ray.normal * @as(zm.Vec, @splat(bounding_box_hit.exit_distance)),
             );
-            var traversal_iterator = GridTraversal.init(start, end);
+            var traversal_iterator = GridLineTraversal.init(start, end);
             while (traversal_iterator.next()) |cell_coord| {
                 const cell_index = GridBounds(16).coordToIndex(cell_coord);
                 const cell = bins[cell_index];
@@ -297,6 +375,26 @@ pub fn GridBounds(grid_width: usize) type {
         pub fn coordToIndex(coord: GridCoord) usize {
             return coord[0] + coord[1] * width + coord[2] * width * width;
         }
+
+        // const RayTriangleBin = struct {
+        //     triangles: std.ArrayList(*const Triangle),
+        //     rays: std.ArrayList(*const Ray),
+        // };
+
+        // pub noinline fn binRaysAndTriangles(
+        //     self: @This(),
+        //     allocator: std.mem.Allocator,
+        //     triangles: []const Triangle,
+        //     rays: []const Ray,
+        // ) !std.ArrayHashMap(GridCoord, *RayTriangleBin) {
+        //     _ = self; // autofix
+        //     _ = triangles; // autofix
+        //     _ = rays; // autofix
+        //     var bins = std.ArrayHashMap(GridCoord, *RayTriangleBin).init(allocator);
+
+        //     _ = bins; // autofix
+        // }
+
         pub noinline fn binTriangles(
             self: @This(),
             allocator: std.mem.Allocator,

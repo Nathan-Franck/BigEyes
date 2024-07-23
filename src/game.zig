@@ -323,7 +323,7 @@ pub const interface = struct {
                             const end = grid_bounds.transformPoint(
                                 ray.position + ray.normal * @as(zm.Vec, @splat(bounding_box_hit.exit_distance)),
                             );
-                            var traversal_iterator = raytrace.GridTraversal.init(start, end);
+                            var traversal_iterator = raytrace.GridLineTraversal.init(start, end);
                             while (traversal_iterator.next()) |cell_coord| {
                                 const cell_index = GridBounds.coordToIndex(cell_coord);
                                 const cell = bins[cell_index];
