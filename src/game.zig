@@ -269,6 +269,19 @@ pub const interface = struct {
                         @as(zm.Vec, @splat(-props.settings.orbit_speed));
                 }
 
+                const world_matrix = zm.mul(
+                    zm.translationV(props.orbit_camera.position),
+                    zm.mul(
+                        zm.mul(
+                            zm.matFromRollPitchYaw(0, props.orbit_camera.rotation[0], 0),
+                            zm.matFromRollPitchYaw(props.orbit_camera.rotation[1], 0, 0),
+                        ),
+                        zm.translationV(zm.loadArr3(.{ 0.0, 0.0, props.orbit_camera.track_distance })),
+                    ),
+                );
+                const eye_position = zm.mul(world_matrix, zm.Vec{ 0, 0, 0, 1 });
+                _ = eye_position; // autofix
+
                 const source_mesh = props.resources.cat;
                 const current_frame_index = @mod(
                     props.game_time_ms * source_mesh.frame_rate / 1000,
@@ -315,7 +328,16 @@ pub const interface = struct {
                         var closest_distance = std.math.floatMax(f32);
                         const ray = .{
                             .position = position,
-                            .normal = normal,
+                            .normal = reflect: {
+                                const eye_direction = -normal;
+                                // const eye_direction_normalized = zm.normalize3(eye_direction);
+                                // const normal_normalized = zm.normalize3(normal);
+                                // const reflection_vector = eye_direction_normalized - normal_normalized *
+                                //     zm.f32x4s(2) * zm.dot3(eye_direction_normalized, normal_normalized);
+                                // break :reflect zm.normalize3(reflection_vector);
+                                // break :reflect zm.normalize3(normal);
+                                break :reflect eye_direction;
+                            },
                         };
                         const bounding_box_test = raytrace.rayBoundsIntersection(ray, grid_bounds.bounds);
                         if (bounding_box_test) |bounding_box_hit| {
@@ -349,16 +371,7 @@ pub const interface = struct {
                 return .{
                     .current_cat_mesh = final_mesh,
                     .world_matrix = zm.mul(
-                        zm.mul(
-                            zm.translationV(props.orbit_camera.position),
-                            zm.mul(
-                                zm.mul(
-                                    zm.matFromRollPitchYaw(0, props.orbit_camera.rotation[0], 0),
-                                    zm.matFromRollPitchYaw(props.orbit_camera.rotation[1], 0, 0),
-                                ),
-                                zm.translationV(zm.loadArr3(.{ 0.0, 0.0, props.orbit_camera.track_distance })),
-                            ),
-                        ),
+                        world_matrix,
                         zm.perspectiveFovLh(
                             0.25 * 3.14151,
                             @as(f32, @floatFromInt(props.settings.render_resolution.x)) /
