@@ -306,7 +306,7 @@ pub const interface = struct {
 
                     var colors = std.ArrayList(zm.Vec).init(allocator);
 
-                    const GridBounds = raytrace.GridBounds(128);
+                    const GridBounds = raytrace.GridBounds(16);
                     const grid_bounds = GridBounds{
                         .bounds = raytrace.Bounds.initEncompass(positions),
                     };
