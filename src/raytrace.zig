@@ -21,7 +21,12 @@ pub const Bounds = struct {
         return Bounds{ .min = min, .max = max };
     }
     pub fn size(self: Bounds) Vec {
-        return self.max - self.min;
+        return @select(
+            f32,
+            @Vector(4, bool){ true, true, true, false },
+            self.max - self.min,
+            Vec{ 1, 1, 1, 1 },
+        );
     }
     pub fn scale(self: Bounds, factor: f32) Bounds {
         return Bounds{ .min = self.min * factor, .max = self.max * factor };
@@ -74,7 +79,7 @@ test "Ray Triangle Intersection" {
         Vec{ 0, 1, 0, 0 },
     };
     const result = rayTriangleIntersection(ray, triangle);
-    try std.testing.expectEqualDeep(10.0, result.?.distance);
+    try std.testing.expectEqualDeep(10.0, result);
 }
 
 pub fn rayBoundsIntersection(ray: Ray, bounds: Bounds) ?struct { entry_distance: f32, exit_distance: f32 } {
@@ -173,8 +178,8 @@ pub const GridTraversal = struct {
             self.tMax,
         );
 
-        const result: GridCoord = @as([4]u32, @as(
-            @Vector(4, u32),
+        const result: GridCoord = @as([4]usize, @as(
+            @Vector(4, usize),
             @intCast(self.current),
         ))[0..3].*;
 
@@ -236,6 +241,59 @@ test "Grid Traversal Iterator Diagonal Line (Backwards)" {
     try std.testing.expectEqual(traversal.current, Coord{ 0, 0, 0, 0 });
 }
 
+test "Triangle in a Bin" {
+    const my_triangle = Triangle{
+        .{ 1, 1, 2, 0 },
+        .{ 2, 1, 2, 0 },
+        .{ 1, 2, 2, 0 },
+    };
+    const grid_bounds = GridBounds(16){
+        .bounds = .{ .min = .{ 0, 0, 0, 0 }, .max = .{ 4, 4, 4, 0 } },
+    };
+    const allocator = std.heap.page_allocator;
+    const triangles = &.{my_triangle};
+    const bins = try grid_bounds.binTriangles(allocator, triangles);
+
+    const ray: Ray = .{
+        .position = .{ 1.3, 1.3, 0, 0 },
+        .normal = .{ 0, 0, 1.0, 0 },
+    };
+
+    {
+        const hit_distance = rayTriangleIntersection(ray, my_triangle);
+        std.debug.print("{d}\n", .{hit_distance});
+    }
+
+    const result_triangle = find_triangle: {
+        const bounding_box_test = rayBoundsIntersection(ray, grid_bounds.bounds);
+        if (bounding_box_test) |bounding_box_hit| {
+            const start = grid_bounds.transformPoint(ray.position);
+            const end = grid_bounds.transformPoint(
+                ray.position + ray.normal * @as(zm.Vec, @splat(bounding_box_hit.exit_distance)),
+            );
+            var traversal_iterator = GridTraversal.init(start, end);
+            while (traversal_iterator.next()) |cell_coord| {
+                const cell_index = GridBounds(16).coordToIndex(cell_coord);
+                const cell = bins[cell_index];
+                std.debug.print("{any}\n", .{cell_coord});
+                if (cell) |cell_triangles| {
+                    std.debug.print("{any}\n", .{cell_triangles.items.len});
+                    for (cell_triangles.items) |triangle| {
+                        const hit_distance = rayTriangleIntersection(ray, triangle.*);
+                        if (hit_distance < 100)
+                            break :find_triangle triangle;
+                    }
+                }
+            }
+        }
+        unreachable;
+    };
+
+    _ = result_triangle;
+
+    std.debug.print("Success!", .{});
+}
+
 pub fn GridBounds(grid_width: usize) type {
     return struct {
         pub const width = grid_width;
@@ -247,9 +305,12 @@ pub fn GridBounds(grid_width: usize) type {
         pub fn coordToIndex(coord: GridCoord) usize {
             return coord[0] + coord[1] * width + coord[2] * width * width;
         }
-        pub noinline fn binTriangles(self: @This(), allocator: std.mem.Allocator, triangles: []Triangle) ![]const ?*std.ArrayList(*Triangle) {
-            // var bins: [array_size]?*std.ArrayList(*Triangle) = .{null} ** array_size;
-            var bins: []?*std.ArrayList(*Triangle) = (try allocator.alloc(?*std.ArrayList(*Triangle), array_size));
+        pub noinline fn binTriangles(
+            self: @This(),
+            allocator: std.mem.Allocator,
+            triangles: []const Triangle,
+        ) ![]const ?*std.ArrayList(*const Triangle) {
+            var bins = try allocator.alloc(?*std.ArrayList(*const Triangle), array_size);
             for (0..bins.len) |i|
                 bins[i] = null;
 
@@ -257,15 +318,18 @@ pub fn GridBounds(grid_width: usize) type {
                 const triangle_bounds = Bounds.initEncompass(triangle);
                 const min: @Vector(4, usize) = @intFromFloat(@floor(self.transformPoint(triangle_bounds.min)));
                 const max: @Vector(4, usize) = @intFromFloat(@ceil(self.transformPoint(triangle_bounds.max)));
-                for (min[2]..max[2]) |z|
-                    for (min[1]..max[1]) |y|
-                        for (min[0]..max[0]) |x| {
+                // std.debug.print("{any} {any} {any}\n", .{ triangle_bounds, min, max });
+
+                for (min[2]..max[2] + 1) |z|
+                    for (min[1]..max[1] + 1) |y|
+                        for (min[0]..max[0] + 1) |x| {
                             const index = coordToIndex(.{ x, y, z });
                             var bin = if (bins[index]) |bin| bin else blk: {
-                                var bin = std.ArrayList(*Triangle).init(allocator);
+                                var bin = std.ArrayList(*const Triangle).init(allocator);
                                 bins[index] = &bin;
                                 break :blk &bin;
                             };
+                            // std.debug.print("Binned in {any}\n", .{.{ x, y, z }});
                             try bin.append(triangle);
                         };
             }
@@ -277,9 +341,9 @@ pub fn GridBounds(grid_width: usize) type {
                 const triangle_bounds = Bounds.initEncompass(triangle);
                 const min: @Vector(4, usize) = @intFromFloat(@floor(self.transformPoint(triangle_bounds.min)));
                 const max: @Vector(4, usize) = @intFromFloat(@ceil(self.transformPoint(triangle_bounds.max)));
-                for (min[2]..max[2]) |z|
-                    for (min[1]..max[1]) |y|
-                        for (min[0]..max[0]) |x| {
+                for (min[2]..max[2] + 1) |z|
+                    for (min[1]..max[1] + 1) |y|
+                        for (min[0]..max[0] + 1) |x| {
                             const index = coordToIndex(.{ x, y, z });
                             bins[index] = true;
                         };

@@ -242,7 +242,7 @@ pub const interface = struct {
                 };
             }
 
-            noinline fn raytraceCell(ray: raytrace.Ray, cell: ?*std.ArrayList(*raytrace.Triangle), closest_distance: *f32) void {
+            noinline fn raytraceCell(ray: raytrace.Ray, cell: ?*std.ArrayList(*const raytrace.Triangle), closest_distance: *f32) void {
                 if (cell) |cell_triangles| for (cell_triangles.items) |triangle| {
                     const hit_distance = raytrace.rayTriangleIntersection(ray, triangle.*);
                     closest_distance.* = @min(closest_distance.*, hit_distance);
@@ -323,7 +323,6 @@ pub const interface = struct {
                             const end = grid_bounds.transformPoint(
                                 ray.position + ray.normal * @as(zm.Vec, @splat(bounding_box_hit.exit_distance)),
                             );
-                            // wasm_entry.dumpDebugLogFmt(std.heap.page_allocator, "{any} {any}", .{ start, end }) catch unreachable;
                             var traversal_iterator = raytrace.GridTraversal.init(start, end);
                             while (traversal_iterator.next()) |cell_coord| {
                                 const cell_index = GridBounds.coordToIndex(cell_coord);

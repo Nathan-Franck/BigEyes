@@ -19,8 +19,8 @@ const ExportMeshes = struct {
         };
         return self;
     }
-    fn exportMeshes(step: *std.Build.Step, prog_node: std.Progress.Node) !void {
-        _ = prog_node;
+    fn exportMeshes(step: *std.Build.Step, options: std.Build.Step.MakeOptions) !void {
+        _ = options;
         const self = @as(*ExportMeshes, @fieldParentPtr("step", step));
 
         var b = step.owner;
