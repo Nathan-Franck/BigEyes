@@ -242,7 +242,7 @@ pub const interface = struct {
                 };
             }
 
-            noinline fn raytraceCell(ray: raytrace.Ray, cell: ?std.ArrayList(*const raytrace.Triangle), closest_distance: *f32) void {
+            noinline fn raytraceCell(ray: raytrace.Ray, cell: ?*std.ArrayList(*const raytrace.Triangle), closest_distance: *f32) void {
                 if (cell) |cell_triangles| for (cell_triangles.items) |triangle| {
                     const hit_distance = raytrace.rayTriangleIntersection(ray, triangle.*);
                     closest_distance.* = @min(closest_distance.*, hit_distance);

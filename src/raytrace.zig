@@ -245,12 +245,13 @@ test "Triangle in a Bin" {
     const my_triangle = Triangle{
         .{ 1, 1, 2, 0 },
         .{ 2, 1, 2, 0 },
-        .{ 1, 2, 2, 0 },
+        .{ 1, 2, 3, 0 },
     };
     const grid_bounds = GridBounds(16){
-        .bounds = .{ .min = .{ 0, 0, 0, 0 }, .max = .{ 4, 4, 4, 0 } },
+        // .bounds = .{ .min = .{ 0, 0, 0, 0 }, .max = .{ 4, 4, 4, 0 } },
+        .bounds = Bounds.initEncompass(&my_triangle),
     };
-    const allocator = std.testing.allocator;
+    const allocator = std.heap.page_allocator;
     const triangles = &.{my_triangle};
     const bins = try grid_bounds.binTriangles(allocator, triangles);
 
@@ -300,26 +301,31 @@ pub fn GridBounds(grid_width: usize) type {
             self: @This(),
             allocator: std.mem.Allocator,
             triangles: []const Triangle,
-        ) ![]const ?std.ArrayList(*const Triangle) {
-            var bins = try allocator.alloc(?std.ArrayList(*const Triangle), array_size);
+        ) ![]const ?*std.ArrayList(*const Triangle) {
+            var bins = try allocator.alloc(?*std.ArrayList(*const Triangle), array_size);
             for (0..bins.len) |i|
                 bins[i] = null;
 
             for (triangles) |*triangle| {
                 const triangle_bounds = Bounds.initEncompass(triangle);
                 const min: @Vector(4, usize) = @intFromFloat(@floor(self.transformPoint(triangle_bounds.min)));
-                const max: @Vector(4, usize) = @intFromFloat(@ceil(self.transformPoint(triangle_bounds.max)));
+                const max = @min(
+                    @as(@Vector(4, usize), @intFromFloat(@floor(self.transformPoint(triangle_bounds.max)))) +
+                        @as(@Vector(4, usize), @splat(1)),
+                    @as(@Vector(4, usize), @splat(width - 1)),
+                );
 
-                for (min[2]..max[2] + 1) |z|
-                    for (min[1]..max[1] + 1) |y|
-                        for (min[0]..max[0] + 1) |x| {
+                for (min[2]..max[2]) |z|
+                    for (min[1]..max[1]) |y|
+                        for (min[0]..max[0]) |x| {
                             const index = coordToIndex(.{ x, y, z });
-                            var bin = if (bins[index]) |bin| bin else blk: {
-                                break :blk std.ArrayList(*const Triangle).init(allocator);
+                            const bin = if (bins[index]) |bin| bin else blk: {
+                                const T = std.ArrayList(*const Triangle);
+                                const bin = &(try allocator.dupe(T, &.{T.init(allocator)}))[0];
+                                bins[index] = bin;
+                                break :blk bin;
                             };
                             try bin.append(triangle);
-                            std.debug.assert(bin.items.len == 1);
-                            bins[index] = bin;
                         };
             }
             return bins;
