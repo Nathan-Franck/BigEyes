@@ -48,17 +48,24 @@ inline fn IsEventType(the_type: type) bool {
     };
 }
 
-fn AttemptEventCast(InputType: type, OutputType: type, value: InputType) OutputType {
-    return if (!IsEventType(InputType))
-        value
-    else if (value) |non_null_value| blk: {
+fn EventCast(InputType: type, OutputType: type, value: InputType) ?OutputType {
+    if (value) |non_null_value| blk: {
         const active_tag_index = @intFromEnum(non_null_value);
-        inline for (@typeInfo(@typeInfo(InputType).Optional.child).Union.fields, 0..) |field_candidate, field_index| {
+        inline for (
+            @typeInfo(
+                @typeInfo(InputType).Optional.child,
+            ).Union.fields,
+            0..,
+        ) |field_candidate, field_index| {
             if (active_tag_index == field_index) {
                 const OutputNonNull = @typeInfo(OutputType).Optional.child;
                 inline for (@typeInfo(OutputNonNull).Union.fields) |output_field| {
                     if (field_candidate.type == output_field.type) {
-                        break :blk @unionInit(OutputNonNull, output_field.name, @field(non_null_value, field_candidate.name));
+                        break :blk @unionInit(
+                            OutputNonNull,
+                            output_field.name,
+                            @field(non_null_value, field_candidate.name),
+                        );
                     }
                 }
             }
@@ -83,35 +90,34 @@ pub fn NodeGraph(
                 .ErrorUnion => |error_union| error_union.payload,
             };
             comptime var output_fields: []const std.builtin.Type.StructField = @typeInfo(non_error_outputs).Struct.fields;
-            for (@typeInfo(node_inputs[node_inputs.len - 1].type.?).Struct.fields) |input_field| {
-                switch (@typeInfo(input_field.type)) {
+            for (@typeInfo(
+                node_inputs[node_inputs.len - 1].type.?,
+            ).Struct.fields) |input_field| switch (@typeInfo(input_field.type)) {
+                else => {},
+                .Pointer => |pointer| switch (pointer.size) {
                     else => {},
-                    .Pointer => |pointer| {
-                        switch (pointer.size) {
-                            else => {},
-                            .One => {
-                                if (!pointer.is_const)
-                                    output_fields = comptime output_fields ++ .{.{
-                                        .name = input_field.name,
-                                        .type = pointer.child,
-                                        .default_value = null,
-                                        .is_comptime = false,
-                                        .alignment = @alignOf(input_field.type),
-                                    }};
-                            },
-                            .Slice => {
-                                output_fields = comptime output_fields ++ .{.{
-                                    .name = input_field.name,
-                                    .type = []const pointer.child,
-                                    .default_value = null,
-                                    .is_comptime = false,
-                                    .alignment = @alignOf(input_field.type),
-                                }};
-                            },
-                        }
+                    .One => {
+                        if (!pointer.is_const)
+                            output_fields = comptime output_fields ++ .{.{
+                                .name = input_field.name,
+                                .type = pointer.child,
+                                .default_value = null,
+                                .is_comptime = false,
+                                .alignment = @alignOf(input_field.type),
+                            }};
                     },
-                }
-            }
+                    .Slice => {
+                        output_fields = comptime output_fields ++ .{.{
+                            .name = input_field.name,
+                            .type = []const pointer.child,
+                            .default_value = null,
+                            .is_comptime = false,
+                            .alignment = @alignOf(input_field.type),
+                        }};
+                    },
+                },
+            };
+
             const non_error_outputs_and_pointers = @Type(std.builtin.Type{ .Struct = .{
                 .layout = .auto,
                 .fields = output_fields,
@@ -355,17 +361,11 @@ pub fn NodeGraph(
 
         fn getOutputFieldTypeFromNode(node: NodeGraphBlueprintEntry, field_name: []const u8) type {
             const node_outputs = for (@typeInfo(NodeOutputs).Struct.fields) |field|
-                if (std.mem.eql(u8, field.name, node.name))
-                    break field.type
-                else
-                    continue
+                if (!std.mem.eql(u8, field.name, node.name)) continue else break field.type
             else
                 @compileError("Node not found " ++ node.name);
             const field_type = for (@typeInfo(node_outputs).Struct.fields) |field|
-                if (std.mem.eql(u8, field.name, field_name))
-                    break field.type
-                else
-                    continue
+                if (!std.mem.eql(u8, field.name, field_name)) continue else break field.type
             else
                 @compileError("Field not found " ++ field_name ++ " in node " ++ node.name);
             return field_type;
@@ -377,11 +377,13 @@ pub fn NodeGraph(
             var inputs_dirty: SystemInputsDirtyFlags = undefined;
             inline for (@typeInfo(SystemInputs).Struct.fields) |field| {
                 const field_name = field.name;
-                @field(inputs_dirty, field_name) = if (self.system_inputs) |previous_inputs|
-                    !std.meta.eql(@field(inputs, field_name), @field(previous_inputs, field_name))
-                else
-                    true;
+                @field(inputs_dirty, field_name) = if (self.system_inputs) |previous_inputs| !std.meta.eql(
+                    @field(inputs, field_name),
+                    @field(previous_inputs, field_name),
+                ) else true;
             }
+
+            // Now we can actually set the inputs!
             self.system_inputs = inputs;
 
             // Process all nodes...
@@ -446,7 +448,10 @@ pub fn NodeGraph(
                             if (@field(self.nodes_dirty_flags, node_blueprint.name)) {
                                 dirty = true;
                             }
-                            break :input_field AttemptEventCast(InputType, OutputType, node_output);
+                            break :input_field if (IsEventType(InputType))
+                                EventCast(InputType, OutputType, node_output)
+                            else
+                                node_output;
                         },
                     };
                     const target_input_field = &@field(node_inputs, link.field);
@@ -487,11 +492,11 @@ pub fn NodeGraph(
                                 );
                                 break :cloned &result;
                             },
-                            .Slice => (try utils.deepClone(
+                            .Slice => try utils.deepClone(
                                 @TypeOf(input_to_clone.*),
                                 self.nodes_arenas[node_index].allocator(),
                                 @field(mutable_fields, field.name),
-                            )).value,
+                            ),
                             else => unreachable,
                         };
                     }
@@ -499,7 +504,9 @@ pub fn NodeGraph(
                     const function_output = @call(
                         .auto,
                         @field(node_definitions, node.function),
-                        if (@typeInfo(@TypeOf(@field(node_definitions, node.function))).Fn.params.len == 1)
+                        if (@typeInfo(
+                            @TypeOf(@field(node_definitions, node.function)),
+                        ).Fn.params.len == 1)
                             .{
                                 node_inputs,
                             }
@@ -535,8 +542,11 @@ pub fn NodeGraph(
             inline for (graph.store) |store_defn| {
                 const node_result = @field(self.nodes_outputs, store_defn.output_node);
                 const result = @field(node_result, store_defn.output_field);
-                @field(self.store, store_defn.system_field) =
-                    try utils.deepClone(@TypeOf(result), self.store_arena.allocator(), result);
+                @field(self.store, store_defn.system_field) = try utils.deepClone(
+                    @TypeOf(result),
+                    self.store_arena.allocator(),
+                    result,
+                );
             }
 
             // Output from system from select nodes...

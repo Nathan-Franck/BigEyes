@@ -116,7 +116,8 @@ pub fn deepClone(
     allocator: std.mem.Allocator,
     source: anytype,
 ) !T {
-    return (try deepCloneInner(T, allocator, source)).value;
+    const result = try deepCloneInner(T, allocator, source);
+    return result.value;
 }
 
 fn deepCloneInner(
@@ -279,7 +280,6 @@ test "deepClone" {
 }
 
 /// Takes any type that has fields and returns a list of the field names as strings.
-/// NOTE: Required to run at comptime from the callsite.
 pub fn fieldNamesToStrings(comptime with_fields: type) []const []const u8 {
     comptime var options: []const []const u8 = &.{};
     inline for (std.meta.fields(with_fields)) |field| {
