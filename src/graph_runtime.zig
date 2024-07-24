@@ -85,8 +85,10 @@ pub fn NodeGraph(
             comptime var output_fields: []const std.builtin.Type.StructField = @typeInfo(non_error_outputs).Struct.fields;
             for (@typeInfo(node_inputs[node_inputs.len - 1].type.?).Struct.fields) |input_field| {
                 switch (@typeInfo(input_field.type)) {
+                    else => {},
                     .Pointer => |pointer| {
                         switch (pointer.size) {
+                            else => {},
                             .One => {
                                 if (!pointer.is_const)
                                     output_fields = comptime output_fields ++ .{.{
@@ -106,10 +108,8 @@ pub fn NodeGraph(
                                     .alignment = @alignOf(input_field.type),
                                 }};
                             },
-                            else => {},
                         }
                     },
-                    else => {},
                 }
             }
             const non_error_outputs_and_pointers = @Type(std.builtin.Type{ .Struct = .{
@@ -220,8 +220,12 @@ pub fn NodeGraph(
                 for (node.input_links) |link| switch (link.source) {
                     else => {},
                     .input_field => |input_field| {
-                        const node_params = @typeInfo(@TypeOf(@field(node_definitions, node.name))).Fn.params;
-                        const field_type = for (@typeInfo(node_params[node_params.len - 1].type.?).Struct.fields) |field|
+                        const node_params = @typeInfo(
+                            @TypeOf(@field(node_definitions, node.name)),
+                        ).Fn.params;
+                        const field_type = for (@typeInfo(
+                            node_params[node_params.len - 1].type.?,
+                        ).Struct.fields) |field|
                             if (std.mem.eql(u8, field.name, input_field)) break field.type else continue
                         else
                             @panic("fancy serve"); // TODO: Provide a useful compiler error about how blueprint and node defn's disagree.
@@ -392,34 +396,31 @@ pub fn NodeGraph(
 
                 var mutable_fields: build_type: {
                     var mutable_fields: []const std.builtin.Type.StructField = &.{};
-                    for (node.input_links) |link| {
+                    for (node.input_links) |link|
                         switch (@typeInfo(@TypeOf(@field(node_inputs, link.field)))) {
-                            .Pointer => |pointer| {
-                                switch (pointer.size) {
-                                    .One => {
-                                        mutable_fields = mutable_fields ++ .{.{
-                                            .name = link.field[0.. :0],
-                                            .type = *const pointer.child,
-                                            .default_value = null,
-                                            .is_comptime = false,
-                                            .alignment = @alignOf(pointer.child),
-                                        }};
-                                    },
-                                    .Slice => {
-                                        mutable_fields = mutable_fields ++ .{.{
-                                            .name = link.field[0.. :0],
-                                            .type = []const pointer.child,
-                                            .default_value = null,
-                                            .is_comptime = false,
-                                            .alignment = @alignOf(pointer.child),
-                                        }};
-                                    },
-                                    else => {},
-                                }
-                            },
                             else => {},
-                        }
-                    }
+                            .Pointer => |pointer| switch (pointer.size) {
+                                else => {},
+                                .One => {
+                                    mutable_fields = mutable_fields ++ .{.{
+                                        .name = link.field[0.. :0],
+                                        .type = *const pointer.child,
+                                        .default_value = null,
+                                        .is_comptime = false,
+                                        .alignment = @alignOf(pointer.child),
+                                    }};
+                                },
+                                .Slice => {
+                                    mutable_fields = mutable_fields ++ .{.{
+                                        .name = link.field[0.. :0],
+                                        .type = []const pointer.child,
+                                        .default_value = null,
+                                        .is_comptime = false,
+                                        .alignment = @alignOf(pointer.child),
+                                    }};
+                                },
+                            },
+                        };
                     break :build_type @Type(.{ .Struct = .{
                         .layout = .auto,
                         .fields = mutable_fields,
@@ -452,6 +453,7 @@ pub fn NodeGraph(
                     target_input_field.* = switch (@typeInfo(@TypeOf(target_input_field.*))) {
                         else => node_input_field,
                         .Pointer => |pointer| switch (pointer.size) {
+                            else => unreachable,
                             .One => deferred_clone: {
                                 @field(mutable_fields, link.field) = &node_input_field;
                                 break :deferred_clone undefined;
@@ -460,7 +462,6 @@ pub fn NodeGraph(
                                 @field(mutable_fields, link.field) = node_input_field;
                                 break :deferred_clone undefined;
                             },
-                            else => unreachable,
                         },
                     };
                 }
@@ -479,11 +480,11 @@ pub fn NodeGraph(
                         const input_to_clone = &@field(node_inputs, field.name);
                         input_to_clone.* = switch (pointer.size) {
                             .One => cloned: {
-                                var result = (try utils.deepClone(
+                                var result = try utils.deepClone(
                                     pointer.child,
                                     self.nodes_arenas[node_index].allocator(),
                                     @field(mutable_fields, field.name).*,
-                                )).value;
+                                );
                                 break :cloned &result;
                             },
                             .Slice => (try utils.deepClone(
@@ -535,7 +536,7 @@ pub fn NodeGraph(
                 const node_result = @field(self.nodes_outputs, store_defn.output_node);
                 const result = @field(node_result, store_defn.output_field);
                 @field(self.store, store_defn.system_field) =
-                    (try utils.deepClone(@TypeOf(result), self.store_arena.allocator(), result)).value;
+                    try utils.deepClone(@TypeOf(result), self.store_arena.allocator(), result);
             }
 
             // Output from system from select nodes...
@@ -543,8 +544,11 @@ pub fn NodeGraph(
             inline for (graph.output) |output_defn| {
                 const node_outputs = @field(self.nodes_outputs, output_defn.output_node);
                 const result = @field(node_outputs, output_defn.output_field);
-                @field(system_outputs, output_defn.system_field) =
-                    (try utils.deepClone(@TypeOf(result), self.store_arena.allocator(), result)).value;
+                @field(system_outputs, output_defn.system_field) = try utils.deepClone(
+                    @TypeOf(result),
+                    self.store_arena.allocator(),
+                    result,
+                );
             }
 
             return system_outputs;

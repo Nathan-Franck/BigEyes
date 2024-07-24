@@ -115,6 +115,14 @@ pub fn deepClone(
     T: type,
     allocator: std.mem.Allocator,
     source: anytype,
+) !T {
+    return (try deepCloneInner(T, allocator, source)).value;
+}
+
+fn deepCloneInner(
+    T: type,
+    allocator: std.mem.Allocator,
+    source: anytype,
 ) !DeepCloneResult(T) {
     return switch (@typeInfo(T)) {
         else => .{ .value = source, .allocator_used = false },
@@ -122,7 +130,7 @@ pub fn deepClone(
             var elements: [a.len]a.child = undefined;
             var allocator_used = false;
             for (source, 0..) |elem, idx| {
-                const result = try deepClone(a.child, allocator, elem);
+                const result = try deepCloneInner(a.child, allocator, elem);
                 allocator_used = allocator_used or result.allocator_used;
                 elements[idx] = result.value;
             }
@@ -151,7 +159,7 @@ pub fn deepClone(
             var allocator_used = false;
             inline for (struct_info.fields) |field| {
                 const field_value = @field(source, field.name);
-                const field_clone = try deepClone(field.type, allocator, field_value);
+                const field_clone = try deepCloneInner(field.type, allocator, field_value);
                 allocator_used = allocator_used or field_clone.allocator_used;
                 @field(result, field.name) = field_clone.value;
             }
@@ -165,7 +173,7 @@ pub fn deepClone(
             const active_tag_index = @intFromEnum(source);
             inline for (union_info.fields, 0..) |field_candidate, field_index| {
                 if (active_tag_index == field_index) {
-                    const result = try deepClone(
+                    const result = try deepCloneInner(
                         field_candidate.type,
                         allocator,
                         @field(source, field_candidate.name),
@@ -189,7 +197,7 @@ pub fn deepClone(
             .Many, .Slice => blk: {
                 var elements = std.ArrayList(pointer_info.child).init(allocator);
                 for (source) |elem| {
-                    const result = try deepClone(pointer_info.child, allocator, elem);
+                    const result = try deepCloneInner(pointer_info.child, allocator, elem);
                     try elements.append(result.value);
                 }
                 break :blk .{ .value = elements.items, .allocator_used = true };
@@ -200,7 +208,7 @@ pub fn deepClone(
         },
         .Optional => |optional_info| blk: {
             if (source) |non_null_source| {
-                const result = try deepClone(optional_info.child, allocator, non_null_source);
+                const result = try deepCloneInner(optional_info.child, allocator, non_null_source);
                 break :blk .{ .value = result.value, .allocator_used = result.allocator_used };
             } else {
                 break :blk .{ .value = null, .allocator_used = false };
@@ -214,14 +222,14 @@ test "deepClone" {
         const Type = struct { a: i32, b: i32 };
         const source: Type = .{ .a = 1, .b = 2 };
         const result = try deepClone(Type, std.heap.page_allocator, source);
-        try std.testing.expect(std.meta.eql(source, result.value));
+        try std.testing.expect(std.meta.eql(source, result));
     }
 
     { // Slice
         const Type = []const i32;
         const source: Type = &.{ 1, 2, 3 };
         const result = try deepClone(Type, std.heap.page_allocator, source);
-        try std.testing.expect(std.mem.eql(i32, source, result.value));
+        try std.testing.expect(std.mem.eql(i32, source, result));
     }
 
     { // Slice of slices
@@ -235,14 +243,14 @@ test "deepClone" {
         const Type = []const [4]i32;
         const source: Type = &.{.{ 1, 2, 3, 4 }};
         const result = try deepClone(Type, std.heap.page_allocator, source);
-        try std.testing.expect(std.mem.eql(i32, &source[0], &result.value[0]));
+        try std.testing.expect(std.mem.eql(i32, &source[0], &result[0]));
     }
 
     { // Struct with slices inside
         const Type = struct { a: []const i32, b: []const i32 };
         const source: Type = .{ .a = &.{ 1, 2, 3 }, .b = &.{ 4, 5, 6 } };
         const result = try deepClone(Type, std.heap.page_allocator, source);
-        try std.testing.expect(std.mem.eql(i32, source.a, result.value.a));
+        try std.testing.expect(std.mem.eql(i32, source.a, result.a));
     }
 
     { // Hashmap
@@ -250,7 +258,7 @@ test "deepClone" {
         try thinger.put(1, 2);
         try thinger.put(3, 4);
         const result = try deepClone(@TypeOf(thinger), std.heap.page_allocator, thinger);
-        try std.testing.expect(thinger.get(1) == result.value.get(1));
+        try std.testing.expect(thinger.get(1) == result.get(1));
     }
 
     { // Hashmap
@@ -258,7 +266,7 @@ test "deepClone" {
         try thinger.put(1, 2);
         try thinger.put(3, 4);
         const result = try deepClone(@TypeOf(thinger), std.heap.page_allocator, thinger);
-        try std.testing.expect(thinger.get(1) == result.value.get(1));
+        try std.testing.expect(thinger.get(1) == result.get(1));
     }
 
     { // ArrayList
@@ -266,7 +274,7 @@ test "deepClone" {
         try thinger.append(1);
         try thinger.append(3);
         const result = try deepClone(@TypeOf(thinger), std.heap.page_allocator, thinger);
-        try std.testing.expect(std.mem.eql(u32, thinger.items, result.value.items));
+        try std.testing.expect(std.mem.eql(u32, thinger.items, result.items));
     }
 }
 
