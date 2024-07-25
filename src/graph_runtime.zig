@@ -89,7 +89,8 @@ pub fn NodeGraph(
                 else => node_outputs,
                 .ErrorUnion => |error_union| error_union.payload,
             };
-            comptime var output_fields: []const std.builtin.Type.StructField = @typeInfo(non_error_outputs).Struct.fields;
+            comptime var output_fields: []const std.builtin.Type.StructField =
+                @typeInfo(non_error_outputs).Struct.fields;
             for (@typeInfo(
                 node_inputs[node_inputs.len - 1].type.?,
             ).Struct.fields) |input_field| switch (@typeInfo(input_field.type)) {
@@ -229,12 +230,14 @@ pub fn NodeGraph(
                         const node_params = @typeInfo(
                             @TypeOf(@field(node_definitions, node.name)),
                         ).Fn.params;
-                        const field_type = for (@typeInfo(
-                            node_params[node_params.len - 1].type.?,
-                        ).Struct.fields) |field|
+                        const output_node_type = node_params[node_params.len - 1].type.?;
+                        const field_type = for (@typeInfo(output_node_type).Struct.fields) |field|
                             if (std.mem.eql(u8, field.name, input_field)) break field.type else continue
                         else
-                            @panic("fancy serve"); // TODO: Provide a useful compiler error about how blueprint and node defn's disagree.
+                            @compileError(std.fmt.comptimePrint("Can't find the field {s} in type {any}", .{
+                                input_field,
+                                output_node_type,
+                            }));
                         fields = fields ++ for (fields) |system_input|
                             if (std.mem.eql(u8, system_input.name, input_field)) break .{} else continue
                         else

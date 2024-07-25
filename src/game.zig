@@ -194,7 +194,12 @@ pub const interface = struct {
             } {
                 const mesh_input_data = blk: {
                     const json_data = @embedFile("content/Cat.blend.json");
-                    break :blk std.json.parseFromSliceLeaky(MeshSpec, allocator, json_data, .{}) catch unreachable;
+                    break :blk std.json.parseFromSliceLeaky(
+                        MeshSpec,
+                        allocator,
+                        json_data,
+                        .{},
+                    ) catch unreachable;
                 };
                 const input_data = mesh_input_data.meshes[0];
                 const quads_by_subdiv = blk: {
@@ -207,11 +212,19 @@ pub const interface = struct {
                         ),
                     );
                     var quads_by_subdiv = std.ArrayList([]const subdiv.Quad).init(allocator);
-                    var mesh_result = try subdiv.Polygon(.Face).cmcSubdiv(allocator, input_vertices, input_data.polygons);
+                    var mesh_result = try subdiv.Polygon(.Face).cmcSubdiv(
+                        allocator,
+                        input_vertices,
+                        input_data.polygons,
+                    );
                     try quads_by_subdiv.append(mesh_result.quads);
                     var subdiv_count: u32 = 0;
                     while (subdiv_count < props.settings.subdiv_level) {
-                        mesh_result = try subdiv.Polygon(.Quad).cmcSubdiv(allocator, mesh_result.points, mesh_result.quads);
+                        mesh_result = try subdiv.Polygon(.Quad).cmcSubdiv(
+                            allocator,
+                            mesh_result.points,
+                            mesh_result.quads,
+                        );
                         subdiv_count += 1;
                         try quads_by_subdiv.append(mesh_result.quads);
                     }
@@ -232,7 +245,10 @@ pub const interface = struct {
                     .resources = .{
                         .cat = SubdivAnimationMesh{
                             .label = input_data.name,
-                            .indices = QuadMeshHelper.toTriangleIndices(allocator, quads_by_subdiv[quads_by_subdiv.len - 1]),
+                            .indices = QuadMeshHelper.toTriangleIndices(
+                                allocator,
+                                quads_by_subdiv[quads_by_subdiv.len - 1],
+                            ),
                             .quads_by_subdiv = quads_by_subdiv,
                             .polygons = input_data.polygons,
                             .frames = frames.items,
@@ -242,7 +258,11 @@ pub const interface = struct {
                 };
             }
 
-            noinline fn raytraceCell(ray: raytrace.Ray, cell: ?*std.ArrayList(*const raytrace.Triangle), closest_distance: *f32) void {
+            noinline fn raytraceCell(
+                ray: raytrace.Ray,
+                cell: ?*std.ArrayList(*const raytrace.Triangle),
+                closest_distance: *f32,
+            ) void {
                 if (cell) |cell_triangles| for (cell_triangles.items) |triangle| {
                     const hit_distance = raytrace.rayTriangleIntersection(ray, triangle.*);
                     closest_distance.* = @min(closest_distance.*, hit_distance);
@@ -276,16 +296,28 @@ pub const interface = struct {
                 );
                 const current_frame = source_mesh.frames[@intCast(current_frame_index)];
                 const subdiv_mesh = subdiv_mesh: {
-                    var mesh_result = try subdiv.Polygon(.Face).cmcSubdivOnlyPoints(allocator, current_frame, source_mesh.polygons);
+                    var mesh_result = try subdiv.Polygon(.Face).cmcSubdivOnlyPoints(
+                        allocator,
+                        current_frame,
+                        source_mesh.polygons,
+                    );
                     var subdiv_count: u32 = 0;
                     while (subdiv_count < props.settings.subdiv_level) {
-                        mesh_result = try subdiv.Polygon(.Quad).cmcSubdivOnlyPoints(allocator, mesh_result, source_mesh.quads_by_subdiv[subdiv_count]);
+                        mesh_result = try subdiv.Polygon(.Quad).cmcSubdivOnlyPoints(
+                            allocator,
+                            mesh_result,
+                            source_mesh.quads_by_subdiv[subdiv_count],
+                        );
                         subdiv_count += 1;
                     }
                     break :subdiv_mesh .{
                         .indices = source_mesh.indices,
                         .positions = mesh_result,
-                        .normals = QuadMeshHelper.calculateNormals(allocator, mesh_result, source_mesh.quads_by_subdiv[source_mesh.quads_by_subdiv.len - 1]),
+                        .normals = QuadMeshHelper.calculateNormals(
+                            allocator,
+                            mesh_result,
+                            source_mesh.quads_by_subdiv[source_mesh.quads_by_subdiv.len - 1],
+                        ),
                     };
                 };
                 const color = occlude: {
