@@ -271,7 +271,10 @@ pub fn NodeGraph(
                     else => {},
                     .input_field => |input_field| {
                         fields = fields ++ for (fields) |system_input_dirty|
-                            if (std.mem.eql(u8, system_input_dirty.name, input_field)) break .{} else continue
+                            if (std.mem.eql(u8, system_input_dirty.name, input_field))
+                                break .{}
+                            else
+                                continue
                         else
                             .{std.builtin.Type.StructField{
                                 .name = input_field[0.. :0],
