@@ -2,6 +2,10 @@
 
 Can 3D toon graphics be easy?
 
+![image](Cat2024-07-28.png)
+
+[Check out the current working build!](https://nathan-franck.github.io/BigEyes/)
+
 ### Objective
 
 * Make a simple renderer and game loop to test out mesh generation techniques in zig
