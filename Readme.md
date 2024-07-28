@@ -24,7 +24,7 @@ zig build wasm
 
 The game won't run fast unless you build the wasm bundle on ReleaseFast, though this takes much longer to build
 ```
-zig build wasm -Doptimize=ReleaseFast
+zig build wasm --release=fast
 ```
 
 ### Custom Blender Export
