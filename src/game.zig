@@ -192,6 +192,23 @@ pub const interface = struct {
             }) !struct {
                 resources: Resources,
             } {
+                const cube_map_input_data = blk: {
+                    const cubemap_directions = .{
+                        "nx",
+                        "ny",
+                        "nz",
+                        "px",
+                        "py",
+                        "pz",
+                    };
+                    comptime var thinger: []const []const u8 = &.{};
+                    inline for (cubemap_directions) |direction| {
+                        const direction_texture = @embedFile("content/Bush_Cube_Map/" ++ direction ++ ".png");
+                        thinger = thinger ++ .{direction_texture};
+                    }
+                    break :blk thinger;
+                };
+                _ = cube_map_input_data; // autofix
                 const mesh_input_data = blk: {
                     const json_data = @embedFile("content/Cat.blend.json");
                     break :blk std.json.parseFromSliceLeaky(
@@ -343,25 +360,28 @@ pub const interface = struct {
                         .bounds = raytrace.Bounds.initEncompass(positions),
                     };
                     const bins = try grid_bounds.binTriangles(allocator, triangles);
+                    _ = bins; // autofix
                     for (positions, normals) |position, normal| {
-                        var closest_distance = std.math.floatMax(f32);
-                        const ray = .{
-                            .position = position,
-                            .normal = normal,
-                        };
-                        const bounding_box_test = raytrace.rayBoundsIntersection(ray, grid_bounds.bounds);
-                        if (bounding_box_test) |bounding_box_hit| {
-                            const start = grid_bounds.transformPoint(ray.position);
-                            const end = grid_bounds.transformPoint(
-                                ray.position + ray.normal * @as(zm.Vec, @splat(bounding_box_hit.exit_distance)),
-                            );
-                            var traversal_iterator = raytrace.GridTraversal.init(start, end);
-                            while (traversal_iterator.next()) |cell_coord| {
-                                const cell_index = GridBounds.coordToIndex(cell_coord);
-                                const cell = bins[cell_index];
-                                raytraceCell(ray, cell, &closest_distance);
-                            }
-                        }
+                        _ = position; // autofix
+                        _ = normal; // autofix
+                        const closest_distance = std.math.floatMax(f32);
+                        // const ray = .{
+                        //     .position = position,
+                        //     .normal = normal,
+                        // };
+                        // const bounding_box_test = raytrace.rayBoundsIntersection(ray, grid_bounds.bounds);
+                        // if (bounding_box_test) |bounding_box_hit| {
+                        //     const start = grid_bounds.transformPoint(ray.position);
+                        //     const end = grid_bounds.transformPoint(
+                        //         ray.position + ray.normal * @as(zm.Vec, @splat(bounding_box_hit.exit_distance)),
+                        //     );
+                        //     var traversal_iterator = raytrace.GridTraversal.init(start, end);
+                        //     while (traversal_iterator.next()) |cell_coord| {
+                        //         const cell_index = GridBounds.coordToIndex(cell_coord);
+                        //         const cell = bins[cell_index];
+                        //         raytraceCell(ray, cell, &closest_distance);
+                        //     }
+                        // }
 
                         try colors.append(if (closest_distance < 100)
                             zm.Vec{ 1.0, 1.0, 1.0, 1.0 }
