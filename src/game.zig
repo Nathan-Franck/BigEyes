@@ -3,6 +3,7 @@ const graph = @import("./graph_runtime.zig");
 const typeDefinitions = @import("./type_definitions.zig");
 
 const subdiv = @import("./subdiv.zig");
+const Image = @import("./Image.zig");
 const raytrace = @import("./raytrace.zig");
 const mesh_helper = @import("./mesh_helper.zig");
 const MeshSpec = @import("./MeshSpec.zig");
@@ -193,20 +194,20 @@ pub const interface = struct {
                 resources: Resources,
             } {
                 const cube_map_input_data = blk: {
-                    const cubemap_directions = .{
+                    var cubemap_images = std.ArrayList(Image).init(allocator);
+                    inline for (.{
                         "nx",
                         "ny",
                         "nz",
                         "px",
                         "py",
                         "pz",
-                    };
-                    comptime var thinger: []const []const u8 = &.{};
-                    inline for (cubemap_directions) |direction| {
+                    }) |direction| {
                         const direction_texture = @embedFile("content/Bush_Cube_Map/" ++ direction ++ ".png");
-                        thinger = thinger ++ .{direction_texture};
+                        const image_data = try Image.loadPng(allocator, direction_texture);
+                        try cubemap_images.append(image_data);
                     }
-                    break :blk thinger;
+                    break :blk cubemap_images.items;
                 };
                 _ = cube_map_input_data; // autofix
                 const mesh_input_data = blk: {

@@ -236,11 +236,12 @@ export function App() {
           max="4"
           value={subdivLevel}
           onChange={(event) => {
-            setSubdivLevel(parseInt(event.target!.value));
+            var element = event.target! as HTMLInputElement;
+            setSubdivLevel(parseInt(element.value));
             updateGraph({
               game_time_ms: Date.now(),
               user_changes: {
-                subdiv_level_update: parseInt(event.target!.value),
+                subdiv_level_update: parseInt(element.value),
               },
             });
           }}
