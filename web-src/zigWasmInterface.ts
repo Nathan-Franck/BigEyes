@@ -80,13 +80,16 @@ export function stringToSlice(string: string) {
 };
 
 export function sliceToString(slice: { type: "Uint8Array", ptr: number, len: number }) {
-  const result =  new TextDecoder().decode(new Uint8Array(instance.exports.memory.buffer, slice.ptr, slice.len));
+  const result = new TextDecoder().decode(new Uint8Array(instance.exports.memory.buffer, slice.ptr, slice.len));
   console.log("Slice to string", slice, result);
   return result;
 }
 
-function sliceToArrayFunc<N extends string, T extends { new(buffer: ArrayBuffer, byteOffset: number, length: number): any}>(_: N, constructor: T) {
+function sliceToArrayFunc<N extends string, T extends { new (length: number): any, new(buffer: ArrayBuffer, byteOffset: number, length: number): any }>(_: N, constructor: T) {
   return (slice: { type: N, ptr: number, len: number }): InstanceType<T> => {
+    if (slice.len == 0) {
+      return new constructor(0);
+    }
     return new constructor(instance.exports.memory.buffer, slice.ptr, slice.len);
   }
 }

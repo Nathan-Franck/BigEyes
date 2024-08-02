@@ -10,6 +10,7 @@ const MeshSpec = @import("./MeshSpec.zig");
 const zm = @import("./zmath/main.zig");
 const wasm_entry = @import("./wasm_entry.zig");
 const utils = @import("./utils.zig");
+const tree = @import("./tree.zig");
 
 pub const Mesh = struct {
     label: []const u8,
@@ -87,6 +88,7 @@ pub const interface = struct {
                     .orbit_speed = 0.01,
                     .render_resolution = .{ .x = 0, .y = 0 },
                     .subdiv_level = 0,
+                    .should_raytrace = false,
                 },
                 .orbit_camera = .{
                     .position = .{ 0, 0, 0, 1 },
@@ -118,14 +120,22 @@ pub const interface = struct {
                     },
                 },
                 .{
-                    .name = "game",
-                    .function = "game",
+                    .name = "orbit",
+                    .function = "orbit",
                     .input_links = &[_]graph.InputLink{
-                        .{ .field = "resources", .source = .{ .node = .{ .name = "getResources", .field = "resources" } } },
                         .{ .field = "settings", .source = .{ .node = .{ .name = "changeSettings", .field = "settings" } } },
                         .{ .field = "game_time_ms", .source = .{ .input_field = "game_time_ms" } },
                         .{ .field = "input", .source = .{ .input_field = "input" } },
                         .{ .field = "orbit_camera", .source = .{ .store_field = "orbit_camera" } },
+                    },
+                },
+                .{
+                    .name = "displayCat",
+                    .function = "displayCat",
+                    .input_links = &[_]graph.InputLink{
+                        .{ .field = "resources", .source = .{ .node = .{ .name = "getResources", .field = "resources" } } },
+                        .{ .field = "settings", .source = .{ .node = .{ .name = "changeSettings", .field = "settings" } } },
+                        .{ .field = "game_time_ms", .source = .{ .input_field = "game_time_ms" } },
                     },
                 },
                 .{
@@ -138,13 +148,12 @@ pub const interface = struct {
                 },
             },
             .store = &[_]graph.SystemSink{
-                .{ .output_node = "game", .output_field = "orbit_camera", .system_field = "orbit_camera" },
+                .{ .output_node = "orbit", .output_field = "orbit_camera", .system_field = "orbit_camera" },
                 .{ .output_node = "changeSettings", .output_field = "settings", .system_field = "settings" },
             },
             .output = &[_]graph.SystemSink{
-                .{ .output_node = "game", .output_field = "current_cat_mesh", .system_field = "current_cat_mesh" },
-                .{ .output_node = "game", .output_field = "orbit_camera", .system_field = "orbit_camera" },
-                .{ .output_node = "game", .output_field = "world_matrix", .system_field = "world_matrix" },
+                .{ .output_node = "displayCat", .output_field = "current_cat_mesh", .system_field = "current_cat_mesh" },
+                .{ .output_node = "orbit", .output_field = "world_matrix", .system_field = "world_matrix" },
             },
         },
         struct {
@@ -160,11 +169,13 @@ pub const interface = struct {
 
             pub const Resources = struct {
                 cat: SubdivAnimationMesh,
+                tree: struct { leaf_mesh: tree.Mesh, bark_mesh: tree.Mesh },
             };
 
             pub const Settings = struct {
                 orbit_speed: f32,
                 subdiv_level: u8,
+                should_raytrace: bool,
                 render_resolution: PixelPoint,
             };
 
@@ -173,6 +184,7 @@ pub const interface = struct {
                 user_changes: ?union(enum) {
                     resolution_update: PixelPoint,
                     subdiv_level_update: u8,
+                    should_raytrace_update: bool,
                 },
             }) !struct {} {
                 if (props.user_changes) |c| {
@@ -182,6 +194,9 @@ pub const interface = struct {
                         },
                         .subdiv_level_update => |level| {
                             props.settings.subdiv_level = level;
+                        },
+                        .should_raytrace_update => |should_raytrace| {
+                            props.settings.should_raytrace = should_raytrace;
                         },
                     }
                 }
@@ -193,23 +208,23 @@ pub const interface = struct {
             }) !struct {
                 resources: Resources,
             } {
-                const cube_map_input_data = blk: {
-                    var cubemap_images = std.ArrayList(Image).init(allocator);
-                    inline for (.{
-                        "nx",
-                        "ny",
-                        "nz",
-                        "px",
-                        "py",
-                        "pz",
-                    }) |direction| {
-                        const direction_texture = @embedFile("content/Bush_Cube_Map/" ++ direction ++ ".png");
-                        const image_data = try Image.loadPng(allocator, direction_texture);
-                        try cubemap_images.append(image_data);
-                    }
-                    break :blk cubemap_images.items;
-                };
-                _ = cube_map_input_data; // autofix
+                // const cube_map_input_data = blk: {
+                //     var cubemap_images = std.ArrayList(Image).init(allocator);
+                //     inline for (.{
+                //         "nx",
+                //         "ny",
+                //         "nz",
+                //         "px",
+                //         "py",
+                //         "pz",
+                //     }) |direction| {
+                //         const direction_texture = @embedFile("content/Bush_Cube_Map/" ++ direction ++ ".png");
+                //         const image_data = try Image.loadPng(allocator, direction_texture);
+                //         try cubemap_images.append(image_data);
+                //     }
+                //     break :blk cubemap_images.items;
+                // };
+                // _ = cube_map_input_data; // autofix
                 const mesh_input_data = blk: {
                     const json_data = @embedFile("content/Cat.blend.json");
                     break :blk std.json.parseFromSliceLeaky(
@@ -259,6 +274,8 @@ pub const interface = struct {
                     ));
                 }
 
+                const tree_skeleton = try tree.generateStructure(allocator, tree.diciduous.structure);
+
                 return .{
                     .resources = .{
                         .cat = SubdivAnimationMesh{
@@ -271,6 +288,10 @@ pub const interface = struct {
                             .polygons = input_data.polygons,
                             .frames = frames.items,
                             .frame_rate = 24,
+                        },
+                        .tree = .{
+                            .bark_mesh = try tree.generateTaperedWood(allocator, tree_skeleton, tree.diciduous.mesh),
+                            .leaf_mesh = try tree.generateLeaves(allocator, tree_skeleton, tree.diciduous.mesh),
                         },
                     },
                 };
@@ -287,26 +308,16 @@ pub const interface = struct {
                 };
             }
 
-            pub fn game(
+            pub fn displayCat(
                 allocator: std.mem.Allocator,
                 props: struct {
                     settings: Settings,
                     resources: Resources,
                     game_time_ms: u64,
-                    input: ?struct { mouse_delta: zm.Vec },
-
-                    orbit_camera: *OrbitCamera,
                 },
             ) !struct {
                 current_cat_mesh: Mesh,
-                world_matrix: zm.Mat,
             } {
-                if (props.input) |found_input| {
-                    props.orbit_camera.rotation = props.orbit_camera.rotation +
-                        found_input.mouse_delta *
-                        @as(zm.Vec, @splat(-props.settings.orbit_speed));
-                }
-
                 const source_mesh = props.resources.cat;
                 const current_frame_index = @mod(
                     props.game_time_ms * source_mesh.frame_rate / 1000,
@@ -338,7 +349,7 @@ pub const interface = struct {
                         ),
                     };
                 };
-                const color = occlude: {
+                const color: []const @Vector(4, f32) = if (!props.settings.should_raytrace) &.{} else occlude: {
                     const positions = subdiv_mesh.positions;
                     const normals = subdiv_mesh.normals;
 
@@ -361,28 +372,25 @@ pub const interface = struct {
                         .bounds = raytrace.Bounds.initEncompass(positions),
                     };
                     const bins = try grid_bounds.binTriangles(allocator, triangles);
-                    _ = bins; // autofix
                     for (positions, normals) |position, normal| {
-                        _ = position; // autofix
-                        _ = normal; // autofix
-                        const closest_distance = std.math.floatMax(f32);
-                        // const ray = .{
-                        //     .position = position,
-                        //     .normal = normal,
-                        // };
-                        // const bounding_box_test = raytrace.rayBoundsIntersection(ray, grid_bounds.bounds);
-                        // if (bounding_box_test) |bounding_box_hit| {
-                        //     const start = grid_bounds.transformPoint(ray.position);
-                        //     const end = grid_bounds.transformPoint(
-                        //         ray.position + ray.normal * @as(zm.Vec, @splat(bounding_box_hit.exit_distance)),
-                        //     );
-                        //     var traversal_iterator = raytrace.GridTraversal.init(start, end);
-                        //     while (traversal_iterator.next()) |cell_coord| {
-                        //         const cell_index = GridBounds.coordToIndex(cell_coord);
-                        //         const cell = bins[cell_index];
-                        //         raytraceCell(ray, cell, &closest_distance);
-                        //     }
-                        // }
+                        var closest_distance = std.math.floatMax(f32);
+                        const ray = .{
+                            .position = position,
+                            .normal = normal,
+                        };
+                        const bounding_box_test = raytrace.rayBoundsIntersection(ray, grid_bounds.bounds);
+                        if (bounding_box_test) |bounding_box_hit| {
+                            const start = grid_bounds.transformPoint(ray.position);
+                            const end = grid_bounds.transformPoint(
+                                ray.position + ray.normal * @as(zm.Vec, @splat(bounding_box_hit.exit_distance)),
+                            );
+                            var traversal_iterator = raytrace.GridTraversal.init(start, end);
+                            while (traversal_iterator.next()) |cell_coord| {
+                                const cell_index = GridBounds.coordToIndex(cell_coord);
+                                const cell = bins[cell_index];
+                                raytraceCell(ray, cell, &closest_distance);
+                            }
+                        }
 
                         try colors.append(if (closest_distance < 100)
                             zm.Vec{ 1.0, 1.0, 1.0, 1.0 }
@@ -399,8 +407,37 @@ pub const interface = struct {
                     .normal = mesh_helper.pointsToFloatSlice(allocator, subdiv_mesh.normals),
                     .position = mesh_helper.pointsToFloatSlice(allocator, subdiv_mesh.positions),
                 };
+
+                wasm_entry.dumpDebugLogFmt("Tree vert count {any}", .{props.resources.tree.bark_mesh.vertices.len});
+
                 return .{
                     .current_cat_mesh = final_mesh,
+                    // .current_cat_mesh = .{
+                    //     .label = "Tree",
+                    //     .indices = props.resources.tree.bark_mesh.triangles,
+                    //     .position = mesh_helper.pointsToFloatSlice(allocator, props.resources.tree.bark_mesh.vertices),
+                    //     .color = undefined,
+                    //     .normal = mesh_helper.pointsToFloatSlice(allocator, props.resources.tree.bark_mesh.normals),
+                    // },
+                };
+            }
+
+            pub fn orbit(
+                props: struct {
+                    settings: Settings,
+                    game_time_ms: u64,
+                    input: ?struct { mouse_delta: zm.Vec },
+                    orbit_camera: *OrbitCamera,
+                },
+            ) !struct {
+                world_matrix: zm.Mat,
+            } {
+                if (props.input) |found_input| {
+                    props.orbit_camera.rotation = props.orbit_camera.rotation +
+                        found_input.mouse_delta *
+                        @as(zm.Vec, @splat(-props.settings.orbit_speed));
+                }
+                return .{
                     .world_matrix = zm.mul(
                         zm.mul(
                             zm.translationV(props.orbit_camera.position),

@@ -23,30 +23,16 @@ pub const SmoothCurve = struct {
     x_range: [2]f32,
 
     pub fn sample(self: SmoothCurve, t: f32) f32 {
-        const x_min = self.x_range[0];
-        const x_max = self.x_range[1];
-
-        // Clamp t to the x_range
-        const clamped_t = std.math.clamp(t, x_min, x_max);
-
-        // Calculate the normalized position within the range
-        const normalized_t = (clamped_t - x_min) / (x_max - x_min);
-
-        // Calculate the index in y_values
-        const index_float = normalized_t * @as(f32, @floatFromInt(self.y_values.len - 1));
+        const normalized_t = (t - self.x_range[0]) / (self.x_range[1] - self.x_range[0]);
+        const clamped_t = std.math.clamp(normalized_t, 0, 1);
+        const index_float = clamped_t * @as(f32, @floatFromInt(self.y_values.len - 1));
         const index_low = @as(usize, @intFromFloat(std.math.floor(index_float)));
         const index_high = @as(usize, @intFromFloat(std.math.ceil(index_float)));
-
-        // If we're at an exact y-value, return it
-        if (index_low == index_high) {
-            return self.y_values[index_low];
-        }
-
-        // Otherwise, interpolate between the two nearest y-values
         const frac = index_float - @as(f32, @floatFromInt(index_low));
         return self.y_values[index_low] * (1 - frac) + self.y_values[index_high] * frac;
     }
 };
+
 pub const DepthDefinition = struct {
     split_amount: f32,
     flatness: f32,
@@ -201,7 +187,7 @@ const bark_normals = [_]zm.Vec{
     zm.loadArr3(.{ 0.5, -0.5, 0 }),
 };
 
-const bark_triangles = [_]u16{
+const bark_triangles = [_]u32{
     0, 1, 2, 2, 3, 0, // Bottom
     6, 5, 4, 4, 7, 6, // Top
     2, 1, 5, 5, 6, 2, // Left
@@ -210,7 +196,7 @@ const bark_triangles = [_]u16{
     1, 0, 4, 4, 5, 1, // Forward
 };
 
-const leaf_triangles = [_]u16{ 0, 1, 2, 2, 3, 0 };
+const leaf_triangles = [_]u32{ 0, 1, 2, 2, 3, 0 };
 
 const leaf_normals = [_]zm.Vec{
     zm.loadArr3(.{ 0, 1, 0 }),
@@ -223,7 +209,7 @@ pub const Mesh = struct {
     vertices: []Vec4,
     normals: []Vec4,
     split_height: []f32,
-    triangles: []u16,
+    triangles: []u32,
 };
 
 pub fn generateTaperedWood(allocator: Allocator, skeleton: Skeleton, settings: MeshSettings) !Mesh {
@@ -234,7 +220,7 @@ pub fn generateTaperedWood(allocator: Allocator, skeleton: Skeleton, settings: M
         .vertices = try allocator.alloc(Vec4, vertex_count),
         .normals = try allocator.alloc(Vec4, vertex_count),
         .split_height = try allocator.alloc(f32, vertex_count),
-        .triangles = try allocator.alloc(u16, triangle_count),
+        .triangles = try allocator.alloc(u32, triangle_count),
     };
 
     var node_index: usize = 0;
@@ -292,7 +278,7 @@ pub fn generateLeaves(allocator: Allocator, skeleton: Skeleton, settings: MeshSe
         .vertices = try allocator.alloc(Vec4, vertex_count),
         .normals = try allocator.alloc(Vec4, vertex_count),
         .split_height = try allocator.alloc(f32, vertex_count),
-        .triangles = try allocator.alloc(u16, triangle_count),
+        .triangles = try allocator.alloc(u32, triangle_count),
     };
 
     var node_index: usize = 0;
@@ -332,76 +318,76 @@ pub fn generateLeaves(allocator: Allocator, skeleton: Skeleton, settings: MeshSe
     return mesh;
 }
 
-test "Build a tree" {
-    const diciduous = .{
-        .structure = Settings{
-            .start_size = 1,
-            .start_growth = 1,
-            .depth_definitions = &[_]DepthDefinition{
-                .{
-                    .split_amount = 10,
-                    .flatness = 0,
-                    .size = 0.3,
-                    .height_spread = 0.8,
-                    .branch_pitch = 50,
-                    .branch_roll = 90,
-                    .height_to_growth = .{
-                        .y_values = &.{ 0, 1 },
-                        .x_range = .{ 0, 0.25 },
-                    },
+pub const diciduous = .{
+    .structure = Settings{
+        .start_size = 1,
+        .start_growth = 1,
+        .depth_definitions = &[_]DepthDefinition{
+            .{
+                .split_amount = 10,
+                .flatness = 0,
+                .size = 0.3,
+                .height_spread = 0.8,
+                .branch_pitch = 50,
+                .branch_roll = 90,
+                .height_to_growth = .{
+                    .y_values = &.{ 0, 1 },
+                    .x_range = .{ 0, 0.25 },
                 },
-                .{
-                    .split_amount = 6,
-                    .flatness = 0.6,
-                    .size = 0.4,
-                    .height_spread = 0.8,
-                    .branch_pitch = 60 / 180 * math.pi,
-                    .branch_roll = 90 / 180 * math.pi,
-                    .height_to_growth = .{
-                        .y_values = &.{ 0.5, 0.9, 1 },
-                        .x_range = .{ 0, 0.5 },
-                    },
+            },
+            .{
+                .split_amount = 6,
+                .flatness = 0.6,
+                .size = 0.4,
+                .height_spread = 0.8,
+                .branch_pitch = 60 / 180 * math.pi,
+                .branch_roll = 90 / 180 * math.pi,
+                .height_to_growth = .{
+                    .y_values = &.{ 0.5, 0.9, 1 },
+                    .x_range = .{ 0, 0.5 },
                 },
-                .{
-                    .split_amount = 10,
-                    .flatness = 0,
-                    .size = 0.4,
-                    .height_spread = 0.8,
-                    .branch_pitch = 40 / 180 * math.pi,
-                    .branch_roll = 90 / 180 * math.pi,
-                    .height_to_growth = .{
-                        .y_values = &.{ 0.5, 0.8, 1, 0.8, 0.5 },
-                        .x_range = .{ 0, 0.5 },
-                    },
+            },
+            .{
+                .split_amount = 10,
+                .flatness = 0,
+                .size = 0.4,
+                .height_spread = 0.8,
+                .branch_pitch = 40 / 180 * math.pi,
+                .branch_roll = 90 / 180 * math.pi,
+                .height_to_growth = .{
+                    .y_values = &.{ 0.5, 0.8, 1, 0.8, 0.5 },
+                    .x_range = .{ 0, 0.5 },
                 },
-                .{
-                    .split_amount = 10,
-                    .flatness = 0,
-                    .size = 0.7,
-                    .height_spread = 0.8,
-                    .branch_pitch = 40 / 180 * math.pi,
-                    .branch_roll = 90 / 180 * math.pi,
-                    .height_to_growth = .{
-                        .y_values = &.{ 0.5, 0.8, 1, 0.8, 0.5 },
-                        .x_range = .{ 0, 0.5 },
-                    },
+            },
+            .{
+                .split_amount = 10,
+                .flatness = 0,
+                .size = 0.7,
+                .height_spread = 0.8,
+                .branch_pitch = 40 / 180 * math.pi,
+                .branch_roll = 90 / 180 * math.pi,
+                .height_to_growth = .{
+                    .y_values = &.{ 0.5, 0.8, 1, 0.8, 0.5 },
+                    .x_range = .{ 0, 0.5 },
                 },
             },
         },
-        .mesh = MeshSettings{
-            .thickness = 0.05,
-            .leaves = .{
-                .split_depth = 4,
-                .length = 1,
-                .breadth = 0.3,
-            },
-            .growth_to_thickness = .{
-                .y_values = &.{ 0.0025, 0.035 },
-                .x_range = .{ 0, 1 },
-            },
+    },
+    .mesh = MeshSettings{
+        .thickness = 0.05,
+        .leaves = .{
+            .split_depth = 4,
+            .length = 1,
+            .breadth = 0.3,
         },
-    };
+        .growth_to_thickness = .{
+            .y_values = &.{ 0.0025, 0.035 },
+            .x_range = .{ 0, 1 },
+        },
+    },
+};
 
+test "Build a tree" {
     const allocator = std.testing.allocator;
     var arena = std.heap.ArenaAllocator.init(allocator);
     defer arena.deinit();

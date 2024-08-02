@@ -66,7 +66,7 @@ let updateRender:
   | null = null;
 
 function updateGraph(newInputs: typeof graphInputs) {
-  graphInputs = newInputs;
+var  graphInputs = newInputs;
   const graphOutputs = nodeGraph.call(graphInputs);
   if (graphOutputs == null || "error" in graphOutputs) return;
   if (updateRender != null) updateRender(graphOutputs)();
@@ -86,6 +86,7 @@ export function App() {
   });
 
   const [subdivLevel, setSubdivLevel] = useState(0);
+  const [shouldRaytrace, setShouldRaytrace] = useState(false);
   const [stats, setStats] = useState({ polygonCount: 0, framerate: 0 });
 
   useEffect(() => {
@@ -242,6 +243,22 @@ export function App() {
               game_time_ms: Date.now(),
               user_changes: {
                 subdiv_level_update: parseInt(element.value),
+              },
+            });
+          }}
+        ></input>
+
+        Raytrace?
+        <input
+          type="checkbox"
+          checked={shouldRaytrace}
+          onChange={(event) => {
+            var element = event.target! as HTMLInputElement;
+            setShouldRaytrace(element.checked);
+            updateGraph({
+              game_time_ms: Date.now(),
+              user_changes: {
+                should_raytrace_update: element.checked,
               },
             });
           }}
