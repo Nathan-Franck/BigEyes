@@ -3,27 +3,50 @@ const math = std.math;
 const zm = @import("./zmath/main.zig");
 const Allocator = std.mem.Allocator;
 
-pub const Vec3 = @Vector(3, f32);
 pub const Vec4 = @Vector(4, f32);
 pub const Quat = Vec4;
 
-fn flattenAngle(angle: f32, rate: f32) f32 {
-    if (rate <= 0) return angle;
+fn flattenAngle(unnormalized_angle: f32, rate: f32) f32 {
+    var angle = unnormalized_angle;
+    if (rate <= 0) {
+        return angle;
+    }
     while (angle < 0) angle += 360;
     while (angle > 360) angle -= 360;
-    const offset = if (angle > 90) 180 else 0;
+    const offset: f32 = if (angle > 90.0) 180 else 0;
     return ((angle - offset) *
         (1 - rate) + offset);
 }
 
 pub const SmoothCurve = struct {
-    // Simplified SmoothCurve implementation
-    fn sample(self: SmoothCurve, t: f32) f32 {
-        _ = self;
-        return t; // Linear interpolation as a placeholder
+    y_values: []const f32,
+    x_range: [2]f32,
+
+    pub fn sample(self: SmoothCurve, t: f32) f32 {
+        const x_min = self.x_range[0];
+        const x_max = self.x_range[1];
+
+        // Clamp t to the x_range
+        const clamped_t = std.math.clamp(t, x_min, x_max);
+
+        // Calculate the normalized position within the range
+        const normalized_t = (clamped_t - x_min) / (x_max - x_min);
+
+        // Calculate the index in y_values
+        const index_float = normalized_t * @as(f32, @floatFromInt(self.y_values.len - 1));
+        const index_low = @as(usize, @intFromFloat(std.math.floor(index_float)));
+        const index_high = @as(usize, @intFromFloat(std.math.ceil(index_float)));
+
+        // If we're at an exact y-value, return it
+        if (index_low == index_high) {
+            return self.y_values[index_low];
+        }
+
+        // Otherwise, interpolate between the two nearest y-values
+        const frac = index_float - @as(f32, @floatFromInt(index_low));
+        return self.y_values[index_low] * (1 - frac) + self.y_values[index_high] * frac;
     }
 };
-
 pub const DepthDefinition = struct {
     split_amount: f32,
     flatness: f32,
@@ -37,7 +60,7 @@ pub const DepthDefinition = struct {
 pub const Settings = struct {
     start_size: f32,
     start_growth: f32,
-    depth_definitions: std.StringHashMap(DepthDefinition),
+    depth_definitions: []const DepthDefinition,
 };
 
 pub const MeshSettings = struct {
@@ -52,7 +75,7 @@ pub const MeshSettings = struct {
 
 pub const Node = struct {
     size: f32,
-    position: Vec3,
+    position: Vec4,
     rotation: Quat,
     split_height: f32,
     growth: f32,
@@ -69,10 +92,10 @@ pub const Skeleton = struct {
     node_to_primary_child_index: std.ArrayList(?usize),
 };
 
-pub fn generateStructure(allocator: *Allocator, settings: Settings) !Skeleton {
+pub fn generateStructure(allocator: Allocator, settings: Settings) !Skeleton {
     const start_node = Node{
         .size = settings.start_size,
-        .position = Vec3{ 0, 0, 0 },
+        .position = zm.loadArr3(.{ 0, 0, 0 }),
         .rotation = Quat{ 0, 0, 0, 1 },
         .split_height = 0,
         .growth = settings.start_growth,
@@ -96,9 +119,8 @@ pub fn generateStructure(allocator: *Allocator, settings: Settings) !Skeleton {
         }
 
         // Branch spawning
-        var depth_definitions_iterator = settings.depth_definitions.valueIterator();
         var current_depth: usize = 0;
-        while (depth_definitions_iterator.next()) |depth_definition| {
+        for (settings.depth_definitions) |depth_definition| {
             defer current_depth += 1;
 
             if (gen_item.node.split_depth < current_depth) {
@@ -108,11 +130,20 @@ pub fn generateStructure(allocator: *Allocator, settings: Settings) !Skeleton {
                 // Main branch extension
                 {
                     const growth = math.clamp(depth_definition.height_to_growth.sample(0), 0, 1);
-                    const forward = zm.rotate(gen_item.node.rotation, Vec3{ 0, 0, gen_item.node.size * gen_item.node.growth });
+                    const forward = zm.rotate(
+                        gen_item.node.rotation,
+                        zm.loadArr3(.{ 0, 0, gen_item.node.size * gen_item.node.growth }),
+                    );
                     try generation_queue.append(GenQueueItem{
                         .node = Node{
                             .position = gen_item.node.position + forward,
-                            .rotation = zm.qmul(gen_item.node.rotation, zm.quatFromAxisAngle(Vec3{ 0, 0, 1 }, depth_definition.branch_roll)),
+                            .rotation = zm.qmul(
+                                gen_item.node.rotation,
+                                zm.quatFromNormAxisAngle(
+                                    zm.loadArr3(.{ 0, 0, 1 }),
+                                    depth_definition.branch_roll,
+                                ),
+                            ),
                             .size = gen_item.node.size * depth_definition.size,
                             .split_height = if (split_depth == 1) 0 else gen_item.node.split_height,
                             .growth = growth,
@@ -131,9 +162,15 @@ pub fn generateStructure(allocator: *Allocator, settings: Settings) !Skeleton {
                     const growth = math.clamp(depth_definition.height_to_growth.sample(split_height * gen_item.node.growth), 0, 1);
                     try generation_queue.append(GenQueueItem{
                         .node = Node{
-                            .position = gen_item.node.position + zm.rotate(gen_item.node.rotation, Vec3{ 0, 0, gen_item.node.size * gen_item.node.growth * (1 - split_height * depth_definition.height_spread) }),
-                            .rotation = zm.qmul(gen_item.node.rotation, zm.qmul(zm.quatFromAxisAngle(Vec3{ 0, 0, 1 }, depth_definition.branch_roll +
-                                flattenAngle(@as(f32, @floatFromInt(split_index)) * 6.283 * 0.618, depth_definition.flatness)), zm.matFromNormAxisAngle(Vec3{ 0, 1, 0 }, depth_definition.branch_pitch))),
+                            .position = gen_item.node.position + zm.rotate(gen_item.node.rotation, zm.loadArr3(.{ 0, 0, gen_item.node.size * gen_item.node.growth * (1 - split_height * depth_definition.height_spread) })),
+                            .rotation = zm.qmul(
+                                gen_item.node.rotation,
+                                zm.qmul(
+                                    zm.quatFromNormAxisAngle(zm.loadArr3(.{ 0, 0, 1 }), depth_definition.branch_roll +
+                                        flattenAngle(@as(f32, @floatFromInt(split_index)) * 6.283 * 0.618, depth_definition.flatness)),
+                                    zm.quatFromNormAxisAngle(zm.loadArr3(.{ 0, 1, 0 }), depth_definition.branch_pitch),
+                                ),
+                            ),
                             .size = gen_item.node.size * depth_definition.size,
                             .growth = growth,
                             .split_height = if (split_depth == 1) split_height else gen_item.node.split_height,
@@ -153,15 +190,15 @@ pub fn generateStructure(allocator: *Allocator, settings: Settings) !Skeleton {
     };
 }
 
-const bark_normals = [_]Vec3{
-    Vec3{ 0.5, 0.5, 0 },
-    Vec3{ -0.5, 0.5, 0 },
-    Vec3{ -0.5, -0.5, 0 },
-    Vec3{ 0.5, -0.5, 0 },
-    Vec3{ 0.5, 0.5, 0 },
-    Vec3{ -0.5, 0.5, 0 },
-    Vec3{ -0.5, -0.5, 0 },
-    Vec3{ 0.5, -0.5, 0 },
+const bark_normals = [_]zm.Vec{
+    zm.loadArr3(.{ 0.5, 0.5, 0 }),
+    zm.loadArr3(.{ -0.5, 0.5, 0 }),
+    zm.loadArr3(.{ -0.5, -0.5, 0 }),
+    zm.loadArr3(.{ 0.5, -0.5, 0 }),
+    zm.loadArr3(.{ 0.5, 0.5, 0 }),
+    zm.loadArr3(.{ -0.5, 0.5, 0 }),
+    zm.loadArr3(.{ -0.5, -0.5, 0 }),
+    zm.loadArr3(.{ 0.5, -0.5, 0 }),
 };
 
 const bark_triangles = [_]u16{
@@ -175,27 +212,27 @@ const bark_triangles = [_]u16{
 
 const leaf_triangles = [_]u16{ 0, 1, 2, 2, 3, 0 };
 
-const leaf_normals = [_]Vec3{
-    Vec3{ 0, 1, 0 },
-    Vec3{ -0.2, 0.8, 0 },
-    Vec3{ 0, 1, 0 },
-    Vec3{ 0.2, 0.8, 0 },
+const leaf_normals = [_]zm.Vec{
+    zm.loadArr3(.{ 0, 1, 0 }),
+    zm.loadArr3(.{ -0.2, 0.8, 0 }),
+    zm.loadArr3(.{ 0, 1, 0 }),
+    zm.loadArr3(.{ 0.2, 0.8, 0 }),
 };
 
 pub const Mesh = struct {
     vertices: []Vec4,
-    normals: []Vec3,
+    normals: []Vec4,
     split_height: []f32,
     triangles: []u16,
 };
 
-pub fn generateTaperedWood(allocator: *Allocator, skeleton: Skeleton, settings: MeshSettings) !Mesh {
+pub fn generateTaperedWood(allocator: Allocator, skeleton: Skeleton, settings: MeshSettings) !Mesh {
     const vertex_count = skeleton.nodes.items.len * 8;
     const triangle_count = skeleton.nodes.items.len * 6 * 6;
 
     var mesh = Mesh{
         .vertices = try allocator.alloc(Vec4, vertex_count),
-        .normals = try allocator.alloc(Vec3, vertex_count),
+        .normals = try allocator.alloc(Vec4, vertex_count),
         .split_height = try allocator.alloc(f32, vertex_count),
         .triangles = try allocator.alloc(u16, triangle_count),
     };
@@ -247,13 +284,13 @@ pub fn generateTaperedWood(allocator: *Allocator, skeleton: Skeleton, settings: 
     return mesh;
 }
 
-pub fn generateLeaves(allocator: *Allocator, skeleton: Skeleton, settings: MeshSettings) !Mesh {
+pub fn generateLeaves(allocator: Allocator, skeleton: Skeleton, settings: MeshSettings) !Mesh {
     const vertex_count = skeleton.nodes.items.len * 4;
     const triangle_count = skeleton.nodes.items.len * 6;
 
     var mesh = Mesh{
         .vertices = try allocator.alloc(Vec4, vertex_count),
-        .normals = try allocator.alloc(Vec3, vertex_count),
+        .normals = try allocator.alloc(Vec4, vertex_count),
         .split_height = try allocator.alloc(f32, vertex_count),
         .triangles = try allocator.alloc(u16, triangle_count),
     };
@@ -293,4 +330,86 @@ pub fn generateLeaves(allocator: *Allocator, skeleton: Skeleton, settings: MeshS
     }
 
     return mesh;
+}
+
+test "Build a tree" {
+    const diciduous = .{
+        .structure = Settings{
+            .start_size = 1,
+            .start_growth = 1,
+            .depth_definitions = &[_]DepthDefinition{
+                .{
+                    .split_amount = 10,
+                    .flatness = 0,
+                    .size = 0.3,
+                    .height_spread = 0.8,
+                    .branch_pitch = 50,
+                    .branch_roll = 90,
+                    .height_to_growth = .{
+                        .y_values = &.{ 0, 1 },
+                        .x_range = .{ 0, 0.25 },
+                    },
+                },
+                .{
+                    .split_amount = 6,
+                    .flatness = 0.6,
+                    .size = 0.4,
+                    .height_spread = 0.8,
+                    .branch_pitch = 60 / 180 * math.pi,
+                    .branch_roll = 90 / 180 * math.pi,
+                    .height_to_growth = .{
+                        .y_values = &.{ 0.5, 0.9, 1 },
+                        .x_range = .{ 0, 0.5 },
+                    },
+                },
+                .{
+                    .split_amount = 10,
+                    .flatness = 0,
+                    .size = 0.4,
+                    .height_spread = 0.8,
+                    .branch_pitch = 40 / 180 * math.pi,
+                    .branch_roll = 90 / 180 * math.pi,
+                    .height_to_growth = .{
+                        .y_values = &.{ 0.5, 0.8, 1, 0.8, 0.5 },
+                        .x_range = .{ 0, 0.5 },
+                    },
+                },
+                .{
+                    .split_amount = 10,
+                    .flatness = 0,
+                    .size = 0.7,
+                    .height_spread = 0.8,
+                    .branch_pitch = 40 / 180 * math.pi,
+                    .branch_roll = 90 / 180 * math.pi,
+                    .height_to_growth = .{
+                        .y_values = &.{ 0.5, 0.8, 1, 0.8, 0.5 },
+                        .x_range = .{ 0, 0.5 },
+                    },
+                },
+            },
+        },
+        .mesh = MeshSettings{
+            .thickness = 0.05,
+            .leaves = .{
+                .split_depth = 4,
+                .length = 1,
+                .breadth = 0.3,
+            },
+            .growth_to_thickness = .{
+                .y_values = &.{ 0.0025, 0.035 },
+                .x_range = .{ 0, 1 },
+            },
+        },
+    };
+
+    const allocator = std.testing.allocator;
+    var arena = std.heap.ArenaAllocator.init(allocator);
+    defer arena.deinit();
+
+    const skeleton = try generateStructure(arena.allocator(), diciduous.structure);
+    const bark_mesh = try generateTaperedWood(arena.allocator(), skeleton, diciduous.mesh);
+    const leaf_mesh = try generateLeaves(arena.allocator(), skeleton, diciduous.mesh);
+
+    _ = bark_mesh;
+    _ = leaf_mesh;
 }
