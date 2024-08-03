@@ -82,7 +82,7 @@ pub fn generateStructure(allocator: Allocator, settings: Settings) !Skeleton {
     const start_node = Node{
         .size = settings.start_size,
         .position = .{ 0, 0, 0, 1 },
-        .rotation = Quat{ 0, 0, 0, 1 },
+        .rotation = zm.quatFromAxisAngle(zm.loadArr3(.{ -1, 0, 0 }), 90.0 * math.rad_per_deg),
         .split_height = 0,
         .growth = settings.start_growth,
         .split_depth = 0,
@@ -116,7 +116,7 @@ pub fn generateStructure(allocator: Allocator, settings: Settings) !Skeleton {
                 // Main branch extension
                 {
                     const growth = math.clamp(depth_definition.height_to_growth.sample(0), 0, 1);
-                    const up = zm.rotate(
+                    const forward = zm.rotate(
                         gen_item.node.rotation,
                         zm.loadArr3(.{ 0, 0, gen_item.node.size * gen_item.node.growth }),
                     );
@@ -328,8 +328,8 @@ pub const diciduous = .{
                 .flatness = 0.0,
                 .size = 0.3,
                 .height_spread = 0.8,
-                .branch_pitch = 50.0 / 180.0 * math.pi,
-                .branch_roll = 90.0 / 180.0 * math.pi,
+                .branch_pitch = 50.0 * math.rad_per_deg,
+                .branch_roll = 90.0 * math.rad_per_deg,
                 .height_to_growth = .{
                     .y_values = &.{ 0.0, 1.0 },
                     .x_range = .{ 0.0, 0.25 },
@@ -340,8 +340,8 @@ pub const diciduous = .{
                 .flatness = 0.6,
                 .size = 0.4,
                 .height_spread = 0.8,
-                .branch_pitch = 60.0 / 180.0 * math.pi,
-                .branch_roll = 90.0 / 180.0 * math.pi,
+                .branch_pitch = 60.0 * math.rad_per_deg,
+                .branch_roll = 90.0 * math.rad_per_deg,
                 .height_to_growth = .{
                     .y_values = &.{ 0.5, 0.9, 1.0 },
                     .x_range = .{ 0.0, 0.5 },
@@ -352,8 +352,8 @@ pub const diciduous = .{
                 .flatness = 0.0,
                 .size = 0.4,
                 .height_spread = 0.8,
-                .branch_pitch = 40.0 / 180.0 * math.pi,
-                .branch_roll = 90.0 / 180.0 * math.pi,
+                .branch_pitch = 40.0 * math.rad_per_deg,
+                .branch_roll = 90.0 * math.rad_per_deg,
                 .height_to_growth = .{
                     .y_values = &.{ 0.5, 0.8, 1.0, 0.8, 0.5 },
                     .x_range = .{ 0.0, 0.5 },
@@ -364,8 +364,8 @@ pub const diciduous = .{
                 .flatness = 0.0,
                 .size = 0.7,
                 .height_spread = 0.8,
-                .branch_pitch = 40.0 / 180.0 * math.pi,
-                .branch_roll = 90.0 / 180.0 * math.pi,
+                .branch_pitch = 40.0 * math.rad_per_deg,
+                .branch_roll = 90.0 * math.rad_per_deg,
                 .height_to_growth = .{
                     .y_values = &.{ 0.5, 0.8, 1.0, 0.8, 0.5 },
                     .x_range = .{ 0.0, 0.5 },
