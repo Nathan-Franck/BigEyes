@@ -74,14 +74,14 @@ pub const GenQueueItem = struct {
 };
 
 pub const Skeleton = struct {
-    nodes: std.ArrayList(Node),
-    node_to_primary_child_index: std.ArrayList(?usize),
+    nodes: []const Node,
+    node_to_primary_child_index: []const ?usize,
 };
 
 pub fn generateStructure(allocator: Allocator, settings: Settings) !Skeleton {
     const start_node = Node{
         .size = settings.start_size,
-        .position = zm.loadArr3(.{ 0, 0, 0 }),
+        .position = .{ 0, 0, 0, 1 },
         .rotation = Quat{ 0, 0, 0, 1 },
         .split_height = 0,
         .growth = settings.start_growth,
@@ -124,11 +124,11 @@ pub fn generateStructure(allocator: Allocator, settings: Settings) !Skeleton {
                         .node = Node{
                             .position = gen_item.node.position + forward,
                             .rotation = zm.qmul(
-                                gen_item.node.rotation,
                                 zm.quatFromNormAxisAngle(
                                     zm.loadArr3(.{ 0, 0, 1 }),
                                     depth_definition.branch_roll,
                                 ),
+                                gen_item.node.rotation,
                             ),
                             .size = gen_item.node.size * depth_definition.size,
                             .split_height = if (split_depth == 1) 0 else gen_item.node.split_height,
@@ -150,12 +150,12 @@ pub fn generateStructure(allocator: Allocator, settings: Settings) !Skeleton {
                         .node = Node{
                             .position = gen_item.node.position + zm.rotate(gen_item.node.rotation, zm.loadArr3(.{ 0, 0, gen_item.node.size * gen_item.node.growth * (1 - split_height * depth_definition.height_spread) })),
                             .rotation = zm.qmul(
-                                gen_item.node.rotation,
                                 zm.qmul(
+                                    zm.quatFromNormAxisAngle(zm.loadArr3(.{ 0, 1, 0 }), depth_definition.branch_pitch),
                                     zm.quatFromNormAxisAngle(zm.loadArr3(.{ 0, 0, 1 }), depth_definition.branch_roll +
                                         flattenAngle(@as(f32, @floatFromInt(split_index)) * 6.283 * 0.618, depth_definition.flatness)),
-                                    zm.quatFromNormAxisAngle(zm.loadArr3(.{ 0, 1, 0 }), depth_definition.branch_pitch),
                                 ),
+                                gen_item.node.rotation,
                             ),
                             .size = gen_item.node.size * depth_definition.size,
                             .growth = growth,
@@ -171,8 +171,8 @@ pub fn generateStructure(allocator: Allocator, settings: Settings) !Skeleton {
     }
 
     return Skeleton{
-        .nodes = nodes,
-        .node_to_primary_child_index = node_to_primary_child_index,
+        .nodes = nodes.items,
+        .node_to_primary_child_index = node_to_primary_child_index.items,
     };
 }
 
@@ -213,8 +213,8 @@ pub const Mesh = struct {
 };
 
 pub fn generateTaperedWood(allocator: Allocator, skeleton: Skeleton, settings: MeshSettings) !Mesh {
-    const vertex_count = skeleton.nodes.items.len * 8;
-    const triangle_count = skeleton.nodes.items.len * 6 * 6;
+    const vertex_count = skeleton.nodes.len * 8;
+    const triangle_count = skeleton.nodes.len * 6 * 6;
 
     var mesh = Mesh{
         .vertices = try allocator.alloc(Vec4, vertex_count),
@@ -224,12 +224,12 @@ pub fn generateTaperedWood(allocator: Allocator, skeleton: Skeleton, settings: M
     };
 
     var node_index: usize = 0;
-    for (skeleton.nodes.items) |parent| {
+    for (skeleton.nodes) |parent| {
         if (parent.split_depth != settings.leaves.split_depth) {
-            const child_index = skeleton.node_to_primary_child_index.items[node_index];
-            const child = if (child_index) |idx| skeleton.nodes.items[idx] else parent;
-            const grandchild_index = if (child_index) |idx| skeleton.node_to_primary_child_index.items[idx] else null;
-            const grandchild = if (grandchild_index) |idx| skeleton.nodes.items[idx] else child;
+            const child_index = skeleton.node_to_primary_child_index[node_index];
+            const child = if (child_index) |idx| skeleton.nodes[idx] else parent;
+            const grandchild_index = if (child_index) |idx| skeleton.node_to_primary_child_index[idx] else null;
+            const grandchild = if (grandchild_index) |idx| skeleton.nodes[idx] else child;
 
             const height = parent.size * parent.growth;
             const parent_size = zm.lerpV(child.size, parent.size, parent.growth) * settings.thickness;
@@ -271,8 +271,8 @@ pub fn generateTaperedWood(allocator: Allocator, skeleton: Skeleton, settings: M
 }
 
 pub fn generateLeaves(allocator: Allocator, skeleton: Skeleton, settings: MeshSettings) !Mesh {
-    const vertex_count = skeleton.nodes.items.len * 4;
-    const triangle_count = skeleton.nodes.items.len * 6;
+    const vertex_count = skeleton.nodes.len * 4;
+    const triangle_count = skeleton.nodes.len * 6;
 
     var mesh = Mesh{
         .vertices = try allocator.alloc(Vec4, vertex_count),
@@ -282,7 +282,7 @@ pub fn generateLeaves(allocator: Allocator, skeleton: Skeleton, settings: MeshSe
     };
 
     var node_index: usize = 0;
-    for (skeleton.nodes.items) |node| {
+    for (skeleton.nodes) |node| {
         if (node.split_depth == settings.leaves.split_depth) {
             const length = node.size * settings.leaves.length;
             const breadth = node.size * settings.leaves.breadth;
@@ -325,14 +325,14 @@ pub const diciduous = .{
         .depth_definitions = &[_]DepthDefinition{
             .{
                 .split_amount = 10,
-                .flatness = 0,
+                .flatness = 0.0,
                 .size = 0.3,
                 .height_spread = 0.8,
-                .branch_pitch = 50,
-                .branch_roll = 90,
+                .branch_pitch = 50.0 / 180.0 * math.pi,
+                .branch_roll = 90.0 / 180.0 * math.pi,
                 .height_to_growth = .{
-                    .y_values = &.{ 0, 1 },
-                    .x_range = .{ 0, 0.25 },
+                    .y_values = &.{ 0.0, 1.0 },
+                    .x_range = .{ 0.0, 0.25 },
                 },
             },
             .{
@@ -340,35 +340,35 @@ pub const diciduous = .{
                 .flatness = 0.6,
                 .size = 0.4,
                 .height_spread = 0.8,
-                .branch_pitch = 60 / 180 * math.pi,
-                .branch_roll = 90 / 180 * math.pi,
+                .branch_pitch = 60.0 / 180.0 * math.pi,
+                .branch_roll = 90.0 / 180.0 * math.pi,
                 .height_to_growth = .{
-                    .y_values = &.{ 0.5, 0.9, 1 },
-                    .x_range = .{ 0, 0.5 },
+                    .y_values = &.{ 0.5, 0.9, 1.0 },
+                    .x_range = .{ 0.0, 0.5 },
                 },
             },
             .{
                 .split_amount = 10,
-                .flatness = 0,
+                .flatness = 0.0,
                 .size = 0.4,
                 .height_spread = 0.8,
-                .branch_pitch = 40 / 180 * math.pi,
-                .branch_roll = 90 / 180 * math.pi,
+                .branch_pitch = 40.0 / 180.0 * math.pi,
+                .branch_roll = 90.0 / 180.0 * math.pi,
                 .height_to_growth = .{
-                    .y_values = &.{ 0.5, 0.8, 1, 0.8, 0.5 },
-                    .x_range = .{ 0, 0.5 },
+                    .y_values = &.{ 0.5, 0.8, 1.0, 0.8, 0.5 },
+                    .x_range = .{ 0.0, 0.5 },
                 },
             },
             .{
                 .split_amount = 10,
-                .flatness = 0,
+                .flatness = 0.0,
                 .size = 0.7,
                 .height_spread = 0.8,
-                .branch_pitch = 40 / 180 * math.pi,
-                .branch_roll = 90 / 180 * math.pi,
+                .branch_pitch = 40.0 / 180.0 * math.pi,
+                .branch_roll = 90.0 / 180.0 * math.pi,
                 .height_to_growth = .{
-                    .y_values = &.{ 0.5, 0.8, 1, 0.8, 0.5 },
-                    .x_range = .{ 0, 0.5 },
+                    .y_values = &.{ 0.5, 0.8, 1.0, 0.8, 0.5 },
+                    .x_range = .{ 0.0, 0.5 },
                 },
             },
         },
@@ -377,12 +377,12 @@ pub const diciduous = .{
         .thickness = 0.05,
         .leaves = .{
             .split_depth = 4,
-            .length = 1,
+            .length = 1.0,
             .breadth = 0.3,
         },
         .growth_to_thickness = .{
             .y_values = &.{ 0.0025, 0.035 },
-            .x_range = .{ 0, 1 },
+            .x_range = .{ 0.0, 1.0 },
         },
     },
 };
@@ -398,4 +398,6 @@ test "Build a tree" {
 
     _ = bark_mesh;
     _ = leaf_mesh;
+
+    std.debug.print("{any}", .{skeleton.nodes});
 }

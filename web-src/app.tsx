@@ -148,6 +148,10 @@ export function App() {
     });
 
     updateRender = (graphOutputs) => () => {
+
+
+      console.table(JSON.stringify(graphOutputs.resources.tree.skeleton.nodes.slice(20, 40)));
+
       const buffers = {
         indices: ShaderBuilder.createElementBuffer(
           gl,

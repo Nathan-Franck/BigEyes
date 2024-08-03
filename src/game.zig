@@ -77,6 +77,12 @@ pub fn Args(comptime func: anytype) type {
     } });
 }
 
+pub fn main() void {
+    // TODO - Generate some utility structs that can be used to compose the node_graph quick and easy!
+    // Structs are based on the input, store and each node, where the nodes's fields are assigned from
+    std.debug.print("Hello World!\n", .{});
+}
+
 pub const interface = struct {
     var node_graph: NodeGraph = undefined;
 
@@ -129,13 +135,20 @@ pub const interface = struct {
                         .{ .field = "orbit_camera", .source = .{ .store_field = "orbit_camera" } },
                     },
                 },
+                // .{
+                //     .name = "displayCat",
+                //     .function = "displayCat",
+                //     .input_links = &[_]graph.InputLink{
+                //         .{ .field = "resources", .source = .{ .node = .{ .name = "getResources", .field = "resources" } } },
+                //         .{ .field = "settings", .source = .{ .node = .{ .name = "changeSettings", .field = "settings" } } },
+                //         .{ .field = "game_time_ms", .source = .{ .input_field = "game_time_ms" } },
+                //     },
+                // },
                 .{
-                    .name = "displayCat",
-                    .function = "displayCat",
+                    .name = "displayTree",
+                    .function = "displayTree",
                     .input_links = &[_]graph.InputLink{
                         .{ .field = "resources", .source = .{ .node = .{ .name = "getResources", .field = "resources" } } },
-                        .{ .field = "settings", .source = .{ .node = .{ .name = "changeSettings", .field = "settings" } } },
-                        .{ .field = "game_time_ms", .source = .{ .input_field = "game_time_ms" } },
                     },
                 },
                 .{
@@ -152,7 +165,9 @@ pub const interface = struct {
                 .{ .output_node = "changeSettings", .output_field = "settings", .system_field = "settings" },
             },
             .output = &[_]graph.SystemSink{
-                .{ .output_node = "displayCat", .output_field = "current_cat_mesh", .system_field = "current_cat_mesh" },
+                // .{ .output_node = "displayCat", .output_field = "current_cat_mesh", .system_field = "current_cat_mesh" },
+                .{ .output_node = "displayTree", .output_field = "current_cat_mesh", .system_field = "current_cat_mesh" },
+                .{ .output_node = "getResources", .output_field = "resources", .system_field = "resources" },
                 .{ .output_node = "orbit", .output_field = "world_matrix", .system_field = "world_matrix" },
             },
         },
@@ -169,7 +184,7 @@ pub const interface = struct {
 
             pub const Resources = struct {
                 cat: SubdivAnimationMesh,
-                tree: struct { leaf_mesh: tree.Mesh, bark_mesh: tree.Mesh },
+                tree: struct { skeleton: tree.Skeleton, leaf_mesh: tree.Mesh, bark_mesh: tree.Mesh },
             };
 
             pub const Settings = struct {
@@ -225,6 +240,7 @@ pub const interface = struct {
                 //     break :blk cubemap_images.items;
                 // };
                 // _ = cube_map_input_data; // autofix
+
                 const mesh_input_data = blk: {
                     const json_data = @embedFile("content/Cat.blend.json");
                     break :blk std.json.parseFromSliceLeaky(
@@ -290,9 +306,68 @@ pub const interface = struct {
                             .frame_rate = 24,
                         },
                         .tree = .{
+                            .skeleton = tree_skeleton,
                             .bark_mesh = try tree.generateTaperedWood(allocator, tree_skeleton, tree.diciduous.mesh),
                             .leaf_mesh = try tree.generateLeaves(allocator, tree_skeleton, tree.diciduous.mesh),
                         },
+                    },
+                };
+            }
+
+            pub fn orbit(
+                props: struct {
+                    settings: Settings,
+                    game_time_ms: u64,
+                    input: ?struct { mouse_delta: zm.Vec },
+                    orbit_camera: *OrbitCamera,
+                },
+            ) !struct {
+                world_matrix: zm.Mat,
+            } {
+                if (props.input) |found_input| {
+                    props.orbit_camera.rotation = props.orbit_camera.rotation +
+                        found_input.mouse_delta *
+                        @as(zm.Vec, @splat(-props.settings.orbit_speed));
+                }
+                return .{
+                    .world_matrix = zm.mul(
+                        zm.mul(
+                            zm.translationV(props.orbit_camera.position),
+                            zm.mul(
+                                zm.mul(
+                                    zm.matFromRollPitchYaw(0, props.orbit_camera.rotation[0], 0),
+                                    zm.matFromRollPitchYaw(props.orbit_camera.rotation[1], 0, 0),
+                                ),
+                                zm.translationV(zm.loadArr3(.{ 0.0, 0.0, props.orbit_camera.track_distance })),
+                            ),
+                        ),
+                        zm.perspectiveFovLh(
+                            0.25 * 3.14151,
+                            @as(f32, @floatFromInt(props.settings.render_resolution.x)) /
+                                @as(f32, @floatFromInt(props.settings.render_resolution.y)),
+                            0.1,
+                            500,
+                        ),
+                    ),
+                };
+            }
+
+            pub fn displayTree(
+                allocator: std.mem.Allocator,
+                props: struct {
+                    resources: Resources,
+                },
+            ) !struct {
+                current_cat_mesh: Mesh,
+            } {
+                wasm_entry.dumpDebugLogFmt("Tree vert count {any}", .{props.resources.tree.bark_mesh.vertices.len});
+                return .{
+                    .current_cat_mesh = .{
+                        .label = "Tree",
+                        .indices = props.resources.tree.bark_mesh.triangles,
+                        .position = mesh_helper.pointsToFloatSlice(allocator, props.resources.tree.bark_mesh.vertices),
+                        .color = undefined,
+                        .normal = mesh_helper.pointsToFloatSlice(allocator, props.resources.tree.bark_mesh.normals),
                     },
                 };
             }
@@ -408,55 +483,8 @@ pub const interface = struct {
                     .position = mesh_helper.pointsToFloatSlice(allocator, subdiv_mesh.positions),
                 };
 
-                wasm_entry.dumpDebugLogFmt("Tree vert count {any}", .{props.resources.tree.bark_mesh.vertices.len});
-
                 return .{
                     .current_cat_mesh = final_mesh,
-                    // .current_cat_mesh = .{
-                    //     .label = "Tree",
-                    //     .indices = props.resources.tree.bark_mesh.triangles,
-                    //     .position = mesh_helper.pointsToFloatSlice(allocator, props.resources.tree.bark_mesh.vertices),
-                    //     .color = undefined,
-                    //     .normal = mesh_helper.pointsToFloatSlice(allocator, props.resources.tree.bark_mesh.normals),
-                    // },
-                };
-            }
-
-            pub fn orbit(
-                props: struct {
-                    settings: Settings,
-                    game_time_ms: u64,
-                    input: ?struct { mouse_delta: zm.Vec },
-                    orbit_camera: *OrbitCamera,
-                },
-            ) !struct {
-                world_matrix: zm.Mat,
-            } {
-                if (props.input) |found_input| {
-                    props.orbit_camera.rotation = props.orbit_camera.rotation +
-                        found_input.mouse_delta *
-                        @as(zm.Vec, @splat(-props.settings.orbit_speed));
-                }
-                return .{
-                    .world_matrix = zm.mul(
-                        zm.mul(
-                            zm.translationV(props.orbit_camera.position),
-                            zm.mul(
-                                zm.mul(
-                                    zm.matFromRollPitchYaw(0, props.orbit_camera.rotation[0], 0),
-                                    zm.matFromRollPitchYaw(props.orbit_camera.rotation[1], 0, 0),
-                                ),
-                                zm.translationV(zm.loadArr3(.{ 0.0, 0.0, props.orbit_camera.track_distance })),
-                            ),
-                        ),
-                        zm.perspectiveFovLh(
-                            0.25 * 3.14151,
-                            @as(f32, @floatFromInt(props.settings.render_resolution.x)) /
-                                @as(f32, @floatFromInt(props.settings.render_resolution.y)),
-                            0.1,
-                            500,
-                        ),
-                    ),
                 };
             }
         },
