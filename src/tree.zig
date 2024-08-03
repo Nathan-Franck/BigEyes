@@ -116,7 +116,7 @@ pub fn generateStructure(allocator: Allocator, settings: Settings) !Skeleton {
                 // Main branch extension
                 {
                     const growth = math.clamp(depth_definition.height_to_growth.sample(0), 0, 1);
-                    const forward = zm.rotate(
+                    const up = zm.rotate(
                         gen_item.node.rotation,
                         zm.loadArr3(.{ 0, 0, gen_item.node.size * gen_item.node.growth }),
                     );
@@ -376,7 +376,7 @@ pub const diciduous = .{
     .mesh = MeshSettings{
         .thickness = 0.05,
         .leaves = .{
-            .split_depth = 4,
+            .split_depth = 3,
             .length = 1.0,
             .breadth = 0.3,
         },

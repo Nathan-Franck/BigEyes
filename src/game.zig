@@ -371,16 +371,16 @@ pub const interface = struct {
                         .indices = try std.mem.concat(allocator, u32, &.{
                             props.resources.tree.leaf_mesh.triangles,
                             // props.resources.tree.bark_mesh.triangles,
-                            // bark_mesh_triangles,
+                            bark_mesh_triangles,
                         }),
                         .position = mesh_helper.pointsToFloatSlice(allocator, try std.mem.concat(allocator, tree.Vec4, &.{
                             props.resources.tree.leaf_mesh.vertices,
-                            // props.resources.tree.bark_mesh.vertices,
+                            props.resources.tree.bark_mesh.vertices,
                         })),
                         .color = undefined,
                         .normal = mesh_helper.pointsToFloatSlice(allocator, try std.mem.concat(allocator, tree.Vec4, &.{
                             props.resources.tree.leaf_mesh.normals,
-                            // props.resources.tree.bark_mesh.normals,
+                            props.resources.tree.bark_mesh.normals,
                         })),
                     },
                 };
