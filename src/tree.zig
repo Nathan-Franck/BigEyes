@@ -249,11 +249,11 @@ pub fn generateTaperedWood(allocator: Allocator, skeleton: Skeleton, settings: M
             const vertex_offset = node_index * 8;
             for (vertices, 0..) |vertex, i| {
                 mesh.vertices[vertex_offset + i] = zm.mul(
-                    zm.mul(
-                        zm.translationV(parent.position),
-                        zm.matFromQuat(parent.rotation),
-                    ),
                     vertex,
+                    zm.mul(
+                        zm.matFromQuat(parent.rotation),
+                        zm.translationV(parent.position),
+                    ),
                 );
                 mesh.normals[vertex_offset + i] = zm.normalize3(zm.rotate(parent.rotation, bark_normals[i]));
                 mesh.split_height[vertex_offset + i] = parent.split_height;
@@ -297,11 +297,11 @@ pub fn generateLeaves(allocator: Allocator, skeleton: Skeleton, settings: MeshSe
             const vertex_offset = node_index * 4;
             for (vertices, 0..) |vertex, i| {
                 mesh.vertices[vertex_offset + i] = zm.mul(
-                    zm.mul(
-                        zm.translationV(node.position),
-                        zm.matFromQuat(node.rotation),
-                    ),
                     vertex,
+                    zm.mul(
+                        zm.matFromQuat(node.rotation),
+                        zm.translationV(node.position),
+                    ),
                 );
                 mesh.normals[vertex_offset + i] = zm.normalize3(zm.rotate(node.rotation, leaf_normals[i]));
                 mesh.split_height[vertex_offset + i] = node.split_height;

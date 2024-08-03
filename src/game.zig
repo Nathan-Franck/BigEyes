@@ -99,7 +99,7 @@ pub const interface = struct {
                 .orbit_camera = .{
                     .position = .{ 0, 0, 0, 1 },
                     .rotation = .{ 0, 0, 0, 1 },
-                    .track_distance = 20,
+                    .track_distance = 2,
                 },
             },
         });
@@ -361,13 +361,27 @@ pub const interface = struct {
                 current_cat_mesh: Mesh,
             } {
                 wasm_entry.dumpDebugLogFmt("Tree vert count {any}", .{props.resources.tree.bark_mesh.vertices.len});
+                var bark_mesh_triangles = try allocator.alloc(u32, props.resources.tree.bark_mesh.triangles.len);
+                for (props.resources.tree.bark_mesh.triangles, 0..) |index, i| {
+                    bark_mesh_triangles[i] = index + props.resources.tree.leaf_mesh.vertices.len;
+                }
                 return .{
                     .current_cat_mesh = .{
                         .label = "Tree",
-                        .indices = props.resources.tree.bark_mesh.triangles,
-                        .position = mesh_helper.pointsToFloatSlice(allocator, props.resources.tree.bark_mesh.vertices),
+                        .indices = try std.mem.concat(allocator, u32, &.{
+                            props.resources.tree.leaf_mesh.triangles,
+                            // props.resources.tree.bark_mesh.triangles,
+                            // bark_mesh_triangles,
+                        }),
+                        .position = mesh_helper.pointsToFloatSlice(allocator, try std.mem.concat(allocator, tree.Vec4, &.{
+                            props.resources.tree.leaf_mesh.vertices,
+                            // props.resources.tree.bark_mesh.vertices,
+                        })),
                         .color = undefined,
-                        .normal = mesh_helper.pointsToFloatSlice(allocator, props.resources.tree.bark_mesh.normals),
+                        .normal = mesh_helper.pointsToFloatSlice(allocator, try std.mem.concat(allocator, tree.Vec4, &.{
+                            props.resources.tree.leaf_mesh.normals,
+                            // props.resources.tree.bark_mesh.normals,
+                        })),
                     },
                 };
             }
