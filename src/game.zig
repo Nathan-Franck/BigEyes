@@ -97,7 +97,7 @@ pub const interface = struct {
                     .should_raytrace = false,
                 },
                 .orbit_camera = .{
-                    .position = .{ 0, 0, 0, 1 },
+                    .position = .{ 0, -1, 0, 1 },
                     .rotation = .{ 0, 0, 0, 1 },
                     .track_distance = 2,
                 },
@@ -167,7 +167,7 @@ pub const interface = struct {
             .output = &[_]graph.SystemSink{
                 // .{ .output_node = "displayCat", .output_field = "current_cat_mesh", .system_field = "current_cat_mesh" },
                 .{ .output_node = "displayTree", .output_field = "current_cat_mesh", .system_field = "current_cat_mesh" },
-                .{ .output_node = "getResources", .output_field = "resources", .system_field = "resources" },
+                // .{ .output_node = "getResources", .output_field = "resources", .system_field = "resources" },
                 .{ .output_node = "orbit", .output_field = "world_matrix", .system_field = "world_matrix" },
             },
         },
@@ -184,7 +184,11 @@ pub const interface = struct {
 
             pub const Resources = struct {
                 cat: SubdivAnimationMesh,
-                tree: struct { skeleton: tree.Skeleton, leaf_mesh: tree.Mesh, bark_mesh: tree.Mesh },
+                tree: struct {
+                    skeleton: tree.Skeleton,
+                    leaf_mesh: tree.Mesh,
+                    bark_mesh: tree.Mesh,
+                },
             };
 
             pub const Settings = struct {
@@ -377,7 +381,7 @@ pub const interface = struct {
                             props.resources.tree.leaf_mesh.vertices,
                             props.resources.tree.bark_mesh.vertices,
                         })),
-                        .color = undefined,
+                        .color = &.{},
                         .normal = mesh_helper.pointsToFloatSlice(allocator, try std.mem.concat(allocator, tree.Vec4, &.{
                             props.resources.tree.leaf_mesh.normals,
                             props.resources.tree.bark_mesh.normals,

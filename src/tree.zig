@@ -109,7 +109,7 @@ pub fn generateStructure(allocator: Allocator, settings: Settings) !Skeleton {
         for (settings.depth_definitions) |depth_definition| {
             defer current_depth += 1;
 
-            if (gen_item.node.split_depth < current_depth) {
+            if (gen_item.node.split_depth <= current_depth) {
                 const split_amount: usize = @intFromFloat(depth_definition.split_amount * gen_item.node.growth);
                 const split_depth = gen_item.node.split_depth + 1;
 
@@ -153,7 +153,7 @@ pub fn generateStructure(allocator: Allocator, settings: Settings) !Skeleton {
                                 zm.qmul(
                                     zm.quatFromNormAxisAngle(zm.loadArr3(.{ 0, 1, 0 }), depth_definition.branch_pitch),
                                     zm.quatFromNormAxisAngle(zm.loadArr3(.{ 0, 0, 1 }), depth_definition.branch_roll +
-                                        flattenAngle(@as(f32, @floatFromInt(split_index)) * 6.283 * 0.618, depth_definition.flatness)),
+                                        flattenAngle(@as(f32, @floatFromInt(split_index)) * 3.1419 * 4 * 1.618, depth_definition.flatness)),
                                 ),
                                 gen_item.node.rotation,
                             ),
@@ -376,7 +376,7 @@ pub const diciduous = .{
     .mesh = MeshSettings{
         .thickness = 0.05,
         .leaves = .{
-            .split_depth = 3,
+            .split_depth = 4,
             .length = 1.0,
             .breadth = 0.3,
         },
