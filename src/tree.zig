@@ -11,9 +11,9 @@ fn flattenAngle(unnormalized_angle: f32, rate: f32) f32 {
     if (rate <= 0) {
         return angle;
     }
-    while (angle < 0) angle += 360;
-    while (angle > 360) angle -= 360;
-    const offset: f32 = if (angle > 90.0) 180 else 0;
+    while (angle < 0) angle += math.pi * 2.0;
+    while (angle > math.pi * 2.0) angle -= math.pi * 2.0;
+    const offset: f32 = if (angle > math.pi / 2.0) math.pi else 0;
     return ((angle - offset) *
         (1 - rate) + offset);
 }
@@ -153,7 +153,7 @@ pub fn generateStructure(allocator: Allocator, settings: Settings) !Skeleton {
                                 zm.qmul(
                                     zm.quatFromNormAxisAngle(zm.loadArr3(.{ 0, 1, 0 }), depth_definition.branch_pitch),
                                     zm.quatFromNormAxisAngle(zm.loadArr3(.{ 0, 0, 1 }), depth_definition.branch_roll +
-                                        flattenAngle(@as(f32, @floatFromInt(split_index)) * 3.1419 * 4 * 1.618, depth_definition.flatness)),
+                                        flattenAngle(@as(f32, @floatFromInt(split_index)) * 3.1419 * 2 * 1.618, depth_definition.flatness)),
                                 ),
                                 gen_item.node.rotation,
                             ),
@@ -327,12 +327,12 @@ pub const diciduous = .{
                 .split_amount = 10,
                 .flatness = 0.0,
                 .size = 0.3,
-                .height_spread = 0.8,
+                .height_spread = 0.6,
                 .branch_pitch = 50.0 * math.rad_per_deg,
                 .branch_roll = 90.0 * math.rad_per_deg,
                 .height_to_growth = .{
-                    .y_values = &.{ 0.0, 1.0 },
-                    .x_range = .{ 0.0, 0.25 },
+                    .y_values = &.{ 1.0, 1.0, 0.0 },
+                    .x_range = .{ 0.0, 1.0 },
                 },
             },
             .{
@@ -343,26 +343,26 @@ pub const diciduous = .{
                 .branch_pitch = 60.0 * math.rad_per_deg,
                 .branch_roll = 90.0 * math.rad_per_deg,
                 .height_to_growth = .{
-                    .y_values = &.{ 0.5, 0.9, 1.0 },
-                    .x_range = .{ 0.0, 0.5 },
+                    .y_values = &.{ 1.0, 1.0, 0.0 },
+                    .x_range = .{ 0.0, 1.0 },
                 },
             },
             .{
                 .split_amount = 10,
                 .flatness = 0.0,
-                .size = 0.4,
+                .size = 0.6,
                 .height_spread = 0.8,
                 .branch_pitch = 40.0 * math.rad_per_deg,
                 .branch_roll = 90.0 * math.rad_per_deg,
                 .height_to_growth = .{
-                    .y_values = &.{ 0.5, 0.8, 1.0, 0.8, 0.5 },
-                    .x_range = .{ 0.0, 0.5 },
+                    .y_values = &.{ 1.0, 1.0, 0.0 },
+                    .x_range = .{ 0.0, 1.0 },
                 },
             },
             .{
                 .split_amount = 10,
                 .flatness = 0.0,
-                .size = 0.7,
+                .size = 0.6,
                 .height_spread = 0.8,
                 .branch_pitch = 40.0 * math.rad_per_deg,
                 .branch_roll = 90.0 * math.rad_per_deg,

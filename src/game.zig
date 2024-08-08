@@ -97,9 +97,9 @@ pub const interface = struct {
                     .should_raytrace = false,
                 },
                 .orbit_camera = .{
-                    .position = .{ 0, -1, 0, 1 },
+                    .position = .{ 0, -0.75, 0, 1 },
                     .rotation = .{ 0, 0, 0, 1 },
-                    .track_distance = 2,
+                    .track_distance = 1.5,
                 },
             },
         });
