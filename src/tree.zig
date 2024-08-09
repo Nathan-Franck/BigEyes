@@ -326,7 +326,7 @@ pub const diciduous = .{
             .{
                 .split_amount = 10,
                 .flatness = 0.0,
-                .size = 0.3,
+                .size = 0.4,
                 .height_spread = 0.6,
                 .branch_pitch = 50.0 * math.rad_per_deg,
                 .branch_roll = 90.0 * math.rad_per_deg,
@@ -337,8 +337,8 @@ pub const diciduous = .{
             },
             .{
                 .split_amount = 6,
-                .flatness = 0.6,
-                .size = 0.4,
+                .flatness = 0.3,
+                .size = 0.45,
                 .height_spread = 0.8,
                 .branch_pitch = 60.0 * math.rad_per_deg,
                 .branch_roll = 90.0 * math.rad_per_deg,
@@ -350,7 +350,7 @@ pub const diciduous = .{
             .{
                 .split_amount = 10,
                 .flatness = 0.0,
-                .size = 0.6,
+                .size = 0.5,
                 .height_spread = 0.8,
                 .branch_pitch = 40.0 * math.rad_per_deg,
                 .branch_roll = 90.0 * math.rad_per_deg,
