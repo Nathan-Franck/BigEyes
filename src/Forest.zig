@@ -50,7 +50,6 @@ test "Ascii Forest" {
         };
     };
 
-    // I'm a little sad that my variable id's go away once packed into a tuple :/
     const typeInfo: std.builtin.Type = @typeInfo(Trees);
     const decls = typeInfo.Struct.decls;
 

@@ -11,8 +11,43 @@ fn Node(InputDefinition: type) type {
     return struct {
         pub const Definition = InputDefinition;
 
-        input: Definition.Input,
-        output: Definition.Output = undefined,
+        in: Definition.Input,
+        out: Definition.Output = undefined,
+    };
+}
+
+fn GraphInput(InputDefinition: type) InputDefinition {
+    return undefined;
+}
+
+fn GraphStore(InputDefinition: type) type {
+    return struct {
+        pub const Definition = InputDefinition;
+
+        pub const Input = reference_fields: {
+            var fields: []const std.builtin.Type.StructField = &.{};
+            for (@typeInfo(Input).Struct.fields) |field| {
+                fields = fields ++ .{std.builtin.Type.StructField{
+                    .name = field.name,
+                    .type = @Type(std.builtin.Type{.Pointer{
+                        .size = .One,
+                        .is_const = true,
+                        .child = field.type,
+                    }}),
+                    .default_value = null,
+                    .is_comptime = false,
+                    .alignment = @alignOf(field.type),
+                }};
+            }
+            break :reference_fields @Type(std.builtin.Type{ .Struct = .{
+                .layout = .auto,
+                .fields = fields,
+                .decls = &.{},
+                .is_tuple = false,
+            } });
+        };
+
+        pub const out: Definition = undefined;
     };
 }
 
@@ -36,14 +71,11 @@ fn linkFields(T: type, fields_to_link: anytype) T {
 
 test "Graph Node Idea" {
     const EatCheese = struct {
-        pub const Input = struct {};
-
-        pub const Output = struct {
-            cheese_type: []const u8,
-            taste_signature: u8,
-            munch_speed: f32,
+        pub const Input = struct {
+            thinger: *const u32,
+            munch_speed: *const f32,
         };
-
+        pub const Output = struct { cheese_type: []const u8, taste_signature: u8, munch_speed: f32 };
         pub fn run(input: Input) Output {
             _ = input;
             return Output{
@@ -55,42 +87,40 @@ test "Graph Node Idea" {
     };
 
     const FeelFull = struct {
-        pub const Input = struct {
-            cheese_type: *const []const u8,
-            taste_signature: *const u8,
-            munch_speed: *f32,
-        };
-
-        pub const Output = struct {
-            success: bool,
-        };
-
+        pub const Input = struct { cheese_type: *const []const u8, taste_signature: *const u8, munch_speed: *const f32 };
+        pub const Output = struct { is_full: bool };
         pub fn run(input: Input) Output {
             if (std.mem.eql(u8, input.cheese_type.*, "guda")) {
-                return .{ .success = true };
+                return Output{ .is_full = true };
             } else {
-                return .{ .success = false };
+                return Output{ .is_full = false };
             }
         }
     };
 
     // Declare a graph of nodes to run later...
     const Graph = struct {
-        pub var eat_cheese = Node(EatCheese){ .input = .{} };
-        pub var feel_full = Node(FeelFull){ .input = .{
-            .cheese_type = &eat_cheese.output.cheese_type,
-            .taste_signature = &eat_cheese.output.taste_signature,
-            .munch_speed = &eat_cheese.output.munch_speed,
-        } };
+        pub const input = GraphInput(struct { thinger: u32 });
+        pub const store = GraphStore(struct { munch_speed: f32 });
+        pub const nodes = struct {
+            pub const eat_cheese = Node(EatCheese){ .in = .{ .thinger = &input.thinger, .munch_speed = &store.out.munch_speed } };
+            pub const feel_full = Node(FeelFull){ .in = .{
+                .cheese_type = &eat_cheese.out.cheese_type,
+                .taste_signature = &eat_cheese.out.taste_signature,
+                .munch_speed = &eat_cheese.out.munch_speed,
+            } };
+        };
+        pub const next_store = store.Input{ .munch_speed = &nodes.eat_cheese.out.munch_speed };
+        pub const output = .{ .munch_speed = &nodes.feel_full.out.is_full };
     };
 
-    std.debug.print("{any}\n", .{Graph.feel_full});
+    std.debug.print("{any}\n", .{Graph.nodes.feel_full});
 
     // Or, just call the nodes inline!
-    var eat_cheese_result = EatCheese.run(.{});
+    var eat_cheese_result = EatCheese.run(.{ .thinger = &0, .munch_speed = &0.0 });
     const feel_full_result = FeelFull.run(
         linkFields(FeelFull.Input, &eat_cheese_result),
     );
 
-    std.debug.print("{any}\n", .{feel_full_result.success});
+    std.debug.print("{any}\n", .{feel_full_result.is_full});
 }
