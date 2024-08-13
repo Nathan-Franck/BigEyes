@@ -1,5 +1,8 @@
 const std = @import("std");
 const zm = @import("./zmath/main.zig");
+const util = .{
+    .tree = @import("./tree.zig"),
+};
 
 const Vec4 = @Vector(4, f32);
 
@@ -13,7 +16,9 @@ pub fn Forest(Prefab: type, comptime chunk_size: i32) type {
             };
             spawn_radius: ?[]const SpawnRadius = null,
             prefab: Prefab,
+            density_tier: i32,
             likelihood: f32,
+            scale_range: util.tree.SmoothCurve,
         };
 
         pub const Spawn = struct {
@@ -67,7 +72,11 @@ pub fn Forest(Prefab: type, comptime chunk_size: i32) type {
                 pub const Coord = struct {
                     x: i32,
                     y: i32,
-                    depth: i32,
+                    density_tier: i32,
+                };
+                pub const Bounds = struct {
+                    x: f32,
+                    y: f32,
                 };
 
                 const context = {};
@@ -75,14 +84,20 @@ pub fn Forest(Prefab: type, comptime chunk_size: i32) type {
                 const hashFn = std.hash_map.getAutoHashFn(struct { Coord, u32 }, @TypeOf(context));
 
                 chunks: Chunks,
-                const coord_indices = enum {
-                    X,
-                    Y,
-                    Z,
-                };
 
-                pub fn getChunk(coord: Coord) Chunk {
-                    const spacing = std.math.pow(f32, 2.0, @floatFromInt(coord.depth));
+                pub fn gatherCollection(allocator: std.mem.Allocator, bounds: zm.Vec) []const Prefab {
+                    _ = allocator; // autofix
+                    _ = bounds; // autofix
+                }
+
+                pub fn getChunk(self: *@This(), coord: Coord) !*const Chunk {
+                    const chunk_entry = try self.chunks.getOrPut(coord);
+                    if (chunk_entry.found_existing) {
+                        std.debug.print("Already here!", .{});
+                        return chunk_entry.value_ptr;
+                    }
+
+                    const spacing = std.math.pow(f32, 2.0, @floatFromInt(coord.density_tier));
                     const offset = .{
                         .x = @as(f32, @floatFromInt(coord.x)) * spacing * chunk_size,
                         .z = @as(f32, @floatFromInt(coord.y)) * spacing * chunk_size,
@@ -91,9 +106,10 @@ pub fn Forest(Prefab: type, comptime chunk_size: i32) type {
                         .spawn = rng.init(hashFn(context, .{ coord, 0 })),
                         .position = rng.init(hashFn(context, .{ coord, 1 })),
                         .rotation = rng.init(hashFn(context, .{ coord, 2 })),
+                        .scale = rng.init(hashFn(context, .{ coord, 3 })),
                     };
-                    var chunk: Chunk = undefined;
-                    for (&chunk, 0..) |*row, y| {
+                    const chunk: *Chunk = chunk_entry.value_ptr;
+                    for (chunk, 0..) |*row, y| {
                         for (row, 0..) |*item, x| {
                             item.* = if (tree_range[
                                 rand.spawn.random().intRangeLessThan(usize, 0, quantization)
@@ -107,9 +123,9 @@ pub fn Forest(Prefab: type, comptime chunk_size: i32) type {
                                     }),
                                     .rotation = zm.quatFromAxisAngle(
                                         zm.loadArr3(.{ 0, 1, 0 }),
-                                        rand.rotation.random().float(f32) * std.math.pi * 2,
+                                        rand.rotation.random().float(f32) * 360 * std.math.rad_per_deg,
                                     ),
-                                    .scale = undefined,
+                                    .scale = tree.scale_range.sample(rand.scale.random().float(f32)),
                                 }
                             else
                                 null;
@@ -127,16 +143,19 @@ pub fn main() !void {
     const Ascii = struct {
         character: u8,
     };
-
     const AsciiForest = Forest(Ascii, 5);
-    const Trees = struct {
+    const Spawner = AsciiForest.spawner(struct {
         pub const little_tree = AsciiForest.Tree{
-            .likelihood = 0.20,
             .prefab = .{ .character = 'i' },
+            .density_tier = 0,
+            .likelihood = 0.20,
+            .scale_range = .{ .x_range = .{ 0, 1 }, .y_values = &.{ 0.8, 1.0 } },
         };
         pub const big_tree = AsciiForest.Tree{
-            .likelihood = 0.05,
             .prefab = .{ .character = '&' },
+            .density_tier = 1,
+            .likelihood = 0.05,
+            .scale_range = .{ .x_range = .{ 0, 1 }, .y_values = &.{ 0.8, 1.0 } },
             .spawn_radius = &[_]AsciiForest.Tree.SpawnRadius{
                 .{
                     .tree = &little_tree,
@@ -145,21 +164,29 @@ pub fn main() !void {
                 },
             },
         };
-    };
-    const Spawner = AsciiForest.spawner(Trees);
-
-    const chunk = Spawner.getChunk(.{ .x = 0, .y = 0, .depth = 8 });
+    });
 
     const allocator = std.heap.page_allocator;
-    for (chunk) |row| {
-        var line_data = std.ArrayList(u8).init(allocator);
-        for (row) |maybe_item| {
-            try line_data.appendSlice(&.{
-                if (maybe_item) |item| item.prefab.character else '_',
-                ' ',
-            });
+    var spawner: Spawner = .{ .chunks = Spawner.Chunks.init(allocator) };
+    const chunks: []const *const Spawner.Chunk = &.{
+        try spawner.getChunk(.{ .x = 0, .y = 0, .density_tier = 8 }),
+        try spawner.getChunk(.{ .x = 0, .y = 0, .density_tier = 8 }),
+    };
+
+    // const collection = Spawner.gatherCollection();
+
+    for (chunks) |chunk| {
+        std.debug.print("another chunk\n", .{});
+        for (chunk) |row| {
+            var line_data = std.ArrayList(u8).init(allocator);
+            for (row) |maybe_item| {
+                try line_data.appendSlice(&.{
+                    if (maybe_item) |item| item.prefab.character else '_',
+                    ' ',
+                });
+            }
+            std.debug.print("{s}\n", .{line_data.items});
         }
-        std.debug.print("{s}\n", .{line_data.items});
     }
 
     // TODO - Spawn trees and Display in a large grid, that shows all density tiers together with random offsets 🌲
