@@ -1,4 +1,5 @@
 const std = @import("std");
+const zm = @import("./zmath/main.zig");
 
 const Vec4 = @Vector(4, f32);
 
@@ -25,14 +26,12 @@ pub fn Forest(Prefab: type, comptime chunk_size: i32) type {
         fn spawner(ForestSettings: type) type {
             const trees = unpack: {
                 const decls: []const std.builtin.Type.Declaration = @typeInfo(ForestSettings).Struct.decls;
-                var trees: []const Tree = &.{};
-                for (decls) |decl_definition| {
-                    const tree: Tree = @field(ForestSettings, decl_definition.name);
-                    trees = trees ++ .{tree};
+                var trees: [decls.len]Tree = undefined;
+                for (decls, 0..) |decl_definition, i| {
+                    trees[i] = @field(ForestSettings, decl_definition.name);
                 }
                 break :unpack trees;
             };
-
             const total_likelihood = calc: {
                 var total: f32 = 0;
                 for (trees) |tree|
@@ -65,28 +64,51 @@ pub fn Forest(Prefab: type, comptime chunk_size: i32) type {
             return struct {
                 pub const Chunk = [chunk_size][chunk_size]?Spawn;
                 pub const Chunks = std.AutoHashMap(Coord, Chunk);
-                pub const Coord = @Vector(3, i32);
+                pub const Coord = struct {
+                    x: i32,
+                    y: i32,
+                    depth: i32,
+                };
+
+                const context = {};
+                const rng = std.Random.DefaultPrng;
+                const hashFn = std.hash_map.getAutoHashFn(struct { Coord, u32 }, @TypeOf(context));
 
                 chunks: Chunks,
+                const coord_indices = enum {
+                    X,
+                    Y,
+                    Z,
+                };
 
                 pub fn getChunk(coord: Coord) Chunk {
-                    const context = {};
-                    const hashFn = std.hash_map.getAutoHashFn(@Vector(3, i32), @TypeOf(context));
-                    var rand = std.Random.DefaultPrng.init(hashFn(context, coord));
+                    const spacing = std.math.pow(f32, 2.0, @floatFromInt(coord.depth));
+                    const offset = .{
+                        .x = @as(f32, @floatFromInt(coord.x)) * spacing * chunk_size,
+                        .z = @as(f32, @floatFromInt(coord.y)) * spacing * chunk_size,
+                    };
+                    var rand = .{
+                        .spawn = rng.init(hashFn(context, .{ coord, 0 })),
+                        .position = rng.init(hashFn(context, .{ coord, 1 })),
+                        .rotation = rng.init(hashFn(context, .{ coord, 2 })),
+                    };
                     var chunk: Chunk = undefined;
-                    for (&chunk) |*row| {
-                        for (row) |*item| {
-                            const samp = tree_range[
-                                @intCast(@mod(
-                                    rand.next(),
-                                    quantization,
-                                ))
-                            ];
-                            item.* = if (samp) |tree|
+                    for (&chunk, 0..) |*row, y| {
+                        for (row, 0..) |*item, x| {
+                            item.* = if (tree_range[
+                                rand.spawn.random().intRangeLessThan(usize, 0, quantization)
+                            ]) |tree|
                                 Spawn{
                                     .prefab = &tree.prefab,
-                                    .position = undefined,
-                                    .rotation = undefined,
+                                    .position = zm.loadArr3(.{
+                                        offset.x + (@as(f32, @floatFromInt(x)) + rand.position.random().float(f32)) * spacing,
+                                        0, // TODO - conform to a heightmap?
+                                        offset.z + (@as(f32, @floatFromInt(y)) + rand.position.random().float(f32)) * spacing,
+                                    }),
+                                    .rotation = zm.quatFromAxisAngle(
+                                        zm.loadArr3(.{ 0, 1, 0 }),
+                                        rand.rotation.random().float(f32) * std.math.pi * 2,
+                                    ),
                                     .scale = undefined,
                                 }
                             else
@@ -124,10 +146,9 @@ pub fn main() !void {
             },
         };
     };
-
     const Spawner = AsciiForest.spawner(Trees);
 
-    const chunk = Spawner.getChunk(.{ 0, 0, 8 });
+    const chunk = Spawner.getChunk(.{ .x = 0, .y = 0, .depth = 8 });
 
     const allocator = std.heap.page_allocator;
     for (chunk) |row| {
