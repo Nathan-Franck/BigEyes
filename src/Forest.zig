@@ -22,10 +22,6 @@ pub fn Forest(Prefab: type, comptime chunk_size: i32) type {
             scale: f32,
         };
 
-        pub const Chunk = [chunk_size][chunk_size]?Spawn;
-
-        chunks: std.AutoHashMap(@Vector(3, i32), Chunk),
-
         fn spawner(ForestSettings: type) type {
             const trees = unpack: {
                 const decls: []const std.builtin.Type.Declaration = @typeInfo(ForestSettings).Struct.decls;
@@ -45,11 +41,11 @@ pub fn Forest(Prefab: type, comptime chunk_size: i32) type {
             };
             const quantization = 128;
             const tree_range = calc: {
-                var tree_range: [quantization]?*const Tree = .{null} ** quantization;
+                var range: [quantization]?*const Tree = .{null} ** quantization;
                 var current_tree_index: u32 = 0;
                 var accum_likelihood: f32 = trees[current_tree_index].likelihood;
                 var next_transition: i32 = @as(i32, @intFromFloat(accum_likelihood / total_likelihood * quantization));
-                for (&tree_range, 0..) |*cell, cell_index| {
+                for (&range, 0..) |*cell, cell_index| {
                     cell.* = if (current_tree_index >= trees.len)
                         null
                     else
@@ -63,13 +59,20 @@ pub fn Forest(Prefab: type, comptime chunk_size: i32) type {
                         next_transition = @as(i32, @intFromFloat(accum_likelihood / total_likelihood * quantization));
                     }
                 }
-                break :calc tree_range;
+                break :calc range;
             };
 
             return struct {
-                pub fn getChunk() Chunk {
-                    var rand = std.Random.DefaultPrng.init(@intCast(std.time.milliTimestamp()));
-                    _ = &rand; // autofix
+                pub const Chunk = [chunk_size][chunk_size]?Spawn;
+                pub const Chunks = std.AutoHashMap(Coord, Chunk);
+                pub const Coord = @Vector(3, i32);
+
+                chunks: Chunks,
+
+                pub fn getChunk(coord: Coord) Chunk {
+                    const context = {};
+                    const hashFn = std.hash_map.getAutoHashFn(@Vector(3, i32), @TypeOf(context));
+                    var rand = std.Random.DefaultPrng.init(hashFn(context, coord));
                     var chunk: Chunk = undefined;
                     for (&chunk) |*row| {
                         for (row) |*item| {
@@ -106,11 +109,11 @@ pub fn main() !void {
     const AsciiForest = Forest(Ascii, 5);
     const Trees = struct {
         pub const little_tree = AsciiForest.Tree{
-            .likelihood = 0.25,
+            .likelihood = 0.20,
             .prefab = .{ .character = 'i' },
         };
         pub const big_tree = AsciiForest.Tree{
-            .likelihood = 0.25,
+            .likelihood = 0.05,
             .prefab = .{ .character = '&' },
             .spawn_radius = &[_]AsciiForest.Tree.SpawnRadius{
                 .{
@@ -123,13 +126,17 @@ pub fn main() !void {
     };
 
     const Spawner = AsciiForest.spawner(Trees);
-    const chunk = Spawner.getChunk();
+
+    const chunk = Spawner.getChunk(.{ 0, 0, 8 });
+
     const allocator = std.heap.page_allocator;
     for (chunk) |row| {
         var line_data = std.ArrayList(u8).init(allocator);
         for (row) |maybe_item| {
-            try line_data.append(if (maybe_item) |item| item.prefab.character else '_');
-            try line_data.append(' ');
+            try line_data.appendSlice(&.{
+                if (maybe_item) |item| item.prefab.character else '_',
+                ' ',
+            });
         }
         std.debug.print("{s}\n", .{line_data.items});
     }
