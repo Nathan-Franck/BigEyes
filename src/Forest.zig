@@ -12,9 +12,9 @@ pub fn Forest(Prefab: type, comptime chunk_size: i32) type {
             pub const SpawnRadius = struct {
                 tree: *const Tree,
                 radius: f32,
-                likelihood_change: f32,
+                likelihood: f32,
             };
-            spawn_radius: ?[]const SpawnRadius = null,
+            spawn_radii: ?[]const SpawnRadius = null,
             prefab: Prefab,
             density_tier: i32,
             likelihood: f32,
@@ -37,6 +37,30 @@ pub fn Forest(Prefab: type, comptime chunk_size: i32) type {
                 }
                 break :unpack trees;
             };
+            const density_tiers = calc: {
+                var min_tier: i32 = trees[0].density_tier;
+                var max_tier: i32 = trees[0].density_tier;
+                for (trees[1..]) |tree| {
+                    min_tier = @min(min_tier, tree.density_tier);
+                    max_tier = @max(max_tier, tree.density_tier);
+                }
+                const tier_len = max_tier - min_tier + 1;
+                var tiers: [tier_len][]const Tree = undefined;
+                for (&tiers, 0..) |*tier, tier_index| {
+                    var tier_contents: []const Tree = &.{};
+                    for (trees) |tree| {
+                        if (tree.density_tier == @as(i32, tier_index) + min_tier) {
+                            tier_contents = tier_contents ++ .{tree};
+                        }
+                    }
+                    tier.* = tier_contents;
+                }
+                break :calc tiers;
+            };
+            _ = density_tiers; // autofix
+
+            // if (true) @compileError(std.fmt.comptimePrint("{any}", .{density_tiers}));
+
             const total_likelihood = calc: {
                 var total: f32 = 0;
                 for (trees) |tree|
@@ -147,20 +171,32 @@ pub fn main() !void {
     const Spawner = AsciiForest.spawner(struct {
         pub const little_tree = AsciiForest.Tree{
             .prefab = .{ .character = 'i' },
-            .density_tier = 0,
+            .density_tier = -3,
+            .likelihood = 0.20,
+            .scale_range = .{ .x_range = .{ 0, 1 }, .y_values = &.{ 0.8, 1.0 } },
+        };
+        pub const little_tree2 = AsciiForest.Tree{
+            .prefab = .{ .character = 'j' },
+            .density_tier = -2,
+            .likelihood = 0.20,
+            .scale_range = .{ .x_range = .{ 0, 1 }, .y_values = &.{ 0.8, 1.0 } },
+        };
+        pub const little_tree3 = AsciiForest.Tree{
+            .prefab = .{ .character = 'k' },
+            .density_tier = 3,
             .likelihood = 0.20,
             .scale_range = .{ .x_range = .{ 0, 1 }, .y_values = &.{ 0.8, 1.0 } },
         };
         pub const big_tree = AsciiForest.Tree{
-            .prefab = .{ .character = '&' },
-            .density_tier = 1,
+            .prefab = .{ .character = 'T' },
+            .density_tier = 7,
             .likelihood = 0.05,
             .scale_range = .{ .x_range = .{ 0, 1 }, .y_values = &.{ 0.8, 1.0 } },
-            .spawn_radius = &[_]AsciiForest.Tree.SpawnRadius{
+            .spawn_radii = &[_]AsciiForest.Tree.SpawnRadius{
                 .{
                     .tree = &little_tree,
                     .radius = 10,
-                    .likelihood_change = 1,
+                    .likelihood = 1,
                 },
             },
         };
