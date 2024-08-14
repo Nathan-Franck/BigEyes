@@ -37,7 +37,9 @@ pub fn Forest(Prefab: type, comptime chunk_size: i32) type {
                 }
                 break :unpack trees;
             };
-            const density_tiers = calc: {
+
+            const quantization = 128;
+            const density_tiers, const min_tier = density_tiers: {
                 var min_tier: i32 = trees[0].density_tier;
                 var max_tier: i32 = trees[0].density_tier;
                 for (trees[1..]) |tree| {
@@ -45,50 +47,62 @@ pub fn Forest(Prefab: type, comptime chunk_size: i32) type {
                     max_tier = @max(max_tier, tree.density_tier);
                 }
                 const tier_len = max_tier - min_tier + 1;
-                var tiers: [tier_len][]const Tree = undefined;
+                var tiers: [tier_len]struct {
+                    density: i32,
+                    trees: []const Tree,
+                    tree_range: [quantization]?*const Tree,
+                } = undefined;
                 for (&tiers, 0..) |*tier, tier_index| {
-                    var tier_contents: []const Tree = &.{};
+                    var tier_trees: []const Tree = &.{};
+                    const density_tier = @as(i32, tier_index) + min_tier;
                     for (trees) |tree| {
-                        if (tree.density_tier == @as(i32, tier_index) + min_tier) {
-                            tier_contents = tier_contents ++ .{tree};
+                        if (tree.density_tier == density_tier) {
+                            tier_trees = tier_trees ++ .{tree};
                         }
                     }
-                    tier.* = tier_contents;
+                    tier.* = if (tier_trees.len == 0) undefined else tier: {
+                        const total_likelihood = total_likelihood: {
+                            var total: f32 = 0;
+                            for (tier_trees) |tree|
+                                total += tree.likelihood;
+                            break :total_likelihood @max(total, 1);
+                        };
+                        const tree_range = tree_range: {
+                            var range: [quantization]?*const Tree = .{null} ** quantization;
+                            var current_tree_index: u32 = 0;
+                            var accum_likelihood: f32 = tier_trees[current_tree_index].likelihood;
+                            var next_transition: i32 = @as(i32, @intFromFloat(accum_likelihood / total_likelihood * quantization));
+                            for (&range, 0..) |*cell, cell_index| {
+                                cell.* = if (current_tree_index >= tier_trees.len)
+                                    null
+                                else
+                                    &tier_trees[current_tree_index];
+                                if (cell_index >= next_transition) {
+                                    current_tree_index += 1;
+                                    accum_likelihood = if (current_tree_index >= tier_trees.len)
+                                        total_likelihood
+                                    else
+                                        accum_likelihood + tier_trees[current_tree_index].likelihood;
+                                    next_transition = @as(i32, @intFromFloat(accum_likelihood / total_likelihood * quantization));
+                                }
+                            }
+                            break :tree_range range;
+                        };
+                        break :tier .{
+                            .trees = tier_trees,
+                            .density = density_tier,
+                            .tree_range = tree_range,
+                        };
+                    };
                 }
-                break :calc tiers;
+                break :density_tiers .{ tiers, min_tier };
             };
-            _ = density_tiers; // autofix
 
             // if (true) @compileError(std.fmt.comptimePrint("{any}", .{density_tiers}));
 
-            const total_likelihood = calc: {
-                var total: f32 = 0;
-                for (trees) |tree|
-                    total += tree.likelihood;
-                break :calc @max(total, 1);
-            };
-            const quantization = 128;
-            const tree_range = calc: {
-                var range: [quantization]?*const Tree = .{null} ** quantization;
-                var current_tree_index: u32 = 0;
-                var accum_likelihood: f32 = trees[current_tree_index].likelihood;
-                var next_transition: i32 = @as(i32, @intFromFloat(accum_likelihood / total_likelihood * quantization));
-                for (&range, 0..) |*cell, cell_index| {
-                    cell.* = if (current_tree_index >= trees.len)
-                        null
-                    else
-                        &trees[current_tree_index];
-                    if (cell_index >= next_transition) {
-                        current_tree_index += 1;
-                        accum_likelihood = if (current_tree_index >= trees.len)
-                            total_likelihood
-                        else
-                            accum_likelihood + trees[current_tree_index].likelihood;
-                        next_transition = @as(i32, @intFromFloat(accum_likelihood / total_likelihood * quantization));
-                    }
-                }
-                break :calc range;
-            };
+            for (density_tiers) |density_tier| {
+                _ = density_tier; // autofix
+            }
 
             return struct {
                 pub const Chunk = [chunk_size][chunk_size]?Spawn;
@@ -108,6 +122,10 @@ pub fn Forest(Prefab: type, comptime chunk_size: i32) type {
                 const hashFn = std.hash_map.getAutoHashFn(struct { Coord, u32 }, @TypeOf(context));
 
                 chunks: Chunks,
+
+                pub fn densityTierToIndex(density_tier: i32) usize {
+                    return @intCast(density_tier - min_tier);
+                }
 
                 pub fn gatherCollection(allocator: std.mem.Allocator, bounds: zm.Vec) []const Prefab {
                     _ = allocator; // autofix
@@ -135,7 +153,7 @@ pub fn Forest(Prefab: type, comptime chunk_size: i32) type {
                     const chunk: *Chunk = chunk_entry.value_ptr;
                     for (chunk, 0..) |*row, y| {
                         for (row, 0..) |*item, x| {
-                            item.* = if (tree_range[
+                            item.* = if (density_tiers[densityTierToIndex(coord.density_tier)].tree_range[
                                 rand.spawn.random().intRangeLessThan(usize, 0, quantization)
                             ]) |tree|
                                 Spawn{
@@ -205,8 +223,8 @@ pub fn main() !void {
     const allocator = std.heap.page_allocator;
     var spawner: Spawner = .{ .chunks = Spawner.Chunks.init(allocator) };
     const chunks: []const *const Spawner.Chunk = &.{
-        try spawner.getChunk(.{ .x = 0, .y = 0, .density_tier = 8 }),
-        try spawner.getChunk(.{ .x = 0, .y = 0, .density_tier = 8 }),
+        try spawner.getChunk(.{ .x = 0, .y = 0, .density_tier = -2 }),
+        try spawner.getChunk(.{ .x = 0, .y = 0, .density_tier = -2 }),
     };
 
     // const collection = Spawner.gatherCollection();
