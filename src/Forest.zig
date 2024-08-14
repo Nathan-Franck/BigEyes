@@ -29,6 +29,68 @@ pub fn Forest(Prefab: type, comptime chunk_size: i32) type {
         };
 
         fn spawner(ForestSettings: type) type {
+            const Coord = struct {
+                x: i32,
+                y: i32,
+                density_tier: i32,
+            };
+            const ChunkType = [chunk_size][chunk_size]?Spawn;
+            const ChunksType = std.AutoHashMap(Coord, ChunkType);
+
+            const quantization = 128;
+            const context = {};
+            const rng = std.Random.DefaultPrng;
+            const hashFn = std.hash_map.getAutoHashFn(struct { Coord, u32 }, @TypeOf(context));
+
+            // const Bounds = struct {
+            //     x: f32,
+            //     y: f32,
+            // };
+            const DensityTier = struct {
+                density: i32,
+                trees: []const Tree,
+                tree_range: [quantization]?*const Tree,
+
+                pub fn getChunk(self: *const @This(), coord: struct { x: i32, y: i32 }) !ChunkType {
+                    const spacing = std.math.pow(f32, 2.0, @floatFromInt(self.density));
+                    const offset = .{
+                        .x = @as(f32, @floatFromInt(coord.x)) * spacing * chunk_size,
+                        .z = @as(f32, @floatFromInt(coord.y)) * spacing * chunk_size,
+                    };
+                    const hash_coord: Coord = .{ .x = coord.x, .y = coord.y, .density_tier = self.density };
+                    var rand = .{
+                        .spawn = rng.init(hashFn(context, .{ hash_coord, 0 })),
+                        .position = rng.init(hashFn(context, .{ hash_coord, 1 })),
+                        .rotation = rng.init(hashFn(context, .{ hash_coord, 2 })),
+                        .scale = rng.init(hashFn(context, .{ hash_coord, 3 })),
+                    };
+                    var chunk: ChunkType = undefined;
+                    for (&chunk, 0..) |*row, y| {
+                        for (row, 0..) |*item, x| {
+                            item.* = if (self.tree_range[
+                                rand.spawn.random().intRangeLessThan(usize, 0, quantization)
+                            ]) |tree|
+                                Spawn{
+                                    .prefab = &tree.prefab,
+                                    .position = zm.loadArr3(.{
+                                        offset.x + (@as(f32, @floatFromInt(x)) + rand.position.random().float(f32)) * spacing,
+                                        0, // TODO - conform to a heightmap?
+                                        offset.z + (@as(f32, @floatFromInt(y)) + rand.position.random().float(f32)) * spacing,
+                                    }),
+                                    .rotation = zm.quatFromAxisAngle(
+                                        zm.loadArr3(.{ 0, 1, 0 }),
+                                        rand.rotation.random().float(f32) * 360 * std.math.rad_per_deg,
+                                    ),
+                                    .scale = tree.scale_range.sample(rand.scale.random().float(f32)),
+                                }
+                            else
+                                null;
+                        }
+                    }
+                    return chunk;
+                }
+            };
+
             const trees = unpack: {
                 const decls: []const std.builtin.Type.Declaration = @typeInfo(ForestSettings).Struct.decls;
                 var trees: [decls.len]Tree = undefined;
@@ -38,7 +100,6 @@ pub fn Forest(Prefab: type, comptime chunk_size: i32) type {
                 break :unpack trees;
             };
 
-            const quantization = 128;
             const density_tiers, const min_tier = density_tiers: {
                 var min_tier: i32 = trees[0].density_tier;
                 var max_tier: i32 = trees[0].density_tier;
@@ -47,11 +108,7 @@ pub fn Forest(Prefab: type, comptime chunk_size: i32) type {
                     max_tier = @max(max_tier, tree.density_tier);
                 }
                 const tier_len = max_tier - min_tier + 1;
-                var tiers: [tier_len]struct {
-                    density: i32,
-                    trees: []const Tree,
-                    tree_range: [quantization]?*const Tree,
-                } = undefined;
+                var tiers: [tier_len]?DensityTier = undefined;
                 for (&tiers, 0..) |*tier, tier_index| {
                     var tier_trees: []const Tree = &.{};
                     const density_tier = @as(i32, tier_index) + min_tier;
@@ -60,7 +117,7 @@ pub fn Forest(Prefab: type, comptime chunk_size: i32) type {
                             tier_trees = tier_trees ++ .{tree};
                         }
                     }
-                    tier.* = if (tier_trees.len == 0) undefined else tier: {
+                    tier.* = if (tier_trees.len == 0) null else tier: {
                         const total_likelihood = total_likelihood: {
                             var total: f32 = 0;
                             for (tier_trees) |tree|
@@ -105,21 +162,8 @@ pub fn Forest(Prefab: type, comptime chunk_size: i32) type {
             }
 
             return struct {
-                pub const Chunk = [chunk_size][chunk_size]?Spawn;
-                pub const Chunks = std.AutoHashMap(Coord, Chunk);
-                pub const Coord = struct {
-                    x: i32,
-                    y: i32,
-                    density_tier: i32,
-                };
-                pub const Bounds = struct {
-                    x: f32,
-                    y: f32,
-                };
-
-                const context = {};
-                const rng = std.Random.DefaultPrng;
-                const hashFn = std.hash_map.getAutoHashFn(struct { Coord, u32 }, @TypeOf(context));
+                const Chunks = ChunksType;
+                const Chunk = ChunkType;
 
                 chunks: Chunks,
 
@@ -131,49 +175,18 @@ pub fn Forest(Prefab: type, comptime chunk_size: i32) type {
                     _ = allocator; // autofix
                     _ = bounds; // autofix
                 }
-
-                pub fn getChunk(self: *@This(), coord: Coord) !*const Chunk {
+                pub fn getChunk(self: *@This(), coord: Coord) !*const ChunkType {
                     const chunk_entry = try self.chunks.getOrPut(coord);
                     if (chunk_entry.found_existing) {
                         std.debug.print("Already here!", .{});
                         return chunk_entry.value_ptr;
                     }
-
-                    const spacing = std.math.pow(f32, 2.0, @floatFromInt(coord.density_tier));
-                    const offset = .{
-                        .x = @as(f32, @floatFromInt(coord.x)) * spacing * chunk_size,
-                        .z = @as(f32, @floatFromInt(coord.y)) * spacing * chunk_size,
-                    };
-                    var rand = .{
-                        .spawn = rng.init(hashFn(context, .{ coord, 0 })),
-                        .position = rng.init(hashFn(context, .{ coord, 1 })),
-                        .rotation = rng.init(hashFn(context, .{ coord, 2 })),
-                        .scale = rng.init(hashFn(context, .{ coord, 3 })),
-                    };
-                    const chunk: *Chunk = chunk_entry.value_ptr;
-                    for (chunk, 0..) |*row, y| {
-                        for (row, 0..) |*item, x| {
-                            item.* = if (density_tiers[densityTierToIndex(coord.density_tier)].tree_range[
-                                rand.spawn.random().intRangeLessThan(usize, 0, quantization)
-                            ]) |tree|
-                                Spawn{
-                                    .prefab = &tree.prefab,
-                                    .position = zm.loadArr3(.{
-                                        offset.x + (@as(f32, @floatFromInt(x)) + rand.position.random().float(f32)) * spacing,
-                                        0, // TODO - conform to a heightmap?
-                                        offset.z + (@as(f32, @floatFromInt(y)) + rand.position.random().float(f32)) * spacing,
-                                    }),
-                                    .rotation = zm.quatFromAxisAngle(
-                                        zm.loadArr3(.{ 0, 1, 0 }),
-                                        rand.rotation.random().float(f32) * 360 * std.math.rad_per_deg,
-                                    ),
-                                    .scale = tree.scale_range.sample(rand.scale.random().float(f32)),
-                                }
-                            else
-                                null;
-                        }
-                    }
-                    return chunk;
+                    const density_tier = &density_tiers[densityTierToIndex(coord.density_tier)];
+                    return if (density_tier.*) |*tier| calc_and_cache: {
+                        const chunk = try tier.getChunk(.{ .x = coord.x, .y = coord.y });
+                        chunk_entry.value_ptr.* = chunk;
+                        break :calc_and_cache chunk_entry.value_ptr;
+                    } else @panic("Tried to access a chunk from a tier that isn't defined!");
                 }
             };
         }
