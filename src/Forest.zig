@@ -38,15 +38,17 @@ pub fn Forest(Prefab: type, comptime chunk_size: i32) type {
             const ChunksType = std.AutoHashMap(Coord, ChunkType);
 
             const quantization = 128;
-            const context = {};
-            const rng = std.Random.DefaultPrng;
-            const hashFn = std.hash_map.getAutoHashFn(struct { Coord, u32 }, @TypeOf(context));
 
             // const Bounds = struct {
             //     x: f32,
             //     y: f32,
             // };
+
             const DensityTier = struct {
+                const context = {};
+                const rng = std.Random.DefaultPrng;
+                const hashFn = std.hash_map.getAutoHashFn(struct { Coord, u32 }, @TypeOf(context));
+
                 density: i32,
                 trees: []const Tree,
                 tree_range: [quantization]?*const Tree,
@@ -91,16 +93,15 @@ pub fn Forest(Prefab: type, comptime chunk_size: i32) type {
                 }
             };
 
-            const trees = unpack: {
-                const decls: []const std.builtin.Type.Declaration = @typeInfo(ForestSettings).Struct.decls;
-                var trees: [decls.len]Tree = undefined;
-                for (decls, 0..) |decl_definition, i| {
-                    trees[i] = @field(ForestSettings, decl_definition.name);
-                }
-                break :unpack trees;
-            };
-
             const density_tiers, const min_tier = density_tiers: {
+                const trees = unpack: {
+                    const decls: []const std.builtin.Type.Declaration = @typeInfo(ForestSettings).Struct.decls;
+                    var trees: [decls.len]Tree = undefined;
+                    for (decls, 0..) |decl_definition, i| {
+                        trees[i] = @field(ForestSettings, decl_definition.name);
+                    }
+                    break :unpack trees;
+                };
                 var min_tier: i32 = trees[0].density_tier;
                 var max_tier: i32 = trees[0].density_tier;
                 for (trees[1..]) |tree| {
@@ -175,6 +176,7 @@ pub fn Forest(Prefab: type, comptime chunk_size: i32) type {
                     _ = allocator; // autofix
                     _ = bounds; // autofix
                 }
+
                 pub fn getChunk(self: *@This(), coord: Coord) !*const ChunkType {
                     const chunk_entry = try self.chunks.getOrPut(coord);
                     if (chunk_entry.found_existing) {
