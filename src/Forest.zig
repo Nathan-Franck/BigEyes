@@ -217,7 +217,7 @@ pub fn Forest(Prefab: type, comptime chunk_size: i32) type {
                                     .y = chunk_coord[1],
                                     .density_tier = tier.density,
                                 });
-                                const chunk_offset: Vec2 = @floatFromInt(chunk_coord * @as(Coord, @splat(chunk_size)));
+                                const chunk_offset = @as(Vec2, @floatFromInt(chunk_coord)) * @as(Vec2, @splat(chunk_span));
                                 var coords = CoordIterator.init(
                                     std.math.clamp(
                                         @as(Coord, @intFromFloat(@floor((bounds.min - chunk_offset) / @as(Vec2, @splat(coord_span))))),
@@ -265,27 +265,27 @@ pub fn main() !void {
     const AsciiForest = Forest(Ascii, 5);
     const Spawner = AsciiForest.spawner(struct {
         pub const little_tree = AsciiForest.Tree{
-            .prefab = .{ .character = 'i' },
+            .prefab = .{ .character = '`' },
             .density_tier = -3,
             .likelihood = 0.20,
             .scale_range = .{ .x_range = .{ 0, 1 }, .y_values = &.{ 0.8, 1.0 } },
         };
         pub const little_tree2 = AsciiForest.Tree{
-            .prefab = .{ .character = 'j' },
+            .prefab = .{ .character = ',' },
             .density_tier = -2,
             .likelihood = 0.20,
             .scale_range = .{ .x_range = .{ 0, 1 }, .y_values = &.{ 0.8, 1.0 } },
         };
         pub const little_tree3 = AsciiForest.Tree{
-            .prefab = .{ .character = 'k' },
-            .density_tier = 3,
+            .prefab = .{ .character = 't' },
+            .density_tier = 0,
             .likelihood = 0.20,
             .scale_range = .{ .x_range = .{ 0, 1 }, .y_values = &.{ 0.8, 1.0 } },
         };
         pub const big_tree = AsciiForest.Tree{
             .prefab = .{ .character = 'T' },
-            .density_tier = 7,
-            .likelihood = 0.05,
+            .density_tier = 1,
+            .likelihood = 0.5,
             .scale_range = .{ .x_range = .{ 0, 1 }, .y_values = &.{ 0.8, 1.0 } },
             .spawn_radii = &[_]AsciiForest.Tree.SpawnRadius{
                 .{
@@ -320,24 +320,22 @@ pub fn main() !void {
 
     // Spawn trees and Display in a large grid, that shows all density tiers together with random offsets 🌲
     const bounds = Bounds{
-        .min = .{ -20, -20 },
-        .size = .{ 40, 40 },
+        .min = .{ -8, -8 },
+        .size = .{ 16, 16 },
     };
     const spawns = try spawner.gatherSpawnsInBounds(allocator, bounds);
 
     const world_size = .{ .width = 128, .height = 64 };
     var world: [world_size.height][world_size.width]u8 = .{.{' '} ** world_size.width} ** world_size.height;
     for (spawns) |spawn| {
-        const location: Coord = std.math.clamp(
-            @as(Coord, @intFromFloat(@floor(
-                (Vec2{ spawn.position[0], spawn.position[2] } - bounds.min) /
-                    bounds.size *
-                    Vec2{ world_size.width, world_size.height },
-            ))),
-            @as(Coord, @splat(0)),
-            Coord{ world_size.width - 1, world_size.height - 1 },
-        );
-        world[@intCast(location[1])][@intCast(location[0])] = spawn.prefab.character;
+        const location: Coord = @as(Coord, @intFromFloat(@floor(
+            (Vec2{ spawn.position[0], spawn.position[2] } - bounds.min) /
+                bounds.size *
+                Vec2{ world_size.width, world_size.height },
+        )));
+        if (location[0] >= 0 and location[0] < world_size.width and
+            location[1] >= 0 and location[1] < world_size.height)
+            world[@intCast(location[1])][@intCast(location[0])] = spawn.prefab.character;
     }
 
     for (world) |row| {
