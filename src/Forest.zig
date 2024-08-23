@@ -330,7 +330,7 @@ pub fn main() !void {
     for (spawns) |spawn| {
         const location: Coord = std.math.clamp(
             @as(Coord, @intFromFloat(@floor(
-                (Vec2{ spawn.position[0], spawn.position[1] } - bounds.min) /
+                (Vec2{ spawn.position[0], spawn.position[2] } - bounds.min) /
                     bounds.size *
                     Vec2{ world_size.width, world_size.height },
             ))),
