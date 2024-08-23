@@ -7,6 +7,28 @@ const util = .{
 const Vec4 = @Vector(4, f32);
 const Vec2 = @Vector(2, f32);
 const Coord = @Vector(2, i32);
+const CoordIterator = struct {
+    current: Coord,
+    min_coord: Coord,
+    max_coord: Coord,
+    fn init(min_coord: Coord, max_coord: Coord) @This() {
+        return .{
+            .current = .{ min_coord[0] - 1, min_coord[1] },
+            .min_coord = min_coord,
+            .max_coord = max_coord,
+        };
+    }
+    fn next(self: *@This()) ?Coord {
+        self.current[0] += 1;
+        if (self.current[0] > self.max_coord[0]) {
+            self.current[0] = self.min_coord[0];
+            self.current[1] += 1;
+            if (self.current[1] > self.max_coord[1])
+                return null;
+        }
+        return self.current;
+    }
+};
 const Bounds = struct {
     min: Vec2,
     size: Vec2,
@@ -44,11 +66,6 @@ pub fn Forest(Prefab: type, comptime chunk_size: i32) type {
             const ChunksType = std.AutoHashMap(DensityCoord, ChunkType);
 
             const quantization = 128;
-
-            // const Bounds = struct {
-            //     x: f32,
-            //     y: f32,
-            // };
 
             const DensityTier = struct {
                 const context = {};
@@ -178,29 +195,6 @@ pub fn Forest(Prefab: type, comptime chunk_size: i32) type {
                     return @intCast(density_tier - min_tier);
                 }
 
-                const CoordIterator = struct {
-                    current: Coord,
-                    min_coord: Coord,
-                    max_coord: Coord,
-                    fn init(min_coord: Coord, max_coord: Coord) @This() {
-                        return .{
-                            .current = min_coord,
-                            .min_coord = min_coord,
-                            .max_coord = max_coord,
-                        };
-                    }
-                    fn next(self: *@This()) ?Coord {
-                        self.current[0] += 1;
-                        if (self.current[0] > self.max_coord[0]) {
-                            self.current[0] = self.min_coord[0];
-                            self.current[1] += 1;
-                            if (self.current[1] > self.max_coord[1])
-                                return null;
-                        }
-                        return self.current;
-                    }
-                };
-
                 pub fn gatherSpawnsInBounds(self: *@This(), allocator: std.mem.Allocator, bounds: Bounds) ![]const Spawn {
                     var spawns = std.ArrayList(Spawn).init(allocator);
                     for (density_tiers) |density_tier| {
@@ -231,7 +225,7 @@ pub fn Forest(Prefab: type, comptime chunk_size: i32) type {
                                     ),
                                 );
                                 while (coords.next()) |coord| {
-                                    if (chunk[@intCast(coord[0])][@intCast(coord[1])]) |spawn|
+                                    if (chunk[@intCast(coord[1])][@intCast(coord[0])]) |spawn|
                                         try spawns.append(spawn);
                                 }
                             }
@@ -262,30 +256,30 @@ pub fn main() !void {
     const Ascii = struct {
         character: u8,
     };
-    const AsciiForest = Forest(Ascii, 5);
+    const AsciiForest = Forest(Ascii, 16);
     const Spawner = AsciiForest.spawner(struct {
-        pub const little_tree = AsciiForest.Tree{
+        pub const grass1 = AsciiForest.Tree{
             .prefab = .{ .character = '`' },
             .density_tier = -3,
             .likelihood = 0.20,
             .scale_range = .{ .x_range = .{ 0, 1 }, .y_values = &.{ 0.8, 1.0 } },
         };
-        pub const little_tree2 = AsciiForest.Tree{
+        pub const grass2 = AsciiForest.Tree{
             .prefab = .{ .character = ',' },
             .density_tier = -2,
             .likelihood = 0.20,
             .scale_range = .{ .x_range = .{ 0, 1 }, .y_values = &.{ 0.8, 1.0 } },
         };
-        pub const little_tree3 = AsciiForest.Tree{
+        pub const little_tree = AsciiForest.Tree{
             .prefab = .{ .character = 't' },
             .density_tier = 0,
-            .likelihood = 0.20,
+            .likelihood = 1,
             .scale_range = .{ .x_range = .{ 0, 1 }, .y_values = &.{ 0.8, 1.0 } },
         };
         pub const big_tree = AsciiForest.Tree{
             .prefab = .{ .character = 'T' },
             .density_tier = 1,
-            .likelihood = 0.5,
+            .likelihood = 1,
             .scale_range = .{ .x_range = .{ 0, 1 }, .y_values = &.{ 0.8, 1.0 } },
             .spawn_radii = &[_]AsciiForest.Tree.SpawnRadius{
                 .{
@@ -299,24 +293,25 @@ pub fn main() !void {
 
     const allocator = std.heap.page_allocator;
     var spawner: Spawner = .{ .chunks = Spawner.Chunks.init(allocator) };
-    const chunks: []const *const Spawner.Chunk = &.{
-        try spawner.getChunk(.{ .x = 0, .y = 0, .density_tier = -2 }),
-        try spawner.getChunk(.{ .x = 0, .y = 0, .density_tier = -2 }),
-    };
 
-    for (chunks) |chunk| {
-        std.debug.print("another chunk\n", .{});
-        for (chunk) |row| {
-            var line_data = std.ArrayList(u8).init(allocator);
-            for (row) |maybe_item| {
-                try line_data.appendSlice(&.{
-                    if (maybe_item) |item| item.prefab.character else '_',
-                    ' ',
-                });
-            }
-            std.debug.print("{s}\n", .{line_data.items});
-        }
-    }
+    // const chunks: []const *const Spawner.Chunk = &.{
+    //     try spawner.getChunk(.{ .x = 0, .y = 0, .density_tier = -2 }),
+    //     try spawner.getChunk(.{ .x = 0, .y = 0, .density_tier = -2 }),
+    // };
+
+    // for (chunks) |chunk| {
+    //     std.debug.print("another chunk\n", .{});
+    //     for (chunk) |row| {
+    //         var line_data = std.ArrayList(u8).init(allocator);
+    //         for (row) |maybe_item| {
+    //             try line_data.appendSlice(&.{
+    //                 if (maybe_item) |item| item.prefab.character else '_',
+    //                 ' ',
+    //             });
+    //         }
+    //         std.debug.print("{s}\n", .{line_data.items});
+    //     }
+    // }
 
     // Spawn trees and Display in a large grid, that shows all density tiers together with random offsets 🌲
     const bounds = Bounds{
