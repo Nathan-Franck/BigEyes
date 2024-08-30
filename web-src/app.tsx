@@ -234,13 +234,13 @@ export function App() {
           }
         }}
       >
-        // Select a subdivision detail between 0-3
+        Select a subdivision detail between 0-3
         <input
           type="range"
           min="0"
           max="4"
           value={subdivLevel}
-          onChange={(event) => {
+          onInput={(event) => {
             var element = event.target! as HTMLInputElement;
             setSubdivLevel(parseInt(element.value));
             updateGraph({
@@ -265,6 +265,9 @@ export function App() {
                 should_raytrace_update: element.checked,
               },
             });
+          }}
+          onMouseMove={(event) => {
+            event.stopPropagation(); // Prevent orbit cam.
           }}
         ></input>
         <div class={classes.stats}>
