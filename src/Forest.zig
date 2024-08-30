@@ -5,12 +5,16 @@ const util = .{
 };
 
 const Vec4 = @Vector(4, f32);
+
 const Vec2 = @Vector(2, f32);
+
 const Coord = @Vector(2, i32);
+
 const CoordIterator = struct {
     current: Coord,
     min_coord: Coord,
     max_coord: Coord,
+
     fn init(min_coord: Coord, max_coord: Coord) @This() {
         return .{
             .current = .{ min_coord[0] - 1, min_coord[1] },
@@ -18,6 +22,7 @@ const CoordIterator = struct {
             .max_coord = max_coord,
         };
     }
+
     fn next(self: *@This()) ?Coord {
         self.current[0] += 1;
         if (self.current[0] > self.max_coord[0]) {
@@ -29,6 +34,7 @@ const CoordIterator = struct {
         return self.current;
     }
 };
+
 const Bounds = struct {
     min: Vec2,
     size: Vec2,
@@ -60,10 +66,10 @@ pub fn Forest(Prefab: type, comptime chunk_size: i32) type {
             const DensityCoord = struct {
                 x: i32,
                 y: i32,
-                density_tier: i32,
+                density: i32,
             };
-            const ChunkType = [chunk_size][chunk_size]?Spawn;
-            const ChunksType = std.AutoHashMap(DensityCoord, ChunkType);
+            const Chunk = [chunk_size][chunk_size]?Spawn;
+            const ChunkCache = std.AutoHashMap(Coord, Chunk);
 
             const quantization = 128;
 
@@ -72,51 +78,68 @@ pub fn Forest(Prefab: type, comptime chunk_size: i32) type {
                 const rng = std.Random.DefaultPrng;
                 const hashFn = std.hash_map.getAutoHashFn(struct { DensityCoord, u32 }, @TypeOf(context));
 
+                cache: ChunkCache,
+
                 density: i32,
                 trees: []const Tree,
                 tree_range: [quantization]?*const Tree,
 
-                pub fn getSpacing(self: @This()) f32 {
+                pub fn getSpan(self: @This()) f32 {
                     return std.math.pow(f32, 2.0, @floatFromInt(self.density));
                 }
 
-                pub fn getChunk(self: *const @This(), coord: struct { x: i32, y: i32 }) !ChunkType {
-                    const spacing = self.getSpacing();
+                pub fn intToFloatRange(i: u64) f32 {
+                    return @as(f32, @floatFromInt(i)) / @as(f32, @floatFromInt(std.math.maxInt(u64)));
+                }
+
+                pub fn getChunk(self: *@This(), coord: Coord) !*const Chunk {
+                    const chunk_entry = try self.cache.getOrPut(coord);
+                    if (chunk_entry.found_existing) {
+                        return chunk_entry.value_ptr;
+                    }
+
+                    const span = self.getSpan();
                     const offset = .{
-                        .x = @as(f32, @floatFromInt(coord.x)) * spacing * chunk_size,
-                        .z = @as(f32, @floatFromInt(coord.y)) * spacing * chunk_size,
+                        .x = @as(f32, @floatFromInt(coord[0])) * span * chunk_size,
+                        .z = @as(f32, @floatFromInt(coord[1])) * span * chunk_size,
                     };
-                    const hash_coord: DensityCoord = .{ .x = coord.x, .y = coord.y, .density_tier = self.density };
-                    var rand = .{
-                        .spawn = rng.init(hashFn(context, .{ hash_coord, 0 })),
-                        .position = rng.init(hashFn(context, .{ hash_coord, 1 })),
-                        .rotation = rng.init(hashFn(context, .{ hash_coord, 2 })),
-                        .scale = rng.init(hashFn(context, .{ hash_coord, 3 })),
-                    };
-                    var chunk: ChunkType = undefined;
-                    for (&chunk, 0..) |*row, y| {
+
+                    for (chunk_entry.value_ptr, 0..) |*row, y| {
                         for (row, 0..) |*item, x| {
+                            const hash_coord: DensityCoord = .{
+                                .x = coord[0] * chunk_size + @as(i32, @intCast(x)),
+                                .y = coord[1] * chunk_size + @as(i32, @intCast(y)),
+                                .density = self.density,
+                            };
+                            const rand = .{
+                                .spawn = hashFn(context, .{ hash_coord, 0 }),
+                                .position_x = hashFn(context, .{ hash_coord, 1 }),
+                                .position_y = hashFn(context, .{ hash_coord, 1 }),
+                                .rotation = hashFn(context, .{ hash_coord, 2 }),
+                                .scale = hashFn(context, .{ hash_coord, 3 }),
+                            };
                             item.* = if (self.tree_range[
-                                rand.spawn.random().intRangeLessThan(usize, 0, quantization)
+                                @intCast(rand.spawn % quantization)
                             ]) |tree|
                                 Spawn{
                                     .prefab = &tree.prefab,
                                     .position = zm.loadArr3(.{
-                                        offset.x + (@as(f32, @floatFromInt(x)) + rand.position.random().float(f32)) * spacing,
+                                        offset.x + (@as(f32, @floatFromInt(x)) + intToFloatRange(rand.position_x)) * span,
                                         0, // TODO - conform to a heightmap?
-                                        offset.z + (@as(f32, @floatFromInt(y)) + rand.position.random().float(f32)) * spacing,
+                                        offset.z + (@as(f32, @floatFromInt(y)) + intToFloatRange(rand.position_y)) * span,
                                     }),
                                     .rotation = zm.quatFromAxisAngle(
                                         zm.loadArr3(.{ 0, 1, 0 }),
-                                        rand.rotation.random().float(f32) * 360 * std.math.rad_per_deg,
+                                        intToFloatRange(rand.rotation) * 360 * std.math.rad_per_deg,
                                     ),
-                                    .scale = tree.scale_range.sample(rand.scale.random().float(f32)),
+                                    .scale = tree.scale_range.sample(intToFloatRange(rand.scale)),
                                 }
                             else
                                 null;
                         }
                     }
-                    return chunk;
+
+                    return chunk_entry.value_ptr;
                 }
             };
 
@@ -174,6 +197,7 @@ pub fn Forest(Prefab: type, comptime chunk_size: i32) type {
                             break :tree_range range;
                         };
                         break :tier .{
+                            .cache = undefined,
                             .trees = tier_trees,
                             .density = density_tier,
                             .tree_range = tree_range,
@@ -183,13 +207,18 @@ pub fn Forest(Prefab: type, comptime chunk_size: i32) type {
                 break :density_tiers .{ tiers, min_tier };
             };
 
-            // if (true) @compileError(std.fmt.comptimePrint("{any}", .{density_tiers}));
-
             return struct {
-                const Chunks = ChunksType;
-                const Chunk = ChunkType;
+                density_tiers: @TypeOf(density_tiers),
 
-                chunks: Chunks,
+                pub fn init(allocator: std.mem.Allocator) @This() {
+                    var result = @This(){
+                        .density_tiers = density_tiers,
+                    };
+                    for (&result.density_tiers) |*maybe_density_tier| if (maybe_density_tier.*) |*density_tier| {
+                        density_tier.cache = ChunkCache.init(allocator);
+                    };
+                    return result;
+                }
 
                 pub fn densityTierToIndex(density_tier: i32) usize {
                     return @intCast(density_tier - min_tier);
@@ -197,54 +226,38 @@ pub fn Forest(Prefab: type, comptime chunk_size: i32) type {
 
                 pub fn gatherSpawnsInBounds(self: *@This(), allocator: std.mem.Allocator, bounds: Bounds) ![]const Spawn {
                     var spawns = std.ArrayList(Spawn).init(allocator);
-                    for (density_tiers) |density_tier| {
-                        if (density_tier) |tier| {
-                            const coord_span = tier.getSpacing();
-                            const chunk_span = coord_span * chunk_size;
-                            var chunk_coords = CoordIterator.init(
-                                @intFromFloat(@floor(bounds.min / @as(Vec2, @splat(chunk_span)))),
-                                @intFromFloat(@ceil((bounds.min + bounds.size) / @as(Vec2, @splat(chunk_span)))),
+                    for (&self.density_tiers) |*maybe_density_tier| if (maybe_density_tier.*) |*density_tier| {
+                        const coord_span: Vec2 = @splat(density_tier.getSpan());
+                        const chunk_span = coord_span * @as(Vec2, @splat(chunk_size));
+                        var chunk_coords = CoordIterator.init(
+                            @intFromFloat(@floor(bounds.min / chunk_span)),
+                            @intFromFloat(@ceil((bounds.min + bounds.size) / chunk_span)),
+                        );
+                        while (chunk_coords.next()) |chunk_coord| {
+                            const chunk = try density_tier.getChunk(.{
+                                chunk_coord[0],
+                                chunk_coord[1],
+                            });
+                            const chunk_offset = @as(Vec2, @floatFromInt(chunk_coord)) * chunk_span;
+                            const min: Coord = @splat(0);
+                            const max: Coord = @splat(chunk_size - 1);
+                            var coords = CoordIterator.init(
+                                std.math.clamp(@as(Coord, @intFromFloat(@floor((bounds.min - chunk_offset) / coord_span))), min, max),
+                                std.math.clamp(@as(Coord, @intFromFloat(@ceil((bounds.min - chunk_offset + bounds.size) / coord_span))), min, max),
                             );
-                            while (chunk_coords.next()) |chunk_coord| {
-                                const chunk = try self.getChunk(.{
-                                    .x = chunk_coord[0],
-                                    .y = chunk_coord[1],
-                                    .density_tier = tier.density,
-                                });
-                                const chunk_offset = @as(Vec2, @floatFromInt(chunk_coord)) * @as(Vec2, @splat(chunk_span));
-                                var coords = CoordIterator.init(
-                                    std.math.clamp(
-                                        @as(Coord, @intFromFloat(@floor((bounds.min - chunk_offset) / @as(Vec2, @splat(coord_span))))),
-                                        @as(Coord, @splat(0)),
-                                        @as(Coord, @splat(chunk_size - 1)),
-                                    ),
-                                    std.math.clamp(
-                                        @as(Coord, @intFromFloat(@ceil((bounds.min - chunk_offset + bounds.size) / @as(Vec2, @splat(coord_span))))),
-                                        @as(Coord, @splat(0)),
-                                        @as(Coord, @splat(chunk_size - 1)),
-                                    ),
-                                );
-                                while (coords.next()) |coord| {
-                                    if (chunk[@intCast(coord[1])][@intCast(coord[0])]) |spawn|
-                                        try spawns.append(spawn);
-                                }
-                            }
+                            while (coords.next()) |coord| if (chunk[@intCast(coord[1])][@intCast(coord[0])]) |spawn|
+                                try spawns.append(spawn);
                         }
-                    }
+                    };
                     return spawns.items;
                 }
 
-                pub fn getChunk(self: *@This(), density_coord: DensityCoord) !*const ChunkType {
-                    const chunk_entry = try self.chunks.getOrPut(density_coord);
-                    if (chunk_entry.found_existing) {
-                        return chunk_entry.value_ptr;
-                    }
-                    const density_tier = &density_tiers[densityTierToIndex(density_coord.density_tier)];
-                    return if (density_tier.*) |*tier| calc_and_cache: {
-                        const chunk = try tier.getChunk(.{ .x = density_coord.x, .y = density_coord.y });
-                        chunk_entry.value_ptr.* = chunk;
-                        break :calc_and_cache chunk_entry.value_ptr;
-                    } else @panic("Tried to access a chunk from a tier that isn't defined!");
+                pub fn getChunk(self: *@This(), density_coord: DensityCoord) !*const Chunk {
+                    const density_tier = &self.density_tiers[densityTierToIndex(density_coord.density)];
+                    return if (density_tier.*) |*tier|
+                        try tier.getChunk(.{ density_coord.x, density_coord.y })
+                    else
+                        @panic("Tried to access a chunk from a tier that isn't defined!");
                 }
             };
         }
@@ -260,26 +273,26 @@ pub fn main() !void {
     const Spawner = AsciiForest.spawner(struct {
         pub const grass1 = AsciiForest.Tree{
             .prefab = .{ .character = '`' },
-            .density_tier = -3,
-            .likelihood = 0.20,
+            .density_tier = -2,
+            .likelihood = 0.05,
             .scale_range = .{ .x_range = .{ 0, 1 }, .y_values = &.{ 0.8, 1.0 } },
         };
         pub const grass2 = AsciiForest.Tree{
             .prefab = .{ .character = ',' },
             .density_tier = -2,
-            .likelihood = 0.20,
+            .likelihood = 0.05,
             .scale_range = .{ .x_range = .{ 0, 1 }, .y_values = &.{ 0.8, 1.0 } },
         };
         pub const little_tree = AsciiForest.Tree{
             .prefab = .{ .character = 't' },
-            .density_tier = 0,
-            .likelihood = 1,
+            .density_tier = 1,
+            .likelihood = 0.25,
             .scale_range = .{ .x_range = .{ 0, 1 }, .y_values = &.{ 0.8, 1.0 } },
         };
         pub const big_tree = AsciiForest.Tree{
             .prefab = .{ .character = 'T' },
-            .density_tier = 1,
-            .likelihood = 1,
+            .density_tier = 2,
+            .likelihood = 0.5,
             .scale_range = .{ .x_range = .{ 0, 1 }, .y_values = &.{ 0.8, 1.0 } },
             .spawn_radii = &[_]AsciiForest.Tree.SpawnRadius{
                 .{
@@ -292,26 +305,7 @@ pub fn main() !void {
     });
 
     const allocator = std.heap.page_allocator;
-    var spawner: Spawner = .{ .chunks = Spawner.Chunks.init(allocator) };
-
-    // const chunks: []const *const Spawner.Chunk = &.{
-    //     try spawner.getChunk(.{ .x = 0, .y = 0, .density_tier = -2 }),
-    //     try spawner.getChunk(.{ .x = 0, .y = 0, .density_tier = -2 }),
-    // };
-
-    // for (chunks) |chunk| {
-    //     std.debug.print("another chunk\n", .{});
-    //     for (chunk) |row| {
-    //         var line_data = std.ArrayList(u8).init(allocator);
-    //         for (row) |maybe_item| {
-    //             try line_data.appendSlice(&.{
-    //                 if (maybe_item) |item| item.prefab.character else '_',
-    //                 ' ',
-    //             });
-    //         }
-    //         std.debug.print("{s}\n", .{line_data.items});
-    //     }
-    // }
+    var spawner: Spawner = Spawner.init(allocator);
 
     // Spawn trees and Display in a large grid, that shows all density tiers together with random offsets 🌲
     const bounds = Bounds{
@@ -323,11 +317,11 @@ pub fn main() !void {
     const world_size = .{ .width = 128, .height = 64 };
     var world: [world_size.height][world_size.width]u8 = .{.{' '} ** world_size.width} ** world_size.height;
     for (spawns) |spawn| {
-        const location: Coord = @as(Coord, @intFromFloat(@floor(
+        const location: Coord = @intFromFloat(@floor(
             (Vec2{ spawn.position[0], spawn.position[2] } - bounds.min) /
                 bounds.size *
                 Vec2{ world_size.width, world_size.height },
-        )));
+        ));
         if (location[0] >= 0 and location[0] < world_size.width and
             location[1] >= 0 and location[1] < world_size.height)
             world[@intCast(location[1])][@intCast(location[0])] = spawn.prefab.character;
