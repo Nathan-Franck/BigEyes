@@ -9,7 +9,11 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@types/file-saver": "^2.0.7",
+    "file-saver": "^2.0.5",
+    "jszip": "^3.10.1",
     "preact": "^10.19.6",
+    "react-image-crop": "^11.0.6",
     "vite-plugin-top-level-await": "^1.4.1",
     "vite-plugin-wasm": "^3.3.0",
     "vite-plugin-zip-pack": "^1.2.3",

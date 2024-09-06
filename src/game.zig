@@ -11,6 +11,7 @@ const zm = @import("./zmath/main.zig");
 const wasm_entry = @import("./wasm_entry.zig");
 const utils = @import("./utils.zig");
 const tree = @import("./tree.zig");
+const forest = @import("./forest.zig");
 
 pub const Mesh = struct {
     label: []const u8,
@@ -152,6 +153,13 @@ pub const interface = struct {
                     },
                 },
                 .{
+                    .name = "displayForest",
+                    .function = "displayForest",
+                    .input_links = &[_]graph.InputLink{
+                        .{ .field = "resources", .source = .{ .node = .{ .name = "getResources", .field = "resources" } } },
+                    },
+                },
+                .{
                     .name = "changeSettings",
                     .function = "changeSettings",
                     .input_links = &[_]graph.InputLink{
@@ -166,7 +174,8 @@ pub const interface = struct {
             },
             .output = &[_]graph.SystemSink{
                 // .{ .output_node = "displayCat", .output_field = "current_cat_mesh", .system_field = "current_cat_mesh" },
-                .{ .output_node = "displayTree", .output_field = "current_cat_mesh", .system_field = "current_cat_mesh" },
+                .{ .output_node = "displayTree", .output_field = "tree_mesh", .system_field = "current_cat_mesh" },
+                .{ .output_node = "displayForest", .output_field = "forest_data", .system_field = "forest_data" },
                 // .{ .output_node = "getResources", .output_field = "resources", .system_field = "resources" },
                 .{ .output_node = "orbit", .output_field = "world_matrix", .system_field = "world_matrix" },
             },
@@ -356,13 +365,24 @@ pub const interface = struct {
                 };
             }
 
+            pub fn displayForest(
+                allocator: std.mem.Allocator,
+                props: struct {
+                    resources: Resources,
+                },
+            ) !struct { forest_data: struct {} } {
+                const Prefab = struct {};
+                const Forest = forest.Forest(Prefab, 32);
+                const spawner = Forest.Spawner();
+            }
+
             pub fn displayTree(
                 allocator: std.mem.Allocator,
                 props: struct {
                     resources: Resources,
                 },
             ) !struct {
-                current_cat_mesh: Mesh,
+                tree_mesh: Mesh,
             } {
                 wasm_entry.dumpDebugLogFmt("Tree vert count {any}", .{props.resources.tree.bark_mesh.vertices.len});
                 var bark_mesh_triangles = try allocator.alloc(u32, props.resources.tree.bark_mesh.triangles.len);
@@ -370,7 +390,7 @@ pub const interface = struct {
                     bark_mesh_triangles[i] = index + props.resources.tree.leaf_mesh.vertices.len;
                 }
                 return .{
-                    .current_cat_mesh = .{
+                    .tree_mesh = .{
                         .label = "Tree",
                         .indices = try std.mem.concat(allocator, u32, &.{
                             props.resources.tree.leaf_mesh.triangles,

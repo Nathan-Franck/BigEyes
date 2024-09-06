@@ -62,7 +62,7 @@ pub fn Forest(Prefab: type, comptime chunk_size: i32) type {
             scale: f32,
         };
 
-        fn spawner(ForestSettings: type) type {
+        pub fn spawner(ForestSettings: type) type {
             const DensityCoord = struct {
                 x: i32,
                 y: i32,
