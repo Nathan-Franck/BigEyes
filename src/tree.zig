@@ -291,19 +291,14 @@ pub fn generateLeaves(allocator: Allocator, skeleton: Skeleton, settings: MeshSe
             const length = node.size * settings.leaves.length;
             const breadth = node.size * settings.leaves.breadth;
 
-            const vertices = [_]Vec4{
-                Vec4{ 0, 0, 0, 1 },
-                Vec4{ breadth, 0, 0, 1 },
-                Vec4{ breadth, 0, length, 1 },
-                Vec4{ 0, 0, length, 1 },
+            const uvs = [_]Vec2{ Vec2{ 0, 0 }, Vec2{ 1, 0 }, Vec2{ 1, 1 }, Vec2{ 0, 1 } };
+            const vertices = blk: {
+                var result: [4]Vec4 = undefined;
+                inline for (uvs, 0..) |uv, index| {
+                    result[index] = Vec4{ uv[0] * breadth, 0, uv[1] * length, 1 };
+                }
+                break :blk result;
             };
-            const uvs = [_]Vec2{
-                Vec2{ 0, 0 },
-                Vec2{ 1, 0 },
-                Vec2{ 1, 1 },
-                Vec2{ 0, 1 },
-            };
-            _ = uvs; // autofix
 
             const vertex_offset = node_index * 4;
             for (vertices, 0..) |vertex, i| {
@@ -314,6 +309,7 @@ pub fn generateLeaves(allocator: Allocator, skeleton: Skeleton, settings: MeshSe
                         zm.translationV(node.position),
                     ),
                 );
+                mesh.uvs[vertex_offset + i] = uvs[i];
                 mesh.normals[vertex_offset + i] = zm.normalize3(zm.rotate(node.rotation, leaf_normals[i]));
                 mesh.split_height[vertex_offset + i] = node.split_height;
             }
