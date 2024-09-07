@@ -1,33 +1,43 @@
 const std = @import("std");
 const PngFormat = @import("./zigimg/src/formats/png.zig");
+const Image = @import("./zigimg/src/Image.zig");
+const Rgba32 = @import("./zigimg/src/color.zig").Rgba32;
 const wasm_entry = @import("./wasm_entry.zig");
 
 const ImageSizeLimit = 4096;
-
-data: []const u8,
-width: usize,
-height: usize,
-scale: u8, // If we downsample, we have to declare that we have to scale up upon displaying.
+const Rgba32Image = struct {
+    pixels: []const Rgba32,
+    width: u32,
+    height: u32,
+};
 
 pub fn loadPng(
     allocator: std.mem.Allocator,
     png_data: []const u8,
-) !@This() {
-    const image_data = load_png: {
-        var stream_source = std.io.StreamSource{ .const_buffer = std.io.fixedBufferStream(png_data) };
-        var default_options = PngFormat.DefaultOptions{};
-        break :load_png try PngFormat.load(&stream_source, allocator, default_options.get());
-    };
-    const data = switch (image_data.pixels) {
-        .rgba32 => |rgba| std.mem.sliceAsBytes(rgba),
+) !Rgba32Image {
+    var stream_source = std.io.StreamSource{ .const_buffer = std.io.fixedBufferStream(png_data) };
+    var default_options = PngFormat.DefaultOptions{};
+    const image_data = try PngFormat.load(&stream_source, allocator, default_options.get());
+    switch (image_data.pixels) {
+        .rgba32 => |rgba| return .{
+            .pixels = rgba,
+            .width = image_data.width,
+            .height = image_data.height,
+        },
         else => @panic("handy axiom"),
-    };
+    }
+}
+
+pub fn processImageForGPU(
+    allocator: std.mem.Allocator,
+    image_data: Rgba32Image,
+) !ProcessedImage {
+    const data = std.mem.sliceAsBytes(image_data.pixels);
     if (image_data.width > ImageSizeLimit or image_data.height > ImageSizeLimit) {
         // Return a down-sampled version instead
         var dimensions: struct { width: usize, height: usize } = .{ .width = image_data.width, .height = image_data.height };
         var downSampleRate: u8 = 1;
         while (dimensions.width > ImageSizeLimit or dimensions.height > ImageSizeLimit) {
-            wasm_entry.dumpDebugLogFmt("Hello! {d}", .{downSampleRate});
             downSampleRate *= 2;
             dimensions.width /= 2;
             dimensions.height /= 2;
@@ -69,4 +79,19 @@ pub fn loadPng(
         .height = image_data.height,
         .scale = 1,
     };
+}
+
+pub const ProcessedImage = struct {
+    data: []const u8,
+    width: usize,
+    height: usize,
+    scale: u8, // If we downsample, we have to declare that we have to scale up upon displaying.
+};
+
+pub fn loadPngAndProcess(
+    allocator: std.mem.Allocator,
+    png_data: []const u8,
+) ProcessedImage {
+    const image_data = loadPng(allocator, png_data);
+    return processImageForGPU(allocator, image_data);
 }

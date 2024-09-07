@@ -82,6 +82,7 @@ pub fn NodeGraph(
         comptime var node_output_fields: []const std.builtin.Type.StructField = &.{};
         inline for (graph.nodes) |node| {
             const node_defn = @field(node_definitions, node.name);
+
             const function_definition = @typeInfo(@TypeOf(node_defn)).Fn;
             const node_outputs = function_definition.return_type.?;
             const node_inputs = function_definition.params;

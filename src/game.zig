@@ -4,6 +4,8 @@ const typeDefinitions = @import("./type_definitions.zig");
 
 const subdiv = @import("./subdiv.zig");
 const Image = @import("./Image.zig");
+const ProcessedImage = @import("./Image.zig").ProcessedImage;
+const Rgba32 = @import("./zigimg/src/color.zig").Rgba32;
 const raytrace = @import("./raytrace.zig");
 const mesh_helper = @import("./mesh_helper.zig");
 const MeshSpec = @import("./MeshSpec.zig");
@@ -152,13 +154,13 @@ pub const interface = struct {
                         .{ .field = "resources", .source = .{ .node = .{ .name = "getResources", .field = "resources" } } },
                     },
                 },
-                .{
-                    .name = "displayForest",
-                    .function = "displayForest",
-                    .input_links = &[_]graph.InputLink{
-                        .{ .field = "resources", .source = .{ .node = .{ .name = "getResources", .field = "resources" } } },
-                    },
-                },
+                // .{
+                //     .name = "displayForest",
+                //     .function = "displayForest",
+                //     .input_links = &[_]graph.InputLink{
+                //         .{ .field = "resources", .source = .{ .node = .{ .name = "getResources", .field = "resources" } } },
+                //     },
+                // },
                 .{
                     .name = "changeSettings",
                     .function = "changeSettings",
@@ -175,7 +177,7 @@ pub const interface = struct {
             .output = &[_]graph.SystemSink{
                 // .{ .output_node = "displayCat", .output_field = "current_cat_mesh", .system_field = "current_cat_mesh" },
                 .{ .output_node = "displayTree", .output_field = "tree_mesh", .system_field = "current_cat_mesh" },
-                .{ .output_node = "displayForest", .output_field = "forest_data", .system_field = "forest_data" },
+                // .{ .output_node = "displayForest", .output_field = "forest_data", .system_field = "forest_data" },
                 // .{ .output_node = "getResources", .output_field = "resources", .system_field = "resources" },
                 .{ .output_node = "orbit", .output_field = "world_matrix", .system_field = "world_matrix" },
             },
@@ -198,6 +200,7 @@ pub const interface = struct {
                     leaf_mesh: tree.Mesh,
                     bark_mesh: tree.Mesh,
                 },
+                cutout_leaf: ProcessedImage,
             };
 
             pub const Settings = struct {
@@ -247,12 +250,27 @@ pub const interface = struct {
                 //         "pz",
                 //     }) |direction| {
                 //         const direction_texture = @embedFile("content/Bush_Cube_Map/" ++ direction ++ ".png");
-                //         const image_data = try Image.loadPng(allocator, direction_texture);
+                //         const image_data = try Image.loadPngAndProcess(allocator, direction_texture);
                 //         try cubemap_images.append(image_data);
                 //     }
                 //     break :blk cubemap_images.items;
                 // };
                 // _ = cube_map_input_data; // autofix
+
+                const cutout_leaf = blk: {
+                    const diffuse = try Image.loadPng(allocator, @embedFile("content/7mr5x/diffuse.png"));
+                    const alpha = try Image.loadPng(allocator, @embedFile("content/7mr5x/alpha.png"));
+                    const cutout_diffuse = .{
+                        .width = diffuse.width,
+                        .height = diffuse.height,
+                        .pixels = try allocator.alloc(@TypeOf(diffuse.pixels[0]), diffuse.pixels.len),
+                    };
+                    for (cutout_diffuse.pixels, 0..) |*pixel, pixel_index| {
+                        pixel.* = diffuse.pixels[pixel_index];
+                        pixel.*.a = alpha.pixels[pixel_index].r;
+                    }
+                    break :blk try Image.processImageForGPU(allocator, cutout_diffuse);
+                };
 
                 const mesh_input_data = blk: {
                     const json_data = @embedFile("content/Cat.blend.json");
@@ -307,6 +325,7 @@ pub const interface = struct {
 
                 return .{
                     .resources = .{
+                        .cutout_leaf = cutout_leaf,
                         .cat = SubdivAnimationMesh{
                             .label = input_data.name,
                             .indices = QuadMeshHelper.toTriangleIndices(
@@ -365,16 +384,16 @@ pub const interface = struct {
                 };
             }
 
-            pub fn displayForest(
-                allocator: std.mem.Allocator,
-                props: struct {
-                    resources: Resources,
-                },
-            ) !struct { forest_data: struct {} } {
-                const Prefab = struct {};
-                const Forest = forest.Forest(Prefab, 32);
-                const spawner = Forest.Spawner();
-            }
+            // pub fn displayForest(
+            //     allocator: std.mem.Allocator,
+            //     props: struct {
+            //         resources: Resources,
+            //     },
+            // ) !struct { forest_data: struct {} } {
+            //     const Prefab = struct {};
+            //     const Forest = forest.Forest(Prefab, 32);
+            //     const spawner = Forest.Spawner();
+            // }
 
             pub fn displayTree(
                 allocator: std.mem.Allocator,
@@ -389,12 +408,12 @@ pub const interface = struct {
                 for (props.resources.tree.bark_mesh.triangles, 0..) |index, i| {
                     bark_mesh_triangles[i] = index + props.resources.tree.leaf_mesh.vertices.len;
                 }
+                wasm_entry.dumpDebugLogFmt("{}", .{props.resources.tree.leaf_mesh.vertices.len});
                 return .{
                     .tree_mesh = .{
                         .label = "Tree",
                         .indices = try std.mem.concat(allocator, u32, &.{
                             props.resources.tree.leaf_mesh.triangles,
-                            // props.resources.tree.bark_mesh.triangles,
                             bark_mesh_triangles,
                         }),
                         .position = mesh_helper.pointsToFloatSlice(allocator, try std.mem.concat(allocator, tree.Vec4, &.{

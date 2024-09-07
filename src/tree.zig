@@ -4,6 +4,7 @@ const zm = @import("./zmath/main.zig");
 const Allocator = std.mem.Allocator;
 
 pub const Vec4 = @Vector(4, f32);
+pub const Vec2 = @Vector(2, f32);
 pub const Quat = Vec4;
 
 fn flattenAngle(unnormalized_angle: f32, rate: f32) f32 {
@@ -207,6 +208,7 @@ const leaf_normals = [_]zm.Vec{
 
 pub const Mesh = struct {
     vertices: []Vec4,
+    uvs: []Vec2,
     normals: []Vec4,
     split_height: []f32,
     triangles: []u32,
@@ -218,6 +220,7 @@ pub fn generateTaperedWood(allocator: Allocator, skeleton: Skeleton, settings: M
 
     var mesh = Mesh{
         .vertices = try allocator.alloc(Vec4, vertex_count),
+        .uvs = try allocator.alloc(Vec2, vertex_count),
         .normals = try allocator.alloc(Vec4, vertex_count),
         .split_height = try allocator.alloc(f32, vertex_count),
         .triangles = try allocator.alloc(u32, triangle_count),
@@ -276,6 +279,7 @@ pub fn generateLeaves(allocator: Allocator, skeleton: Skeleton, settings: MeshSe
 
     var mesh = Mesh{
         .vertices = try allocator.alloc(Vec4, vertex_count),
+        .uvs = try allocator.alloc(Vec2, vertex_count),
         .normals = try allocator.alloc(Vec4, vertex_count),
         .split_height = try allocator.alloc(f32, vertex_count),
         .triangles = try allocator.alloc(u32, triangle_count),
@@ -289,10 +293,17 @@ pub fn generateLeaves(allocator: Allocator, skeleton: Skeleton, settings: MeshSe
 
             const vertices = [_]Vec4{
                 Vec4{ 0, 0, 0, 1 },
-                Vec4{ breadth * 0.4, breadth * 0.1, length * 0.5, 1 },
+                Vec4{ breadth, 0, 0, 1 },
+                Vec4{ breadth, 0, length, 1 },
                 Vec4{ 0, 0, length, 1 },
-                Vec4{ breadth * -0.4, breadth * 0.1, length * 0.5, 1 },
             };
+            const uvs = [_]Vec2{
+                Vec2{ 0, 0 },
+                Vec2{ 1, 0 },
+                Vec2{ 1, 1 },
+                Vec2{ 0, 1 },
+            };
+            _ = uvs; // autofix
 
             const vertex_offset = node_index * 4;
             for (vertices, 0..) |vertex, i| {

@@ -124,8 +124,8 @@ export function App() {
         indices: { type: "element" },
         position: { type: "attribute", unit: "vec3" },
         normals: { type: "attribute", unit: "vec3" },
-        colors: { type: "attribute", unit: "vec3" },
-        color: { type: "varying", unit: "vec3" },
+        // colors: { type: "attribute", unit: "vec3" },
+        // color: { type: "varying", unit: "vec3" },
         normal: { type: "varying", unit: "vec3" },
         item_position: { type: "attribute", unit: "vec3", instanced: true },
         perspectiveMatrix: { type: "uniform", unit: "mat4", count: 1 },
@@ -135,7 +135,7 @@ export function App() {
         void main(void) {
           gl_Position = perspectiveMatrix * vec4(item_position + position, 1);
           normal = normals;
-          color = colors;
+          // color = colors;
         }
       `,
       fragSource: `

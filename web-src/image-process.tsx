@@ -257,15 +257,6 @@ export default function ImageProcessingWorkflow() {
         ctx.drawImage(croppedCanvas, 0, 0)
       }
 
-      // // Apply offset
-      // const offsetCanvas = document.createElement('canvas')
-      // const offsetCtx = offsetCanvas.getContext('2d')
-      // if (!offsetCtx) continue
-
-      // offsetCanvas.width = canvas.width
-      // offsetCanvas.height = canvas.height
-      // offsetCtx.drawImage(canvas, image.offset.x, image.offset.y)
-
       console.log("image transformed")
 
       const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve))
