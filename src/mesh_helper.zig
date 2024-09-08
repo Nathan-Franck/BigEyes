@@ -34,15 +34,19 @@ pub fn flipYZ(allocator: std.mem.Allocator, points: []const spec.Point) []const 
     return flipped.items;
 }
 
-pub fn pointsToFloatSlice(allocator: std.mem.Allocator, points: []const spec.Point) []const f32 {
-    var float_slice = allocator.alloc(f32, points.len * 3) catch unreachable;
-    return for (points, 0..) |point, index| {
-        std.mem.copyForwards(
-            f32,
-            float_slice[index * 3 .. index * 3 + 3],
-            @as([4]f32, point)[0..3],
-        );
-    } else float_slice;
+pub fn VecSliceFlattener(comptime vec_size: u32, comptime sample_size: u32) type {
+    return struct {
+        pub fn convert(allocator: std.mem.Allocator, points: []const @Vector(vec_size, f32)) []const f32 {
+            var float_slice = allocator.alloc(f32, points.len * sample_size) catch unreachable;
+            return for (points, 0..) |point, index| {
+                std.mem.copyForwards(
+                    f32,
+                    float_slice[index * sample_size .. index * sample_size + sample_size],
+                    @as([vec_size]f32, point)[0..sample_size],
+                );
+            } else float_slice;
+        }
+    };
 }
 
 pub fn Polygon(comptime poly_selection: enum { Quad, Face }) type {

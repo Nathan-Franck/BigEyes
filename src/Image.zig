@@ -31,7 +31,7 @@ pub fn loadPng(
 pub fn processImageForGPU(
     allocator: std.mem.Allocator,
     image_data: Rgba32Image,
-) !ProcessedImage {
+) !Processed {
     const data = std.mem.sliceAsBytes(image_data.pixels);
     if (image_data.width > ImageSizeLimit or image_data.height > ImageSizeLimit) {
         // Return a down-sampled version instead
@@ -81,7 +81,7 @@ pub fn processImageForGPU(
     };
 }
 
-pub const ProcessedImage = struct {
+pub const Processed = struct {
     data: []const u8,
     width: usize,
     height: usize,
@@ -91,7 +91,7 @@ pub const ProcessedImage = struct {
 pub fn loadPngAndProcess(
     allocator: std.mem.Allocator,
     png_data: []const u8,
-) ProcessedImage {
+) Processed {
     const image_data = loadPng(allocator, png_data);
     return processImageForGPU(allocator, image_data);
 }

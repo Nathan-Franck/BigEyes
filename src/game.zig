@@ -4,7 +4,6 @@ const typeDefinitions = @import("./type_definitions.zig");
 
 const subdiv = @import("./subdiv.zig");
 const Image = @import("./Image.zig");
-const ProcessedImage = @import("./Image.zig").ProcessedImage;
 const Rgba32 = @import("./zigimg/src/color.zig").Rgba32;
 const raytrace = @import("./raytrace.zig");
 const mesh_helper = @import("./mesh_helper.zig");
@@ -19,7 +18,7 @@ pub const Mesh = struct {
     label: []const u8,
     indices: []const u32,
     position: []const f32,
-    color: []const f32,
+    uv: []const f32,
     normal: []const f32,
 };
 
@@ -200,7 +199,7 @@ pub const interface = struct {
                     leaf_mesh: tree.Mesh,
                     bark_mesh: tree.Mesh,
                 },
-                cutout_leaf: ProcessedImage,
+                cutout_leaf: Image.Processed,
             };
 
             pub const Settings = struct {
@@ -324,7 +323,7 @@ pub const interface = struct {
                 const tree_skeleton = try tree.generateStructure(allocator, tree.diciduous.structure);
 
                 return .{
-                    .resources = .{
+                    .resources = Resources{
                         .cutout_leaf = cutout_leaf,
                         .cat = SubdivAnimationMesh{
                             .label = input_data.name,
@@ -409,6 +408,8 @@ pub const interface = struct {
                     bark_mesh_triangles[i] = index + props.resources.tree.leaf_mesh.vertices.len;
                 }
                 wasm_entry.dumpDebugLogFmt("{}", .{props.resources.tree.leaf_mesh.vertices.len});
+                const PointFlattener = mesh_helper.VecSliceFlattener(4, 3);
+                const UvFlattener = mesh_helper.VecSliceFlattener(2, 2);
                 return .{
                     .tree_mesh = .{
                         .label = "Tree",
@@ -416,12 +417,15 @@ pub const interface = struct {
                             props.resources.tree.leaf_mesh.triangles,
                             bark_mesh_triangles,
                         }),
-                        .position = mesh_helper.pointsToFloatSlice(allocator, try std.mem.concat(allocator, tree.Vec4, &.{
+                        .position = PointFlattener.convert(allocator, try std.mem.concat(allocator, tree.Vec4, &.{
                             props.resources.tree.leaf_mesh.vertices,
                             props.resources.tree.bark_mesh.vertices,
                         })),
-                        .color = &.{},
-                        .normal = mesh_helper.pointsToFloatSlice(allocator, try std.mem.concat(allocator, tree.Vec4, &.{
+                        .uv = UvFlattener.convert(allocator, try std.mem.concat(allocator, tree.Vec2, &.{
+                            props.resources.tree.leaf_mesh.uvs,
+                            props.resources.tree.bark_mesh.uvs,
+                        })),
+                        .normal = PointFlattener.convert(allocator, try std.mem.concat(allocator, tree.Vec4, &.{
                             props.resources.tree.leaf_mesh.normals,
                             props.resources.tree.bark_mesh.normals,
                         })),
