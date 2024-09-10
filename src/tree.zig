@@ -295,7 +295,7 @@ pub fn generateLeaves(allocator: Allocator, skeleton: Skeleton, settings: MeshSe
             const vertices = blk: {
                 var result: [4]Vec4 = undefined;
                 inline for (uvs, 0..) |uv, index| {
-                    result[index] = Vec4{ uv[0] * breadth, 0, uv[1] * length, 1 };
+                    result[index] = Vec4{ std.math.lerp(-1, 1, uv[0]) * breadth, 0, std.math.lerp(1, 0, uv[1]) * length, 1 };
                 }
                 break :blk result;
             };
@@ -386,6 +386,63 @@ pub const diciduous = .{
             .split_depth = 4,
             .length = 1.0,
             .breadth = 0.3,
+        },
+        .growth_to_thickness = .{
+            .y_values = &.{ 0.0025, 0.035 },
+            .x_range = .{ 0.0, 1.0 },
+        },
+    },
+};
+
+pub const diciduous_low_poly = .{
+    .structure = Settings{
+        .start_size = 1,
+        .start_growth = 1,
+        .depth_definitions = &[_]DepthDefinition{
+            .{
+                .split_amount = 10,
+                .flatness = 0.0,
+                .size = 0.4,
+                .height_spread = 0.6,
+                .branch_pitch = 50.0 * math.rad_per_deg,
+                .branch_roll = 90.0 * math.rad_per_deg,
+                .height_to_growth = .{
+                    .y_values = &.{ 1.0, 1.0, 0.0 },
+                    .x_range = .{ 0.0, 1.0 },
+                },
+            },
+            .{
+                .split_amount = 6,
+                .flatness = 0.3,
+                .size = 0.45,
+                .height_spread = 0.8,
+                .branch_pitch = 60.0 * math.rad_per_deg,
+                .branch_roll = 90.0 * math.rad_per_deg,
+                .height_to_growth = .{
+                    .y_values = &.{ 1.0, 1.0, 0.0 },
+                    .x_range = .{ 0.0, 1.0 },
+                },
+            },
+            .{
+                .split_amount = 10,
+                .flatness = 0.0,
+                .size = 0.5,
+                .height_spread = 0.8,
+                .branch_pitch = 40.0 * math.rad_per_deg,
+                .branch_roll = 90.0 * math.rad_per_deg,
+                .height_to_growth = .{
+                    .y_values = &.{ 1.0, 1.0, 0.0 },
+                    .x_range = .{ 0.0, 1.0 },
+                },
+            },
+        },
+    },
+    .mesh = MeshSettings{
+        .thickness = 0.05,
+        .leaves = .{
+            .split_depth = 3,
+            .length = 2.0,
+            .breadth = 1.0,
         },
         .growth_to_thickness = .{
             .y_values = &.{ 0.0025, 0.035 },

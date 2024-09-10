@@ -66,7 +66,7 @@ let updateRender:
   | null = null;
 
 function updateGraph(newInputs: typeof graphInputs) {
-var  graphInputs = newInputs;
+  var graphInputs = newInputs;
   const graphOutputs = nodeGraph.call(graphInputs);
   if (graphOutputs == null || "error" in graphOutputs) return;
   if (updateRender != null) updateRender(graphOutputs)();
@@ -115,7 +115,7 @@ export function App() {
     if (!gl) return;
 
     gl.enable(gl.BLEND);
-    gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
     gl.enable(gl.DEPTH_TEST);
 
     const coolMesh = ShaderBuilder.generateMaterial(gl, {
@@ -124,9 +124,10 @@ export function App() {
         indices: { type: "element" },
         position: { type: "attribute", unit: "vec3" },
         normals: { type: "attribute", unit: "vec3" },
-        // uvs: { type: "attribute", unit: "vec2" },
-        // uv: { type: "varying", unit: "vec2" },
+        uvs: { type: "attribute", unit: "vec2" },
+        uv: { type: "varying", unit: "vec2" },
         normal: { type: "varying", unit: "vec3" },
+        texture: { type: "uniform", unit: "sampler2D", count: 1 },
         item_position: { type: "attribute", unit: "vec3", instanced: true },
         perspectiveMatrix: { type: "uniform", unit: "mat4", count: 1 },
       },
@@ -134,13 +135,21 @@ export function App() {
         precision highp float;
         void main(void) {
           gl_Position = perspectiveMatrix * vec4(item_position + position, 1);
+          uv = uvs;
           normal = normals;
         }
       `,
       fragSource: `
         precision highp float;
         void main(void) {
-          gl_FragColor = vec4(normal * 0.5 + 0.5, 1);
+          // gl_FragColor = vec4(normal * 0.5 + 0.5, 1);
+          // gl_FragColor = texture2D(texture, uv);
+          // gl_FragColor = vec4(texture2D(texture, uv).a, 0, 0, 1);
+          if (texture2D(texture, uv).a > 0.65) {
+            discard;
+          }
+          gl_FragColor = vec4(texture2D(texture, uv).rgb, 1);
+          // gl_FragColor = vec4(uv, 0, 1);
         }
       `,
     });
@@ -174,6 +183,11 @@ export function App() {
         perspectiveMatrix: graphOutputs.world_matrix.flatMap(
           (row) => row,
         ) as Mat4,
+        texture: ShaderBuilder.loadImageData(gl,
+          sliceToArray.Uint8Array(graphOutputs.current_cat_mesh.texture.data),
+          graphOutputs.current_cat_mesh.texture.width,
+          graphOutputs.current_cat_mesh.texture.height,
+        ),
       };
       requestAnimationFrame(() => {
         {
@@ -220,9 +234,9 @@ export function App() {
             lastMousePosition == null
               ? currentMouse
               : {
-                  x: currentMouse.x - lastMousePosition.x,
-                  y: currentMouse.y - lastMousePosition.y,
-                };
+                x: currentMouse.x - lastMousePosition.x,
+                y: currentMouse.y - lastMousePosition.y,
+              };
           lastMousePosition = currentMouse;
           if (event.buttons) {
             updateGraph({

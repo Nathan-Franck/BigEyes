@@ -16,6 +16,7 @@ const forest = @import("./forest.zig");
 
 pub const Mesh = struct {
     label: []const u8,
+    texture: Image.Processed,
     indices: []const u32,
     position: []const f32,
     uv: []const f32,
@@ -320,7 +321,7 @@ pub const interface = struct {
                     ));
                 }
 
-                const tree_skeleton = try tree.generateStructure(allocator, tree.diciduous.structure);
+                const tree_skeleton = try tree.generateStructure(allocator, tree.diciduous_low_poly.structure);
 
                 return .{
                     .resources = Resources{
@@ -338,8 +339,8 @@ pub const interface = struct {
                         },
                         .tree = .{
                             .skeleton = tree_skeleton,
-                            .bark_mesh = try tree.generateTaperedWood(allocator, tree_skeleton, tree.diciduous.mesh),
-                            .leaf_mesh = try tree.generateLeaves(allocator, tree_skeleton, tree.diciduous.mesh),
+                            .bark_mesh = try tree.generateTaperedWood(allocator, tree_skeleton, tree.diciduous_low_poly.mesh),
+                            .leaf_mesh = try tree.generateLeaves(allocator, tree_skeleton, tree.diciduous_low_poly.mesh),
                         },
                     },
                 };
@@ -413,6 +414,7 @@ pub const interface = struct {
                 return .{
                     .tree_mesh = .{
                         .label = "Tree",
+                        .texture = props.resources.cutout_leaf,
                         .indices = try std.mem.concat(allocator, u32, &.{
                             props.resources.tree.leaf_mesh.triangles,
                             bark_mesh_triangles,
