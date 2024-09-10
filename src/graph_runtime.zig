@@ -306,7 +306,7 @@ pub fn NodeGraph(
                 const field_type = getOutputFieldTypeFromNode(node, output_defn.output_field);
                 fields = fields ++ .{.{
                     .name = name[0.. :0],
-                    .type = field_type,
+                    .type = ?field_type,
                     .default_value = null,
                     .is_comptime = false,
                     .alignment = @alignOf(field_type),
@@ -547,6 +547,7 @@ pub fn NodeGraph(
 
             // Copy over new store values...
             inline for (graph.store) |store_defn| {
+                // TODO - Once we need to optimize, only copy values that have changed!
                 const node_result = @field(self.nodes_outputs, store_defn.output_node);
                 const result = @field(node_result, store_defn.output_field);
                 @field(self.store, store_defn.system_field) = try utils.deepClone(
@@ -559,13 +560,19 @@ pub fn NodeGraph(
             // Output from system from select nodes...
             var system_outputs: SystemOutputs = undefined;
             inline for (graph.output) |output_defn| {
-                const node_outputs = @field(self.nodes_outputs, output_defn.output_node);
-                const result = @field(node_outputs, output_defn.output_field);
-                @field(system_outputs, output_defn.system_field) = try utils.deepClone(
-                    @TypeOf(result),
-                    self.store_arena.allocator(),
-                    result,
-                );
+                const target = &@field(system_outputs, output_defn.system_field);
+                const is_dirty = @field(self.nodes_dirty_flags, output_defn.output_node);
+                if (!is_dirty) {
+                    target.* = null;
+                } else {
+                    const node_outputs = @field(self.nodes_outputs, output_defn.output_node);
+                    const result = @field(node_outputs, output_defn.output_field);
+                    target.* = try utils.deepClone(
+                        @TypeOf(result),
+                        self.store_arena.allocator(),
+                        result,
+                    );
+                }
             }
 
             return system_outputs;

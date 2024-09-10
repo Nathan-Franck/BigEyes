@@ -72,20 +72,20 @@ export type ElementBuffer = {
 	glType: "UNSIGNED_SHORT" | "UNSIGNED_INT",
 };
 export type Binds<T> =
-	& { readonly [key in AllowedKeys<T, { type: "uniform", unit: "float", count: 1 }>]: number }
-	& { readonly [key in AllowedKeys<T, { type: "uniform", unit: "vec2", count: 1 }>]: Vec2 }
-	& { readonly [key in AllowedKeys<T, { type: "uniform", unit: "vec3", count: 1 }>]: Vec3 }
-	& { readonly [key in AllowedKeys<T, { type: "uniform", unit: "vec4", count: 1 }>]: Vec4 }
-	& { readonly [key in AllowedKeys<T, { type: "uniform", unit: "mat4", count: 1 }>]: Mat4 }
-	& { readonly [key in AllowedKeys<T, { type: "uniform", unit: "sampler2D", count: 1 }>]: Texture }
-	& { readonly [key in AllowedKeys<T, { type: "uniform", unit: "float", count: UniformSizes }>]: readonly number[] }
-	& { readonly [key in AllowedKeys<T, { type: "uniform", unit: "vec2", count: UniformSizes }>]: readonly Vec2[] }
-	& { readonly [key in AllowedKeys<T, { type: "uniform", unit: "vec3", count: UniformSizes }>]: readonly Vec3[] }
-	& { readonly [key in AllowedKeys<T, { type: "uniform", unit: "vec4", count: UniformSizes }>]: readonly Vec4[] }
-	& { readonly [key in AllowedKeys<T, { type: "uniform", unit: "mat4", count: UniformSizes }>]: readonly Mat4[] }
-	& { readonly [key in AllowedKeys<T, { type: "uniform", unit: "sampler2D", count: UniformSizes }>]: readonly Texture[] }
-	& { readonly [key in AllowedKeys<T, Attribute>]: SizedBuffer }
-	& { readonly [key in AllowedKeys<T, Element>]: ElementBuffer }
+	& { [key in AllowedKeys<T, { type: "uniform", unit: "float", count: 1 }>]: number }
+	& { [key in AllowedKeys<T, { type: "uniform", unit: "vec2", count: 1 }>]: Vec2 }
+	& { [key in AllowedKeys<T, { type: "uniform", unit: "vec3", count: 1 }>]: Vec3 }
+	& { [key in AllowedKeys<T, { type: "uniform", unit: "vec4", count: 1 }>]: Vec4 }
+	& { [key in AllowedKeys<T, { type: "uniform", unit: "mat4", count: 1 }>]: Mat4 }
+	& { [key in AllowedKeys<T, { type: "uniform", unit: "sampler2D", count: 1 }>]: Texture }
+	& { [key in AllowedKeys<T, { type: "uniform", unit: "float", count: UniformSizes }>]: readonly number[] }
+	& { [key in AllowedKeys<T, { type: "uniform", unit: "vec2", count: UniformSizes }>]: readonly Vec2[] }
+	& { [key in AllowedKeys<T, { type: "uniform", unit: "vec3", count: UniformSizes }>]: readonly Vec3[] }
+	& { [key in AllowedKeys<T, { type: "uniform", unit: "vec4", count: UniformSizes }>]: readonly Vec4[] }
+	& { [key in AllowedKeys<T, { type: "uniform", unit: "mat4", count: UniformSizes }>]: readonly Mat4[] }
+	& { [key in AllowedKeys<T, { type: "uniform", unit: "sampler2D", count: UniformSizes }>]: readonly Texture[] }
+	& { [key in AllowedKeys<T, Attribute>]: SizedBuffer }
+	& { [key in AllowedKeys<T, Element>]: ElementBuffer }
 
 export type ShaderGlobals = {
 	readonly [key: string]:

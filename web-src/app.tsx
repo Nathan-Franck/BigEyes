@@ -3,7 +3,7 @@ import { NodeGraph, GraphOutputs } from "./nodeGraph";
 import { declareStyle } from "./declareStyle";
 import { useEffect, useRef, useState } from "preact/hooks";
 import { callWasm, sliceToArray } from "./zigWasmInterface";
-import { Mat4, ShaderBuilder } from "./shaderBuilder";
+import { Mat4, ShaderBuilder, Binds } from "./shaderBuilder";
 
 const { classes, encodedStyle } = declareStyle({
   stats: {
@@ -142,53 +142,55 @@ export function App() {
       fragSource: `
         precision highp float;
         void main(void) {
-          // gl_FragColor = vec4(normal * 0.5 + 0.5, 1);
-          // gl_FragColor = texture2D(texture, uv);
-          // gl_FragColor = vec4(texture2D(texture, uv).a, 0, 0, 1);
           if (texture2D(texture, uv).a > 0.65) {
             discard;
           }
           gl_FragColor = vec4(texture2D(texture, uv).rgb, 1);
-          // gl_FragColor = vec4(uv, 0, 1);
         }
       `,
     });
+    // let perspectiveMatrix: Mat4;
+
+    let binds = {} as Binds<typeof coolMesh.globals>;
 
     updateRender = (graphOutputs) => () => {
-
-
-      // console.table(JSON.stringify(graphOutputs.resources.tree.skeleton.nodes.slice(20, 40)));
-
-      const buffers = {
-        indices: ShaderBuilder.createElementBuffer(
-          gl,
-          sliceToArray.Uint32Array(graphOutputs.current_cat_mesh.indices),
-        ),
-        position: ShaderBuilder.createBuffer(
-          gl,
-          sliceToArray.Float32Array(graphOutputs.current_cat_mesh.position),
-        ),
-        normals: ShaderBuilder.createBuffer(
-          gl,
-          sliceToArray.Float32Array(graphOutputs.current_cat_mesh.normal),
-        ),
-        uvs: ShaderBuilder.createBuffer(
-          gl,
-          sliceToArray.Float32Array(graphOutputs.current_cat_mesh.uv),
-        ),
-        item_position: ShaderBuilder.createBuffer(
-          gl,
-          new Float32Array([0, 0, 0]),
-        ),
-        perspectiveMatrix: graphOutputs.world_matrix.flatMap(
+      const mesh = graphOutputs.current_cat_mesh;
+      const worldMatrix = graphOutputs.world_matrix;
+      if (worldMatrix) {
+        binds.perspectiveMatrix = worldMatrix.flatMap(
           (row) => row,
-        ) as Mat4,
-        texture: ShaderBuilder.loadImageData(gl,
-          sliceToArray.Uint8Array(graphOutputs.current_cat_mesh.texture.data),
-          graphOutputs.current_cat_mesh.texture.width,
-          graphOutputs.current_cat_mesh.texture.height,
-        ),
-      };
+        ) as Mat4;
+      }
+      if (mesh) {
+        binds = {
+          ...binds,
+          indices: ShaderBuilder.createElementBuffer(
+            gl,
+            sliceToArray.Uint32Array(mesh.indices),
+          ),
+          position: ShaderBuilder.createBuffer(
+            gl,
+            sliceToArray.Float32Array(mesh.position),
+          ),
+          normals: ShaderBuilder.createBuffer(
+            gl,
+            sliceToArray.Float32Array(mesh.normal),
+          ),
+          uvs: ShaderBuilder.createBuffer(
+            gl,
+            sliceToArray.Float32Array(mesh.uv),
+          ),
+          item_position: ShaderBuilder.createBuffer(
+            gl,
+            new Float32Array([0, 0, 0]),
+          ),
+          texture: ShaderBuilder.loadImageData(gl,
+            sliceToArray.Uint8Array(mesh.texture.data),
+            mesh.texture.width,
+            mesh.texture.height,
+          ),
+        };
+      }
       requestAnimationFrame(() => {
         {
           gl.viewport(0, 0, windowSize.width, windowSize.height);
@@ -196,10 +198,10 @@ export function App() {
           gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
         }
 
-        ShaderBuilder.renderMaterial(gl, coolMesh, buffers);
+        ShaderBuilder.renderMaterial(gl, coolMesh, binds);
 
         setStats({
-          polygonCount: buffers.indices.length / 3,
+          polygonCount: binds.indices.length / 3,
           framerate: 1000.0 / (Date.now() - graphInputs.game_time_ms),
         });
       });
