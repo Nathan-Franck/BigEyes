@@ -1,22 +1,24 @@
 const std = @import("std");
 const graph = @import("./graph_runtime.zig");
-const typeDefinitions = @import("./type_definitions.zig");
 
 const subdiv = @import("./subdiv.zig");
 const Image = @import("./Image.zig");
-const Rgba32 = @import("./zigimg/src/color.zig").Rgba32;
 const raytrace = @import("./raytrace.zig");
 const mesh_helper = @import("./mesh_helper.zig");
 const MeshSpec = @import("./MeshSpec.zig");
 const zm = @import("./zmath/main.zig");
-const wasm_entry = @import("./wasm_entry.zig");
-const utils = @import("./utils.zig");
 const tree = @import("./tree.zig");
-const forest = @import("./forest.zig");
 
-pub const Mesh = struct {
+pub const GreyboxMesh = struct {
     label: []const u8,
-    texture: Image.Processed,
+    indices: []const u32,
+    position: []const f32,
+    normal: []const f32,
+};
+
+pub const TextureMesh = struct {
+    label: []const u8,
+    diffuse_alpha: Image.Processed,
     indices: []const u32,
     position: []const f32,
     uv: []const f32,
@@ -24,7 +26,6 @@ pub const Mesh = struct {
 };
 
 pub const SubdivAnimationMesh = struct {
-    label: []const u8,
     polygons: []const subdiv.Face,
     quads_by_subdiv: []const []const subdiv.Quad,
     indices: []const u32,
@@ -78,12 +79,6 @@ pub fn Args(comptime func: anytype) type {
         .decls = &.{},
         .is_tuple = true,
     } });
-}
-
-pub fn main() void {
-    // TODO - Generate some utility structs that can be used to compose the node_graph quick and easy!
-    // Structs are based on the input, store and each node, where the nodes's fields are assigned from
-    std.debug.print("Hello World!\n", .{});
 }
 
 pub const interface = struct {
@@ -176,7 +171,7 @@ pub const interface = struct {
             },
             .output = &[_]graph.SystemSink{
                 // .{ .output_node = "displayCat", .output_field = "current_cat_mesh", .system_field = "current_cat_mesh" },
-                .{ .output_node = "displayTree", .output_field = "tree_mesh", .system_field = "current_cat_mesh" },
+                .{ .output_node = "displayTree", .output_field = "meshes", .system_field = "meshes" },
                 // .{ .output_node = "displayForest", .output_field = "forest_data", .system_field = "forest_data" },
                 // .{ .output_node = "getResources", .output_field = "resources", .system_field = "resources" },
                 .{ .output_node = "orbit", .output_field = "world_matrix", .system_field = "world_matrix" },
@@ -327,7 +322,6 @@ pub const interface = struct {
                     .resources = Resources{
                         .cutout_leaf = cutout_leaf,
                         .cat = SubdivAnimationMesh{
-                            .label = input_data.name,
                             .indices = QuadMeshHelper.toTriangleIndices(
                                 allocator,
                                 quads_by_subdiv[quads_by_subdiv.len - 1],
@@ -401,38 +395,27 @@ pub const interface = struct {
                     resources: Resources,
                 },
             ) !struct {
-                tree_mesh: Mesh,
+                meshes: []const union(enum) {
+                    greybox: GreyboxMesh,
+                    textured: TextureMesh,
+                },
             } {
-                wasm_entry.dumpDebugLogFmt("Tree vert count {any}", .{props.resources.tree.bark_mesh.vertices.len});
                 var bark_mesh_triangles = try allocator.alloc(u32, props.resources.tree.bark_mesh.triangles.len);
                 for (props.resources.tree.bark_mesh.triangles, 0..) |index, i| {
                     bark_mesh_triangles[i] = index + props.resources.tree.leaf_mesh.vertices.len;
                 }
-                wasm_entry.dumpDebugLogFmt("{}", .{props.resources.tree.leaf_mesh.vertices.len});
                 const PointFlattener = mesh_helper.VecSliceFlattener(4, 3);
-                const UvFlattener = mesh_helper.VecSliceFlattener(2, 2);
-                return .{
-                    .tree_mesh = .{
-                        .label = "Tree",
-                        .texture = props.resources.cutout_leaf,
-                        .indices = try std.mem.concat(allocator, u32, &.{
-                            props.resources.tree.leaf_mesh.triangles,
-                            bark_mesh_triangles,
-                        }),
-                        .position = PointFlattener.convert(allocator, try std.mem.concat(allocator, tree.Vec4, &.{
-                            props.resources.tree.leaf_mesh.vertices,
-                            props.resources.tree.bark_mesh.vertices,
-                        })),
-                        .uv = UvFlattener.convert(allocator, try std.mem.concat(allocator, tree.Vec2, &.{
-                            props.resources.tree.leaf_mesh.uvs,
-                            props.resources.tree.bark_mesh.uvs,
-                        })),
-                        .normal = PointFlattener.convert(allocator, try std.mem.concat(allocator, tree.Vec4, &.{
-                            props.resources.tree.leaf_mesh.normals,
-                            props.resources.tree.bark_mesh.normals,
-                        })),
+                // const UvFlattener = mesh_helper.VecSliceFlattener(2, 2);
+                return .{ .meshes = &.{
+                    .{
+                        .greybox = .{
+                            .label = "bark",
+                            .indices = props.resources.tree.bark_mesh.triangles,
+                            .normal = PointFlattener.convert(allocator, props.resources.tree.bark_mesh.normals),
+                            .position = PointFlattener.convert(allocator, props.resources.tree.bark_mesh.vertices),
+                        },
                     },
-                };
+                } };
             }
 
             noinline fn raytraceCell(
@@ -454,7 +437,7 @@ pub const interface = struct {
                     game_time_ms: u64,
                 },
             ) !struct {
-                current_cat_mesh: Mesh,
+                current_cat_mesh: TextureMesh,
             } {
                 const source_mesh = props.resources.cat;
                 const current_frame_index = @mod(
@@ -538,8 +521,7 @@ pub const interface = struct {
                     break :occlude colors.items;
                 };
 
-                const final_mesh = Mesh{
-                    .label = "cat",
+                const final_mesh = TextureMesh{
                     .color = mesh_helper.pointsToFloatSlice(allocator, color),
                     .indices = subdiv_mesh.indices,
                     .normal = mesh_helper.pointsToFloatSlice(allocator, subdiv_mesh.normals),

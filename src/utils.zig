@@ -233,11 +233,19 @@ test "deepClone" {
         try std.testing.expect(std.mem.eql(i32, source, result));
     }
 
+    { // Slice of union (that uses allocators)
+        const Union = union(enum) { first: []const u8, second: []const u32 };
+        const Type = []const Union;
+        const source: Type = &.{ .{ .first = "hello!" }, .{ .second = &.{ 1, 2, 3 } } };
+        const result = try deepClone(Type, std.heap.page_allocator, source);
+        try std.testing.expect(std.mem.eql(u32, source[1].second, result[1].second));
+    }
+
     { // Slice of slices
         const Type = []const []const i32;
         const source: Type = &.{&.{ 1, 2, 3 }};
         const result = try deepClone(Type, std.heap.page_allocator, source);
-        try std.testing.expect(std.mem.eql(i32, source[0], result.value[0]));
+        try std.testing.expect(std.mem.eql(i32, source[0], result[0]));
     }
 
     { // Array

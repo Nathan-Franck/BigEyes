@@ -1,5 +1,6 @@
 const std = @import("std");
 const utils = @import("./utils.zig");
+const wasm_entry = @import("./wasm_entry.zig");
 
 pub const NodeLink = struct {
     name: []const u8,
@@ -574,6 +575,8 @@ pub fn NodeGraph(
                     );
                 }
             }
+
+            wasm_entry.dumpDebugLogFmt("{any}\n", .{system_outputs.meshes.?[0].greybox.label});
 
             return system_outputs;
         }

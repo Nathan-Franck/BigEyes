@@ -22,7 +22,7 @@ pub inline fn typescriptTypeOf(comptime from_type: anytype, comptime options: st
             .Many, .Slice => if (pointer.child == u8)
                 "string"
             else
-                typescriptTypeOf(pointer.child, .{}) ++ "[]",
+                "Array<" ++ typescriptTypeOf(pointer.child, .{}) ++ ">",
             else => "unknown",
         },
         .Enum => |enum_info| {
@@ -289,6 +289,17 @@ test "DeepTypedArrayReferences" {
     { // Optional
         const t = DeepTypedArrayReferences(union { a: ?[]f32, b: []const u8 }).type;
         _ = t{ .a = .{ .type = .Float32Array, .ptr = 0, .len = 0 } };
+    }
+
+    { // String
+        const String = []const u8;
+        const Fn = struct {
+            noinline fn justAString() String {
+                return "Hello!";
+            }
+        }.justAString;
+        const t = try deepTypedArrayReferences(String, std.testing.allocator, Fn());
+        try std.testing.expect(t.len > 0);
     }
 
     { // Deep type equality when nothing is referenceable

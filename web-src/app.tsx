@@ -1,8 +1,7 @@
 import "./app.css";
-import { NodeGraph, GraphOutputs } from "./nodeGraph";
 import { declareStyle } from "./declareStyle";
 import { useEffect, useRef, useState } from "preact/hooks";
-import { callWasm, sliceToArray } from "./zigWasmInterface";
+import { callWasm, sliceToArray, sliceToString } from "./zigWasmInterface";
 import { Mat4, ShaderBuilder, Binds } from "./shaderBuilder";
 
 const { classes, encodedStyle } = declareStyle({
@@ -55,26 +54,27 @@ const { classes, encodedStyle } = declareStyle({
 // TODO - Get the error messages from the console showing up
 // https://stackoverflow.com/questions/6604192/showing-console-errors-and-alerts-in-a-div-inside-the-page
 
-let graphInputs: Parameters<(typeof nodeGraph)["call"]>[0] = {
+type UpdateNodeGraph = typeof callWasm<"updateNodeGraph">;
+type GraphOutputs = Exclude<ReturnType<UpdateNodeGraph>, { error: any }>["outputs"];
+const graphInputs: Parameters<UpdateNodeGraph>[1] = {
   game_time_ms: 0,
   user_changes: {
     resolution_update: { x: window.innerWidth, y: window.innerHeight },
   },
 };
+
+callWasm("init");
 let updateRender:
-  | ((graphOutputs: NonNullable<GraphOutputs>) => () => void)
+  | ((graphOutputs: GraphOutputs) => () => void)
   | null = null;
 
 function updateGraph(newInputs: typeof graphInputs) {
   var graphInputs = newInputs;
-  const graphOutputs = nodeGraph.call(graphInputs);
-  if (graphOutputs == null || "error" in graphOutputs) return;
-  if (updateRender != null) updateRender(graphOutputs)();
+  const graphResult = callWasm("updateNodeGraph", graphInputs);
+  if ("error" in graphResult) return graphResult;
+  if (updateRender != null) updateRender(graphResult.outputs)();
 }
 
-callWasm("init");
-
-const nodeGraph = NodeGraph(graphInputs);
 let lastMousePosition: { x: number; y: number } | null = null;
 
 export function App() {
@@ -85,9 +85,10 @@ export function App() {
     height: window.innerHeight,
   });
 
-  const [subdivLevel, setSubdivLevel] = useState(0);
-  const [shouldRaytrace, setShouldRaytrace] = useState(false);
-  const [stats, setStats] = useState({ polygonCount: 0, framerate: 0 });
+  const [stats, setStats] = useState({
+    // polygonCount: 0,
+    framerate: 0,
+  });
 
   useEffect(() => {
     const resizeHandler = () => {
@@ -118,7 +119,33 @@ export function App() {
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
     gl.enable(gl.DEPTH_TEST);
 
-    const coolMesh = ShaderBuilder.generateMaterial(gl, {
+    const greyboxMaterial = ShaderBuilder.generateMaterial(gl, {
+      mode: "TRIANGLES",
+      globals: {
+        indices: { type: "element" },
+        position: { type: "attribute", unit: "vec3" },
+        normals: { type: "attribute", unit: "vec3" },
+        normal: { type: "varying", unit: "vec3" },
+        item_position: { type: "attribute", unit: "vec3", instanced: true },
+        perspectiveMatrix: { type: "uniform", unit: "mat4", count: 1 },
+      },
+      vertSource: `
+        precision highp float;
+        void main(void) {
+          gl_Position = perspectiveMatrix * vec4(item_position + position, 1);
+          normal = normals;
+        }
+      `,
+      fragSource: `
+        precision highp float;
+        void main(void) {
+          float brightness = dot(normal, normalize(vec3(1, 1, 1)));
+          gl_FragColor = vec4(vec3(0.8, 0.8, 0.8) * brightness, 1);
+        }
+      `,
+    });
+
+    const texturedMeshMaterial = ShaderBuilder.generateMaterial(gl, {
       mode: "TRIANGLES",
       globals: {
         indices: { type: "element" },
@@ -149,47 +176,87 @@ export function App() {
         }
       `,
     });
-    // let perspectiveMatrix: Mat4;
 
-    let binds = {} as Binds<typeof coolMesh.globals>;
+    type Model =
+      | { greybox: Omit<Binds<typeof greyboxMaterial.globals>, "perspectiveMatrix"> }
+      | { textured: Omit<Binds<typeof texturedMeshMaterial.globals>, "perspectiveMatrix"> }
+    let models: Record<string, Model> = {};
+    let perspectiveMatrix: Mat4;
+
+    // let binds = {} as Binds<typeof coolMesh.globals>;
 
     updateRender = (graphOutputs) => () => {
-      const mesh = graphOutputs.current_cat_mesh;
       const worldMatrix = graphOutputs.world_matrix;
       if (worldMatrix) {
-        binds.perspectiveMatrix = worldMatrix.flatMap(
-          (row) => row,
-        ) as Mat4;
+        perspectiveMatrix = worldMatrix.flat() as Mat4;
       }
-      if (mesh) {
-        binds = {
-          ...binds,
-          indices: ShaderBuilder.createElementBuffer(
-            gl,
-            sliceToArray.Uint32Array(mesh.indices),
-          ),
-          position: ShaderBuilder.createBuffer(
-            gl,
-            sliceToArray.Float32Array(mesh.position),
-          ),
-          normals: ShaderBuilder.createBuffer(
-            gl,
-            sliceToArray.Float32Array(mesh.normal),
-          ),
-          uvs: ShaderBuilder.createBuffer(
-            gl,
-            sliceToArray.Float32Array(mesh.uv),
-          ),
-          item_position: ShaderBuilder.createBuffer(
-            gl,
-            new Float32Array([0, 0, 0]),
-          ),
-          texture: ShaderBuilder.loadImageData(gl,
-            sliceToArray.Uint8Array(mesh.texture.data),
-            mesh.texture.width,
-            mesh.texture.height,
-          ),
-        };
+      const meshes = graphOutputs.meshes;
+      if (meshes != null) {
+        console.table(meshes)
+        for (let meshVariation of meshes) {
+          if ("greybox" in meshVariation) {
+            console.log("Greybox!")
+            const mesh = meshVariation.greybox;
+            console.table(mesh);
+            console.table(mesh.label);
+            const label = sliceToString(mesh.label);
+            models[label] = {
+              greybox: {
+                indices: ShaderBuilder.createElementBuffer(
+                  gl,
+                  sliceToArray.Uint32Array(mesh.indices),
+                ),
+                position: ShaderBuilder.createBuffer(
+                  gl,
+                  sliceToArray.Float32Array(mesh.position),
+                ),
+                normals: ShaderBuilder.createBuffer(
+                  gl,
+                  sliceToArray.Float32Array(mesh.normal),
+                ),
+                item_position: ShaderBuilder.createBuffer(
+                  gl,
+                  new Float32Array([0, 0, 0]),
+                ),
+              },
+            };
+          }
+          else if ("textured" in meshVariation) {
+            const mesh = meshVariation.textured;
+            console.table(mesh);
+            console.table(mesh.label);
+            const label = sliceToString(mesh.label);
+            models[label] = {
+              textured: {
+                indices: ShaderBuilder.createElementBuffer(
+                  gl,
+                  sliceToArray.Uint32Array(mesh.indices),
+                ),
+                position: ShaderBuilder.createBuffer(
+                  gl,
+                  sliceToArray.Float32Array(mesh.position),
+                ),
+                normals: ShaderBuilder.createBuffer(
+                  gl,
+                  sliceToArray.Float32Array(mesh.normal),
+                ),
+                uvs: ShaderBuilder.createBuffer(
+                  gl,
+                  sliceToArray.Float32Array(mesh.uv),
+                ),
+                item_position: ShaderBuilder.createBuffer(
+                  gl,
+                  new Float32Array([0, 0, 0]),
+                ),
+                texture: ShaderBuilder.loadImageData(gl,
+                  sliceToArray.Uint8Array(mesh.diffuse_alpha.data),
+                  mesh.diffuse_alpha.width,
+                  mesh.diffuse_alpha.height,
+                ),
+              },
+            };
+          }
+        }
       }
       requestAnimationFrame(() => {
         {
@@ -198,16 +265,25 @@ export function App() {
           gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
         }
 
-        ShaderBuilder.renderMaterial(gl, coolMesh, binds);
+        for (const [label, model] of Object.entries(models)) {
+          console.log(label);
+          if ("greybox" in model) {
+            ShaderBuilder.renderMaterial(gl, greyboxMaterial, { ...model.greybox, perspectiveMatrix });
+          }
+          if ("textured" in model) {
+            ShaderBuilder.renderMaterial(gl, texturedMeshMaterial, { ...model.textured, perspectiveMatrix });
+          }
+        }
+
 
         setStats({
-          polygonCount: binds.indices.length / 3,
+          // polygonCount: binds.indices.length / 3,
           framerate: 1000.0 / (Date.now() - graphInputs.game_time_ms),
         });
       });
     };
 
-    updateGraph({ game_time_ms: Date.now() });
+    updateGraph(graphInputs);
 
     let animationRunning = true;
     const intervalID = setInterval(() => {
@@ -248,45 +324,7 @@ export function App() {
           }
         }}
       >
-        Select a subdivision detail between 0-3
-        <input
-          type="range"
-          min="0"
-          max="4"
-          value={subdivLevel}
-          onInput={(event) => {
-            var element = event.target! as HTMLInputElement;
-            setSubdivLevel(parseInt(element.value));
-            updateGraph({
-              game_time_ms: Date.now(),
-              user_changes: {
-                subdiv_level_update: parseInt(element.value),
-              },
-            });
-          }}
-        ></input>
-
-        Raytrace?
-        <input
-          type="checkbox"
-          checked={shouldRaytrace}
-          onChange={(event) => {
-            var element = event.target! as HTMLInputElement;
-            setShouldRaytrace(element.checked);
-            updateGraph({
-              game_time_ms: Date.now(),
-              user_changes: {
-                should_raytrace_update: element.checked,
-              },
-            });
-          }}
-          onMouseMove={(event) => {
-            event.stopPropagation(); // Prevent orbit cam.
-          }}
-        ></input>
         <div class={classes.stats}>
-          <div>subdiv_level - {subdivLevel}</div>
-          <div>polygon_count - {stats.polygonCount}</div>
           <div>frame_rate - {"" + Math.round(stats.framerate)}</div>
         </div>
       </div>
