@@ -128,6 +128,8 @@ export function App() {
         indices: { type: "element" },
         position: { type: "attribute", unit: "vec3" },
         normals: { type: "attribute", unit: "vec3" },
+        uvs: { type: "attribute", unit: "vec2" },
+        uv: { type: "varying", unit: "vec2" },
         normal: { type: "varying", unit: "vec3" },
         item_position: { type: "attribute", unit: "vec3", instanced: true },
         perspectiveMatrix: { type: "uniform", unit: "mat4", count: 1 },
@@ -136,6 +138,7 @@ export function App() {
         precision highp float;
         void main(void) {
           gl_Position = perspectiveMatrix * vec4(item_position + position, 1);
+          uv = uvs;
           normal = normals;
         }
       `,
@@ -166,19 +169,21 @@ export function App() {
         void main(void) {
           gl_Position = perspectiveMatrix * vec4(item_position + position, 1);
           uv = uvs;
+          // uv = vec2(0.5, 0.5);
           normal = normals;
         }
       `,
       fragSource: `
         precision highp float;
         void main(void) {
-          // if (texture2D(texture, uv).a > 0.65) {
-          //   discard;
-          // }
+          if (texture2D(texture, uv).a > 0.65) {
+            discard;
+          }
           gl_FragColor = vec4(texture2D(texture, uv).rgb, 1);
         }
       `,
     });
+
 
     type Model =
       | { greybox: Omit<Binds<typeof greyboxMaterial.globals>, "perspectiveMatrix"> }
@@ -207,6 +212,10 @@ export function App() {
                   gl,
                   sliceToArray.Float32Array(mesh.position),
                 ),
+                uvs: ShaderBuilder.createBuffer(
+                  gl,
+                  sliceToArray.Float32Array(mesh.normal),
+                ),
                 normals: ShaderBuilder.createBuffer(
                   gl,
                   sliceToArray.Float32Array(mesh.normal),
@@ -221,7 +230,8 @@ export function App() {
           else if ("textured" in meshVariation) {
             const mesh = meshVariation.textured;
             const label = sliceToString(mesh.label);
-            console.table(sliceToArray.Uint8Array(mesh.diffuse_alpha.data));
+            const uvs = sliceToArray.Float32Array(mesh.uv);
+            // uvs[0] = 1;
             models[label] = {
               textured: {
                 indices: ShaderBuilder.createElementBuffer(
@@ -238,7 +248,7 @@ export function App() {
                 ),
                 uvs: ShaderBuilder.createBuffer(
                   gl,
-                  sliceToArray.Float32Array(mesh.uv),
+                  uvs,
                 ),
                 item_position: ShaderBuilder.createBuffer(
                   gl,

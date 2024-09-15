@@ -2,6 +2,7 @@ const std = @import("std");
 const math = std.math;
 const zm = @import("./zmath/main.zig");
 const Allocator = std.mem.Allocator;
+const wasm_entry = @import("wasm_entry.zig");
 
 pub const Vec4 = @Vector(4, f32);
 pub const Vec2 = @Vector(2, f32);
@@ -318,8 +319,8 @@ pub fn generateLeaves(allocator: Allocator, skeleton: Skeleton, settings: MeshSe
             for (leaf_triangles, 0..) |triangle, i| {
                 mesh.triangles[triangle_offset + i] = @intCast(triangle + vertex_offset);
             }
+            node_index += 1;
         }
-        node_index += 1;
     }
 
     return mesh;
