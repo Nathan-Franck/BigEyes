@@ -340,9 +340,7 @@ export namespace ShaderBuilder {
 					const dataType = global.unit;
 					gl.vertexAttribPointer(attributeLocation, unitToSize[dataType], gl.FLOAT, false, 0, 0);
 					gl.enableVertexAttribArray(attributeLocation);
-					if (global.instanced) {
-						gl.vertexAttribDivisor(attributeLocation, 1);
-					}
+					gl.vertexAttribDivisor(attributeLocation, global.instanced ? 1 : 0);
 				});
 		}
 
