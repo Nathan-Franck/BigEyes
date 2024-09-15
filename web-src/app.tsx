@@ -176,8 +176,6 @@ export function App() {
           //   discard;
           // }
           gl_FragColor = vec4(texture2D(texture, uv).rgb, 1);
-          // gl_FragColor = vec4(1, 1, 1, 1);
-
         }
       `,
     });
@@ -187,8 +185,6 @@ export function App() {
       | { textured: Omit<Binds<typeof texturedMeshMaterial.globals>, "perspectiveMatrix"> }
     let models: Record<string, Model> = {};
     let perspectiveMatrix: Mat4;
-
-    // let binds = {} as Binds<typeof coolMesh.globals>;
 
     updateRender = (graphOutputs) => () => {
       const worldMatrix = graphOutputs.world_matrix;
@@ -225,9 +221,7 @@ export function App() {
           else if ("textured" in meshVariation) {
             const mesh = meshVariation.textured;
             const label = sliceToString(mesh.label);
-            console.table(
-                  sliceToArray.Uint8Array(mesh.diffuse_alpha.data)
-                  );
+            console.table(sliceToArray.Uint8Array(mesh.diffuse_alpha.data));
             models[label] = {
               textured: {
                 indices: ShaderBuilder.createElementBuffer(
@@ -272,15 +266,9 @@ export function App() {
             ShaderBuilder.renderMaterial(gl, greyboxMaterial, { ...model.greybox, perspectiveMatrix });
           }
           if ("textured" in model) {
-            ShaderBuilder.renderMaterial(gl,texturedMeshMaterial, { ...model.textured, perspectiveMatrix });
+            ShaderBuilder.renderMaterial(gl, texturedMeshMaterial, { ...model.textured, perspectiveMatrix });
           }
         }
-
-
-        // setStats({
-        //   // polygonCount: binds.indices.length / 3,
-        //   framerate: 1000.0 / (Date.now() - graphInputs.game_time_ms),
-        // });
       });
     };
 
@@ -321,7 +309,6 @@ export function App() {
           lastMousePosition = currentMouse;
           if (event.buttons) {
             updateGraph({
-              // game_time_ms: Date.now(),
               input: { mouse_delta: [mouseDelta.x, mouseDelta.y, 0, 0] },
             });
           }
