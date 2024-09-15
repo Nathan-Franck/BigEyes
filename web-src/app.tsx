@@ -57,7 +57,7 @@ const { classes, encodedStyle } = declareStyle({
 type UpdateNodeGraph = typeof callWasm<"updateNodeGraph">;
 type GraphOutputs = Exclude<ReturnType<UpdateNodeGraph>, { error: any }>["outputs"];
 const graphInputs: Parameters<UpdateNodeGraph>[1] = {
-  game_time_ms: 0,
+  // game_time_ms: Date.now(),
   user_changes: {
     resolution_update: { x: window.innerWidth, y: window.innerHeight },
   },
@@ -85,7 +85,10 @@ export function App() {
     height: window.innerHeight,
   });
 
-  const [stats, setStats] = useState({
+  const [
+    stats,
+    // setStats,
+  ] = useState({
     // polygonCount: 0,
     framerate: 0,
   });
@@ -97,7 +100,7 @@ export function App() {
         height: canvasRef.current?.height || 0,
       });
       updateGraph({
-        game_time_ms: Date.now(),
+        // game_time_ms: Date.now(),
         user_changes: {
           resolution_update: { x: window.innerWidth, y: window.innerHeight },
         },
@@ -139,8 +142,8 @@ export function App() {
       fragSource: `
         precision highp float;
         void main(void) {
-          float brightness = dot(normal, normalize(vec3(1, 1, 1)));
-          gl_FragColor = vec4(vec3(0.8, 0.8, 0.8) * brightness, 1);
+          float brightness = clamp(dot(normal, normalize(vec3(1, 1, 1))), 0.0, 1.0);
+          gl_FragColor = vec4(vec3(0.8, 0.8, 0.8) * mix(0.5, 1.0, brightness), 1);
         }
       `,
     });
@@ -169,10 +172,12 @@ export function App() {
       fragSource: `
         precision highp float;
         void main(void) {
-          if (texture2D(texture, uv).a > 0.65) {
-            discard;
-          }
+          // if (texture2D(texture, uv).a > 0.65) {
+          //   discard;
+          // }
           gl_FragColor = vec4(texture2D(texture, uv).rgb, 1);
+          // gl_FragColor = vec4(1, 1, 1, 1);
+
         }
       `,
     });
@@ -192,13 +197,9 @@ export function App() {
       }
       const meshes = graphOutputs.meshes;
       if (meshes != null) {
-        console.table(meshes)
         for (let meshVariation of meshes) {
           if ("greybox" in meshVariation) {
-            console.log("Greybox!")
             const mesh = meshVariation.greybox;
-            console.table(mesh);
-            console.table(mesh.label);
             const label = sliceToString(mesh.label);
             models[label] = {
               greybox: {
@@ -223,9 +224,10 @@ export function App() {
           }
           else if ("textured" in meshVariation) {
             const mesh = meshVariation.textured;
-            console.table(mesh);
-            console.table(mesh.label);
             const label = sliceToString(mesh.label);
+            console.table(
+                  sliceToArray.Uint8Array(mesh.diffuse_alpha.data)
+                  );
             models[label] = {
               textured: {
                 indices: ShaderBuilder.createElementBuffer(
@@ -265,21 +267,20 @@ export function App() {
           gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
         }
 
-        for (const [label, model] of Object.entries(models)) {
-          console.log(label);
+        for (const [_, model] of Object.entries(models)) {
           if ("greybox" in model) {
             ShaderBuilder.renderMaterial(gl, greyboxMaterial, { ...model.greybox, perspectiveMatrix });
           }
           if ("textured" in model) {
-            ShaderBuilder.renderMaterial(gl, texturedMeshMaterial, { ...model.textured, perspectiveMatrix });
+            ShaderBuilder.renderMaterial(gl,texturedMeshMaterial, { ...model.textured, perspectiveMatrix });
           }
         }
 
 
-        setStats({
-          // polygonCount: binds.indices.length / 3,
-          framerate: 1000.0 / (Date.now() - graphInputs.game_time_ms),
-        });
+        // setStats({
+        //   // polygonCount: binds.indices.length / 3,
+        //   framerate: 1000.0 / (Date.now() - graphInputs.game_time_ms),
+        // });
       });
     };
 
@@ -288,7 +289,9 @@ export function App() {
     let animationRunning = true;
     const intervalID = setInterval(() => {
       if (!animationRunning) clearInterval(intervalID);
-      if (document.hasFocus()) updateGraph({ game_time_ms: Date.now() });
+      // if (document.hasFocus()) updateGraph({
+      //   // game_time_ms: Date.now()
+      // });
     }, 1000.0 / 24.0);
 
     return () => (animationRunning = false);
@@ -318,7 +321,7 @@ export function App() {
           lastMousePosition = currentMouse;
           if (event.buttons) {
             updateGraph({
-              game_time_ms: Date.now(),
+              // game_time_ms: Date.now(),
               input: { mouse_delta: [mouseDelta.x, mouseDelta.y, 0, 0] },
             });
           }

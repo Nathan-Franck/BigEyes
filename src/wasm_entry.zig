@@ -111,3 +111,13 @@ export fn callWithJson(name_ptr: [*]const u8, name_len: usize, args_ptr: [*]cons
         return;
     };
 }
+
+pub const StdErrWasm = struct {};
+
+pub fn panic(msg: []const u8, stack_trace: ?*std.builtin.StackTrace, starting_address: ?usize) noreturn {
+    dumpDebugLogFmt("{s}", .{msg});
+    if (stack_trace) |trace| {
+        dumpDebugLogFmt("{any}", .{trace});
+    }
+    std.builtin.default_panic(msg, stack_trace, starting_address);
+}

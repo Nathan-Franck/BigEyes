@@ -128,7 +128,6 @@ pub const interface = struct {
                     .function = "orbit",
                     .input_links = &[_]graph.InputLink{
                         .{ .field = "settings", .source = .{ .node = .{ .name = "changeSettings", .field = "settings" } } },
-                        .{ .field = "game_time_ms", .source = .{ .input_field = "game_time_ms" } },
                         .{ .field = "input", .source = .{ .input_field = "input" } },
                         .{ .field = "orbit_camera", .source = .{ .store_field = "orbit_camera" } },
                     },
@@ -343,7 +342,6 @@ pub const interface = struct {
             pub fn orbit(
                 props: struct {
                     settings: Settings,
-                    game_time_ms: u64,
                     input: ?struct { mouse_delta: zm.Vec },
                     orbit_camera: *OrbitCamera,
                 },
@@ -389,33 +387,41 @@ pub const interface = struct {
             //     const spawner = Forest.Spawner();
             // }
 
+            const GameMesh = union(enum) {
+                greybox: GreyboxMesh,
+                textured: TextureMesh,
+            };
+
             pub fn displayTree(
                 allocator: std.mem.Allocator,
                 props: struct {
                     resources: Resources,
                 },
             ) !struct {
-                meshes: []const union(enum) {
-                    greybox: GreyboxMesh,
-                    textured: TextureMesh,
-                },
+                meshes: []const GameMesh,
             } {
-                var bark_mesh_triangles = try allocator.alloc(u32, props.resources.tree.bark_mesh.triangles.len);
-                for (props.resources.tree.bark_mesh.triangles, 0..) |index, i| {
-                    bark_mesh_triangles[i] = index + props.resources.tree.leaf_mesh.vertices.len;
-                }
                 const PointFlattener = mesh_helper.VecSliceFlattener(4, 3);
-                // const UvFlattener = mesh_helper.VecSliceFlattener(2, 2);
-                return .{ .meshes = &.{
-                    .{
-                        .greybox = .{
-                            .label = "bark",
-                            .indices = props.resources.tree.bark_mesh.triangles,
-                            .normal = PointFlattener.convert(allocator, props.resources.tree.bark_mesh.normals),
-                            .position = PointFlattener.convert(allocator, props.resources.tree.bark_mesh.vertices),
-                        },
-                    },
-                } };
+                const UvFlattener = mesh_helper.VecSliceFlattener(2, 2);
+                var meshes = std.ArrayList(GameMesh).init(allocator);
+                try meshes.appendSlice(&.{
+                    .{ .greybox = .{
+                        .label = "bark",
+                        .indices = props.resources.tree.bark_mesh.triangles,
+                        .normal = PointFlattener.convert(allocator, props.resources.tree.bark_mesh.normals),
+                        .position = PointFlattener.convert(allocator, props.resources.tree.bark_mesh.vertices),
+                    } },
+                    .{ .textured = .{
+                        .label = "leaf",
+                        .diffuse_alpha = props.resources.cutout_leaf,
+                        .indices = props.resources.tree.leaf_mesh.triangles,
+                        .normal = PointFlattener.convert(allocator, props.resources.tree.leaf_mesh.normals),
+                        .position = PointFlattener.convert(allocator, props.resources.tree.leaf_mesh.vertices),
+                        .uv = UvFlattener.convert(allocator, props.resources.tree.leaf_mesh.uvs),
+                    } },
+                });
+                return .{
+                    .meshes = meshes.items,
+                };
             }
 
             noinline fn raytraceCell(

@@ -361,7 +361,8 @@ pub fn NodeGraph(
                 .nodes_outputs = undefined,
                 .nodes_dirty_flags = undefined,
             };
-            for (graph.nodes, 0..) |_, index| {
+            inline for (graph.nodes, 0..) |node, index| {
+                @field(self.nodes_dirty_flags, node.name) = false;
                 self.nodes_arenas[index] = std.heap.ArenaAllocator.init(props.allocator);
             }
             return self;
@@ -466,7 +467,7 @@ pub fn NodeGraph(
                     target_input_field.* = switch (@typeInfo(@TypeOf(target_input_field.*))) {
                         else => node_input_field,
                         .Pointer => |pointer| switch (pointer.size) {
-                            else => unreachable,
+                            else => ("OI!"),
                             .One => deferred_clone: {
                                 @field(mutable_fields, link.field) = &node_input_field;
                                 break :deferred_clone undefined;
@@ -505,7 +506,7 @@ pub fn NodeGraph(
                                 self.nodes_arenas[node_index].allocator(),
                                 @field(mutable_fields, field.name),
                             ),
-                            else => unreachable,
+                            else => @panic("oh no..."),
                         };
                     }
 
@@ -528,7 +529,7 @@ pub fn NodeGraph(
                     inline for (@typeInfo(@TypeOf(mutable_fields)).Struct.fields) |mutable_field| {
                         const pointer = @typeInfo(mutable_field.type).Pointer;
                         @field(node_output, mutable_field.name) = switch (pointer.size) {
-                            else => unreachable,
+                            else => @panic("qwer"),
                             .One => @field(node_inputs, mutable_field.name).*,
                             .Slice => @field(node_inputs, mutable_field.name),
                         };
@@ -575,8 +576,6 @@ pub fn NodeGraph(
                     );
                 }
             }
-
-            wasm_entry.dumpDebugLogFmt("{any}\n", .{system_outputs.meshes.?[0].greybox.label});
 
             return system_outputs;
         }

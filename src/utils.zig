@@ -171,6 +171,9 @@ fn deepCloneInner(
             }
         },
         .Union => |union_info| blk: {
+            if (union_info.tag_type == null) {
+                @compileError(std.fmt.comptimePrint("unable to copy an untagged union: {any}", .{T}));
+            }
             const active_tag_index = @intFromEnum(source);
             inline for (union_info.fields, 0..) |field_candidate, field_index| {
                 if (active_tag_index == field_index) {
@@ -192,7 +195,6 @@ fn deepCloneInner(
                     }
                 }
             }
-            unreachable;
         },
         .Pointer => |pointer_info| switch (pointer_info.size) {
             .Many, .Slice => blk: {
