@@ -128,17 +128,18 @@ export function App() {
         indices: { type: "element" },
         position: { type: "attribute", unit: "vec3" },
         normals: { type: "attribute", unit: "vec3" },
-        uvs: { type: "attribute", unit: "vec2" },
         uv: { type: "varying", unit: "vec2" },
         normal: { type: "varying", unit: "vec3" },
-        item_position: { type: "attribute", unit: "vec3", instanced: true },
         perspectiveMatrix: { type: "uniform", unit: "mat4", count: 1 },
+        // uvs: { type: "attribute", unit: "vec2" },
+        // item_position: { type: "attribute", unit: "vec3", instanced: true },
       },
       vertSource: `
         precision highp float;
+			// attribute vec2 uvs;
         void main(void) {
-          gl_Position = perspectiveMatrix * vec4(item_position + position, 1);
-          uv = uvs;
+          gl_Position = perspectiveMatrix * vec4(position, 1);
+          // uv = uvs;
           normal = normals;
         }
       `,
@@ -161,8 +162,8 @@ export function App() {
         uv: { type: "varying", unit: "vec2" },
         normal: { type: "varying", unit: "vec3" },
         texture: { type: "uniform", unit: "sampler2D", count: 1 },
-        item_position: { type: "attribute", unit: "vec3", instanced: true },
         perspectiveMatrix: { type: "uniform", unit: "mat4", count: 1 },
+        item_position: { type: "attribute", unit: "vec3", instanced: true },
       },
       vertSource: `
         precision highp float;
