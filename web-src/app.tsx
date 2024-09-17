@@ -210,17 +210,13 @@ export function App() {
                   gl,
                   sliceToArray.Float32Array(mesh.position),
                 ),
-                uvs: ShaderBuilder.createBuffer(
-                  gl,
-                  sliceToArray.Float32Array(mesh.normal),
-                ),
                 normals: ShaderBuilder.createBuffer(
                   gl,
                   sliceToArray.Float32Array(mesh.normal),
                 ),
                 item_position: ShaderBuilder.createBuffer(
                   gl,
-                  new Float32Array([0, 0, 0]),
+                  new Float32Array([0, 0, 0, 1, 0, 1]),
                 ),
               },
             };
@@ -250,7 +246,7 @@ export function App() {
                 ),
                 item_position: ShaderBuilder.createBuffer(
                   gl,
-                  new Float32Array([0, 0, 0]),
+                  new Float32Array([0, 0, 0, 1, 0, 1]),
                 ),
                 texture: ShaderBuilder.loadImageData(gl,
                   sliceToArray.Uint8Array(mesh.diffuse_alpha.data),

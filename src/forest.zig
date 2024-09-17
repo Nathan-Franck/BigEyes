@@ -4,11 +4,11 @@ const util = .{
     .tree = @import("./tree.zig"),
 };
 
-const Vec4 = @Vector(4, f32);
+pub const Vec4 = @Vector(4, f32);
 
-const Vec2 = @Vector(2, f32);
+pub const Vec2 = @Vector(2, f32);
 
-const Coord = @Vector(2, i32);
+pub const Coord = @Vector(2, i32);
 
 const CoordIterator = struct {
     current: Coord,
@@ -35,7 +35,7 @@ const CoordIterator = struct {
     }
 };
 
-const Bounds = struct {
+pub const Bounds = struct {
     min: Vec2,
     size: Vec2,
 };

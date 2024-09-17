@@ -1,5 +1,29 @@
 const std = @import("std");
 
+pub fn EnumStruct(field_key: type, field_value: type) type {
+    switch (@typeInfo(field_key)) {
+        else => @compileError("Expected field_key to be an enum"),
+        .Enum => |enum_info| {
+            var fields: []const std.builtin.Type.StructField = &.{};
+            inline for (enum_info.fields) |field| {
+                fields = fields ++ .{std.builtin.Type.StructField{
+                    .name = field.name,
+                    .type = field_value,
+                    .default_value = null,
+                    .is_comptime = false,
+                    .alignment = @alignOf(field_value),
+                }};
+            }
+            return @Type(.{ .Struct = std.builtin.Type.Struct{
+                .layout = .auto,
+                .fields = fields,
+                .decls = &.{},
+                .is_tuple = false,
+            } });
+        },
+    }
+}
+
 /// Apply the changes in `field_changes` to `source_data`.
 ///
 /// NOTE: This will fail to compile if not all field_changes are used in the original source_data.

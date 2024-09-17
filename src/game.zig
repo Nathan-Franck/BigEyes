@@ -1,6 +1,7 @@
 const std = @import("std");
 const graph = @import("./graph_runtime.zig");
 
+const utils = @import("./utils.zig");
 const subdiv = @import("./subdiv.zig");
 const Image = @import("./Image.zig");
 const raytrace = @import("./raytrace.zig");
@@ -8,6 +9,10 @@ const mesh_helper = @import("./mesh_helper.zig");
 const MeshSpec = @import("./MeshSpec.zig");
 const zm = @import("./zmath/main.zig");
 const tree = @import("./tree.zig");
+const Forest = @import("./forest.zig").Forest;
+const Bounds = @import("./forest.zig").Bounds;
+const Coord = @import("./forest.zig").Coord;
+const Vec2 = @import("./forest.zig").Vec2;
 
 pub const GreyboxMesh = struct {
     label: []const u8,
@@ -187,6 +192,12 @@ pub const interface = struct {
                 track_distance: f32,
             };
 
+            pub const TreeMesh = struct {
+                skeleton: tree.Skeleton,
+                leaf_mesh: tree.Mesh,
+                bark_mesh: tree.Mesh,
+            };
+
             pub const Resources = struct {
                 cat: SubdivAnimationMesh,
                 tree: struct {
@@ -315,7 +326,7 @@ pub const interface = struct {
                     ));
                 }
 
-                const tree_skeleton = try tree.generateStructure(allocator, tree.diciduous_low_poly.structure);
+                const tree_skeleton = try tree.generateStructure(allocator, tree.diciduous.structure);
 
                 return .{
                     .resources = Resources{
@@ -376,16 +387,76 @@ pub const interface = struct {
                 };
             }
 
-            // pub fn displayForest(
-            //     allocator: std.mem.Allocator,
-            //     props: struct {
-            //         resources: Resources,
-            //     },
-            // ) !struct { forest_data: struct {} } {
-            //     const Prefab = struct {};
-            //     const Forest = forest.Forest(Prefab, 32);
-            //     const spawner = Forest.Spawner();
-            // }
+            pub fn displayForest(
+                allocator: std.mem.Allocator,
+                // props: struct {
+                //     resources: Resources,
+                // },
+            ) !struct { forest_data: struct {} } {
+                const Sized = struct {
+                    size: f32,
+                };
+                const SizedForest = Forest(Sized, 16);
+                const Spawner = SizedForest.spawner(struct {
+                    pub const grass1 = SizedForest.Tree{
+                        .prefab = .{ .size = 0.1 },
+                        .density_tier = -2,
+                        .likelihood = 0.05,
+                        .scale_range = .{ .x_range = .{ 0, 1 }, .y_values = &.{ 0.8, 1.0 } },
+                    };
+                    pub const grass2 = SizedForest.Tree{
+                        .prefab = .{ .size = 0.14 },
+                        .density_tier = -2,
+                        .likelihood = 0.05,
+                        .scale_range = .{ .x_range = .{ 0, 1 }, .y_values = &.{ 0.8, 1.0 } },
+                    };
+                    pub const little_tree = SizedForest.Tree{
+                        .prefab = .{ .size = 0 },
+                        .density_tier = 1,
+                        .likelihood = 0.25,
+                        .scale_range = .{ .x_range = .{ 0, 1 }, .y_values = &.{ 0.8, 1.0 } },
+                    };
+                    pub const big_tree = SizedForest.Tree{
+                        .prefab = .{ .size = 0 },
+                        .density_tier = 2,
+                        .likelihood = 0.5,
+                        .scale_range = .{ .x_range = .{ 0, 1 }, .y_values = &.{ 0.8, 1.0 } },
+                        .spawn_radii = &[_]SizedForest.Tree.SpawnRadius{
+                            .{
+                                .tree = &little_tree,
+                                .radius = 10,
+                                .likelihood = 1,
+                            },
+                        },
+                    };
+                });
+
+                var spawner: Spawner = Spawner.init(allocator);
+
+                // Spawn trees and Display in a large grid, that shows all density tiers together with random offsets 🌲
+                const bounds = Bounds{
+                    .min = .{ -8, -8 },
+                    .size = .{ 16, 16 },
+                };
+                const spawns = try spawner.gatherSpawnsInBounds(allocator, bounds);
+
+                const world_size = .{ .width = 128, .height = 64 };
+                var world: [world_size.height][world_size.width]u8 = .{.{' '} ** world_size.width} ** world_size.height;
+                for (spawns) |spawn| {
+                    const location: Coord = @intFromFloat(@floor(
+                        (Vec2{ spawn.position[0], spawn.position[2] } - bounds.min) /
+                            bounds.size *
+                            Vec2{ world_size.width, world_size.height },
+                    ));
+                    if (location[0] >= 0 and location[0] < world_size.width and
+                        location[1] >= 0 and location[1] < world_size.height)
+                        world[@intCast(location[1])][@intCast(location[0])] = spawn.prefab.character;
+                }
+
+                for (world) |row| {
+                    std.debug.print("{s}\n", .{row});
+                }
+            }
 
             const GameMesh = union(enum) {
                 greybox: GreyboxMesh,
@@ -540,4 +611,136 @@ pub const interface = struct {
             }
         },
     );
+};
+pub const Trees = struct {
+    const Settings = tree.Settings;
+    const DepthDefinition = tree.DepthDefinition;
+    const MeshSettings = tree.MeshSettings;
+    const math = std.math;
+
+    pub const big_tree = .{
+        .structure = Settings{
+            .start_size = 1,
+            .start_growth = 1,
+            .depth_definitions = &[_]DepthDefinition{
+                .{
+                    .split_amount = 10,
+                    .flatness = 0.0,
+                    .size = 0.4,
+                    .height_spread = 0.6,
+                    .branch_pitch = 50.0 * math.rad_per_deg,
+                    .branch_roll = 90.0 * math.rad_per_deg,
+                    .height_to_growth = .{
+                        .y_values = &.{ 1.0, 1.0, 0.0 },
+                        .x_range = .{ 0.0, 1.0 },
+                    },
+                },
+                .{
+                    .split_amount = 6,
+                    .flatness = 0.3,
+                    .size = 0.45,
+                    .height_spread = 0.8,
+                    .branch_pitch = 60.0 * math.rad_per_deg,
+                    .branch_roll = 90.0 * math.rad_per_deg,
+                    .height_to_growth = .{
+                        .y_values = &.{ 1.0, 1.0, 0.0 },
+                        .x_range = .{ 0.0, 1.0 },
+                    },
+                },
+                .{
+                    .split_amount = 10,
+                    .flatness = 0.0,
+                    .size = 0.5,
+                    .height_spread = 0.8,
+                    .branch_pitch = 40.0 * math.rad_per_deg,
+                    .branch_roll = 90.0 * math.rad_per_deg,
+                    .height_to_growth = .{
+                        .y_values = &.{ 1.0, 1.0, 0.0 },
+                        .x_range = .{ 0.0, 1.0 },
+                    },
+                },
+                .{
+                    .split_amount = 10,
+                    .flatness = 0.0,
+                    .size = 0.6,
+                    .height_spread = 0.8,
+                    .branch_pitch = 40.0 * math.rad_per_deg,
+                    .branch_roll = 90.0 * math.rad_per_deg,
+                    .height_to_growth = .{
+                        .y_values = &.{ 0.5, 0.8, 1.0, 0.8, 0.5 },
+                        .x_range = .{ 0.0, 0.5 },
+                    },
+                },
+            },
+        },
+        .mesh = MeshSettings{
+            .thickness = 0.05,
+            .leaves = .{
+                .split_depth = 4,
+                .length = 1.4,
+                .breadth = 0.7,
+            },
+            .growth_to_thickness = .{
+                .y_values = &.{ 0.0025, 0.035 },
+                .x_range = .{ 0.0, 1.0 },
+            },
+        },
+    };
+
+    pub const litte_tree = .{
+        .structure = Settings{
+            .start_size = 1,
+            .start_growth = 1,
+            .depth_definitions = &[_]DepthDefinition{
+                .{
+                    .split_amount = 10,
+                    .flatness = 0.0,
+                    .size = 0.4,
+                    .height_spread = 0.6,
+                    .branch_pitch = 50.0 * math.rad_per_deg,
+                    .branch_roll = 90.0 * math.rad_per_deg,
+                    .height_to_growth = .{
+                        .y_values = &.{ 1.0, 1.0, 0.0 },
+                        .x_range = .{ 0.0, 1.0 },
+                    },
+                },
+                .{
+                    .split_amount = 6,
+                    .flatness = 0.3,
+                    .size = 0.45,
+                    .height_spread = 0.8,
+                    .branch_pitch = 60.0 * math.rad_per_deg,
+                    .branch_roll = 90.0 * math.rad_per_deg,
+                    .height_to_growth = .{
+                        .y_values = &.{ 1.0, 1.0, 0.0 },
+                        .x_range = .{ 0.0, 1.0 },
+                    },
+                },
+                .{
+                    .split_amount = 10,
+                    .flatness = 0.0,
+                    .size = 0.5,
+                    .height_spread = 0.8,
+                    .branch_pitch = 40.0 * math.rad_per_deg,
+                    .branch_roll = 90.0 * math.rad_per_deg,
+                    .height_to_growth = .{
+                        .y_values = &.{ 1.0, 1.0, 0.0 },
+                        .x_range = .{ 0.0, 1.0 },
+                    },
+                },
+            },
+        },
+        .mesh = MeshSettings{
+            .thickness = 0.05,
+            .leaves = .{
+                .split_depth = 3,
+                .length = 2.0,
+                .breadth = 1.0,
+            },
+            .growth_to_thickness = .{
+                .y_values = &.{ 0.0025, 0.035 },
+                .x_range = .{ 0.0, 1.0 },
+            },
+        },
+    };
 };
