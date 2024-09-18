@@ -9,7 +9,7 @@ const mesh_helper = @import("./mesh_helper.zig");
 const MeshSpec = @import("./MeshSpec.zig");
 const zm = @import("./zmath/main.zig");
 const tree = @import("./tree.zig");
-const Forest = @import("./forest.zig").Forest;
+const Forest = @import("./forest.zig").Forest(16);
 const Bounds = @import("./forest.zig").Bounds;
 const Coord = @import("./forest.zig").Coord;
 const Vec2 = @import("./forest.zig").Vec2;
@@ -371,41 +371,6 @@ pub const interface = struct {
                 };
             }
 
-            const Sized = struct {
-                size: f32,
-            };
-            const SizedForest = Forest(16);
-            const Spawner = SizedForest.spawner(struct {
-                pub const grass1 = SizedForest.Tree{
-                    .density_tier = -2,
-                    .likelihood = 0.05,
-                    .scale_range = .{ .x_range = .{ 0, 1 }, .y_values = &.{ 0.8, 1.0 } },
-                };
-                pub const grass2 = SizedForest.Tree{
-                    .density_tier = -2,
-                    .likelihood = 0.05,
-                    .scale_range = .{ .x_range = .{ 0, 1 }, .y_values = &.{ 0.8, 1.0 } },
-                };
-                pub const little_tree = SizedForest.Tree{
-                    .density_tier = 1,
-                    .likelihood = 0.25,
-                    .scale_range = .{ .x_range = .{ 0, 1 }, .y_values = &.{ 0.8, 1.0 } },
-                };
-                pub const big_tree = SizedForest.Tree{
-                    .density_tier = 2,
-                    .likelihood = 0.5,
-                    .scale_range = .{ .x_range = .{ 0, 1 }, .y_values = &.{ 0.8, 1.0 } },
-                    .spawn_radii = &[_]SizedForest.Tree.SpawnRadius{
-                        .{
-                            .tree = &little_tree,
-                            .radius = 10,
-                            .likelihood = 1,
-                        },
-                    },
-                };
-            });
-            const Vec4 = @Vector(4, f32);
-
             pub fn displayForest(
                 allocator: std.mem.Allocator,
                 props: struct {
@@ -413,16 +378,13 @@ pub const interface = struct {
                 },
             ) !struct { forest_data: []const []const Vec4 } {
                 _ = props;
-
+                const Spawner = Forest.spawner(ForestSettings);
                 var spawner: Spawner = Spawner.init(allocator);
-
-                // Spawn trees and Display in a large grid, that shows all density tiers together with random offsets 🌲
                 const bounds = Bounds{
                     .min = .{ -8, -8 },
                     .size = .{ 16, 16 },
                 };
                 const spawns = try spawner.gatherSpawnsInBounds(allocator, bounds);
-
                 var instances = try allocator.alloc(std.ArrayList(Vec4), spawner.trees.len);
                 for (instances) |*instance| {
                     instance.* = std.ArrayList(Vec4).init(allocator);
@@ -430,12 +392,12 @@ pub const interface = struct {
                 for (spawns) |spawn| {
                     try instances[@intFromEnum(spawn.id)].append(spawn.position);
                 }
-                const instances_slices = try allocator.alloc([]const Vec4, spawner.trees.len);
-                for (instances_slices, 0..) |*instance, i| {
+                const instances_items = try allocator.alloc([]const Vec4, spawner.trees.len);
+                for (instances_items, 0..) |*instance, i| {
                     instance.* = instances[i].items;
                 }
                 return .{
-                    .forest_data = instances_slices,
+                    .forest_data = instances_items,
                 };
             }
 
@@ -593,6 +555,36 @@ pub const interface = struct {
         },
     );
 };
+const Vec4 = @Vector(4, f32);
+const ForestSettings = struct {
+    pub const grass1 = Forest.Tree{
+        .density_tier = -2,
+        .likelihood = 0.05,
+        .scale_range = .{ .x_range = .{ 0, 1 }, .y_values = &.{ 0.8, 1.0 } },
+    };
+    pub const grass2 = Forest.Tree{
+        .density_tier = -2,
+        .likelihood = 0.05,
+        .scale_range = .{ .x_range = .{ 0, 1 }, .y_values = &.{ 0.8, 1.0 } },
+    };
+    pub const little_tree = Forest.Tree{
+        .density_tier = 1,
+        .likelihood = 0.25,
+        .scale_range = .{ .x_range = .{ 0, 1 }, .y_values = &.{ 0.8, 1.0 } },
+    };
+    pub const big_tree = Forest.Tree{
+        .density_tier = 2,
+        .likelihood = 0.5,
+        .scale_range = .{ .x_range = .{ 0, 1 }, .y_values = &.{ 0.8, 1.0 } },
+        .spawn_radii = &[_]Forest.Tree.SpawnRadius{
+            .{
+                .tree = &little_tree,
+                .radius = 10,
+                .likelihood = 1,
+            },
+        },
+    };
+};
 pub const Trees = struct {
     const Settings = tree.Settings;
     const DepthDefinition = tree.DepthDefinition;
@@ -667,7 +659,6 @@ pub const Trees = struct {
             },
         },
     };
-
     pub const litte_tree = .{
         .structure = Settings{
             .start_size = 1,
