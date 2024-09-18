@@ -208,6 +208,7 @@ pub fn Forest(Prefab: type, comptime chunk_size: i32) type {
             };
 
             return struct {
+                pub const Settings = ForestSettings;
                 density_tiers: @TypeOf(density_tiers),
 
                 pub fn init(allocator: std.mem.Allocator) @This() {

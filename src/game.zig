@@ -13,6 +13,7 @@ const Forest = @import("./forest.zig").Forest;
 const Bounds = @import("./forest.zig").Bounds;
 const Coord = @import("./forest.zig").Coord;
 const Vec2 = @import("./forest.zig").Vec2;
+const wasm_entry = @import("./wasm_entry.zig");
 
 pub const GreyboxMesh = struct {
     label: []const u8,
@@ -47,24 +48,7 @@ const hexColors = [_][3]f32{
     .{ 0.0, 1.0, 1.0 },
 };
 
-pub const InterfaceEnum = DeclsToEnum(interface);
-
-pub fn DeclsToEnum(comptime container: type) type {
-    const info = @typeInfo(container);
-    var enum_fields: []const std.builtin.Type.EnumField = &.{};
-    for (info.Struct.decls, 0..) |struct_decl, i| {
-        enum_fields = enum_fields ++ &[_]std.builtin.Type.EnumField{.{
-            .name = struct_decl.name,
-            .value = i,
-        }};
-    }
-    return @Type(std.builtin.Type{ .Enum = .{
-        .tag_type = u32,
-        .fields = enum_fields,
-        .decls = &.{},
-        .is_exhaustive = true,
-    } });
-}
+pub const InterfaceEnum = std.meta.DeclEnum(interface);
 
 pub fn Args(comptime func: anytype) type {
     const ParamInfo = @typeInfo(@TypeOf(func)).Fn.params;
@@ -153,13 +137,13 @@ pub const interface = struct {
                         .{ .field = "resources", .source = .{ .node = .{ .name = "getResources", .field = "resources" } } },
                     },
                 },
-                // .{
-                //     .name = "displayForest",
-                //     .function = "displayForest",
-                //     .input_links = &[_]graph.InputLink{
-                //         .{ .field = "resources", .source = .{ .node = .{ .name = "getResources", .field = "resources" } } },
-                //     },
-                // },
+                .{
+                    .name = "displayForest",
+                    .function = "displayForest",
+                    .input_links = &[_]graph.InputLink{
+                        .{ .field = "resources", .source = .{ .node = .{ .name = "getResources", .field = "resources" } } },
+                    },
+                },
                 .{
                     .name = "changeSettings",
                     .function = "changeSettings",
@@ -176,7 +160,7 @@ pub const interface = struct {
             .output = &[_]graph.SystemSink{
                 // .{ .output_node = "displayCat", .output_field = "current_cat_mesh", .system_field = "current_cat_mesh" },
                 .{ .output_node = "displayTree", .output_field = "meshes", .system_field = "meshes" },
-                // .{ .output_node = "displayForest", .output_field = "forest_data", .system_field = "forest_data" },
+                .{ .output_node = "displayForest", .output_field = "forest_data", .system_field = "forest_data" },
                 // .{ .output_node = "getResources", .output_field = "resources", .system_field = "resources" },
                 .{ .output_node = "orbit", .output_field = "world_matrix", .system_field = "world_matrix" },
             },
@@ -326,7 +310,7 @@ pub const interface = struct {
                     ));
                 }
 
-                const tree_skeleton = try tree.generateStructure(allocator, tree.diciduous.structure);
+                const tree_skeleton = try tree.generateStructure(allocator, Trees.big_tree.structure);
 
                 return .{
                     .resources = Resources{
@@ -343,8 +327,8 @@ pub const interface = struct {
                         },
                         .tree = .{
                             .skeleton = tree_skeleton,
-                            .bark_mesh = try tree.generateTaperedWood(allocator, tree_skeleton, tree.diciduous_low_poly.mesh),
-                            .leaf_mesh = try tree.generateLeaves(allocator, tree_skeleton, tree.diciduous_low_poly.mesh),
+                            .bark_mesh = try tree.generateTaperedWood(allocator, tree_skeleton, Trees.big_tree.mesh),
+                            .leaf_mesh = try tree.generateLeaves(allocator, tree_skeleton, Trees.big_tree.mesh),
                         },
                     },
                 };
@@ -387,49 +371,54 @@ pub const interface = struct {
                 };
             }
 
+            const Sized = struct {
+                size: f32,
+            };
+            const SizedForest = Forest(Sized, 16);
+            const Spawner = SizedForest.spawner(struct {
+                pub const grass1 = SizedForest.Tree{
+                    .prefab = .{ .size = 0.1 },
+                    .density_tier = -2,
+                    .likelihood = 0.05,
+                    .scale_range = .{ .x_range = .{ 0, 1 }, .y_values = &.{ 0.8, 1.0 } },
+                };
+                pub const grass2 = SizedForest.Tree{
+                    .prefab = .{ .size = 0.14 },
+                    .density_tier = -2,
+                    .likelihood = 0.05,
+                    .scale_range = .{ .x_range = .{ 0, 1 }, .y_values = &.{ 0.8, 1.0 } },
+                };
+                pub const little_tree = SizedForest.Tree{
+                    .prefab = .{ .size = 0 },
+                    .density_tier = 1,
+                    .likelihood = 0.25,
+                    .scale_range = .{ .x_range = .{ 0, 1 }, .y_values = &.{ 0.8, 1.0 } },
+                };
+                pub const big_tree = SizedForest.Tree{
+                    .prefab = .{ .size = 0 },
+                    .density_tier = 2,
+                    .likelihood = 0.5,
+                    .scale_range = .{ .x_range = .{ 0, 1 }, .y_values = &.{ 0.8, 1.0 } },
+                    .spawn_radii = &[_]SizedForest.Tree.SpawnRadius{
+                        .{
+                            .tree = &little_tree,
+                            .radius = 10,
+                            .likelihood = 1,
+                        },
+                    },
+                };
+            });
+            const Vec4 = @Vector(4, f32);
+            const ForestKey = std.meta.DeclEnum(Spawner.Settings);
+            const ForestData = utils.EnumStruct(ForestKey, []const Vec4);
+
             pub fn displayForest(
                 allocator: std.mem.Allocator,
-                // props: struct {
-                //     resources: Resources,
-                // },
-            ) !struct { forest_data: struct {} } {
-                const Sized = struct {
-                    size: f32,
-                };
-                const SizedForest = Forest(Sized, 16);
-                const Spawner = SizedForest.spawner(struct {
-                    pub const grass1 = SizedForest.Tree{
-                        .prefab = .{ .size = 0.1 },
-                        .density_tier = -2,
-                        .likelihood = 0.05,
-                        .scale_range = .{ .x_range = .{ 0, 1 }, .y_values = &.{ 0.8, 1.0 } },
-                    };
-                    pub const grass2 = SizedForest.Tree{
-                        .prefab = .{ .size = 0.14 },
-                        .density_tier = -2,
-                        .likelihood = 0.05,
-                        .scale_range = .{ .x_range = .{ 0, 1 }, .y_values = &.{ 0.8, 1.0 } },
-                    };
-                    pub const little_tree = SizedForest.Tree{
-                        .prefab = .{ .size = 0 },
-                        .density_tier = 1,
-                        .likelihood = 0.25,
-                        .scale_range = .{ .x_range = .{ 0, 1 }, .y_values = &.{ 0.8, 1.0 } },
-                    };
-                    pub const big_tree = SizedForest.Tree{
-                        .prefab = .{ .size = 0 },
-                        .density_tier = 2,
-                        .likelihood = 0.5,
-                        .scale_range = .{ .x_range = .{ 0, 1 }, .y_values = &.{ 0.8, 1.0 } },
-                        .spawn_radii = &[_]SizedForest.Tree.SpawnRadius{
-                            .{
-                                .tree = &little_tree,
-                                .radius = 10,
-                                .likelihood = 1,
-                            },
-                        },
-                    };
-                });
+                props: struct {
+                    resources: Resources,
+                },
+            ) !struct { forest_data: ForestData } {
+                _ = props;
 
                 var spawner: Spawner = Spawner.init(allocator);
 
@@ -440,22 +429,28 @@ pub const interface = struct {
                 };
                 const spawns = try spawner.gatherSpawnsInBounds(allocator, bounds);
 
-                const world_size = .{ .width = 128, .height = 64 };
-                var world: [world_size.height][world_size.width]u8 = .{.{' '} ** world_size.width} ** world_size.height;
+                var instances: utils.EnumStruct(
+                    ForestKey,
+                    std.ArrayList(Vec4),
+                ) = undefined;
+                inline for (@typeInfo(ForestKey).Enum.fields) |field| {
+                    @field(instances, field.name) = std.ArrayList(Vec4).init(allocator);
+                }
                 for (spawns) |spawn| {
-                    const location: Coord = @intFromFloat(@floor(
-                        (Vec2{ spawn.position[0], spawn.position[2] } - bounds.min) /
-                            bounds.size *
-                            Vec2{ world_size.width, world_size.height },
-                    ));
-                    if (location[0] >= 0 and location[0] < world_size.width and
-                        location[1] >= 0 and location[1] < world_size.height)
-                        world[@intCast(location[1])][@intCast(location[0])] = spawn.prefab.character;
+                    inline for (@typeInfo(Spawner.Settings).Struct.decls) |*decl| {
+                        wasm_entry.dumpDebugLogFmt("Here's an instance! {s}", .{decl.name});
+                        if (spawn.prefab == &@field(Spawner.Settings, decl.name).prefab) { // We can't trust pointers to be consistent I guess!
+                            try @field(instances, decl.name).append(spawn.position);
+                        }
+                    }
                 }
-
-                for (world) |row| {
-                    std.debug.print("{s}\n", .{row});
+                var instances_slices: ForestData = undefined;
+                inline for (@typeInfo(Spawner.Settings).Struct.decls) |*decl| {
+                    @field(instances_slices, decl.name) = @field(instances, decl.name).items;
                 }
+                return .{
+                    .forest_data = instances_slices,
+                };
             }
 
             const GameMesh = union(enum) {

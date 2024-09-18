@@ -190,6 +190,7 @@ export function App() {
     let perspectiveMatrix: Mat4;
 
     updateRender = (graphOutputs) => () => {
+      console.table(graphOutputs.forest_data);
       const worldMatrix = graphOutputs.world_matrix;
       if (worldMatrix) {
         perspectiveMatrix = worldMatrix.flat() as Mat4;
