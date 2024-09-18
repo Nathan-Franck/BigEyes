@@ -374,28 +374,24 @@ pub const interface = struct {
             const Sized = struct {
                 size: f32,
             };
-            const SizedForest = Forest(Sized, 16);
+            const SizedForest = Forest(16);
             const Spawner = SizedForest.spawner(struct {
                 pub const grass1 = SizedForest.Tree{
-                    .prefab = .{ .size = 0.1 },
                     .density_tier = -2,
                     .likelihood = 0.05,
                     .scale_range = .{ .x_range = .{ 0, 1 }, .y_values = &.{ 0.8, 1.0 } },
                 };
                 pub const grass2 = SizedForest.Tree{
-                    .prefab = .{ .size = 0.14 },
                     .density_tier = -2,
                     .likelihood = 0.05,
                     .scale_range = .{ .x_range = .{ 0, 1 }, .y_values = &.{ 0.8, 1.0 } },
                 };
                 pub const little_tree = SizedForest.Tree{
-                    .prefab = .{ .size = 0 },
                     .density_tier = 1,
                     .likelihood = 0.25,
                     .scale_range = .{ .x_range = .{ 0, 1 }, .y_values = &.{ 0.8, 1.0 } },
                 };
                 pub const big_tree = SizedForest.Tree{
-                    .prefab = .{ .size = 0 },
                     .density_tier = 2,
                     .likelihood = 0.5,
                     .scale_range = .{ .x_range = .{ 0, 1 }, .y_values = &.{ 0.8, 1.0 } },
@@ -409,15 +405,13 @@ pub const interface = struct {
                 };
             });
             const Vec4 = @Vector(4, f32);
-            const ForestKey = std.meta.DeclEnum(Spawner.Settings);
-            const ForestData = utils.EnumStruct(ForestKey, []const Vec4);
 
             pub fn displayForest(
                 allocator: std.mem.Allocator,
                 props: struct {
                     resources: Resources,
                 },
-            ) !struct { forest_data: ForestData } {
+            ) !struct { forest_data: []const []const Vec4 } {
                 _ = props;
 
                 var spawner: Spawner = Spawner.init(allocator);
@@ -429,24 +423,16 @@ pub const interface = struct {
                 };
                 const spawns = try spawner.gatherSpawnsInBounds(allocator, bounds);
 
-                var instances: utils.EnumStruct(
-                    ForestKey,
-                    std.ArrayList(Vec4),
-                ) = undefined;
-                inline for (@typeInfo(ForestKey).Enum.fields) |field| {
-                    @field(instances, field.name) = std.ArrayList(Vec4).init(allocator);
+                var instances = try allocator.alloc(std.ArrayList(Vec4), spawner.trees.len);
+                for (instances) |*instance| {
+                    instance.* = std.ArrayList(Vec4).init(allocator);
                 }
                 for (spawns) |spawn| {
-                    inline for (@typeInfo(Spawner.Settings).Struct.decls) |*decl| {
-                        wasm_entry.dumpDebugLogFmt("Here's an instance! {s}", .{decl.name});
-                        if (spawn.prefab == &@field(Spawner.Settings, decl.name).prefab) { // We can't trust pointers to be consistent I guess!
-                            try @field(instances, decl.name).append(spawn.position);
-                        }
-                    }
+                    try instances[@intFromEnum(spawn.id)].append(spawn.position);
                 }
-                var instances_slices: ForestData = undefined;
-                inline for (@typeInfo(Spawner.Settings).Struct.decls) |*decl| {
-                    @field(instances_slices, decl.name) = @field(instances, decl.name).items;
+                const instances_slices = try allocator.alloc([]const Vec4, spawner.trees.len);
+                for (instances_slices, 0..) |*instance, i| {
+                    instance.* = instances[i].items;
                 }
                 return .{
                     .forest_data = instances_slices,
