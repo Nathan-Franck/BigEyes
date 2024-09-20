@@ -362,7 +362,7 @@ pub fn NodeGraph(
                 .nodes_dirty_flags = undefined,
             };
             inline for (graph.nodes, 0..) |node, index| {
-                @field(self.nodes_dirty_flags, node.name) = false;
+                @field(self.nodes_dirty_flags, node.name) = true;
                 self.nodes_arenas[index] = std.heap.ArenaAllocator.init(props.allocator);
             }
             return self;
@@ -403,7 +403,7 @@ pub fn NodeGraph(
                 const NodeInputs = node_params[node_params.len - 1].type.?;
 
                 var node_inputs: NodeInputs = undefined;
-                var dirty = false;
+                var dirty = @field(self.nodes_dirty_flags, node.name);
 
                 var mutable_fields: build_type: {
                     var mutable_fields: []const std.builtin.Type.StructField = &.{};
@@ -563,8 +563,8 @@ pub fn NodeGraph(
             var system_outputs: SystemOutputs = undefined;
             inline for (graph.output) |output_defn| {
                 const target = &@field(system_outputs, output_defn.system_field);
-                const is_dirty = @field(self.nodes_dirty_flags, output_defn.output_node);
-                if (!is_dirty) {
+                const is_dirty = &@field(self.nodes_dirty_flags, output_defn.output_node);
+                if (!is_dirty.*) {
                     target.* = null;
                 } else {
                     const node_outputs = @field(self.nodes_outputs, output_defn.output_node);
@@ -574,6 +574,7 @@ pub fn NodeGraph(
                         self.store_arena.allocator(),
                         result,
                     );
+                    is_dirty.* = false;
                 }
             }
 

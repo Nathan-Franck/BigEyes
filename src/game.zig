@@ -108,9 +108,7 @@ pub const interface = struct {
                 .{
                     .name = "getResources",
                     .function = "getResources",
-                    .input_links = &[_]graph.InputLink{
-                        .{ .field = "settings", .source = .{ .node = .{ .name = "changeSettings", .field = "settings" } } },
-                    },
+                    .input_links = &[_]graph.InputLink{},
                 },
                 .{
                     .name = "orbit",
@@ -121,15 +119,6 @@ pub const interface = struct {
                         .{ .field = "orbit_camera", .source = .{ .store_field = "orbit_camera" } },
                     },
                 },
-                // .{
-                //     .name = "displayCat",
-                //     .function = "displayCat",
-                //     .input_links = &[_]graph.InputLink{
-                //         .{ .field = "resources", .source = .{ .node = .{ .name = "getResources", .field = "resources" } } },
-                //         .{ .field = "settings", .source = .{ .node = .{ .name = "changeSettings", .field = "settings" } } },
-                //         .{ .field = "game_time_ms", .source = .{ .input_field = "game_time_ms" } },
-                //     },
-                // },
                 .{
                     .name = "displayTree",
                     .function = "displayTree",
@@ -158,10 +147,9 @@ pub const interface = struct {
                 .{ .output_node = "changeSettings", .output_field = "settings", .system_field = "settings" },
             },
             .output = &[_]graph.SystemSink{
-                // .{ .output_node = "displayCat", .output_field = "current_cat_mesh", .system_field = "current_cat_mesh" },
                 .{ .output_node = "displayTree", .output_field = "meshes", .system_field = "meshes" },
+                .{ .output_node = "displayForest", .output_field = "skybox", .system_field = "skybox" },
                 .{ .output_node = "displayForest", .output_field = "forest_data", .system_field = "forest_data" },
-                // .{ .output_node = "getResources", .output_field = "resources", .system_field = "resources" },
                 .{ .output_node = "orbit", .output_field = "world_matrix", .system_field = "world_matrix" },
             },
         },
@@ -183,13 +171,13 @@ pub const interface = struct {
             };
 
             pub const Resources = struct {
-                cat: SubdivAnimationMesh,
+                skybox: []Image.Processed,
+                cutout_leaf: Image.Processed,
                 tree: struct {
                     skeleton: tree.Skeleton,
                     leaf_mesh: tree.Mesh,
                     bark_mesh: tree.Mesh,
                 },
-                cutout_leaf: Image.Processed,
             };
 
             pub const Settings = struct {
@@ -223,32 +211,29 @@ pub const interface = struct {
                 return .{};
             }
 
-            pub fn getResources(allocator: std.mem.Allocator, props: struct {
-                settings: Settings,
-            }) !struct {
+            pub fn getResources(allocator: std.mem.Allocator, _: struct {}) !struct {
                 resources: Resources,
             } {
-                // const cube_map_input_data = blk: {
-                //     var cubemap_images = std.ArrayList(Image).init(allocator);
-                //     inline for (.{
-                //         "nx",
-                //         "ny",
-                //         "nz",
-                //         "px",
-                //         "py",
-                //         "pz",
-                //     }) |direction| {
-                //         const direction_texture = @embedFile("content/Bush_Cube_Map/" ++ direction ++ ".png");
-                //         const image_data = try Image.loadPngAndProcess(allocator, direction_texture);
-                //         try cubemap_images.append(image_data);
-                //     }
-                //     break :blk cubemap_images.items;
-                // };
-                // _ = cube_map_input_data; // autofix
+                const skybox = blk: {
+                    var images = std.ArrayList(Image.Processed).init(allocator);
+                    inline for (.{
+                        "nx",
+                        "ny",
+                        "nz",
+                        "px",
+                        "py",
+                        "pz",
+                    }) |direction| {
+                        const image_png = @embedFile("content/cloudy skybox/" ++ direction ++ ".png");
+                        const image_data = try Image.loadPngAndProcess(allocator, image_png);
+                        try images.append(image_data);
+                    }
+                    break :blk images.items;
+                };
 
                 const cutout_leaf = blk: {
-                    const diffuse = try Image.loadPng(allocator, @embedFile("content/7mr5x/diffuse.png"));
-                    const alpha = try Image.loadPng(allocator, @embedFile("content/7mr5x/alpha.png"));
+                    const diffuse = try Image.loadPng(allocator, @embedFile("content/manitoba maple/diffuse.png"));
+                    const alpha = try Image.loadPng(allocator, @embedFile("content/manitoba maple/alpha.png"));
                     const cutout_diffuse = .{
                         .width = diffuse.width,
                         .height = diffuse.height,
@@ -261,70 +246,12 @@ pub const interface = struct {
                     break :blk try Image.processImageForGPU(allocator, cutout_diffuse);
                 };
 
-                const mesh_input_data = blk: {
-                    const json_data = @embedFile("content/Cat.blend.json");
-                    break :blk std.json.parseFromSliceLeaky(
-                        MeshSpec,
-                        allocator,
-                        json_data,
-                        .{},
-                    ) catch unreachable;
-                };
-                const input_data = mesh_input_data.meshes[0];
-                const quads_by_subdiv = blk: {
-                    const encoded_vertices = input_data.frame_to_vertices[0];
-                    const input_vertices = mesh_helper.flipYZ(
-                        allocator,
-                        mesh_helper.decodeVertexDataFromHexidecimal(
-                            allocator,
-                            encoded_vertices,
-                        ),
-                    );
-                    var quads_by_subdiv = std.ArrayList([]const subdiv.Quad).init(allocator);
-                    var mesh_result = try subdiv.Polygon(.Face).cmcSubdiv(
-                        allocator,
-                        input_vertices,
-                        input_data.polygons,
-                    );
-                    try quads_by_subdiv.append(mesh_result.quads);
-                    var subdiv_count: u32 = 0;
-                    while (subdiv_count < props.settings.subdiv_level) {
-                        mesh_result = try subdiv.Polygon(.Quad).cmcSubdiv(
-                            allocator,
-                            mesh_result.points,
-                            mesh_result.quads,
-                        );
-                        subdiv_count += 1;
-                        try quads_by_subdiv.append(mesh_result.quads);
-                    }
-                    break :blk quads_by_subdiv.items;
-                };
-                var frames = std.ArrayList([]const zm.Vec).init(allocator);
-                for (input_data.frame_to_vertices) |encoded_vertices| {
-                    try frames.append(mesh_helper.flipYZ(
-                        allocator,
-                        mesh_helper.decodeVertexDataFromHexidecimal(
-                            allocator,
-                            encoded_vertices,
-                        ),
-                    ));
-                }
-
                 const tree_skeleton = try tree.generateStructure(allocator, Trees.big_tree.structure);
 
                 return .{
                     .resources = Resources{
+                        .skybox = skybox,
                         .cutout_leaf = cutout_leaf,
-                        .cat = SubdivAnimationMesh{
-                            .indices = QuadMeshHelper.toTriangleIndices(
-                                allocator,
-                                quads_by_subdiv[quads_by_subdiv.len - 1],
-                            ),
-                            .quads_by_subdiv = quads_by_subdiv,
-                            .polygons = input_data.polygons,
-                            .frames = frames.items,
-                            .frame_rate = 24,
-                        },
                         .tree = .{
                             .skeleton = tree_skeleton,
                             .bark_mesh = try tree.generateTaperedWood(allocator, tree_skeleton, Trees.big_tree.mesh),
@@ -376,8 +303,7 @@ pub const interface = struct {
                 props: struct {
                     resources: Resources,
                 },
-            ) !struct { forest_data: []const []const Vec4 } {
-                _ = props;
+            ) !struct { forest_data: []const []const f32, skybox: []Image.Processed } {
                 const Spawner = Forest.spawner(ForestSettings);
                 var spawner: Spawner = Spawner.init(allocator);
                 const bounds = Bounds{
@@ -392,11 +318,14 @@ pub const interface = struct {
                 for (spawns) |spawn| {
                     try instances[@intFromEnum(spawn.id)].append(spawn.position);
                 }
-                const instances_items = try allocator.alloc([]const Vec4, spawner.trees.len);
+                const instances_items = try allocator.alloc([]const f32, spawner.trees.len);
+                const PointFlattener = mesh_helper.VecSliceFlattener(4, 3);
                 for (instances_items, 0..) |*instance, i| {
-                    instance.* = instances[i].items;
+                    instance.* = PointFlattener.convert(allocator, instances[i].items);
                 }
+
                 return .{
+                    .skybox = props.resources.skybox,
                     .forest_data = instances_items,
                 };
             }
@@ -418,12 +347,14 @@ pub const interface = struct {
                 const UvFlattener = mesh_helper.VecSliceFlattener(2, 2);
                 var meshes = std.ArrayList(GameMesh).init(allocator);
                 try meshes.appendSlice(&.{
-                    .{ .greybox = .{
-                        .label = "bark",
-                        .indices = props.resources.tree.bark_mesh.triangles,
-                        .normal = PointFlattener.convert(allocator, props.resources.tree.bark_mesh.normals),
-                        .position = PointFlattener.convert(allocator, props.resources.tree.bark_mesh.vertices),
-                    } },
+                    .{
+                        .greybox = .{
+                            .label = "bark",
+                            .indices = props.resources.tree.bark_mesh.triangles,
+                            .normal = PointFlattener.convert(allocator, props.resources.tree.bark_mesh.normals),
+                            .position = PointFlattener.convert(allocator, props.resources.tree.bark_mesh.vertices),
+                        },
+                    },
                     .{ .textured = .{
                         .label = "leaf",
                         .diffuse_alpha = props.resources.cutout_leaf,

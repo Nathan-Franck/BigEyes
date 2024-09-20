@@ -2,7 +2,7 @@ import "./app.css";
 import { declareStyle } from "./declareStyle";
 import { useEffect, useRef, useState } from "preact/hooks";
 import { callWasm, sliceToArray, sliceToString } from "./zigWasmInterface";
-import { Mat4, ShaderBuilder, Binds } from "./shaderBuilder";
+import { Mat4, ShaderBuilder, Binds, SizedBuffer } from "./shaderBuilder";
 
 const { classes, encodedStyle } = declareStyle({
   stats: {
@@ -184,16 +184,31 @@ export function App() {
 
 
     type Model =
-      | { greybox: Omit<Binds<typeof greyboxMaterial.globals>, "perspectiveMatrix"> }
-      | { textured: Omit<Binds<typeof texturedMeshMaterial.globals>, "perspectiveMatrix"> }
+      | { greybox: Omit<Binds<typeof greyboxMaterial.globals>, "perspectiveMatrix" | "item_position"> }
+      | { textured: Omit<Binds<typeof texturedMeshMaterial.globals>, "perspectiveMatrix" | "item_position"> }
     let models: Record<string, Model> = {};
     let perspectiveMatrix: Mat4;
+    let item_position: SizedBuffer;
+    let skybox: ReturnType<typeof ShaderBuilder.loadImageData>;
 
     updateRender = (graphOutputs) => () => {
       console.table(graphOutputs.forest_data);
+      if (graphOutputs.skybox) {
+        const input = graphOutputs.skybox;
+        // skybox = ShaderBuilder.loadImageData(
+        //   gl,
+        //   sliceToArray.Uint8Array(input[0].data),
+        //   input[0].width,
+        //   input[0].height,
+        // );
+      }
       const worldMatrix = graphOutputs.world_matrix;
       if (worldMatrix) {
         perspectiveMatrix = worldMatrix.flat() as Mat4;
+      }
+      const forest_data = graphOutputs.forest_data;
+      if (forest_data) {
+        item_position = ShaderBuilder.createBuffer(gl, sliceToArray.Float32Array(forest_data[0]));
       }
       const meshes = graphOutputs.meshes;
       if (meshes != null) {
@@ -203,22 +218,9 @@ export function App() {
             const label = sliceToString(mesh.label);
             models[label] = {
               greybox: {
-                indices: ShaderBuilder.createElementBuffer(
-                  gl,
-                  sliceToArray.Uint32Array(mesh.indices),
-                ),
-                position: ShaderBuilder.createBuffer(
-                  gl,
-                  sliceToArray.Float32Array(mesh.position),
-                ),
-                normals: ShaderBuilder.createBuffer(
-                  gl,
-                  sliceToArray.Float32Array(mesh.normal),
-                ),
-                item_position: ShaderBuilder.createBuffer(
-                  gl,
-                  new Float32Array([0, 0, 0, 1, 0, 1]),
-                ),
+                indices: ShaderBuilder.createElementBuffer(gl, sliceToArray.Uint32Array(mesh.indices)),
+                position: ShaderBuilder.createBuffer(gl, sliceToArray.Float32Array(mesh.position)),
+                normals: ShaderBuilder.createBuffer(gl, sliceToArray.Float32Array(mesh.normal)),
               },
             };
           }
@@ -229,26 +231,10 @@ export function App() {
             // uvs[0] = 1;
             models[label] = {
               textured: {
-                indices: ShaderBuilder.createElementBuffer(
-                  gl,
-                  sliceToArray.Uint32Array(mesh.indices),
-                ),
-                position: ShaderBuilder.createBuffer(
-                  gl,
-                  sliceToArray.Float32Array(mesh.position),
-                ),
-                normals: ShaderBuilder.createBuffer(
-                  gl,
-                  sliceToArray.Float32Array(mesh.normal),
-                ),
-                uvs: ShaderBuilder.createBuffer(
-                  gl,
-                  uvs,
-                ),
-                item_position: ShaderBuilder.createBuffer(
-                  gl,
-                  new Float32Array([0, 0, 0, 1, 0, 1]),
-                ),
+                indices: ShaderBuilder.createElementBuffer(gl, sliceToArray.Uint32Array(mesh.indices)),
+                position: ShaderBuilder.createBuffer(gl, sliceToArray.Float32Array(mesh.position)),
+                normals: ShaderBuilder.createBuffer(gl, sliceToArray.Float32Array(mesh.normal)),
+                uvs: ShaderBuilder.createBuffer(gl, uvs),
                 texture: ShaderBuilder.loadImageData(gl,
                   sliceToArray.Uint8Array(mesh.diffuse_alpha.data),
                   mesh.diffuse_alpha.width,
@@ -268,10 +254,10 @@ export function App() {
 
         for (const [_, model] of Object.entries(models)) {
           if ("greybox" in model) {
-            ShaderBuilder.renderMaterial(gl, greyboxMaterial, { ...model.greybox, perspectiveMatrix });
+            ShaderBuilder.renderMaterial(gl, greyboxMaterial, { ...model.greybox, item_position, perspectiveMatrix });
           }
           if ("textured" in model) {
-            ShaderBuilder.renderMaterial(gl, texturedMeshMaterial, { ...model.textured, perspectiveMatrix });
+            ShaderBuilder.renderMaterial(gl, texturedMeshMaterial, { ...model.textured, item_position, perspectiveMatrix });
           }
         }
       });

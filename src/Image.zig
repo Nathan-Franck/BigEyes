@@ -91,7 +91,7 @@ pub const Processed = struct {
 pub fn loadPngAndProcess(
     allocator: std.mem.Allocator,
     png_data: []const u8,
-) Processed {
-    const image_data = loadPng(allocator, png_data);
+) !Processed {
+    const image_data = try loadPng(allocator, png_data);
     return processImageForGPU(allocator, image_data);
 }
