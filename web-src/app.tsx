@@ -228,7 +228,6 @@ export function App() {
             const mesh = meshVariation.textured;
             const label = sliceToString(mesh.label);
             const uvs = sliceToArray.Float32Array(mesh.uv);
-            // uvs[0] = 1;
             models[label] = {
               textured: {
                 indices: ShaderBuilder.createElementBuffer(gl, sliceToArray.Uint32Array(mesh.indices)),

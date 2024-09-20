@@ -148,7 +148,7 @@ pub const interface = struct {
             },
             .output = &[_]graph.SystemSink{
                 .{ .output_node = "displayTree", .output_field = "meshes", .system_field = "meshes" },
-                .{ .output_node = "displayForest", .output_field = "skybox", .system_field = "skybox" },
+                // .{ .output_node = "displayForest", .output_field = "skybox", .system_field = "skybox" },
                 .{ .output_node = "displayForest", .output_field = "forest_data", .system_field = "forest_data" },
                 .{ .output_node = "orbit", .output_field = "world_matrix", .system_field = "world_matrix" },
             },
@@ -171,7 +171,7 @@ pub const interface = struct {
             };
 
             pub const Resources = struct {
-                skybox: []Image.Processed,
+                // skybox: []Image.Processed,
                 cutout_leaf: Image.Processed,
                 tree: struct {
                     skeleton: tree.Skeleton,
@@ -214,22 +214,22 @@ pub const interface = struct {
             pub fn getResources(allocator: std.mem.Allocator, _: struct {}) !struct {
                 resources: Resources,
             } {
-                const skybox = blk: {
-                    var images = std.ArrayList(Image.Processed).init(allocator);
-                    inline for (.{
-                        "nx",
-                        "ny",
-                        "nz",
-                        "px",
-                        "py",
-                        "pz",
-                    }) |direction| {
-                        const image_png = @embedFile("content/cloudy skybox/" ++ direction ++ ".png");
-                        const image_data = try Image.loadPngAndProcess(allocator, image_png);
-                        try images.append(image_data);
-                    }
-                    break :blk images.items;
-                };
+                // const skybox = blk: {
+                //     var images = std.ArrayList(Image.Processed).init(allocator);
+                //     inline for (.{
+                //         "nx",
+                //         "ny",
+                //         "nz",
+                //         "px",
+                //         "py",
+                //         "pz",
+                //     }) |direction| {
+                //         const image_png = @embedFile("content/cloudy skybox/" ++ direction ++ ".png");
+                //         const image_data = try Image.loadPngAndProcess(allocator, image_png);
+                //         try images.append(image_data);
+                //     }
+                //     break :blk images.items;
+                // };
 
                 const cutout_leaf = blk: {
                     const diffuse = try Image.loadPng(allocator, @embedFile("content/manitoba maple/diffuse.png"));
@@ -250,7 +250,7 @@ pub const interface = struct {
 
                 return .{
                     .resources = Resources{
-                        .skybox = skybox,
+                        // .skybox = skybox,
                         .cutout_leaf = cutout_leaf,
                         .tree = .{
                             .skeleton = tree_skeleton,
@@ -300,10 +300,13 @@ pub const interface = struct {
 
             pub fn displayForest(
                 allocator: std.mem.Allocator,
-                props: struct {
+                _: struct {
                     resources: Resources,
                 },
-            ) !struct { forest_data: []const []const f32, skybox: []Image.Processed } {
+            ) !struct {
+                forest_data: []const []const f32,
+                // skybox: []Image.Processed,
+            } {
                 const Spawner = Forest.spawner(ForestSettings);
                 var spawner: Spawner = Spawner.init(allocator);
                 const bounds = Bounds{
@@ -325,7 +328,7 @@ pub const interface = struct {
                 }
 
                 return .{
-                    .skybox = props.resources.skybox,
+                    // .skybox = props.resources.skybox,
                     .forest_data = instances_items,
                 };
             }
