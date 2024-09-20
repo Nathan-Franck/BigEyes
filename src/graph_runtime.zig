@@ -403,7 +403,7 @@ pub fn NodeGraph(
                 const NodeInputs = node_params[node_params.len - 1].type.?;
 
                 var node_inputs: NodeInputs = undefined;
-                var dirty = @field(self.nodes_dirty_flags, node.name);
+                const is_dirty = &@field(self.nodes_dirty_flags, node.name);
 
                 var mutable_fields: build_type: {
                     var mutable_fields: []const std.builtin.Type.StructField = &.{};
@@ -444,7 +444,7 @@ pub fn NodeGraph(
                     const node_input_field = switch (link.source) {
                         .input_field => |input_field| node_input: {
                             if (@field(inputs_dirty, input_field)) {
-                                dirty = true;
+                                is_dirty.* = true;
                             }
                             break :node_input @field(inputs, input_field);
                         },
@@ -455,7 +455,7 @@ pub fn NodeGraph(
                             const InputType = @TypeOf(node_output);
                             const OutputType = @TypeOf(@field(node_inputs, link.field));
                             if (@field(self.nodes_dirty_flags, node_blueprint.name)) {
-                                dirty = true;
+                                is_dirty.* = true;
                             }
                             break :input_field if (IsEventType(InputType))
                                 EventCast(InputType, OutputType, node_output)
@@ -480,10 +480,8 @@ pub fn NodeGraph(
                     };
                 }
 
-                @field(self.nodes_dirty_flags, node.name) = dirty;
-
                 const target = &@field(self.nodes_outputs, node.name);
-                target.* = if (!dirty)
+                target.* = if (!is_dirty.*)
                     target.*
                 else blk: {
                     _ = self.nodes_arenas[node_index].reset(.retain_capacity);
@@ -563,8 +561,8 @@ pub fn NodeGraph(
             var system_outputs: SystemOutputs = undefined;
             inline for (graph.output) |output_defn| {
                 const target = &@field(system_outputs, output_defn.system_field);
-                const is_dirty = &@field(self.nodes_dirty_flags, output_defn.output_node);
-                if (!is_dirty.*) {
+                const is_dirty = @field(self.nodes_dirty_flags, output_defn.output_node);
+                if (!is_dirty) {
                     target.* = null;
                 } else {
                     const node_outputs = @field(self.nodes_outputs, output_defn.output_node);
@@ -574,8 +572,14 @@ pub fn NodeGraph(
                         self.store_arena.allocator(),
                         result,
                     );
-                    is_dirty.* = false;
                 }
+            }
+
+            // Set all nodes to not dirty
+            inline for (node_order) |node_index| {
+                const node = graph.nodes[node_index];
+                const is_dirty = &@field(self.nodes_dirty_flags, node.name);
+                is_dirty.* = false;
             }
 
             return system_outputs;
