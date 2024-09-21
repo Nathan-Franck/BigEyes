@@ -1,5 +1,25 @@
 const std = @import("std");
 
+pub fn FunctionArgs(comptime func: anytype) type {
+    const ParamInfo = @typeInfo(@TypeOf(func)).Fn.params;
+    var fields: []const std.builtin.Type.StructField = &.{};
+    for (ParamInfo, 0..) |param_info, i| {
+        fields = fields ++ &[_]std.builtin.Type.StructField{.{
+            .name = std.fmt.comptimePrint("{d}", .{i}),
+            .type = param_info.type.?,
+            .default_value = null,
+            .is_comptime = false,
+            .alignment = @alignOf(param_info.type.?),
+        }};
+    }
+    return @Type(.{ .Struct = .{
+        .layout = .auto,
+        .fields = fields,
+        .decls = &.{},
+        .is_tuple = true,
+    } });
+}
+
 pub fn EnumStruct(field_key: type, field_value: type) type {
     switch (@typeInfo(field_key)) {
         else => @compileError("Expected field_key to be an enum"),

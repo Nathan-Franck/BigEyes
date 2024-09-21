@@ -122,6 +122,31 @@ export function App() {
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
     gl.enable(gl.DEPTH_TEST);
 
+    const skyboxMaterial = ShaderBuilder.generateMaterial(gl, {
+      mode: "TRIANGLES",
+      globals: {
+        uv: { type: "attribute", unit: "vec2" },
+        normals: { type: "attribute", unit: "vec3" },
+        normal: { type: "varying", unit: "vec3" },
+        skybox: { type: "uniform", unit: "sampler2D", count: 1 },
+      },
+      vertSource: `
+        precision highp float;
+        void main(void) {
+          gl_Position = vec4(uv, 0, 1);
+          normal = normals;
+        }
+      `,
+      fragSource: `
+        precision highp float;
+        void main(void) {
+          // gl_FragColor = textureCube(skybox, normal);
+          vec2 uv = normal.xy;
+          gl_FragColor = vec4(texture2D(skybox, uv).rgb, 1);
+        }
+      `,
+    });
+
     const greyboxMaterial = ShaderBuilder.generateMaterial(gl, {
       mode: "TRIANGLES",
       globals: {
@@ -205,6 +230,12 @@ export function App() {
       const worldMatrix = graphOutputs.world_matrix;
       if (worldMatrix) {
         perspectiveMatrix = worldMatrix.flat() as Mat4;
+      }
+      const skybox_data = graphOutputs.skybox;
+      if (skybox_data) {
+        const one_face = skybox_data[0];
+        skybox = ShaderBuilder.loadImageData(gl, sliceToArray.Uint8Array(one_face.data), one_face.width, one_face.height);
+
       }
       const forest_data = graphOutputs.forest_data;
       if (forest_data) {

@@ -1,5 +1,5 @@
 const std = @import("std");
-const game = @import("./game.zig").interface;
+const game = @import("./game/game.zig").interface;
 const type_definitions = @import("./type_definitions.zig");
 
 var message_arena: std.heap.ArenaAllocator = std.heap.ArenaAllocator.init(std.heap.page_allocator);
