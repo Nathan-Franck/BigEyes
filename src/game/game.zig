@@ -164,15 +164,46 @@ pub const interface = struct {
                 };
             }
 
-            pub fn displaySkybox(
+            pub fn getScreenspaceMesh(
                 allocator: std.mem.Allocator,
                 props: struct {
                     world_matrix: zm.Mat,
                 },
-            ) !struct {} {
-                _ = props;
-                _ = allocator;
-                return .{};
+            ) !struct { screen_space_mesh: struct {
+                indices: []const u32,
+                uvs: []const f32,
+                normals: []const f32,
+            } } {
+                var normals: [4]Vec4 = undefined;
+                for (
+                    &normals,
+                    [_]Vec4{
+                        Vec4{ -1, -1, 1, 0 },
+                        Vec4{ 1, -1, 1, 0 },
+                        Vec4{ 1, 1, 1, 0 },
+                        Vec4{ -1, 1, 1, 0 },
+                    },
+                ) |*normal, screen_direction| {
+                    normal.* = zm.mul(
+                        zm.inverse(props.world_matrix),
+                        screen_direction,
+                    );
+                }
+                const PointFlattener = mesh_helper.VecSliceFlattener(4, 3);
+                const UvFlattener = mesh_helper.VecSliceFlattener(2, 2);
+                return .{ .screen_space_mesh = .{
+                    .indices = try allocator.dupe(u32, &.{
+                        0, 1, 2,
+                        2, 3, 0,
+                    }),
+                    .uvs = UvFlattener.convert(allocator, &.{
+                        Vec2{ 0, 0 },
+                        Vec2{ 1, 0 },
+                        Vec2{ 1, 1 },
+                        Vec2{ 0, 1 },
+                    }),
+                    .normals = PointFlattener.convert(allocator, &normals),
+                } };
             }
 
             pub fn displayForest(
@@ -184,8 +215,8 @@ pub const interface = struct {
                 const Spawner = Forest.spawner(ForestSettings);
                 var spawner: Spawner = Spawner.init(allocator);
                 const bounds = Bounds{
-                    .min = .{ -8, -8 },
-                    .size = .{ 16, 16 },
+                    .min = .{ -2, -2 },
+                    .size = .{ 2, 2 },
                 };
                 const spawns = try spawner.gatherSpawnsInBounds(allocator, bounds);
                 var instances = try allocator.alloc(std.ArrayList(Vec4), spawner.trees.len);

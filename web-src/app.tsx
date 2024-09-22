@@ -125,6 +125,7 @@ export function App() {
     const skyboxMaterial = ShaderBuilder.generateMaterial(gl, {
       mode: "TRIANGLES",
       globals: {
+        indices: { type: "element" },
         uv: { type: "attribute", unit: "vec2" },
         normals: { type: "attribute", unit: "vec3" },
         normal: { type: "varying", unit: "vec3" },
@@ -133,7 +134,7 @@ export function App() {
       vertSource: `
         precision highp float;
         void main(void) {
-          gl_Position = vec4(uv, 0, 1);
+          gl_Position = vec4(vec2(-1, -1) + vec2(2, 2) * uv, 0, 1);
           normal = normals;
         }
       `,
@@ -192,7 +193,6 @@ export function App() {
         void main(void) {
           gl_Position = perspectiveMatrix * vec4(item_position + position, 1);
           uv = uvs;
-          // uv = vec2(0.5, 0.5);
           normal = normals;
         }
       `,
@@ -202,7 +202,8 @@ export function App() {
           if (texture2D(texture, uv).a > 0.65) {
             discard;
           }
-          gl_FragColor = vec4(texture2D(texture, uv).rgb, 1);
+          float brightness = abs(dot(normal, normalize(vec3(1, 1, 1))));
+          gl_FragColor = vec4(texture2D(texture, uv).rgb * brightness, 1);
         }
       `,
     });
@@ -214,19 +215,9 @@ export function App() {
     let models: Record<string, Model> = {};
     let perspectiveMatrix: Mat4;
     let item_position: SizedBuffer;
-    let skybox: ReturnType<typeof ShaderBuilder.loadImageData>;
+    let skybox: Binds<typeof skyboxMaterial.globals>;
 
     updateRender = (graphOutputs) => () => {
-      console.table(graphOutputs.forest_data);
-      if (graphOutputs.skybox) {
-        const input = graphOutputs.skybox;
-        // skybox = ShaderBuilder.loadImageData(
-        //   gl,
-        //   sliceToArray.Uint8Array(input[0].data),
-        //   input[0].width,
-        //   input[0].height,
-        // );
-      }
       const worldMatrix = graphOutputs.world_matrix;
       if (worldMatrix) {
         perspectiveMatrix = worldMatrix.flat() as Mat4;
@@ -234,8 +225,19 @@ export function App() {
       const skybox_data = graphOutputs.skybox;
       if (skybox_data) {
         const one_face = skybox_data[0];
-        skybox = ShaderBuilder.loadImageData(gl, sliceToArray.Uint8Array(one_face.data), one_face.width, one_face.height);
-
+        skybox = {
+          ...skybox,
+          skybox: ShaderBuilder.loadImageData(gl, sliceToArray.Uint8Array(one_face.data), one_face.width, one_face.height),
+        };
+      }
+      const screenspace_data = graphOutputs.screen_space_mesh;
+      if (screenspace_data) {
+        skybox = {
+          ...skybox,
+          indices: ShaderBuilder.createElementBuffer(gl, sliceToArray.Uint32Array(screenspace_data.indices)),
+          uv: ShaderBuilder.createBuffer(gl, sliceToArray.Float32Array(screenspace_data.uvs)),
+          normals: ShaderBuilder.createBuffer(gl, sliceToArray.Float32Array(screenspace_data.normals)),
+        };
       }
       const forest_data = graphOutputs.forest_data;
       if (forest_data) {
@@ -281,6 +283,8 @@ export function App() {
           gl.clearColor(0, 0, 0, 1);
           gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
         }
+
+        ShaderBuilder.renderMaterial(gl, skyboxMaterial, skybox);
 
         for (const [_, model] of Object.entries(models)) {
           if ("greybox" in model) {

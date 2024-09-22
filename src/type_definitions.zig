@@ -3,13 +3,13 @@ const utils = @import("./utils.zig");
 
 pub inline fn typescriptTypeOf(comptime from_type: anytype, comptime options: struct { first: bool = false }) []const u8 {
     return comptime switch (@typeInfo(from_type)) {
-        .Bool => "boolean",
-        .Void => "void",
-        .Int => "number",
-        .Float => "number",
-        .Optional => |optional_info| typescriptTypeOf(optional_info.child, .{}) ++ " | null",
-        .Array => |array_info| typescriptTypeOf(array_info.child, .{}) ++ "[]",
-        .Vector => |vector_info| {
+        .bool => "boolean",
+        .void => "void",
+        .int => "number",
+        .float => "number",
+        .optional => |optional_info| typescriptTypeOf(optional_info.child, .{}) ++ " | null",
+        .array => |array_info| typescriptTypeOf(array_info.child, .{}) ++ "[]",
+        .vector => |vector_info| {
             const child = typescriptTypeOf(vector_info.child, .{});
             var result: []const u8 = &.{};
             for (0..vector_info.len) |i| {
@@ -17,15 +17,15 @@ pub inline fn typescriptTypeOf(comptime from_type: anytype, comptime options: st
             }
             return std.fmt.comptimePrint("[{s}]", .{result});
         },
-        .ErrorUnion => |eu| typescriptTypeOf(eu.payload, .{}), // Ignore the existence of errors for now...
-        .Pointer => |pointer| switch (pointer.size) {
+        .error_union => |eu| typescriptTypeOf(eu.payload, .{}), // Ignore the existence of errors for now...
+        .pointer => |pointer| switch (pointer.size) {
             .Many, .Slice => if (pointer.child == u8)
                 "string"
             else
                 "Array<" ++ typescriptTypeOf(pointer.child, .{}) ++ ">",
             else => "unknown",
         },
-        .Enum => |enum_info| {
+        .@"enum" => |enum_info| {
             var result: []const u8 = &.{};
             for (enum_info.fields, 0..) |field, i| {
                 result = result ++ std.fmt.comptimePrint("{s}\"{s}\"", .{
@@ -35,7 +35,7 @@ pub inline fn typescriptTypeOf(comptime from_type: anytype, comptime options: st
             }
             return result;
         },
-        .Union => |union_info| {
+        .@"union" => |union_info| {
             var result: []const u8 = &.{};
             for (union_info.fields, 0..) |field, i| {
                 result = result ++ std.fmt.comptimePrint("{s}{{ {s}: {s} }}", .{
@@ -46,7 +46,7 @@ pub inline fn typescriptTypeOf(comptime from_type: anytype, comptime options: st
             }
             return result;
         },
-        .Struct => |struct_info| {
+        .@"struct" => |struct_info| {
             var decls: []const u8 = &.{};
             for (struct_info.decls, 0..) |decl, i| {
                 decls = decls ++ std.fmt.comptimePrint("{s}{s}{s}: {s}", .{
@@ -61,7 +61,7 @@ pub inline fn typescriptTypeOf(comptime from_type: anytype, comptime options: st
                 const default = .{ field.type, false };
                 const field_type, const is_optional = switch (@typeInfo(field.type)) {
                     else => default,
-                    .Optional => |field_optional_info| if (field.default_value) |_| .{ field_optional_info.child, true } else default,
+                    .optional => |field_optional_info| if (field.default_value) |_| .{ field_optional_info.child, true } else default,
                 };
                 fields = fields ++ std.fmt.comptimePrint("{s}{s}{s}{s}: {s}", .{
                     if (i == 0) "" else ", ",
@@ -79,7 +79,7 @@ pub inline fn typescriptTypeOf(comptime from_type: anytype, comptime options: st
             });
             return result;
         },
-        .Fn => |function_info| {
+        .@"fn" => |function_info| {
             var params: []const u8 = &.{};
             for (function_info.params, 0..) |param, i| {
                 params = params ++ std.fmt.comptimePrint("{s}arg{d}: {s}", .{ if (i == 0) "" else ", ", i, typescriptTypeOf(param.type.?, .{}) });
