@@ -1,5 +1,5 @@
 const std = @import("std");
-const game = @import("./game/game.zig").interface;
+const game = @import("./game/game.zig");
 const type_definitions = @import("./type_definitions.zig");
 
 var message_arena: std.heap.ArenaAllocator = std.heap.ArenaAllocator.init(std.heap.page_allocator);
@@ -31,25 +31,6 @@ pub fn dumpDebugLogFmt(comptime fmt: []const u8, args: anytype) void {
     dumpDebugLog(std.fmt.allocPrint(std.heap.page_allocator, fmt, args) catch unreachable);
 }
 
-pub const InterfaceEnum = DeclsToEnum(game);
-
-pub fn DeclsToEnum(comptime container: type) type {
-    const info = @typeInfo(container);
-    var enum_fields: []const std.builtin.Type.EnumField = &.{};
-    for (info.Struct.decls, 0..) |struct_decl, i| {
-        enum_fields = enum_fields ++ &[_]std.builtin.Type.EnumField{.{
-            .name = struct_decl.name,
-            .value = i,
-        }};
-    }
-    return @Type(.{ .Enum = .{
-        .tag_type = u32,
-        .fields = enum_fields,
-        .decls = &.{},
-        .is_exhaustive = true,
-    } });
-}
-
 pub fn Args(comptime func: anytype) type {
     const ParamInfo = @typeInfo(@TypeOf(func)).@"fn".params;
     var fields: []const std.builtin.Type.StructField = &.{};
@@ -74,13 +55,13 @@ fn callWithJsonErr(name_ptr: [*]const u8, name_len: usize, args_ptr: [*]const u8
     const allocator = message_arena.allocator();
     const name: []const u8 = name_ptr[0..name_len];
     const args_string: []const u8 = args_ptr[0..args_len];
-    const case = std.meta.stringToEnum(InterfaceEnum, name) orelse {
+    const case = std.meta.stringToEnum(game.InterfaceEnum, name) orelse {
         dumpError(try std.fmt.allocPrint(allocator, "unknown function: {s}\n", .{name}));
         return;
     };
     switch (case) {
         inline else => |fn_name| {
-            const func = @field(game, @tagName(fn_name));
+            const func = @field(game.interface, @tagName(fn_name));
             var diagnostics = std.json.Diagnostics{};
             var scanner = std.json.Scanner.initCompleteInput(allocator, args_string);
             defer scanner.deinit();
@@ -90,8 +71,8 @@ fn callWithJsonErr(name_ptr: [*]const u8, name_len: usize, args_ptr: [*]const u8
                 dumpDebugLog(try std.fmt.allocPrint(allocator, "Something in here isn't parsing right: {s}", .{args_string[0..@intCast(diagnostics.getByteOffset())]}));
                 return err;
             };
-            const result = switch (@typeInfo(@typeInfo(@TypeOf(func)).Fn.return_type.?)) {
-                .ErrorUnion => try @call(.auto, func, args.value),
+            const result = switch (@typeInfo(@typeInfo(@TypeOf(func)).@"fn".return_type.?)) {
+                .error_union => try @call(.auto, func, args.value),
                 else => @call(.auto, func, args.value),
             };
 

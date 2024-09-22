@@ -166,8 +166,11 @@ pub const interface = struct {
 
             pub fn displaySkybox(
                 allocator: std.mem.Allocator,
-                _: struct {},
+                props: struct {
+                    world_matrix: zm.Mat,
+                },
             ) !struct {} {
+                _ = props;
                 _ = allocator;
                 return .{};
             }

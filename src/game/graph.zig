@@ -32,7 +32,9 @@ pub const blueprint = runtime.Blueprint{
         .{
             .name = "displaySkybox",
             .function = "displaySkybox",
-            .input_links = &[_]runtime.InputLink{},
+            .input_links = &[_]runtime.InputLink{
+                .{ .field = "world_matrix", .source = .{ .node = .{ .name = "orbit", .field = "world_matrix" } } },
+            },
         },
         .{
             .name = "changeSettings",
