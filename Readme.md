@@ -14,7 +14,7 @@ Can 3D toon graphics be easy?
 ### Building
 
 Requires Zig 0.14
-> Currently on zig version 0.14.0-dev.105+f7d72ce88
+> Currently on zig version 0.14.0-dev.1632+d83a3f174
 
 ```
 zig build wasm

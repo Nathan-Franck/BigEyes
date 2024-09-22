@@ -53,10 +53,10 @@ pub fn EnumStruct(field_key: type, field_value: type) type {
 pub fn copyWith(source_data: anytype, field_changes: anytype) @TypeOf(source_data) {
     switch (@typeInfo(@TypeOf(source_data))) {
         else => @compileError("Can't merge non-struct types"),
-        .Struct => |struct_info| {
+        .@"struct" => |struct_info| {
             var result = source_data;
             comptime var unused_field_changes: []const []const u8 = &.{};
-            inline for (@typeInfo(@TypeOf(field_changes)).Struct.fields) |unused_field| {
+            inline for (@typeInfo(@TypeOf(field_changes)).@"struct".fields) |unused_field| {
                 unused_field_changes = unused_field_changes ++ &[_][]const u8{unused_field.name};
             }
             inline for (struct_info.fields) |field| {
@@ -109,8 +109,8 @@ test "PickField" {
     const expected_struct = struct { a: u32 };
     try std.testing.expectEqualSlices(
         std.builtin.Type.StructField,
-        @typeInfo(output_struct).Struct.fields,
-        @typeInfo(expected_struct).Struct.fields,
+        @typeInfo(output_struct).@"struct".fields,
+        @typeInfo(expected_struct).@"struct".fields,
     );
 }
 
@@ -124,7 +124,7 @@ pub fn Pick(comptime t: type, comptime field_tags: anytype) type {
     const input_struct = @typeInfo(t).Struct;
     var output_fields: []const std.builtin.Type.StructField = &.{};
     inline for (input_struct.fields) |field| {
-        if (match: for (@typeInfo(@TypeOf(field_tags)).Struct.fields) |tag| {
+        if (match: for (@typeInfo(@TypeOf(field_tags)).@"struct".fields) |tag| {
             if (std.mem.eql(u8, field.name, @tagName(@field(field_tags, tag.name)))) {
                 break :match true;
             }
@@ -143,8 +143,8 @@ test "Pick" {
     const expected_struct = struct { a: u32, c: bool };
     try std.testing.expectEqualSlices(
         std.builtin.Type.StructField,
-        @typeInfo(output_struct).Struct.fields,
-        @typeInfo(expected_struct).Struct.fields,
+        @typeInfo(output_struct).@"struct".fields,
+        @typeInfo(expected_struct).@"struct".fields,
     );
 }
 
@@ -171,7 +171,7 @@ fn deepCloneInner(
 ) !DeepCloneResult(T) {
     return switch (@typeInfo(T)) {
         else => .{ .value = source, .allocator_used = false },
-        .Array => |a| blk: {
+        .array => |a| blk: {
             var elements: [a.len]a.child = undefined;
             var allocator_used = false;
             for (source, 0..) |elem, idx| {
@@ -185,7 +185,7 @@ fn deepCloneInner(
                 break :blk .{ .value = elements, .allocator_used = true };
             }
         },
-        .Struct => |struct_info| blk: {
+        .@"struct" => |struct_info| blk: {
             // Solution to clone ArrayLists and HashMaps, and who knows what else!
             if (@hasDecl(T, "cloneWithAllocator")) {
                 break :blk .{
@@ -214,7 +214,7 @@ fn deepCloneInner(
                 break :blk .{ .value = result, .allocator_used = true };
             }
         },
-        .Union => |union_info| blk: {
+        .@"union" => |union_info| blk: {
             if (union_info.tag_type == null) {
                 @compileError(std.fmt.comptimePrint("unable to copy an untagged union: {any}", .{T}));
             }
@@ -240,7 +240,7 @@ fn deepCloneInner(
                 }
             }
         },
-        .Pointer => |pointer_info| switch (pointer_info.size) {
+        .pointer => |pointer_info| switch (pointer_info.size) {
             .Many, .Slice => blk: {
                 var elements = std.ArrayList(pointer_info.child).init(allocator);
                 for (source) |elem| {
@@ -253,7 +253,7 @@ fn deepCloneInner(
                 @compileError(std.fmt.comptimePrint("Unsupported pointer type {any}", .{pointer_info.child}));
             },
         },
-        .Optional => |optional_info| blk: {
+        .optional => |optional_info| blk: {
             if (source) |non_null_source| {
                 const result = try deepCloneInner(optional_info.child, allocator, non_null_source);
                 break :blk .{ .value = result.value, .allocator_used = result.allocator_used };

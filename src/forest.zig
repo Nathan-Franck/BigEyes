@@ -142,7 +142,7 @@ pub fn Forest(comptime chunk_size: i32) type {
             };
 
             const trees = unpack: {
-                const decls: []const std.builtin.Type.Declaration = @typeInfo(ForestSettings).Struct.decls;
+                const decls: []const std.builtin.Type.Declaration = @typeInfo(ForestSettings).@"struct".decls;
                 var trees: [decls.len]Tree = undefined;
                 for (decls, 0..) |decl_definition, i| {
                     trees[i] = @field(ForestSettings, decl_definition.name);
@@ -157,7 +157,7 @@ pub fn Forest(comptime chunk_size: i32) type {
                     min_tier = @min(min_tier, tree.density_tier);
                     max_tier = @max(max_tier, tree.density_tier);
                 }
-                const tree_decls = @typeInfo(ForestSettings).Struct.decls;
+                const tree_decls = @typeInfo(ForestSettings).@"struct".decls;
                 const tier_len = max_tier - min_tier + 1;
                 var tiers: [tier_len]?DensityTier = undefined;
                 for (&tiers, 0..) |*tier, tier_index| {

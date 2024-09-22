@@ -42,7 +42,7 @@ const Input = struct {
 inline fn IsEventType(the_type: type) bool {
     return switch (@typeInfo(the_type)) {
         else => false,
-        .Optional => |optional| switch (@typeInfo(optional.child)) {
+        .optional => |optional| switch (@typeInfo(optional.child)) {
             else => false,
             .Union => true,
         },
@@ -84,20 +84,20 @@ pub fn NodeGraph(
         inline for (graph.nodes) |node| {
             const node_defn = @field(node_definitions, node.name);
 
-            const function_definition = @typeInfo(@TypeOf(node_defn)).Fn;
+            const function_definition = @typeInfo(@TypeOf(node_defn)).@"fn";
             const node_outputs = function_definition.return_type.?;
             const node_inputs = function_definition.params;
             const non_error_outputs = switch (@typeInfo(node_outputs)) {
                 else => node_outputs,
-                .ErrorUnion => |error_union| error_union.payload,
+                .error_union => |error_union| error_union.payload,
             };
             comptime var output_fields: []const std.builtin.Type.StructField =
-                @typeInfo(non_error_outputs).Struct.fields;
+                @typeInfo(non_error_outputs).@"struct".fields;
             for (@typeInfo(
                 node_inputs[node_inputs.len - 1].type.?,
-            ).Struct.fields) |input_field| switch (@typeInfo(input_field.type)) {
+            ).@"struct".fields) |input_field| switch (@typeInfo(input_field.type)) {
                 else => {},
-                .Pointer => |pointer| switch (pointer.size) {
+                .pointer => |pointer| switch (pointer.size) {
                     else => {},
                     .One => {
                         if (!pointer.is_const)
@@ -121,7 +121,7 @@ pub fn NodeGraph(
                 },
             };
 
-            const non_error_outputs_and_pointers = @Type(std.builtin.Type{ .Struct = .{
+            const non_error_outputs_and_pointers = @Type(std.builtin.Type{ .@"struct" = .{
                 .layout = .auto,
                 .fields = output_fields,
                 .decls = &.{},
@@ -135,7 +135,7 @@ pub fn NodeGraph(
                 .alignment = @alignOf(non_error_outputs),
             }};
         }
-        break :build_type @Type(std.builtin.Type{ .Struct = .{
+        break :build_type @Type(std.builtin.Type{ .@"struct" = .{
             .layout = .auto,
             .fields = node_output_fields,
             .decls = &.{},
@@ -153,7 +153,7 @@ pub fn NodeGraph(
                 .alignment = @alignOf(bool),
             }};
         }
-        break :build_type @Type(std.builtin.Type{ .Struct = .{
+        break :build_type @Type(std.builtin.Type{ .@"struct" = .{
             .layout = .auto,
             .fields = fields,
             .decls = &.{},
@@ -231,9 +231,9 @@ pub fn NodeGraph(
                     .input_field => |input_field| {
                         const node_params = @typeInfo(
                             @TypeOf(@field(node_definitions, node.name)),
-                        ).Fn.params;
+                        ).@"fn".params;
                         const output_node_type = node_params[node_params.len - 1].type.?;
-                        const field_type = for (@typeInfo(output_node_type).Struct.fields) |field|
+                        const field_type = for (@typeInfo(output_node_type).@"struct".fields) |field|
                             if (std.mem.eql(u8, field.name, input_field)) break field.type else continue
                         else
                             @compileError(std.fmt.comptimePrint("Can't find the field {s} in type {any}", .{
@@ -248,7 +248,7 @@ pub fn NodeGraph(
                                 .type = field_type,
                                 .default_value = switch (@typeInfo(field_type)) {
                                     else => null,
-                                    .Optional => |optional| blk: {
+                                    .optional => |optional| blk: {
                                         const default_value: ?optional.child = null;
                                         break :blk @ptrCast(&default_value);
                                     },
@@ -258,7 +258,7 @@ pub fn NodeGraph(
                             }};
                     },
                 };
-            break :build_type @Type(.{ .Struct = .{
+            break :build_type @Type(.{ .@"struct" = .{
                 .layout = .auto,
                 .fields = fields,
                 .decls = &.{},
@@ -287,7 +287,7 @@ pub fn NodeGraph(
                             }};
                     },
                 };
-            break :build_type @Type(.{ .Struct = .{
+            break :build_type @Type(.{ .@"struct" = .{
                 .layout = .auto,
                 .fields = fields,
                 .decls = &.{},
@@ -313,7 +313,7 @@ pub fn NodeGraph(
                     .alignment = @alignOf(field_type),
                 }};
             }
-            break :build_type @Type(.{ .Struct = .{
+            break :build_type @Type(.{ .@"struct" = .{
                 .layout = .auto,
                 .fields = fields,
                 .decls = &.{},
@@ -340,7 +340,7 @@ pub fn NodeGraph(
                     .alignment = @alignOf(field_type),
                 }};
             }
-            break :build_type @Type(.{ .Struct = .{
+            break :build_type @Type(.{ .@"struct" = .{
                 .layout = .auto,
                 .fields = system_store_fields,
                 .decls = &.{},
@@ -369,11 +369,11 @@ pub fn NodeGraph(
         }
 
         fn getOutputFieldTypeFromNode(node: NodeGraphBlueprintEntry, field_name: []const u8) type {
-            const node_outputs = for (@typeInfo(NodeOutputs).Struct.fields) |field|
+            const node_outputs = for (@typeInfo(NodeOutputs).@"struct".fields) |field|
                 if (!std.mem.eql(u8, field.name, node.name)) continue else break field.type
             else
                 @compileError("Node not found " ++ node.name);
-            const field_type = for (@typeInfo(node_outputs).Struct.fields) |field|
+            const field_type = for (@typeInfo(node_outputs).@"struct".fields) |field|
                 if (!std.mem.eql(u8, field.name, field_name)) continue else break field.type
             else
                 @compileError("Field not found " ++ field_name ++ " in node " ++ node.name);
@@ -384,7 +384,7 @@ pub fn NodeGraph(
 
             // Check inputs for changes...
             var inputs_dirty: SystemInputsDirtyFlags = undefined;
-            inline for (@typeInfo(SystemInputs).Struct.fields) |field| {
+            inline for (@typeInfo(SystemInputs).@"struct".fields) |field| {
                 const field_name = field.name;
                 @field(inputs_dirty, field_name) = if (self.system_inputs) |previous_inputs| !std.meta.eql(
                     @field(inputs, field_name),
@@ -399,7 +399,7 @@ pub fn NodeGraph(
             inline for (node_order) |node_index| {
                 const node = graph.nodes[node_index];
                 const node_defn = @field(node_definitions, node.name);
-                const node_params = @typeInfo(@TypeOf(node_defn)).Fn.params;
+                const node_params = @typeInfo(@TypeOf(node_defn)).@"fn".params;
                 const NodeInputs = node_params[node_params.len - 1].type.?;
 
                 var node_inputs: NodeInputs = undefined;
@@ -410,7 +410,7 @@ pub fn NodeGraph(
                     for (node.input_links) |link|
                         switch (@typeInfo(@TypeOf(@field(node_inputs, link.field)))) {
                             else => {},
-                            .Pointer => |pointer| switch (pointer.size) {
+                            .pointer => |pointer| switch (pointer.size) {
                                 else => {},
                                 .One => {
                                     mutable_fields = mutable_fields ++ .{.{
@@ -432,7 +432,7 @@ pub fn NodeGraph(
                                 },
                             },
                         };
-                    break :build_type @Type(.{ .Struct = .{
+                    break :build_type @Type(.{ .@"struct" = .{
                         .layout = .auto,
                         .fields = mutable_fields,
                         .decls = &.{},
@@ -466,7 +466,7 @@ pub fn NodeGraph(
                     const target_input_field = &@field(node_inputs, link.field);
                     target_input_field.* = switch (@typeInfo(@TypeOf(target_input_field.*))) {
                         else => node_input_field,
-                        .Pointer => |pointer| switch (pointer.size) {
+                        .pointer => |pointer| switch (pointer.size) {
                             else => ("OI!"),
                             .One => deferred_clone: {
                                 @field(mutable_fields, link.field) = &node_input_field;
@@ -487,8 +487,8 @@ pub fn NodeGraph(
                     _ = self.nodes_arenas[node_index].reset(.retain_capacity);
 
                     // Duplicate data from inputs where the node is allowed to manipulate pointers ...
-                    inline for (@typeInfo(@TypeOf(mutable_fields)).Struct.fields) |field| {
-                        const pointer = @typeInfo(field.type).Pointer;
+                    inline for (@typeInfo(@TypeOf(mutable_fields)).@"struct".fields) |field| {
+                        const pointer = @typeInfo(field.type).pointer;
                         const input_to_clone = &@field(node_inputs, field.name);
                         input_to_clone.* = switch (pointer.size) {
                             .One => cloned: {
@@ -513,7 +513,7 @@ pub fn NodeGraph(
                         @field(node_definitions, node.function),
                         if (@typeInfo(
                             @TypeOf(@field(node_definitions, node.function)),
-                        ).Fn.params.len == 1)
+                        ).@"fn".params.len == 1)
                             .{
                                 node_inputs,
                             }
@@ -524,8 +524,8 @@ pub fn NodeGraph(
                             },
                     );
                     var node_output: @TypeOf(target.*) = undefined;
-                    inline for (@typeInfo(@TypeOf(mutable_fields)).Struct.fields) |mutable_field| {
-                        const pointer = @typeInfo(mutable_field.type).Pointer;
+                    inline for (@typeInfo(@TypeOf(mutable_fields)).@"struct".fields) |mutable_field| {
+                        const pointer = @typeInfo(mutable_field.type).pointer;
                         @field(node_output, mutable_field.name) = switch (pointer.size) {
                             else => @panic("qwer"),
                             .One => @field(node_inputs, mutable_field.name).*,
@@ -536,7 +536,7 @@ pub fn NodeGraph(
                         node_output,
                         switch (@typeInfo(@TypeOf(function_output))) {
                             else => function_output,
-                            .ErrorUnion => try function_output,
+                            .error_union => try function_output,
                         },
                     );
                     break :blk node_output;

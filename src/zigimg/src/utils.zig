@@ -104,18 +104,18 @@ pub fn writeStructForeign(writer: anytype, value: anytype) StructWriteError!void
 
 // Extend std.mem.byteSwapAllFields to support enums
 fn swapFieldBytes(data: anytype) StructReadError!void {
-    const T = @typeInfo(@TypeOf(data)).Pointer.child;
+    const T = @typeInfo(@TypeOf(data)).pointer.child;
     inline for (std.meta.fields(T)) |entry| {
         switch (@typeInfo(entry.type)) {
-            .Int => |int| {
+            .int => |int| {
                 if (int.bits > 8) {
                     @field(data, entry.name) = @byteSwap(@field(data, entry.name));
                 }
             },
-            .Struct => {
+            .@"struct" => {
                 try swapFieldBytes(&@field(data, entry.name));
             },
-            .Enum => {
+            .@"enum" => {
                 const value = @intFromEnum(@field(data, entry.name));
                 if (@bitSizeOf(@TypeOf(value)) > 8) {
                     @field(data, entry.name) = try std.meta.intToEnum(entry.type, @byteSwap(value));
@@ -123,12 +123,12 @@ fn swapFieldBytes(data: anytype) StructReadError!void {
                     _ = std.meta.intToEnum(entry.type, value) catch return StructReadError.InvalidData;
                 }
             },
-            .Array => |array| {
+            .array => |array| {
                 if (array.child != u8) {
                     @compileError("Add support for type " ++ @typeName(T) ++ "." ++ @typeName(entry.type) ++ " in swapFieldBytes");
                 }
             },
-            .Bool => {},
+            .bool => {},
             else => {
                 @compileError("Add support for type " ++ @typeName(T) ++ "." ++ @typeName(entry.type) ++ " in swapFieldBytes");
             },

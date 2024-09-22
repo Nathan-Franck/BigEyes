@@ -51,7 +51,7 @@ pub fn DeclsToEnum(comptime container: type) type {
 }
 
 pub fn Args(comptime func: anytype) type {
-    const ParamInfo = @typeInfo(@TypeOf(func)).Fn.params;
+    const ParamInfo = @typeInfo(@TypeOf(func)).@"fn".params;
     var fields: []const std.builtin.Type.StructField = &.{};
     for (ParamInfo, 0..) |param_info, i| {
         fields = fields ++ &[_]std.builtin.Type.StructField{.{
@@ -62,7 +62,7 @@ pub fn Args(comptime func: anytype) type {
             .alignment = @alignOf(param_info.type.?),
         }};
     }
-    return @Type(.{ .Struct = .{
+    return @Type(.{ .@"struct" = .{
         .layout = .auto,
         .fields = fields,
         .decls = &.{},
