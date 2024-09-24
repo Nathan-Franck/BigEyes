@@ -55,6 +55,8 @@ pub const interface = struct {
     const NodeGraph = graph_runtime.NodeGraph(
         game.graph.blueprint,
         struct {
+
+            // TODO: Just take in optional values as input into the graph, so that this node isn't needed, obviously it's a waste of space.
             pub fn changeSettings(props: struct {
                 settings: *game.types.Settings,
                 user_changes: ?union(enum) {
