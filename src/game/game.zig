@@ -186,7 +186,6 @@ pub const interface = struct {
                 ) |*normal, screen_position| {
                     const world_position = zm.mul(screen_position, inverse_view_projection);
                     wasm_entry.dumpDebugLogFmt("{any}", .{world_position});
-                    // world_position /= @splat(world_position[3]);
                     normal.* = zm.normalize3(
                         world_position - props.camera_position,
                     );
@@ -218,7 +217,7 @@ pub const interface = struct {
                 var spawner: Spawner = Spawner.init(allocator);
                 const bounds = Bounds{
                     .min = .{ -4, -4 },
-                    .size = .{ 4, 4 },
+                    .size = .{ 8, 8 },
                 };
                 const spawns = try spawner.gatherSpawnsInBounds(allocator, bounds);
                 var instances = try allocator.alloc(std.ArrayList(Vec4), spawner.trees.len);
