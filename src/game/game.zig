@@ -36,7 +36,7 @@ pub const interface = struct {
                 .orbit_camera = .{
                     .position = .{ 0, -0.75, 0, 1 },
                     .rotation = .{ 0, 0, 0, 1 },
-                    .track_distance = 1.5,
+                    .track_distance = 5,
                 },
             },
         });
@@ -127,7 +127,7 @@ pub const interface = struct {
                     orbit_camera: *game.types.OrbitCamera,
                 },
             ) !struct {
-                view_projection: zm.Mat,
+                camera_position: Vec4,
                 world_matrix: zm.Mat,
             } {
                 if (props.input) |found_input| {
@@ -154,7 +154,7 @@ pub const interface = struct {
                 );
 
                 return .{
-                    .view_projection = view_projection,
+                    .camera_position = zm.mul(zm.inverse(location), Vec4{ 0, 0, 0, 1 }),
                     .world_matrix = zm.mul(
                         location,
                         view_projection,
@@ -165,30 +165,30 @@ pub const interface = struct {
             pub fn getScreenspaceMesh(
                 allocator: std.mem.Allocator,
                 props: struct {
+                    camera_position: Vec4,
                     world_matrix: zm.Mat,
-                    view_projection: zm.Mat,
                 },
             ) !struct { screen_space_mesh: struct {
                 indices: []const u32,
                 uvs: []const f32,
                 normals: []const f32,
             } } {
-                const inverse_view_projection = zm.inverse(props.view_projection);
+                const inverse_view_projection = zm.inverse(props.world_matrix);
                 var normals: [4]Vec4 = undefined;
                 for (
                     &normals,
                     [_]Vec4{
-                        Vec4{ -1, -1, 1, 0 },
-                        Vec4{ 1, -1, 1, 0 },
-                        Vec4{ 1, 1, 1, 0 },
-                        Vec4{ -1, 1, 1, 0 },
+                        Vec4{ -1, -1, 1, 1 },
+                        Vec4{ 1, -1, 1, 1 },
+                        Vec4{ 1, 1, 1, 1 },
+                        Vec4{ -1, 1, 1, 1 },
                     },
-                ) |*normal, input_direction| {
-                    var screen_direction = zm.mul(inverse_view_projection, input_direction);
-                    screen_direction /= @splat(screen_direction[3]);
-                    normal.* = zm.mul(
-                        props.world_matrix,
-                        screen_direction,
+                ) |*normal, screen_position| {
+                    const world_position = zm.mul(screen_position, inverse_view_projection);
+                    wasm_entry.dumpDebugLogFmt("{any}", .{world_position});
+                    // world_position /= @splat(world_position[3]);
+                    normal.* = zm.normalize3(
+                        world_position - props.camera_position,
                     );
                 }
                 const PointFlattener = mesh_helper.VecSliceFlattener(4, 3);
@@ -217,8 +217,8 @@ pub const interface = struct {
                 const Spawner = Forest.spawner(ForestSettings);
                 var spawner: Spawner = Spawner.init(allocator);
                 const bounds = Bounds{
-                    .min = .{ -2, -2 },
-                    .size = .{ 2, 2 },
+                    .min = .{ -4, -4 },
+                    .size = .{ 4, 4 },
                 };
                 const spawns = try spawner.gatherSpawnsInBounds(allocator, bounds);
                 var instances = try allocator.alloc(std.ArrayList(Vec4), spawner.trees.len);

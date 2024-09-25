@@ -149,7 +149,7 @@ export function App() {
       fragSource: `
         precision highp float;
         void main(void) {
-          gl_FragColor = textureCube(skybox, normal);
+          gl_FragColor = textureCube(skybox, normalize(normal));
         }
       `,
     });
