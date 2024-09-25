@@ -83,20 +83,13 @@ pub const interface = struct {
 
             pub fn getResources(allocator: std.mem.Allocator, _: struct {}) !game.types.Resources {
                 const skybox = blk: {
-                    var images = std.ArrayList(Image.Processed).init(allocator);
-                    inline for (.{
-                        "nx",
-                        "ny",
-                        "nz",
-                        "px",
-                        "py",
-                        "pz",
-                    }) |direction| {
-                        const image_png = @embedFile("../content/cloudy skybox/" ++ direction ++ ".png");
+                    var images: game.types.ProcessedCubeMap = undefined;
+                    inline for (@typeInfo(game.types.ProcessedCubeMap).@"struct".fields) |field| {
+                        const image_png = @embedFile("../content/cloudy skybox/" ++ field.name ++ ".png");
                         const image_data = try Image.loadPngAndProcess(allocator, image_png);
-                        try images.append(image_data);
+                        @field(images, field.name) = image_data;
                     }
-                    break :blk images.items;
+                    break :blk images;
                 };
 
                 const cutout_leaf = blk: {

@@ -51,6 +51,14 @@ const { classes, encodedStyle } = declareStyle({
   },
 });
 
+function fromEntries<T extends [string, any]>(entries: T[]) {
+  return Object.fromEntries(entries) as any as { [key in T[0]]: T[1] };
+  }
+
+function toEntries<T extends Object>(object: T) {
+  return Object.entries(object) as any as Array<[keyof T, T[keyof T]]>;
+  }
+
 // TODO - Get the error messages from the console showing up
 // https://stackoverflow.com/questions/6604192/showing-console-errors-and-alerts-in-a-div-inside-the-page
 
@@ -129,7 +137,7 @@ export function App() {
         uv: { type: "attribute", unit: "vec2" },
         normals: { type: "attribute", unit: "vec3" },
         normal: { type: "varying", unit: "vec3" },
-        skybox: { type: "uniform", unit: "sampler2D", count: 1 },
+        skybox: { type: "uniform", unit: "samplerCube", count: 1 },
       },
       vertSource: `
         precision highp float;
@@ -141,9 +149,7 @@ export function App() {
       fragSource: `
         precision highp float;
         void main(void) {
-          // gl_FragColor = textureCube(skybox, normal);
-          vec2 uv = normal.xy;
-          gl_FragColor = vec4(texture2D(skybox, uv).rgb, 1);
+          gl_FragColor = textureCube(skybox, normal);
         }
       `,
     });
@@ -224,10 +230,10 @@ export function App() {
       }
       const skybox_data = graphOutputs.skybox;
       if (skybox_data) {
-        const one_face = skybox_data[0];
+        var texture_data = fromEntries(toEntries(skybox_data).map(([key, value]) => [key, sliceToArray.Uint8Array(value.data)] as const))
         skybox = {
           ...skybox,
-          skybox: ShaderBuilder.loadImageData(gl, sliceToArray.Uint8Array(one_face.data), one_face.width, one_face.height),
+          skybox: ShaderBuilder.loadCubemapData(gl, texture_data, skybox_data.nx.width, skybox_data.nx.height),
         };
       }
       const screenspace_data = graphOutputs.screen_space_mesh;

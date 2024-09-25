@@ -49,8 +49,17 @@ pub const TreeMesh = struct {
     bark_mesh: tree.Mesh,
 };
 
+pub const ProcessedCubeMap = struct {
+    nx: Image.Processed,
+    ny: Image.Processed,
+    nz: Image.Processed,
+    px: Image.Processed,
+    py: Image.Processed,
+    pz: Image.Processed,
+};
+
 pub const Resources = struct {
-    skybox: []Image.Processed,
+    skybox: ProcessedCubeMap,
     cutout_leaf: Image.Processed,
     tree: TreeMesh,
 };

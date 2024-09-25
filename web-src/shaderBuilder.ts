@@ -27,7 +27,7 @@ export type AllowedKeys<Base, Condition> =
 
 
 export type GLSLUnit = "float" | "vec2" | "vec3" | "vec4";
-export type GLSLUniformUnit = "float" | "vec2" | "vec3" | "vec4" | "sampler2D" | "mat4";
+export type GLSLUniformUnit = "float" | "vec2" | "vec3" | "vec4" | "sampler2D" | "samplerCube" | "mat4";
 export type Varying = {
 	readonly type: "varying",
 	readonly unit: GLSLUnit,
@@ -57,6 +57,11 @@ export type Texture = {
 	width: number,
 	height: number,
 }
+export type CubemapTexture = {
+	cubemapTexture: WebGLTexture,
+	width: number,
+	height: number,
+}
 export type UniformSizes =
 	2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 |
 	17 | 18 | 19 | 20 | 21 | 22 | 23 | 24 | 25 | 26 | 27 | 28 | 29 | 30 | 31 | 32;
@@ -78,12 +83,14 @@ export type Binds<T> =
 	& { [key in AllowedKeys<T, { type: "uniform", unit: "vec4", count: 1 }>]: Vec4 }
 	& { [key in AllowedKeys<T, { type: "uniform", unit: "mat4", count: 1 }>]: Mat4 }
 	& { [key in AllowedKeys<T, { type: "uniform", unit: "sampler2D", count: 1 }>]: Texture }
+	& { [key in AllowedKeys<T, { type: "uniform", unit: "samplerCube", count: 1 }>]: CubemapTexture }
 	& { [key in AllowedKeys<T, { type: "uniform", unit: "float", count: UniformSizes }>]: readonly number[] }
 	& { [key in AllowedKeys<T, { type: "uniform", unit: "vec2", count: UniformSizes }>]: readonly Vec2[] }
 	& { [key in AllowedKeys<T, { type: "uniform", unit: "vec3", count: UniformSizes }>]: readonly Vec3[] }
 	& { [key in AllowedKeys<T, { type: "uniform", unit: "vec4", count: UniformSizes }>]: readonly Vec4[] }
 	& { [key in AllowedKeys<T, { type: "uniform", unit: "mat4", count: UniformSizes }>]: readonly Mat4[] }
 	& { [key in AllowedKeys<T, { type: "uniform", unit: "sampler2D", count: UniformSizes }>]: readonly Texture[] }
+	& { [key in AllowedKeys<T, { type: "uniform", unit: "samplerCube", count: UniformSizes }>]: readonly CubemapTexture[] }
 	& { [key in AllowedKeys<T, Attribute>]: SizedBuffer }
 	& { [key in AllowedKeys<T, Element>]: ElementBuffer }
 
@@ -106,7 +113,7 @@ export namespace ShaderBuilder {
 	}
 
 	export function uniformText(key: string, element: Uniform) {
-		return `${element.type} ${element.unit == "sampler2D" ? `` : `highp`} ${element.unit} ${key}${element.count > 1 ? `[${element.count}]` : ``};`
+		return `${element.type} ${(element.unit == "sampler2D" || element.unit == "samplerCube") ? `` : `highp`} ${element.unit} ${key}${element.count > 1 ? `[${element.count}]` : ``};`
 	}
 
 	export function toVertText(props: ShaderGlobals) {
@@ -215,6 +222,51 @@ export namespace ShaderBuilder {
 		};
 	}
 
+	export type CubemapData = {
+		nx: Uint8Array,
+		ny: Uint8Array,
+		nz: Uint8Array,
+		px: Uint8Array,
+		py: Uint8Array,
+		pz: Uint8Array,
+	};
+
+	export function loadCubemapData(gl: WebGL2RenderingContext, cubemapData: CubemapData, width: number, height: number) {
+
+		const cubemapTexture = gl.createTexture();
+		if (cubemapTexture == null) {
+			throw new Error("Texture is null, this is not expected!");
+		}
+		gl.bindTexture(gl.TEXTURE_CUBE_MAP, cubemapTexture);
+
+		gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+		gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+		gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+		gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
+		const faces = [
+			{ target: gl.TEXTURE_CUBE_MAP_POSITIVE_X, data: cubemapData.px },
+			{ target: gl.TEXTURE_CUBE_MAP_NEGATIVE_X, data: cubemapData.nx },
+			{ target: gl.TEXTURE_CUBE_MAP_POSITIVE_Y, data: cubemapData.py },
+			{ target: gl.TEXTURE_CUBE_MAP_NEGATIVE_Y, data: cubemapData.ny },
+			{ target: gl.TEXTURE_CUBE_MAP_POSITIVE_Z, data: cubemapData.pz },
+			{ target: gl.TEXTURE_CUBE_MAP_NEGATIVE_Z, data: cubemapData.nz }
+		];
+
+		faces.forEach((face) => {
+			gl.bindTexture(gl.TEXTURE_CUBE_MAP, cubemapTexture);
+			gl.texImage2D(face.target, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, face.data);
+		});
+
+		gl.generateMipmap(gl.TEXTURE_CUBE_MAP);
+
+		return {
+			cubemapTexture,
+			width,
+			height,
+		};
+	}
+
 	export async function loadTexture(gl: WebGL2RenderingContext, url: string) {
 		return await new Promise<Texture>((resolve) => {
 			const texture = gl.createTexture();
@@ -294,16 +346,30 @@ export namespace ShaderBuilder {
 
 					const data = (binds as any)[key];
 					switch (global.unit) {
+						case "samplerCube":
+							{
+								const textures = global.count > 1 ? data as CubemapTexture[] : [data as CubemapTexture];
+								const indices = textures.map((data, subIndex) => {
+									const activeTextureIndex = textureIndex + subIndex;
+									gl.activeTexture(gl.TEXTURE0 + activeTextureIndex);
+									gl.bindTexture(gl.TEXTURE_CUBE_MAP, data.cubemapTexture);
+									return activeTextureIndex;
+								})
+								gl.uniform1iv(uniformLocation, indices);
+								return textureIndex + indices.length;
+							}
 						case "sampler2D":
-							const textures = global.count > 1 ? data as Texture[] : [data as Texture];
-							const indices = textures.map((data, subIndex) => {
-								const activeTextureIndex = textureIndex + subIndex;
-								gl.activeTexture(gl.TEXTURE0 + activeTextureIndex);
-								gl.bindTexture(gl.TEXTURE_2D, data.texture);
-								return activeTextureIndex;
-							})
-							gl.uniform1iv(uniformLocation, indices);
-							return textureIndex + indices.length;
+							{
+								const textures = global.count > 1 ? data as Texture[] : [data as Texture];
+								const indices = textures.map((data, subIndex) => {
+									const activeTextureIndex = textureIndex + subIndex;
+									gl.activeTexture(gl.TEXTURE0 + activeTextureIndex);
+									gl.bindTexture(gl.TEXTURE_2D, data.texture);
+									return activeTextureIndex;
+								})
+								gl.uniform1iv(uniformLocation, indices);
+								return textureIndex + indices.length;
+							}
 						case "float":
 							gl.uniform1fv(uniformLocation, global.count > 1 ? data as number[] : [data as number]);
 							break;
