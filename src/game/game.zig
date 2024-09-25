@@ -180,7 +180,7 @@ pub const interface = struct {
                     },
                 ) |*normal, screen_direction| {
                     normal.* = zm.mul(
-                        zm.inverse(props.world_matrix),
+                        props.world_matrix,
                         screen_direction,
                     );
                 }
