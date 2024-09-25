@@ -33,6 +33,7 @@ pub const blueprint = runtime.Blueprint{
             .name = "getScreenspaceMesh",
             .function = "getScreenspaceMesh",
             .input_links = &[_]runtime.InputLink{
+                .{ .field = "view_projection", .source = .{ .node = .{ .name = "orbit", .field = "view_projection" } } },
                 .{ .field = "world_matrix", .source = .{ .node = .{ .name = "orbit", .field = "world_matrix" } } },
             },
         },

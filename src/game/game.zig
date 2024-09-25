@@ -127,34 +127,37 @@ pub const interface = struct {
                     orbit_camera: *game.types.OrbitCamera,
                 },
             ) !struct {
+                view_projection: zm.Mat,
                 world_matrix: zm.Mat,
             } {
-                const mul = zm.mul;
-
                 if (props.input) |found_input| {
                     props.orbit_camera.rotation = props.orbit_camera.rotation +
                         found_input.mouse_delta *
                         @as(zm.Vec, @splat(-props.settings.orbit_speed));
                 }
+                const view_projection = zm.perspectiveFovLh(
+                    0.25 * 3.14151,
+                    @as(f32, @floatFromInt(props.settings.render_resolution.x)) /
+                        @as(f32, @floatFromInt(props.settings.render_resolution.y)),
+                    0.1,
+                    500,
+                );
+                const location = zm.mul(
+                    zm.translationV(props.orbit_camera.position),
+                    zm.mul(
+                        zm.mul(
+                            zm.matFromRollPitchYaw(0, props.orbit_camera.rotation[0], 0),
+                            zm.matFromRollPitchYaw(props.orbit_camera.rotation[1], 0, 0),
+                        ),
+                        zm.translationV(zm.loadArr3(.{ 0.0, 0.0, props.orbit_camera.track_distance })),
+                    ),
+                );
+
                 return .{
-                    .world_matrix = mul(
-                        mul(
-                            zm.translationV(props.orbit_camera.position),
-                            mul(
-                                mul(
-                                    zm.matFromRollPitchYaw(0, props.orbit_camera.rotation[0], 0),
-                                    zm.matFromRollPitchYaw(props.orbit_camera.rotation[1], 0, 0),
-                                ),
-                                zm.translationV(zm.loadArr3(.{ 0.0, 0.0, props.orbit_camera.track_distance })),
-                            ),
-                        ),
-                        zm.perspectiveFovLh(
-                            0.25 * 3.14151,
-                            @as(f32, @floatFromInt(props.settings.render_resolution.x)) /
-                                @as(f32, @floatFromInt(props.settings.render_resolution.y)),
-                            0.1,
-                            500,
-                        ),
+                    .view_projection = view_projection,
+                    .world_matrix = zm.mul(
+                        location,
+                        view_projection,
                     ),
                 };
             }
@@ -163,12 +166,14 @@ pub const interface = struct {
                 allocator: std.mem.Allocator,
                 props: struct {
                     world_matrix: zm.Mat,
+                    view_projection: zm.Mat,
                 },
             ) !struct { screen_space_mesh: struct {
                 indices: []const u32,
                 uvs: []const f32,
                 normals: []const f32,
             } } {
+                const inverse_view_projection = zm.inverse(props.view_projection);
                 var normals: [4]Vec4 = undefined;
                 for (
                     &normals,
@@ -178,7 +183,9 @@ pub const interface = struct {
                         Vec4{ 1, 1, 1, 0 },
                         Vec4{ -1, 1, 1, 0 },
                     },
-                ) |*normal, screen_direction| {
+                ) |*normal, input_direction| {
+                    var screen_direction = zm.mul(inverse_view_projection, input_direction);
+                    screen_direction /= @splat(screen_direction[3]);
                     normal.* = zm.mul(
                         props.world_matrix,
                         screen_direction,

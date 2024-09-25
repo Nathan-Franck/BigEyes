@@ -290,7 +290,9 @@ export function App() {
           gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
         }
 
+        gl.depthMask(false);
         ShaderBuilder.renderMaterial(gl, skyboxMaterial, skybox);
+        gl.depthMask(true);
 
         for (const [_, model] of Object.entries(models)) {
           if ("greybox" in model) {
