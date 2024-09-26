@@ -26,13 +26,12 @@ pub const interface = struct {
     pub fn init() void {
         node_graph = try NodeGraph.init(.{
             .allocator = std.heap.page_allocator,
+            .inputs = .{
+                .input = null,
+                .orbit_speed = 0.01,
+                .render_resolution = .{ .x = 0, .y = 0 },
+            },
             .store = .{
-                .settings = .{
-                    .orbit_speed = 0.01,
-                    .render_resolution = .{ .x = 0, .y = 0 },
-                    .subdiv_level = 0,
-                    .should_raytrace = false,
-                },
                 .orbit_camera = .{
                     .position = .{ 0, -0.75, 0, 1 },
                     .rotation = .{ 0, 0, 0, 1 },
@@ -43,7 +42,7 @@ pub const interface = struct {
     }
 
     pub fn updateNodeGraph(
-        inputs: NodeGraph.SystemInputs,
+        inputs: NodeGraph.PartialSystemInputs,
     ) !struct {
         outputs: NodeGraph.SystemOutputs,
     } {
@@ -55,32 +54,6 @@ pub const interface = struct {
     const NodeGraph = graph_runtime.NodeGraph(
         game.graph.blueprint,
         struct {
-
-            // TODO: Just take in optional values as input into the graph, so that this node isn't needed, obviously it's a waste of space.
-            pub fn changeSettings(props: struct {
-                settings: *game.types.Settings,
-                user_changes: ?union(enum) {
-                    resolution_update: game.types.PixelPoint,
-                    subdiv_level_update: u8,
-                    should_raytrace_update: bool,
-                },
-            }) !struct {} {
-                if (props.user_changes) |c| {
-                    switch (c) {
-                        .resolution_update => |resolution| {
-                            props.settings.render_resolution = resolution;
-                        },
-                        .subdiv_level_update => |level| {
-                            props.settings.subdiv_level = level;
-                        },
-                        .should_raytrace_update => |should_raytrace| {
-                            props.settings.should_raytrace = should_raytrace;
-                        },
-                    }
-                }
-                return .{};
-            }
-
             pub fn getResources(allocator: std.mem.Allocator, _: struct {}) !game.types.Resources {
                 const skybox = blk: {
                     var images: game.types.ProcessedCubeMap = undefined;
@@ -122,7 +95,8 @@ pub const interface = struct {
 
             pub fn orbit(
                 props: struct {
-                    settings: game.types.Settings,
+                    orbit_speed: f32,
+                    render_resolution: struct { x: i32, y: i32 },
                     input: ?struct { mouse_delta: zm.Vec },
                     orbit_camera: *game.types.OrbitCamera,
                 },
@@ -133,12 +107,12 @@ pub const interface = struct {
                 if (props.input) |found_input| {
                     props.orbit_camera.rotation = props.orbit_camera.rotation +
                         found_input.mouse_delta *
-                        @as(zm.Vec, @splat(-props.settings.orbit_speed));
+                        @as(zm.Vec, @splat(-props.orbit_speed));
                 }
                 const view_projection = zm.perspectiveFovLh(
                     0.25 * 3.14151,
-                    @as(f32, @floatFromInt(props.settings.render_resolution.x)) /
-                        @as(f32, @floatFromInt(props.settings.render_resolution.y)),
+                    @as(f32, @floatFromInt(props.render_resolution.x)) /
+                        @as(f32, @floatFromInt(props.render_resolution.y)),
                     0.1,
                     500,
                 );

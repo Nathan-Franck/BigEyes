@@ -218,7 +218,7 @@ pub fn NodeGraph(
         allocator: std.mem.Allocator,
         store: SystemStore,
         store_arena: std.heap.ArenaAllocator,
-        system_inputs: ?SystemInputs,
+        system_inputs: SystemInputs,
         nodes_arenas: [graph.nodes.len]std.heap.ArenaAllocator,
         nodes_outputs: NodeOutputs,
         nodes_dirty_flags: NodesDirtyFlags,
@@ -229,35 +229,53 @@ pub fn NodeGraph(
                 for (node.input_links) |link| switch (link.source) {
                     else => {},
                     .input_field => |input_field| {
-                        const node_params = @typeInfo(
-                            @TypeOf(@field(node_definitions, node.name)),
-                        ).@"fn".params;
-                        const output_node_type = node_params[node_params.len - 1].type.?;
-                        const field_type = for (@typeInfo(output_node_type).@"struct".fields) |field|
-                            if (std.mem.eql(u8, field.name, input_field)) break field.type else continue
-                        else
-                            @compileError(std.fmt.comptimePrint("Can't find the field {s} in type {any}", .{
-                                input_field,
-                                output_node_type,
-                            }));
+                        const field_type = blk: {
+                            const node_params = @typeInfo(
+                                @TypeOf(@field(node_definitions, node.name)),
+                            ).@"fn".params;
+                            const output_node_type = node_params[node_params.len - 1].type.?;
+                            break :blk for (@typeInfo(output_node_type).@"struct".fields) |field|
+                                if (std.mem.eql(u8, field.name, input_field)) break field.type else continue
+                            else
+                                @compileError(std.fmt.comptimePrint("Can't find the field {s} in type {any}", .{
+                                    input_field,
+                                    output_node_type,
+                                }));
+                        };
                         fields = fields ++ for (fields) |system_input|
                             if (std.mem.eql(u8, system_input.name, input_field)) break .{} else continue
                         else
                             .{std.builtin.Type.StructField{
                                 .name = input_field[0.. :0],
                                 .type = field_type,
-                                .default_value = switch (@typeInfo(field_type)) {
-                                    else => null,
-                                    .optional => |optional| blk: {
-                                        const default_value: ?optional.child = null;
-                                        break :blk @ptrCast(&default_value);
-                                    },
-                                },
+                                .default_value = null,
                                 .is_comptime = false,
                                 .alignment = @alignOf(field_type),
                             }};
                     },
                 };
+            break :build_type @Type(.{ .@"struct" = .{
+                .layout = .auto,
+                .fields = fields,
+                .decls = &.{},
+                .is_tuple = false,
+            } });
+        };
+
+        pub const PartialSystemInputs = build_type: {
+            var fields: []const std.builtin.Type.StructField = &.{};
+            for (@typeInfo(SystemInputs).@"struct".fields) |input_field| {
+                fields = fields ++ .{std.builtin.Type.StructField{
+                    .name = input_field.name[0.. :0],
+                    .type = ?input_field.type,
+                    .default_value = blk: {
+                        const default_value: ?input_field.type = null;
+                        break :blk @ptrCast(&default_value);
+                    },
+                    .is_comptime = false,
+                    .alignment = @alignOf(?input_field.type),
+                }};
+            }
             break :build_type @Type(.{ .@"struct" = .{
                 .layout = .auto,
                 .fields = fields,
@@ -310,7 +328,7 @@ pub fn NodeGraph(
                     .type = ?field_type,
                     .default_value = null,
                     .is_comptime = false,
-                    .alignment = @alignOf(field_type),
+                    .alignment = @alignOf(?field_type),
                 }};
             }
             break :build_type @Type(.{ .@"struct" = .{
@@ -350,13 +368,14 @@ pub fn NodeGraph(
 
         pub fn init(props: struct {
             allocator: std.mem.Allocator,
+            inputs: SystemInputs,
             store: SystemStore,
         }) !Self {
             var self = Self{
                 .allocator = props.allocator,
                 .store = props.store,
                 .store_arena = std.heap.ArenaAllocator.init(props.allocator),
-                .system_inputs = null,
+                .system_inputs = props.inputs,
                 .nodes_arenas = undefined,
                 .nodes_outputs = undefined,
                 .nodes_dirty_flags = undefined,
@@ -380,20 +399,24 @@ pub fn NodeGraph(
             return field_type;
         }
 
-        pub fn update(self: *Self, inputs: SystemInputs) !SystemOutputs {
+        pub fn update(self: *Self, system_inputs: PartialSystemInputs) !SystemOutputs {
 
             // Check inputs for changes...
             var inputs_dirty: SystemInputsDirtyFlags = undefined;
             inline for (@typeInfo(SystemInputs).@"struct".fields) |field| {
                 const field_name = field.name;
-                @field(inputs_dirty, field_name) = if (self.system_inputs) |previous_inputs| !std.meta.eql(
-                    @field(inputs, field_name),
-                    @field(previous_inputs, field_name),
-                ) else true;
+                const maybe_input = @field(system_inputs, field_name);
+                const dirty = &@field(inputs_dirty, field_name);
+                if (maybe_input) |input| {
+                    dirty.* = !std.meta.eql(
+                        input,
+                        @field(self.system_inputs, field_name),
+                    );
+                    @field(self.system_inputs, field_name) = input;
+                } else dirty.* = false;
             }
 
             // Now we can actually set the inputs!
-            self.system_inputs = inputs;
 
             // Process all nodes...
             inline for (node_order) |node_index| {
@@ -446,7 +469,7 @@ pub fn NodeGraph(
                             if (@field(inputs_dirty, input_field)) {
                                 is_dirty.* = true;
                             }
-                            break :node_input @field(inputs, input_field);
+                            break :node_input @field(self.system_inputs, input_field);
                         },
                         .store_field => |store_field| @field(self.store, store_field),
                         .node => |node_blueprint| input_field: {

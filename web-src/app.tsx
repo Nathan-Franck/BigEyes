@@ -53,11 +53,11 @@ const { classes, encodedStyle } = declareStyle({
 
 function fromEntries<T extends [string, any]>(entries: T[]) {
   return Object.fromEntries(entries) as any as { [key in T[0]]: T[1] };
-  }
+}
 
 function toEntries<T extends Object>(object: T) {
   return Object.entries(object) as any as Array<[keyof T, T[keyof T]]>;
-  }
+}
 
 // TODO - Get the error messages from the console showing up
 // https://stackoverflow.com/questions/6604192/showing-console-errors-and-alerts-in-a-div-inside-the-page
@@ -65,10 +65,7 @@ function toEntries<T extends Object>(object: T) {
 type UpdateNodeGraph = typeof callWasm<"updateNodeGraph">;
 type GraphOutputs = Exclude<ReturnType<UpdateNodeGraph>, { error: any }>["outputs"];
 const graphInputs: Parameters<UpdateNodeGraph>[1] = {
-  // game_time_ms: Date.now(),
-  user_changes: {
-    resolution_update: { x: window.innerWidth, y: window.innerHeight },
-  },
+  render_resolution: { x: window.innerWidth, y: window.innerHeight },
 };
 
 callWasm("init");
@@ -108,10 +105,7 @@ export function App() {
         height: canvasRef.current?.height || 0,
       });
       updateGraph({
-        // game_time_ms: Date.now(),
-        user_changes: {
-          resolution_update: { x: window.innerWidth, y: window.innerHeight },
-        },
+        render_resolution: { x: window.innerWidth, y: window.innerHeight },
       });
     };
     window.addEventListener("resize", resizeHandler);

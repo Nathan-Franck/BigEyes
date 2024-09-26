@@ -11,7 +11,8 @@ pub const blueprint = runtime.Blueprint{
             .name = "orbit",
             .function = "orbit",
             .input_links = &[_]runtime.InputLink{
-                .{ .field = "settings", .source = .{ .node = .{ .name = "changeSettings", .field = "settings" } } },
+                .{ .field = "render_resolution", .source = .{ .input_field = "render_resolution" } },
+                .{ .field = "orbit_speed", .source = .{ .input_field = "orbit_speed" } },
                 .{ .field = "input", .source = .{ .input_field = "input" } },
                 .{ .field = "orbit_camera", .source = .{ .store_field = "orbit_camera" } },
             },
@@ -37,19 +38,19 @@ pub const blueprint = runtime.Blueprint{
                 .{ .field = "world_matrix", .source = .{ .node = .{ .name = "orbit", .field = "world_matrix" } } },
             },
         },
-        .{
-            .name = "changeSettings",
-            .function = "changeSettings",
-            .input_links = &[_]runtime.InputLink{
-                .{ .field = "user_changes", .source = .{ .input_field = "user_changes" } },
-                .{ .field = "settings", .source = .{ .store_field = "settings" } },
-            },
-        },
+        // .{
+        //     .name = "changeSettings",
+        //     .function = "changeSettings",
+        //     .input_links = &[_]runtime.InputLink{
+        //         .{ .field = "user_changes", .source = .{ .input_field = "user_changes" } },
+        //         .{ .field = "settings", .source = .{ .store_field = "settings" } },
+        //     },
+        // },
     },
 
     .store = &[_]runtime.SystemSink{
         .{ .output_node = "orbit", .output_field = "orbit_camera", .system_field = "orbit_camera" },
-        .{ .output_node = "changeSettings", .output_field = "settings", .system_field = "settings" },
+        // .{ .output_node = "changeSettings", .output_field = "settings", .system_field = "settings" },
     },
     .output = &[_]runtime.SystemSink{
         .{ .output_node = "getResources", .output_field = "skybox", .system_field = "skybox" },

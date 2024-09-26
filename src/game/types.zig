@@ -63,10 +63,3 @@ pub const Resources = struct {
     cutout_leaf: Image.Processed,
     tree: TreeMesh,
 };
-
-pub const Settings = struct {
-    orbit_speed: f32,
-    subdiv_level: u8,
-    should_raytrace: bool,
-    render_resolution: PixelPoint,
-};
