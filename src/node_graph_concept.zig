@@ -7,7 +7,7 @@ pub fn callNode(node: anytype) @TypeOf(node).Definition.Output {
     return output;
 }
 
-fn Node(InputDefinition: type) type {
+pub fn Node(InputDefinition: type) type {
     return struct {
         pub const Definition = InputDefinition;
 
@@ -16,11 +16,11 @@ fn Node(InputDefinition: type) type {
     };
 }
 
-fn GraphInput(InputDefinition: type) InputDefinition {
+pub fn GraphInput(InputDefinition: type) InputDefinition {
     return undefined;
 }
 
-fn GraphStore(InputDefinition: type) type {
+pub fn GraphStore(InputDefinition: type) type {
     return struct {
         pub const Definition = InputDefinition;
 
@@ -108,8 +108,11 @@ pub fn main() void {
     const Graph = struct {
         pub const input = GraphInput(struct { thinger: u32 });
         pub const nodes = struct {
-            pub const eat_cheese = Node(EatCheese){ .in = .{ .thinger = &input.thinger, .munch_speed = &store.out.munch_speed } };
-            pub const feel_full = Node(FeelFull){ .in = .{
+            pub const eat_cheese = Node(EatCheese){ .in = EatCheese.input{
+                .thinger = &input.thinger,
+                .munch_speed = &store.out.munch_speed,
+            } };
+            pub const feel_full = Node(FeelFull){ .in = FeelFull.Input{
                 .cheese_type = &eat_cheese.out.cheese_type,
                 .taste_signature = &eat_cheese.out.taste_signature,
                 .munch_speed = &eat_cheese.out.munch_speed,
