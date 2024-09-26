@@ -107,7 +107,6 @@ pub fn main() void {
     // Declare a graph of nodes to run later...
     const Graph = struct {
         pub const input = GraphInput(struct { thinger: u32 });
-        pub const store = GraphStore(struct { munch_speed: f32 });
         pub const nodes = struct {
             pub const eat_cheese = Node(EatCheese){ .in = .{ .thinger = &input.thinger, .munch_speed = &store.out.munch_speed } };
             pub const feel_full = Node(FeelFull){ .in = .{
@@ -116,9 +115,16 @@ pub fn main() void {
                 .munch_speed = &eat_cheese.out.munch_speed,
             } };
         };
+
+        // These two definitions for store and next_store need to be seperate since otherwise there's a dependency loop :/
+        pub const store = GraphStore(struct {
+            munch_speed: f32,
+        });
         pub const next_store = store.Input{
             .munch_speed = &nodes.eat_cheese.out.munch_speed,
         };
+        // Easiest to just keep them side-by-side and hope that I won't go crazy with refactoring!
+
         pub const output = .{ .munch_speed = &nodes.feel_full.out.is_full };
     };
 
