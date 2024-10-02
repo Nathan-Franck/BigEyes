@@ -80,16 +80,21 @@ pub const interface = struct {
                     break :blk try Image.processImageForGPU(allocator, cutout_diffuse);
                 };
 
-                const tree_skeleton = try tree.generateStructure(allocator, Trees.big_tree.structure);
+                const tree_blueprints = &.{Trees.big_tree};
+                var trees = std.ArrayList(game.types.TreeMesh).init(allocator);
+                inline for (tree_blueprints) |tree_blueprint| {
+                    const tree_skeleton = try tree.generateStructure(allocator, tree_blueprint.structure);
+                    try trees.append(game.types.TreeMesh{
+                        .skeleton = tree_skeleton,
+                        .bark_mesh = try tree.generateTaperedWood(allocator, tree_skeleton, tree_blueprint.mesh),
+                        .leaf_mesh = try tree.generateLeaves(allocator, tree_skeleton, tree_blueprint.mesh),
+                    });
+                }
 
                 return game.types.Resources{
                     .skybox = skybox,
                     .cutout_leaf = cutout_leaf,
-                    .tree = .{
-                        .skeleton = tree_skeleton,
-                        .bark_mesh = try tree.generateTaperedWood(allocator, tree_skeleton, Trees.big_tree.mesh),
-                        .leaf_mesh = try tree.generateLeaves(allocator, tree_skeleton, Trees.big_tree.mesh),
-                    },
+                    .trees = trees.items,
                 };
             }
 
@@ -212,18 +217,19 @@ pub const interface = struct {
                 };
             }
 
-            pub fn displayTree(
+            pub fn displayTrees(
                 allocator: std.mem.Allocator,
                 props: struct {
                     cutout_leaf: Image.Processed,
                     tree: game.types.TreeMesh,
                 },
             ) !struct {
-                meshes: []const game.types.GameMesh,
+                meshes: []const []const game.types.GameMesh,
             } {
                 const PointFlattener = mesh_helper.VecSliceFlattener(4, 3);
                 const UvFlattener = mesh_helper.VecSliceFlattener(2, 2);
-                var meshes = std.ArrayList(game.types.GameMesh).init(allocator);
+                var meshes = std.ArrayList([]game.types.GameMesh).init(allocator);
+                var per_tree_meshes = std.ArrayList(game.types.GameMesh).init(allocator);
                 try meshes.appendSlice(&.{
                     .{ .greybox = .{
                         .label = "bark",
