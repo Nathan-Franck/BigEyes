@@ -296,7 +296,6 @@ export function App() {
 
         for (const [key, model] of Object.entries(models)) {
           const item_position = item_positions[key];
-          console.table({item_position, key});
           for (const mesh of model) {
             if ("greybox" in mesh) {
               ShaderBuilder.renderMaterial(gl, greyboxMaterial, { ...mesh.greybox, item_position, perspectiveMatrix });

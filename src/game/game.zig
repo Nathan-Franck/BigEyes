@@ -165,7 +165,6 @@ pub const interface = struct {
                     },
                 ) |*normal, screen_position| {
                     const world_position = zm.mul(screen_position, inverse_view_projection);
-                    wasm_entry.dumpDebugLogFmt("{any}", .{world_position});
                     normal.* = zm.normalize3(
                         world_position - props.camera_position,
                     );
