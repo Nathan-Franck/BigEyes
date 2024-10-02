@@ -429,4 +429,80 @@ pub const Trees = struct {
             },
         },
     };
+    pub const grass1 = .{
+        .structure = Settings{
+            .start_size = 0.3,
+            .start_growth = 1,
+            .depth_definitions = &[_]DepthDefinition{
+                .{
+                    .split_amount = 10,
+                    .flatness = 0.0,
+                    .size = 0.4,
+                    .height_spread = 0.6,
+                    .branch_pitch = 50.0 * math.rad_per_deg,
+                    .branch_roll = 90.0 * math.rad_per_deg,
+                    .height_to_growth = .{
+                        .y_values = &.{ 1.0, 1.0, 0.0 },
+                        .x_range = .{ 0.0, 1.0 },
+                    },
+                },
+                .{
+                    .split_amount = 6,
+                    .flatness = 0.3,
+                    .size = 0.45,
+                    .height_spread = 0.8,
+                    .branch_pitch = 60.0 * math.rad_per_deg,
+                    .branch_roll = 90.0 * math.rad_per_deg,
+                    .height_to_growth = .{
+                        .y_values = &.{ 1.0, 1.0, 0.0 },
+                        .x_range = .{ 0.0, 1.0 },
+                    },
+                },
+            },
+        },
+        .mesh = MeshSettings{
+            .thickness = 0.05,
+            .leaves = .{
+                .split_depth = 2,
+                .length = 2.0,
+                .breadth = 1.0,
+            },
+            .growth_to_thickness = .{
+                .y_values = &.{ 0.0025, 0.035 },
+                .x_range = .{ 0.0, 1.0 },
+            },
+        },
+    };
+    pub const grass2 = .{
+        .structure = Settings{
+            .start_size = 0.2,
+            .start_growth = 1,
+            .depth_definitions = &[_]DepthDefinition{
+                .{
+                    .split_amount = 10,
+                    .flatness = 0.0,
+                    .size = 0.4,
+                    .height_spread = 0.6,
+                    .branch_pitch = 50.0 * math.rad_per_deg,
+                    .branch_roll = 90.0 * math.rad_per_deg,
+                    .height_to_growth = .{
+                        .y_values = &.{ 1.0, 1.0, 0.0 },
+                        .x_range = .{ 0.0, 1.0 },
+                    },
+                },
+            },
+        },
+        .mesh = MeshSettings{
+            .thickness = 0.05,
+            .leaves = .{
+                .split_depth = 1,
+                .length = 2.0,
+                .breadth = 1.0,
+            },
+            .growth_to_thickness = .{
+                .y_values = &.{ 0.0025, 0.035 },
+                .x_range = .{ 0.0, 1.0 },
+            },
+        },
+    };
 };
