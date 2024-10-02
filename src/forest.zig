@@ -3,6 +3,7 @@ const zm = @import("./zmath/main.zig");
 const util = .{
     .tree = @import("./tree.zig"),
 };
+const wasm_entry = @import("./wasm_entry.zig");
 
 pub const Vec4 = @Vector(4, f32);
 
@@ -17,19 +18,19 @@ const CoordIterator = struct {
     max_coord: Coord,
 
     fn init(min_coord: Coord, max_coord: Coord) @This() {
-        var initial = @This(){
-            .next_coord = .{ min_coord[0], min_coord[1] },
+        const initial = @This(){
+            .next_coord = min_coord,
             .min_coord = min_coord,
             .max_coord = max_coord,
         };
-        initial.calc();
+        wasm_entry.dumpDebugLogFmt("Initial coord iter: {any}", .{initial});
         return initial;
     }
 
     fn calc(self: *@This()) void {
         self.current = self.next_coord;
         self.next_coord[0] += 1;
-        if (self.next_coord[0] > self.max_coord[0]) {
+        if (self.next_coord[0] >= self.max_coord[0]) {
             self.next_coord[0] = self.min_coord[0];
             self.next_coord[1] += 1;
             if (self.next_coord[1] > self.max_coord[1])
@@ -256,7 +257,7 @@ pub fn Forest(comptime chunk_size: i32) type {
                             const chunk = try density_tier.getChunk(&self.trees, chunk_coord);
                             const chunk_offset = @as(Vec2, @floatFromInt(chunk_coord)) * chunk_span;
                             const min: Coord = @splat(0);
-                            const max: Coord = @splat(chunk_size - 1);
+                            const max: Coord = @splat(chunk_size);
                             var coords = CoordIterator.init(
                                 std.math.clamp(@as(Coord, @intFromFloat(@floor((bounds.min - chunk_offset) / coord_span))), min, max),
                                 std.math.clamp(@as(Coord, @intFromFloat(@ceil((bounds.min - chunk_offset + bounds.size) / coord_span))), min, max),
