@@ -11,26 +11,34 @@ pub const Vec2 = @Vector(2, f32);
 pub const Coord = @Vector(2, i32);
 
 const CoordIterator = struct {
-    current: Coord,
+    next_coord: Coord,
+    current: ?Coord = null,
     min_coord: Coord,
     max_coord: Coord,
 
     fn init(min_coord: Coord, max_coord: Coord) @This() {
-        return .{
-            .current = .{ min_coord[0] - 1, min_coord[1] },
+        var initial = @This(){
+            .next_coord = .{ min_coord[0], min_coord[1] },
             .min_coord = min_coord,
             .max_coord = max_coord,
         };
+        initial.calc();
+        return initial;
+    }
+
+    fn calc(self: *@This()) void {
+        self.current = self.next_coord;
+        self.next_coord[0] += 1;
+        if (self.next_coord[0] > self.max_coord[0]) {
+            self.next_coord[0] = self.min_coord[0];
+            self.next_coord[1] += 1;
+            if (self.next_coord[1] > self.max_coord[1])
+                self.current = null;
+        }
     }
 
     fn next(self: *@This()) ?Coord {
-        self.current[0] += 1;
-        if (self.current[0] > self.max_coord[0]) {
-            self.current[0] = self.min_coord[0];
-            self.current[1] += 1;
-            if (self.current[1] > self.max_coord[1])
-                return null;
-        }
+        self.calc();
         return self.current;
     }
 };
@@ -245,10 +253,7 @@ pub fn Forest(comptime chunk_size: i32) type {
                             @intFromFloat(@ceil((bounds.min + bounds.size) / chunk_span)),
                         );
                         while (chunk_coords.next()) |chunk_coord| {
-                            const chunk = try density_tier.getChunk(&self.trees, .{
-                                chunk_coord[0],
-                                chunk_coord[1],
-                            });
+                            const chunk = try density_tier.getChunk(&self.trees, chunk_coord);
                             const chunk_offset = @as(Vec2, @floatFromInt(chunk_coord)) * chunk_span;
                             const min: Coord = @splat(0);
                             const max: Coord = @splat(chunk_size - 1);
