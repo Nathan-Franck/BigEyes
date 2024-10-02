@@ -195,7 +195,7 @@ pub const interface = struct {
                 const Spawner = Forest.spawner(ForestSettings);
                 var spawner: Spawner = Spawner.init(allocator);
                 const bounds = Bounds{
-                    .min = .{ -16, -16 },
+                    .min = .{ -4, -4 },
                     .size = .{ 8, 8 },
                 };
                 const spawns = try spawner.gatherSpawnsInBounds(allocator, bounds);

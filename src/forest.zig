@@ -3,7 +3,7 @@ const zm = @import("./zmath/main.zig");
 const util = .{
     .tree = @import("./tree.zig"),
 };
-const wasm_entry = @import("./wasm_entry.zig");
+// const wasm_entry = @import("./wasm_entry.zig");
 
 pub const Vec4 = @Vector(4, f32);
 
@@ -13,34 +13,26 @@ pub const Coord = @Vector(2, i32);
 
 const CoordIterator = struct {
     next_coord: Coord,
-    current: ?Coord = null,
     min_coord: Coord,
     max_coord: Coord,
 
     fn init(min_coord: Coord, max_coord: Coord) @This() {
-        const initial = @This(){
-            .next_coord = min_coord,
+        return .{
+            .next_coord = .{ min_coord[0] - 1, min_coord[1] },
             .min_coord = min_coord,
             .max_coord = max_coord,
         };
-        wasm_entry.dumpDebugLogFmt("Initial coord iter: {any}", .{initial});
-        return initial;
     }
 
-    fn calc(self: *@This()) void {
-        self.current = self.next_coord;
+    fn next(self: *@This()) ?Coord {
         self.next_coord[0] += 1;
         if (self.next_coord[0] >= self.max_coord[0]) {
             self.next_coord[0] = self.min_coord[0];
             self.next_coord[1] += 1;
-            if (self.next_coord[1] > self.max_coord[1])
-                self.current = null;
+            if (self.next_coord[1] >= self.max_coord[1])
+                return null;
         }
-    }
-
-    fn next(self: *@This()) ?Coord {
-        self.calc();
-        return self.current;
+        return self.next_coord;
     }
 };
 
@@ -283,31 +275,24 @@ pub fn Forest(comptime chunk_size: i32) type {
 
 // test "Ascii Forest" {
 pub fn main() !void {
-    const Ascii = struct {
-        character: u8,
-    };
-    const AsciiForest = Forest(Ascii, 16);
+    const AsciiForest = Forest(16);
     const Spawner = AsciiForest.spawner(struct {
         pub const grass1 = AsciiForest.Tree{
-            .prefab = .{ .character = '`' },
             .density_tier = -2,
             .likelihood = 0.05,
             .scale_range = .{ .x_range = .{ 0, 1 }, .y_values = &.{ 0.8, 1.0 } },
         };
         pub const grass2 = AsciiForest.Tree{
-            .prefab = .{ .character = ',' },
             .density_tier = -2,
             .likelihood = 0.05,
             .scale_range = .{ .x_range = .{ 0, 1 }, .y_values = &.{ 0.8, 1.0 } },
         };
         pub const little_tree = AsciiForest.Tree{
-            .prefab = .{ .character = 't' },
             .density_tier = 1,
             .likelihood = 0.25,
             .scale_range = .{ .x_range = .{ 0, 1 }, .y_values = &.{ 0.8, 1.0 } },
         };
         pub const big_tree = AsciiForest.Tree{
-            .prefab = .{ .character = 'T' },
             .density_tier = 2,
             .likelihood = 0.5,
             .scale_range = .{ .x_range = .{ 0, 1 }, .y_values = &.{ 0.8, 1.0 } },
@@ -320,6 +305,15 @@ pub fn main() !void {
             },
         };
     });
+    const AsciiTree = struct {
+        character: u8,
+    };
+    const trees = [_]AsciiTree{
+        .{ .character = '`' },
+        .{ .character = ',' },
+        .{ .character = 't' },
+        .{ .character = 'T' },
+    };
 
     const allocator = std.heap.page_allocator;
     var spawner: Spawner = Spawner.init(allocator);
@@ -334,6 +328,9 @@ pub fn main() !void {
     const world_size = .{ .width = 128, .height = 64 };
     var world: [world_size.height][world_size.width]u8 = .{.{' '} ** world_size.width} ** world_size.height;
     for (spawns) |spawn| {
+        const id = @intFromEnum(spawn.id);
+        const character = trees[id].character;
+
         const location: Coord = @intFromFloat(@floor(
             (Vec2{ spawn.position[0], spawn.position[2] } - bounds.min) /
                 bounds.size *
@@ -341,7 +338,7 @@ pub fn main() !void {
         ));
         if (location[0] >= 0 and location[0] < world_size.width and
             location[1] >= 0 and location[1] < world_size.height)
-            world[@intCast(location[1])][@intCast(location[0])] = spawn.prefab.character;
+            world[@intCast(location[1])][@intCast(location[0])] = character;
     }
 
     for (world) |row| {
