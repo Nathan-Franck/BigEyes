@@ -97,7 +97,7 @@ pub fn Forest(comptime chunk_size: i32) type {
                     }
 
                     const span = self.getSpan();
-                    const offset = .{
+                    const chunk_offset = .{
                         .x = @as(f32, @floatFromInt(coord[0])) * span * chunk_size,
                         .z = @as(f32, @floatFromInt(coord[1])) * span * chunk_size,
                     };
@@ -123,9 +123,11 @@ pub fn Forest(comptime chunk_size: i32) type {
                                 break :blk Spawn{
                                     .id = tree_id,
                                     .position = zm.loadArr3(.{
-                                        offset.x + (@as(f32, @floatFromInt(x)) + intToFloatRange(rand.position_x)) * span,
+                                        // chunk_offset.x + (@as(f32, @floatFromInt(x)) + intToFloatRange(rand.position_x)) * span,
+                                        chunk_offset.x + @as(f32, @floatFromInt(x)) * span,
                                         0, // TODO - conform to a heightmap?
-                                        offset.z + (@as(f32, @floatFromInt(y)) + intToFloatRange(rand.position_y)) * span,
+                                        // chunk_offset.z + (@as(f32, @floatFromInt(y)) + intToFloatRange(rand.position_y)) * span,
+                                        chunk_offset.z + @as(f32, @floatFromInt(y)) * span,
                                     }),
                                     .rotation = zm.quatFromAxisAngle(
                                         zm.loadArr3(.{ 0, 1, 0 }),

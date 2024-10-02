@@ -273,7 +273,7 @@ const Vec4 = @Vector(4, f32);
 const ForestSettings = struct {
     pub const grass1 = Forest.Tree{
         .density_tier = -2,
-        .likelihood = 0.05,
+        .likelihood = 1,
         .scale_range = .{ .x_range = .{ 0, 1 }, .y_values = &.{ 0.8, 1.0 } },
     };
     pub const grass2 = Forest.Tree{
@@ -283,12 +283,12 @@ const ForestSettings = struct {
     };
     pub const little_tree = Forest.Tree{
         .density_tier = 1,
-        .likelihood = 0.25,
+        .likelihood = 1,
         .scale_range = .{ .x_range = .{ 0, 1 }, .y_values = &.{ 0.8, 1.0 } },
     };
     pub const big_tree = Forest.Tree{
         .density_tier = 2,
-        .likelihood = 0.5,
+        .likelihood = 1,
         .scale_range = .{ .x_range = .{ 0, 1 }, .y_values = &.{ 0.8, 1.0 } },
         .spawn_radii = &[_]Forest.Tree.SpawnRadius{
             .{
