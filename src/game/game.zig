@@ -191,7 +191,7 @@ pub const interface = struct {
                 allocator: std.mem.Allocator,
                 _: struct {},
             ) !struct {
-                forest_data: []const []const f32,
+                forest_data: []const game.types.ForestData,
             } {
                 const Spawner = Forest.spawner(ForestSettings);
                 var spawner: Spawner = Spawner.init(allocator);
@@ -207,10 +207,13 @@ pub const interface = struct {
                 for (spawns) |spawn| {
                     try instances[@intFromEnum(spawn.id)].append(spawn.position);
                 }
-                const instances_items = try allocator.alloc([]const f32, spawner.trees.len);
+                const instances_items = try allocator.alloc(game.types.ForestData, spawner.trees.len);
                 const PointFlattener = mesh_helper.VecSliceFlattener(4, 3);
-                for (instances_items, 0..) |*instance, i| {
-                    instance.* = PointFlattener.convert(allocator, instances[i].items);
+                for (instances_items, @typeInfo(ForestSettings).@"struct".decls, 0..) |*instance, decl, i| {
+                    instance.* = .{
+                        .label = decl.name,
+                        .positions = PointFlattener.convert(allocator, instances[i].items),
+                    };
                 }
 
                 return .{
@@ -371,7 +374,7 @@ pub const Trees = struct {
             },
         },
     };
-    pub const litte_tree = .{
+    pub const little_tree = .{
         .structure = Settings{
             .start_size = 1,
             .start_growth = 1,

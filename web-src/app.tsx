@@ -214,7 +214,7 @@ export function App() {
       | { textured: Omit<Binds<typeof texturedMeshMaterial.globals>, "perspectiveMatrix" | "item_position"> }
     let models: Record<string, Model[]> = {};
     let perspectiveMatrix: Mat4;
-    let item_position: SizedBuffer;
+    let item_positions: Record<string, SizedBuffer> = {};
     let skybox: Binds<typeof skyboxMaterial.globals>;
 
     updateRender = (graphOutputs) => () => {
@@ -241,7 +241,10 @@ export function App() {
       }
       const forest_data = graphOutputs.forest_data;
       if (forest_data) {
-        item_position = ShaderBuilder.createBuffer(gl, sliceToArray.Float32Array(forest_data[0]));
+        for (let data of forest_data) {
+          const label = sliceToString(data.label);
+          item_positions[label] = ShaderBuilder.createBuffer(gl, sliceToArray.Float32Array(data.positions));
+        }
       }
       if (graphOutputs.models != null) {
         for (let model of graphOutputs.models) {
@@ -291,7 +294,9 @@ export function App() {
         ShaderBuilder.renderMaterial(gl, skyboxMaterial, skybox);
         gl.depthMask(true);
 
-        for (const [_, model] of Object.entries(models)) {
+        for (const [key, model] of Object.entries(models)) {
+          const item_position = item_positions[key];
+          console.table({item_position, key});
           for (const mesh of model) {
             if ("greybox" in mesh) {
               ShaderBuilder.renderMaterial(gl, greyboxMaterial, { ...mesh.greybox, item_position, perspectiveMatrix });
