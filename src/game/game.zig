@@ -375,7 +375,7 @@ pub const Trees = struct {
     };
     pub const little_tree = .{
         .structure = Settings{
-            .start_size = 1,
+            .start_size = 0.6,
             .start_growth = 1,
             .depth_definitions = &[_]DepthDefinition{
                 .{
