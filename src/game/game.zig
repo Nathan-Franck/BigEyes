@@ -80,11 +80,12 @@ pub const interface = struct {
                     break :blk try Image.processImageForGPU(allocator, cutout_diffuse);
                 };
 
-                const tree_blueprints = &.{Trees.big_tree};
                 var trees = std.ArrayList(game.types.TreeMesh).init(allocator);
-                inline for (tree_blueprints) |tree_blueprint| {
+                inline for (@typeInfo(Trees).@"struct".decls) |decl| {
+                    const tree_blueprint = @field(Trees, decl.name);
                     const tree_skeleton = try tree.generateStructure(allocator, tree_blueprint.structure);
                     try trees.append(game.types.TreeMesh{
+                        .label = decl.name,
                         .skeleton = tree_skeleton,
                         .bark_mesh = try tree.generateTaperedWood(allocator, tree_skeleton, tree_blueprint.mesh),
                         .leaf_mesh = try tree.generateLeaves(allocator, tree_skeleton, tree_blueprint.mesh),
@@ -221,33 +222,35 @@ pub const interface = struct {
                 allocator: std.mem.Allocator,
                 props: struct {
                     cutout_leaf: Image.Processed,
-                    tree: game.types.TreeMesh,
+                    trees: []game.types.TreeMesh,
                 },
             ) !struct {
-                meshes: []const []const game.types.GameMesh,
+                models: []const game.types.GameModel,
             } {
                 const PointFlattener = mesh_helper.VecSliceFlattener(4, 3);
                 const UvFlattener = mesh_helper.VecSliceFlattener(2, 2);
-                var meshes = std.ArrayList([]game.types.GameMesh).init(allocator);
-                var per_tree_meshes = std.ArrayList(game.types.GameMesh).init(allocator);
-                try meshes.appendSlice(&.{
-                    .{ .greybox = .{
-                        .label = "bark",
-                        .indices = props.tree.bark_mesh.triangles,
-                        .normal = PointFlattener.convert(allocator, props.tree.bark_mesh.normals),
-                        .position = PointFlattener.convert(allocator, props.tree.bark_mesh.vertices),
-                    } },
-                    .{ .textured = .{
-                        .label = "leaf",
-                        .diffuse_alpha = props.cutout_leaf,
-                        .indices = props.tree.leaf_mesh.triangles,
-                        .normal = PointFlattener.convert(allocator, props.tree.leaf_mesh.normals),
-                        .position = PointFlattener.convert(allocator, props.tree.leaf_mesh.vertices),
-                        .uv = UvFlattener.convert(allocator, props.tree.leaf_mesh.uvs),
-                    } },
-                });
+                var models = std.ArrayList(game.types.GameModel).init(allocator);
+                for (props.trees) |tree_mesh| {
+                    try models.append(.{
+                        .label = tree_mesh.label,
+                        .meshes = try allocator.dupe(game.types.GameMesh, &.{
+                            .{ .greybox = .{
+                                .indices = tree_mesh.bark_mesh.triangles,
+                                .normal = PointFlattener.convert(allocator, tree_mesh.bark_mesh.normals),
+                                .position = PointFlattener.convert(allocator, tree_mesh.bark_mesh.vertices),
+                            } },
+                            .{ .textured = .{
+                                .diffuse_alpha = props.cutout_leaf,
+                                .indices = tree_mesh.leaf_mesh.triangles,
+                                .normal = PointFlattener.convert(allocator, tree_mesh.leaf_mesh.normals),
+                                .position = PointFlattener.convert(allocator, tree_mesh.leaf_mesh.vertices),
+                                .uv = UvFlattener.convert(allocator, tree_mesh.leaf_mesh.uvs),
+                            } },
+                        }),
+                    });
+                }
                 return .{
-                    .meshes = meshes.items,
+                    .models = models.items,
                 };
             }
 

@@ -5,14 +5,12 @@ const tree = @import("../tree.zig");
 const zm = @import("../zmath/main.zig");
 
 pub const GreyboxMesh = struct {
-    label: []const u8,
     indices: []const u32,
     position: []const f32,
     normal: []const f32,
 };
 
 pub const TextureMesh = struct {
-    label: []const u8,
     diffuse_alpha: Image.Processed,
     indices: []const u32,
     position: []const f32,
@@ -44,9 +42,15 @@ pub const OrbitCamera = struct {
 };
 
 pub const TreeMesh = struct {
+    label: []const u8,
     skeleton: tree.Skeleton,
     leaf_mesh: tree.Mesh,
     bark_mesh: tree.Mesh,
+};
+
+pub const GameModel = struct {
+    label: []const u8,
+    meshes: []const GameMesh,
 };
 
 pub const ProcessedCubeMap = struct {

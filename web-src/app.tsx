@@ -212,7 +212,7 @@ export function App() {
     type Model =
       | { greybox: Omit<Binds<typeof greyboxMaterial.globals>, "perspectiveMatrix" | "item_position"> }
       | { textured: Omit<Binds<typeof texturedMeshMaterial.globals>, "perspectiveMatrix" | "item_position"> }
-    let models: Record<string, Model> = {};
+    let models: Record<string, Model[]> = {};
     let perspectiveMatrix: Mat4;
     let item_position: SizedBuffer;
     let skybox: Binds<typeof skyboxMaterial.globals>;
@@ -243,37 +243,40 @@ export function App() {
       if (forest_data) {
         item_position = ShaderBuilder.createBuffer(gl, sliceToArray.Float32Array(forest_data[0]));
       }
-      const meshes = graphOutputs.meshes;
-      if (meshes != null) {
-        for (let meshVariation of meshes) {
-          if ("greybox" in meshVariation) {
-            const mesh = meshVariation.greybox;
-            const label = sliceToString(mesh.label);
-            models[label] = {
-              greybox: {
-                indices: ShaderBuilder.createElementBuffer(gl, sliceToArray.Uint32Array(mesh.indices)),
-                position: ShaderBuilder.createBuffer(gl, sliceToArray.Float32Array(mesh.position)),
-                normals: ShaderBuilder.createBuffer(gl, sliceToArray.Float32Array(mesh.normal)),
-              },
-            };
-          }
-          else if ("textured" in meshVariation) {
-            const mesh = meshVariation.textured;
-            const label = sliceToString(mesh.label);
-            const uvs = sliceToArray.Float32Array(mesh.uv);
-            models[label] = {
-              textured: {
-                indices: ShaderBuilder.createElementBuffer(gl, sliceToArray.Uint32Array(mesh.indices)),
-                position: ShaderBuilder.createBuffer(gl, sliceToArray.Float32Array(mesh.position)),
-                normals: ShaderBuilder.createBuffer(gl, sliceToArray.Float32Array(mesh.normal)),
-                uvs: ShaderBuilder.createBuffer(gl, uvs),
-                texture: ShaderBuilder.loadImageData(gl,
-                  sliceToArray.Uint8Array(mesh.diffuse_alpha.data),
-                  mesh.diffuse_alpha.width,
-                  mesh.diffuse_alpha.height,
-                ),
-              },
-            };
+      if (graphOutputs.models != null) {
+        for (let model of graphOutputs.models) {
+          const label = sliceToString(model.label);
+          const meshes: Model[] = [];
+          models[label] = meshes;
+
+          for (let meshVariation of model.meshes) {
+            if ("greybox" in meshVariation) {
+              const mesh = meshVariation.greybox;
+              meshes.push({
+                greybox: {
+                  indices: ShaderBuilder.createElementBuffer(gl, sliceToArray.Uint32Array(mesh.indices)),
+                  position: ShaderBuilder.createBuffer(gl, sliceToArray.Float32Array(mesh.position)),
+                  normals: ShaderBuilder.createBuffer(gl, sliceToArray.Float32Array(mesh.normal)),
+                },
+              });
+            }
+            else if ("textured" in meshVariation) {
+              const mesh = meshVariation.textured;
+              const uvs = sliceToArray.Float32Array(mesh.uv);
+              meshes.push({
+                textured: {
+                  indices: ShaderBuilder.createElementBuffer(gl, sliceToArray.Uint32Array(mesh.indices)),
+                  position: ShaderBuilder.createBuffer(gl, sliceToArray.Float32Array(mesh.position)),
+                  normals: ShaderBuilder.createBuffer(gl, sliceToArray.Float32Array(mesh.normal)),
+                  uvs: ShaderBuilder.createBuffer(gl, uvs),
+                  texture: ShaderBuilder.loadImageData(gl,
+                    sliceToArray.Uint8Array(mesh.diffuse_alpha.data),
+                    mesh.diffuse_alpha.width,
+                    mesh.diffuse_alpha.height,
+                  ),
+                },
+              });
+            }
           }
         }
       }
@@ -289,11 +292,13 @@ export function App() {
         gl.depthMask(true);
 
         for (const [_, model] of Object.entries(models)) {
-          if ("greybox" in model) {
-            ShaderBuilder.renderMaterial(gl, greyboxMaterial, { ...model.greybox, item_position, perspectiveMatrix });
-          }
-          if ("textured" in model) {
-            ShaderBuilder.renderMaterial(gl, texturedMeshMaterial, { ...model.textured, item_position, perspectiveMatrix });
+          for (const mesh of model) {
+            if ("greybox" in mesh) {
+              ShaderBuilder.renderMaterial(gl, greyboxMaterial, { ...mesh.greybox, item_position, perspectiveMatrix });
+            }
+            if ("textured" in mesh) {
+              ShaderBuilder.renderMaterial(gl, texturedMeshMaterial, { ...mesh.textured, item_position, perspectiveMatrix });
+            }
           }
         }
       });

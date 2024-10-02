@@ -41,7 +41,7 @@ pub const blueprint = runtime.Blueprint{
     .output = &[_]runtime.SystemSink{
         .{ .output_node = "getResources", .output_field = "skybox", .system_field = "skybox" },
         .{ .output_node = "getScreenspaceMesh", .output_field = "screen_space_mesh", .system_field = "screen_space_mesh" },
-        .{ .output_node = "displayTrees", .output_field = "meshes", .system_field = "meshes" },
+        .{ .output_node = "displayTrees", .output_field = "models", .system_field = "models" },
         .{ .output_node = "displayForest", .output_field = "forest_data", .system_field = "forest_data" },
         .{ .output_node = "orbit", .output_field = "world_matrix", .system_field = "world_matrix" },
     },
