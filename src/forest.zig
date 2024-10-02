@@ -124,11 +124,11 @@ pub fn Forest(comptime chunk_size: i32) type {
                                 break :blk Spawn{
                                     .id = tree_id,
                                     .position = zm.loadArr3(.{
-                                        // chunk_offset.x + (@as(f32, @floatFromInt(x)) + intToFloatRange(rand.position_x)) * span,
-                                        chunk_offset.x + @as(f32, @floatFromInt(x)) * span,
+                                        chunk_offset.x + (@as(f32, @floatFromInt(x)) + intToFloatRange(rand.position_x)) * span,
+                                        // chunk_offset.x + @as(f32, @floatFromInt(x)) * span,
                                         0, // TODO - conform to a heightmap?
-                                        // chunk_offset.z + (@as(f32, @floatFromInt(y)) + intToFloatRange(rand.position_y)) * span,
-                                        chunk_offset.z + @as(f32, @floatFromInt(y)) * span,
+                                        chunk_offset.z + (@as(f32, @floatFromInt(y)) + intToFloatRange(rand.position_y)) * span,
+                                        // chunk_offset.z + @as(f32, @floatFromInt(y)) * span,
                                     }),
                                     .rotation = zm.quatFromAxisAngle(
                                         zm.loadArr3(.{ 0, 1, 0 }),
