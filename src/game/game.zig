@@ -13,6 +13,7 @@ const Bounds = @import("../forest.zig").Bounds;
 const Coord = @import("../forest.zig").Coord;
 const Vec2 = @import("../forest.zig").Vec2;
 const wasm_entry = @import("../wasm_entry.zig");
+const CoordIterator = @import("../CoordIterator.zig");
 
 const game = struct {
     pub const graph = @import("./graph.zig");
@@ -266,6 +267,55 @@ pub const interface = struct {
                     closest_distance.* = @min(closest_distance.*, hit_distance);
                 };
             }
+
+            pub fn displayTerrain(
+                allocator: std.mem.Allocator,
+                props: struct {},
+            ) !struct {} {
+                // const Spawner = Forest.spawner(struct {
+                //     pub const Hemisphere = Forest.Tree{
+                //         .density_tier = 1,
+                //         .likelihood = 1,
+                //         .scale_range = .{ .x_range = .{ 0, 1 }, .y_values = &.{ 0.8, 1.0 } },
+                //     };
+                // });
+                // var spawner: Spawner = Spawner.init(allocator);
+                // const spawns = try spawner.gatherSpawnsInBounds(allocator, bounds);
+                // var instances = try allocator.alloc(std.ArrayList(Vec4), spawner.trees.len);
+                // for (instances) |*instance| {
+                //     instance.* = std.ArrayList(Vec4).init(allocator);
+                // }
+                // for (spawns) |spawn| {
+                //     try instances[@intFromEnum(spawn.id)].append(spawn.position);
+                // }
+                // const instances_items = try allocator.alloc(game.types.ForestData, spawner.trees.len);
+                // const PointFlattener = mesh_helper.VecSliceFlattener(4, 3);
+                // for (instances_items, @typeInfo(ForestSettings).@"struct".decls, 0..) |*instance, decl, i| {
+                //     instance.* = .{
+                //         .label = decl.name,
+                //         .positions = PointFlattener.convert(allocator, instances[i].items),
+                //     };
+                // }
+                const bounds = Bounds{
+                    .min = .{ -4, -4 },
+                    .size = .{ 8, 8 },
+                };
+                const terrain_density = 1;
+                var vertex_iterator = CoordIterator.init(bounds.min, bounds.min + bounds.size);
+                var vertex_index: i32 = 0;
+                var vertices = std.ArrayList(Vec4).init(allocator);
+                while (vertex_iterator.next()) |vertex_coord| {
+                    defer vertex_index += 1;
+                    const vertex: Vec4 = .{ @floatFromInt(vertex_coord[0]), @floatFromInt(vertex_coord[1]), 0, 1 };
+                    // const vertex: Vec4 = @as(Vec4, @floatFromInt(vertex_coord));
+                    try vertices.append(vertex);
+                    wasm_entry.dumpDebugLogFmt("{any}", .{vertex_coord});
+                }
+                _ = terrain_density;
+                _ = CoordIterator;
+                _ = props;
+                unreachable;
+            }
         },
     );
 };
@@ -273,7 +323,7 @@ const Vec4 = @Vector(4, f32);
 const ForestSettings = struct {
     pub const grass1 = Forest.Tree{
         .density_tier = -2,
-        .likelihood = 0.05,
+        .likelihood = 1,
         .scale_range = .{ .x_range = .{ 0, 1 }, .y_values = &.{ 0.8, 1.0 } },
     };
     pub const grass2 = Forest.Tree{

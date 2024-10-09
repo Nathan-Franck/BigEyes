@@ -9,32 +9,8 @@ pub const Vec4 = @Vector(4, f32);
 
 pub const Vec2 = @Vector(2, f32);
 
-pub const Coord = @Vector(2, i32);
-
-const CoordIterator = struct {
-    next_coord: Coord,
-    min_coord: Coord,
-    max_coord: Coord,
-
-    fn init(min_coord: Coord, max_coord: Coord) @This() {
-        return .{
-            .next_coord = .{ min_coord[0] - 1, min_coord[1] },
-            .min_coord = min_coord,
-            .max_coord = max_coord,
-        };
-    }
-
-    fn next(self: *@This()) ?Coord {
-        self.next_coord[0] += 1;
-        if (self.next_coord[0] >= self.max_coord[0]) {
-            self.next_coord[0] = self.min_coord[0];
-            self.next_coord[1] += 1;
-            if (self.next_coord[1] >= self.max_coord[1])
-                return null;
-        }
-        return self.next_coord;
-    }
-};
+pub const CoordIterator = @import("./CoordIterator.zig");
+pub const Coord = CoordIterator.Coord;
 
 pub const Bounds = struct {
     min: Vec2,

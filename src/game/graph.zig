@@ -26,6 +26,7 @@ pub const blueprint = runtime.Blueprint{
             } },
         } },
         .{ .name = "displayForest", .function = "displayForest", .input_links = &[_]runtime.InputLink{} },
+        .{ .name = "displayTerrain", .function = "displayTerrain", .input_links = &[_]runtime.InputLink{} },
         .{ .name = "getScreenspaceMesh", .function = "getScreenspaceMesh", .input_links = &[_]runtime.InputLink{
             .{ .field = "camera_position", .source = .{
                 .node = .{ .name = "orbit", .field = "camera_position" },
