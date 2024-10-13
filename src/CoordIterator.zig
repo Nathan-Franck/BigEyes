@@ -13,7 +13,7 @@ pub fn init(min_coord: Coord, max_coord: Coord) @This() {
 }
 
 pub fn width(self: @This()) i32 {
-    return self.min_coord[0] - self.max_coord[0];
+    return self.max_coord[0] - self.min_coord[0];
 }
 
 pub fn next(self: *@This()) ?Coord {

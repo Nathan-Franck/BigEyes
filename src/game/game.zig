@@ -36,7 +36,7 @@ pub const interface = struct {
                 .orbit_camera = .{
                     .position = .{ 0, -0.75, 0, 1 },
                     .rotation = .{ 0, 0, 0, 1 },
-                    .track_distance = 5,
+                    .track_distance = 2,
                 },
             },
         });
@@ -303,21 +303,23 @@ pub const interface = struct {
                     .min = .{ -4, -4 },
                     .size = .{ 8, 8 },
                 };
-                const terrain_resolution = 32;
+                const terrain_resolution = 1;
 
                 var vertex_iterator = CoordIterator.init(@splat(0), @splat(terrain_resolution + 1));
-                var vertices = std.ArrayList(Vec4).init(allocator);
+                var positions = std.ArrayList(Vec4).init(allocator);
+                var normals = std.ArrayList(Vec4).init(allocator);
                 while (vertex_iterator.next()) |vertex_coord| {
-                    const vertex: Vec4 = .{ @floatFromInt(vertex_coord[0]), @floatFromInt(vertex_coord[1]), 0, 1 };
+                    const vertex: Vec4 = .{ @floatFromInt(vertex_coord[0]), 0, @floatFromInt(vertex_coord[1]), 1 };
                     // const vertex: Vec4 = @as(Vec4, @floatFromInt(vertex_coord));
-                    try vertices.append(vertex);
+                    try positions.append(vertex);
+                    try normals.append(.{ 0, 0, 0, 0 });
                 }
                 var quad_iterator = CoordIterator.init(@splat(0), @splat(terrain_resolution));
-                var triangles = std.ArrayList(u32).init(allocator);
+                var indices = std.ArrayList(u32).init(allocator);
                 while (quad_iterator.next()) |quad_coord| {
                     const triangle_indices = &.{
                         0, 1, 2,
-                        1, 2, 3,
+                        0, 2, 3,
                     };
                     const quad_corners = &[_]Coord{
                         .{ 0, 0 },
@@ -328,7 +330,7 @@ pub const interface = struct {
                     inline for (triangle_indices) |triangle_index| {
                         const quad_corner = quad_coord + quad_corners[triangle_index];
 
-                        try triangles.append(
+                        try indices.append(
                             @intCast(quad_corner[0] + quad_corner[1] * vertex_iterator.width()),
                         );
                     }
@@ -340,9 +342,9 @@ pub const interface = struct {
                 const PointFlattener = mesh_helper.VecSliceFlattener(4, 3);
                 return .{
                     .terrain_mesh = game.types.GreyboxMesh{
-                        .indices = triangles.items,
-                        .position = PointFlattener.convert(allocator, vertices.items),
-                        .normal = undefined,
+                        .indices = indices.items,
+                        .position = PointFlattener.convert(allocator, positions.items),
+                        .normal = PointFlattener.convert(allocator, normals.items),
                     },
                     .terrain_instance = game.types.ModelInstances{
                         .label = "terrain",
@@ -357,7 +359,7 @@ const Vec4 = @Vector(4, f32);
 const ForestSettings = struct {
     pub const grass1 = Forest.Tree{
         .density_tier = -2,
-        .likelihood = 1,
+        .likelihood = 0.1,
         .scale_range = .{ .x_range = .{ 0, 1 }, .y_values = &.{ 0.8, 1.0 } },
     };
     pub const grass2 = Forest.Tree{
