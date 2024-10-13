@@ -48,7 +48,7 @@ pub const TreeMesh = struct {
     bark_mesh: tree.Mesh,
 };
 
-pub const ForestData = struct {
+pub const ModelInstances = struct {
     label: []const u8,
     positions: []const f32,
 };

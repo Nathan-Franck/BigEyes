@@ -21,8 +21,9 @@ pub fn next(self: *@This()) ?Coord {
     if (self.next_coord[0] >= self.max_coord[0]) {
         self.next_coord[0] = self.min_coord[0];
         self.next_coord[1] += 1;
-        if (self.next_coord[1] >= self.max_coord[1])
+        if (self.next_coord[1] >= self.max_coord[1]) {
             return null;
+        }
     }
     return self.next_coord;
 }

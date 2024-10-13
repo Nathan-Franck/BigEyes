@@ -191,7 +191,7 @@ pub const interface = struct {
                 allocator: std.mem.Allocator,
                 _: struct {},
             ) !struct {
-                forest_data: []const game.types.ForestData,
+                forest_data: []const game.types.ModelInstances,
             } {
                 const Spawner = Forest.spawner(ForestSettings);
                 var spawner: Spawner = Spawner.init(allocator);
@@ -207,7 +207,7 @@ pub const interface = struct {
                 for (spawns) |spawn| {
                     try instances[@intFromEnum(spawn.id)].append(spawn.position);
                 }
-                const instances_items = try allocator.alloc(game.types.ForestData, spawner.trees.len);
+                const instances_items = try allocator.alloc(game.types.ModelInstances, spawner.trees.len);
                 const PointFlattener = mesh_helper.VecSliceFlattener(4, 3);
                 for (instances_items, @typeInfo(ForestSettings).@"struct".decls, 0..) |*instance, decl, i| {
                     instance.* = .{
@@ -271,7 +271,10 @@ pub const interface = struct {
             pub fn displayTerrain(
                 allocator: std.mem.Allocator,
                 props: struct {},
-            ) !struct {} {
+            ) !struct {
+                terrain_mesh: game.types.GreyboxMesh,
+                terrain_instance: game.types.ModelInstances,
+            } {
                 // const Spawner = Forest.spawner(struct {
                 //     pub const Hemisphere = Forest.Tree{
                 //         .density_tier = 1,
@@ -300,21 +303,52 @@ pub const interface = struct {
                     .min = .{ -4, -4 },
                     .size = .{ 8, 8 },
                 };
-                const terrain_density = 1;
-                var vertex_iterator = CoordIterator.init(bounds.min, bounds.min + bounds.size);
-                var vertex_index: i32 = 0;
+                const terrain_resolution = 32;
+
+                var vertex_iterator = CoordIterator.init(@splat(0), @splat(terrain_resolution + 1));
                 var vertices = std.ArrayList(Vec4).init(allocator);
                 while (vertex_iterator.next()) |vertex_coord| {
-                    defer vertex_index += 1;
                     const vertex: Vec4 = .{ @floatFromInt(vertex_coord[0]), @floatFromInt(vertex_coord[1]), 0, 1 };
                     // const vertex: Vec4 = @as(Vec4, @floatFromInt(vertex_coord));
                     try vertices.append(vertex);
-                    wasm_entry.dumpDebugLogFmt("{any}", .{vertex_coord});
                 }
-                _ = terrain_density;
-                _ = CoordIterator;
-                _ = props;
-                unreachable;
+                var quad_iterator = CoordIterator.init(@splat(0), @splat(terrain_resolution));
+                var triangles = std.ArrayList(u32).init(allocator);
+                while (quad_iterator.next()) |quad_coord| {
+                    const triangle_indices = &.{
+                        0, 1, 2,
+                        1, 2, 3,
+                    };
+                    const quad_corners = &[_]Coord{
+                        .{ 0, 0 },
+                        .{ 1, 0 },
+                        .{ 1, 1 },
+                        .{ 0, 1 },
+                    };
+                    inline for (triangle_indices) |triangle_index| {
+                        const quad_corner = quad_coord + quad_corners[triangle_index];
+
+                        try triangles.append(
+                            @intCast(quad_corner[0] + quad_corner[1] * vertex_iterator.width()),
+                        );
+                    }
+                }
+                _ = .{
+                    props,
+                    bounds,
+                };
+                const PointFlattener = mesh_helper.VecSliceFlattener(4, 3);
+                return .{
+                    .terrain_mesh = game.types.GreyboxMesh{
+                        .indices = triangles.items,
+                        .position = PointFlattener.convert(allocator, vertices.items),
+                        .normal = undefined,
+                    },
+                    .terrain_instance = game.types.ModelInstances{
+                        .label = "terrain",
+                        .positions = PointFlattener.convert(allocator, &.{.{ 0, 0, 0, 0 }}),
+                    },
+                };
             }
         },
     );

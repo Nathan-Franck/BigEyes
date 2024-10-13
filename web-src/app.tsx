@@ -224,7 +224,10 @@ export function App() {
       }
       const skybox_data = graphOutputs.skybox;
       if (skybox_data) {
-        var texture_data = fromEntries(toEntries(skybox_data).map(([key, value]) => [key, sliceToArray.Uint8Array(value.data)] as const))
+        var texture_data = fromEntries(toEntries(skybox_data).map(([key, value]) => [
+          key,
+          sliceToArray.Uint8Array(value.data),
+        ] as const))
         skybox = {
           ...skybox,
           skybox: ShaderBuilder.loadCubemapData(gl, texture_data, skybox_data.nx.width, skybox_data.nx.height),
@@ -245,6 +248,24 @@ export function App() {
           const label = sliceToString(data.label);
           item_positions[label] = ShaderBuilder.createBuffer(gl, sliceToArray.Float32Array(data.positions));
         }
+      }
+      const terrain_instance = graphOutputs.terrain_instance;
+      if (terrain_instance) {
+        const label = sliceToString(terrain_instance.label);
+        item_positions[label] = ShaderBuilder.createBuffer(gl, sliceToArray.Float32Array(terrain_instance.positions));
+      }
+      const terrain_mesh = graphOutputs.terrain_mesh;
+      if (terrain_mesh) {
+        console.log(terrain_mesh.indices.len);
+        models["terrain"] = [
+          {
+            greybox: {
+              indices: ShaderBuilder.createElementBuffer(gl, sliceToArray.Uint32Array(terrain_mesh.indices)),
+              normals: ShaderBuilder.createBuffer(gl, sliceToArray.Float32Array(terrain_mesh.normal)),
+              position: ShaderBuilder.createBuffer(gl, sliceToArray.Float32Array(terrain_mesh.position)),
+            },
+          },
+        ];
       }
       if (graphOutputs.models != null) {
         for (let model of graphOutputs.models) {

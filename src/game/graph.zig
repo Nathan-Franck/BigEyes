@@ -44,6 +44,8 @@ pub const blueprint = runtime.Blueprint{
         .{ .output_node = "getScreenspaceMesh", .output_field = "screen_space_mesh", .system_field = "screen_space_mesh" },
         .{ .output_node = "displayTrees", .output_field = "models", .system_field = "models" },
         .{ .output_node = "displayForest", .output_field = "forest_data", .system_field = "forest_data" },
+        .{ .output_node = "displayTerrain", .output_field = "terrain_mesh", .system_field = "terrain_mesh" },
+        .{ .output_node = "displayTerrain", .output_field = "terrain_instance", .system_field = "terrain_instance" },
         .{ .output_node = "orbit", .output_field = "world_matrix", .system_field = "world_matrix" },
     },
 };
