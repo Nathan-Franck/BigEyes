@@ -45,7 +45,7 @@ pub fn Forest(comptime chunk_size: i32) type {
                 scale: f32,
             };
             const Chunk = [chunk_size][chunk_size]?Spawn;
-            const ForestChunkCache = std.AutoHashMap(Coord, Chunk);
+            const ForestChunkCache = std.AutoHashMap(DensityCoord, Chunk);
 
             const quantization = 128;
 
@@ -65,7 +65,11 @@ pub fn Forest(comptime chunk_size: i32) type {
                 }
 
                 pub fn getChunk(self: @This(), cache: *ForestChunkCache, trees: []const Tree, coord: Coord) !*const Chunk {
-                    const chunk_entry = try cache.getOrPut(coord);
+                    const chunk_entry = try cache.getOrPut(DensityCoord{
+                        .x = coord[0],
+                        .y = coord[1],
+                        .density = self.density,
+                    });
                     if (chunk_entry.found_existing) {
                         return chunk_entry.value_ptr;
                     }
