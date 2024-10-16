@@ -21,6 +21,13 @@ const game = struct {
 };
 
 const ForestSpawner = Forest.spawner(ForestSettings);
+const TerrainSpawner = Forest.spawner(struct {
+    pub const Hemisphere = Forest.Tree{
+        .density_tier = 1,
+        .likelihood = 1,
+        .scale_range = .{ .x_range = .{ 0, 1 }, .y_values = &.{ 0.8, 1.0 } },
+    };
+});
 
 pub const InterfaceEnum = std.meta.DeclEnum(interface);
 pub const interface = struct {
@@ -36,6 +43,7 @@ pub const interface = struct {
             },
             .store = .{
                 .forest_chunk_cache = ForestSpawner.ChunkCache.init(std.heap.page_allocator),
+                .terrain_chunk_cache = TerrainSpawner.ChunkCache.init(std.heap.page_allocator),
                 .orbit_camera = .{
                     .position = .{ 0, -0.75, 0, 1 },
                     .rotation = .{ 0, 0, 0, 1 },
@@ -271,25 +279,39 @@ pub const interface = struct {
                 };
             }
 
-            // pub fn sampleTerrainStamps(pos_2d: Vec2) f32 {
-            //     const Spawner = Forest.spawner(struct {
-            //         pub const Hemisphere = Forest.Tree{
-            //             .density_tier = 1,
-            //             .likelihood = 1,
-            //             .scale_range = .{ .x_range = .{ 0, 1 }, .y_values = &.{ 0.8, 1.0 } },
-            //         };
-            //     });
-            //     var spawner: Spawner = Spawner.init(allocator);
-            // }
-
-            pub fn displayTerrain(
+            const Stamp = struct {
+                // Starting on the assumption that all stamps are centered, so no offset is needed
+                size: Vec2,
+                resolution: struct { x: u32, y: u32 },
+                heights: []f32,
+            };
+            const TerrainStamps = struct {
+                pub const Hemisphere = blk: {
+                    const resolution = .{ .x = 16, .y = 16 };
+                    var heights: [resolution.x * resolution.y]f32 = undefined;
+                    for (0..resolution.y) |y| {
+                        for (0..resolution.x) |x| {
+                            const v = Vec4{ @floatFromInt(x), @floatFromInt(y), 0, 0 } /
+                                @as(Vec4, @splat(@floatFromInt(@max(resolution.x, resolution.y))));
+                            heights[x + y * resolution.x] = @max(1 - zm.length2(v)[0], 0);
+                        }
+                    }
+                    break :blk .{
+                        .resolution = resolution,
+                        .heights = heights,
+                        .size = .{ 1, 1 },
+                    };
+                };
+            };
+            pub fn sampleTerrainStamps(
                 allocator: std.mem.Allocator,
-                props: struct {},
-            ) !struct {
-                terrain_mesh: game.types.GreyboxMesh,
-                terrain_instance: game.types.ModelInstances,
-            } {
-                // const spawns = try spawner.gatherSpawnsInBounds(allocator, bounds);
+                pos_2d: Vec2,
+                terrain_chunk_cache: *TerrainSpawner.ChunkCache,
+            ) f32 {
+                _ = .{ allocator, pos_2d, terrain_chunk_cache, TerrainStamps.Hemisphere };
+                return 0;
+                // // const bounds =
+                // const spawns = try TerrainSpawner.gatherSpawnsInBounds(allocator, bounds);
                 // var instances = try allocator.alloc(std.ArrayList(Vec4), spawner.trees.len);
                 // for (instances) |*instance| {
                 //     instance.* = std.ArrayList(Vec4).init(allocator);
@@ -305,6 +327,17 @@ pub const interface = struct {
                 //         .positions = PointFlattener.convert(allocator, instances[i].items),
                 //     };
                 // }
+            }
+
+            pub fn displayTerrain(
+                allocator: std.mem.Allocator,
+                props: struct {
+                    terrain_chunk_cache: *TerrainSpawner.ChunkCache,
+                },
+            ) !struct {
+                terrain_mesh: game.types.GreyboxMesh,
+                terrain_instance: game.types.ModelInstances,
+            } {
                 const bounds = Bounds{
                     .min = .{ -4, -4 },
                     .size = .{ 8, 8 },
@@ -318,7 +351,7 @@ pub const interface = struct {
                         @as(Vec2, @floatFromInt(vertex_coord)) *
                         bounds.size /
                         @as(Vec2, @splat(terrain_resolution));
-                    const height = 0;
+                    const height = sampleTerrainStamps(allocator, pos_2d, props.terrain_chunk_cache);
                     const vertex: Vec4 = .{
                         pos_2d[0],
                         height,
