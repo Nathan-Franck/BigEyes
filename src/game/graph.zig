@@ -25,7 +25,11 @@ pub const blueprint = runtime.Blueprint{
                 .node = .{ .name = "getResources", .field = "trees" },
             } },
         } },
-        .{ .name = "displayForest", .function = "displayForest", .input_links = &[_]runtime.InputLink{} },
+        .{ .name = "displayForest", .function = "displayForest", .input_links = &[_]runtime.InputLink{
+            .{ .field = "forest_chunk_cache", .source = .{
+                .store_field = "forest_chunk_cache",
+            } },
+        } },
         .{ .name = "displayTerrain", .function = "displayTerrain", .input_links = &[_]runtime.InputLink{} },
         .{ .name = "getScreenspaceMesh", .function = "getScreenspaceMesh", .input_links = &[_]runtime.InputLink{
             .{ .field = "camera_position", .source = .{
@@ -38,6 +42,7 @@ pub const blueprint = runtime.Blueprint{
     },
     .store = &[_]runtime.SystemSink{
         .{ .output_node = "orbit", .output_field = "orbit_camera", .system_field = "orbit_camera" },
+        .{ .output_node = "displayForest", .output_field = "forest_chunk_cache", .system_field = "forest_chunk_cache" },
     },
     .output = &[_]runtime.SystemSink{
         .{ .output_node = "getResources", .output_field = "skybox", .system_field = "skybox" },

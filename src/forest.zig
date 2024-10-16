@@ -45,15 +45,13 @@ pub fn Forest(comptime chunk_size: i32) type {
                 scale: f32,
             };
             const Chunk = [chunk_size][chunk_size]?Spawn;
-            const ChunkCache = std.AutoHashMap(Coord, Chunk);
+            const ForestChunkCache = std.AutoHashMap(Coord, Chunk);
 
             const quantization = 128;
 
             const DensityTier = struct {
                 const context = {};
                 const hashFn = std.hash_map.getAutoHashFn(struct { DensityCoord, u32 }, @TypeOf(context));
-
-                cache: ChunkCache,
 
                 density: i32,
                 tree_range: [quantization]?TreeId,
@@ -66,8 +64,8 @@ pub fn Forest(comptime chunk_size: i32) type {
                     return @as(f32, @floatFromInt(i)) / @as(f32, @floatFromInt(std.math.maxInt(u64)));
                 }
 
-                pub fn getChunk(self: *@This(), trees: []const Tree, coord: Coord) !*const Chunk {
-                    const chunk_entry = try self.cache.getOrPut(coord);
+                pub fn getChunk(self: @This(), cache: *ForestChunkCache, trees: []const Tree, coord: Coord) !*const Chunk {
+                    const chunk_entry = try cache.getOrPut(coord);
                     if (chunk_entry.found_existing) {
                         return chunk_entry.value_ptr;
                     }
@@ -182,7 +180,6 @@ pub fn Forest(comptime chunk_size: i32) type {
                             break :tree_range range;
                         };
                         break :tier .{
-                            .cache = undefined,
                             .density = density_tier,
                             .tree_range = tree_range,
                         };
@@ -192,28 +189,18 @@ pub fn Forest(comptime chunk_size: i32) type {
             };
 
             return struct {
+                pub const ChunkCache = ForestChunkCache;
                 pub const Settings = ForestSettings;
-                trees: [trees.len]Tree,
-                density_tiers: @TypeOf(density_tiers),
-
-                pub fn init(allocator: std.mem.Allocator) @This() {
-                    var result = @This(){
-                        .trees = trees,
-                        .density_tiers = density_tiers,
-                    };
-                    for (&result.density_tiers) |*maybe_density_tier| if (maybe_density_tier.*) |*density_tier| {
-                        density_tier.cache = ChunkCache.init(allocator);
-                    };
-                    return result;
-                }
+                pub const length = trees.len;
+                // pub const trees = trees;
 
                 pub fn densityTierToIndex(density_tier: i32) usize {
                     return @intCast(density_tier - min_tier);
                 }
 
-                pub fn gatherSpawnsInBounds(self: *@This(), allocator: std.mem.Allocator, bounds: Bounds) ![]const Spawn {
+                pub fn gatherSpawnsInBounds(allocator: std.mem.Allocator, chunk_cache: *ForestChunkCache, bounds: Bounds) ![]const Spawn {
                     var spawns = std.ArrayList(Spawn).init(allocator);
-                    for (&self.density_tiers) |*maybe_density_tier| if (maybe_density_tier.*) |*density_tier| {
+                    for (density_tiers) |maybe_density_tier| if (maybe_density_tier) |density_tier| {
                         const coord_span: Vec2 = @splat(density_tier.getSpan());
                         const chunk_span = coord_span * @as(Vec2, @splat(chunk_size));
                         var chunk_coords = CoordIterator.init(
@@ -221,7 +208,7 @@ pub fn Forest(comptime chunk_size: i32) type {
                             @intFromFloat(@ceil((bounds.min + bounds.size) / chunk_span)),
                         );
                         while (chunk_coords.next()) |chunk_coord| {
-                            const chunk = try density_tier.getChunk(&self.trees, chunk_coord);
+                            const chunk = try density_tier.getChunk(chunk_cache, &trees, chunk_coord);
                             const chunk_offset = @as(Vec2, @floatFromInt(chunk_coord)) * chunk_span;
                             const min: Coord = @splat(0);
                             const max: Coord = @splat(chunk_size);

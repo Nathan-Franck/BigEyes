@@ -20,6 +20,8 @@ const game = struct {
     pub const types = @import("./types.zig");
 };
 
+const ForestSpawner = Forest.spawner(ForestSettings);
+
 pub const InterfaceEnum = std.meta.DeclEnum(interface);
 pub const interface = struct {
     var node_graph: NodeGraph = undefined;
@@ -33,6 +35,7 @@ pub const interface = struct {
                 .render_resolution = .{ .x = 0, .y = 0 },
             },
             .store = .{
+                .forest_chunk_cache = ForestSpawner.ChunkCache.init(std.heap.page_allocator),
                 .orbit_camera = .{
                     .position = .{ 0, -0.75, 0, 1 },
                     .rotation = .{ 0, 0, 0, 1 },
@@ -189,25 +192,25 @@ pub const interface = struct {
 
             pub fn displayForest(
                 allocator: std.mem.Allocator,
-                _: struct {},
+                props: struct {
+                    forest_chunk_cache: *ForestSpawner.ChunkCache,
+                },
             ) !struct {
                 forest_data: []const game.types.ModelInstances,
             } {
-                const Spawner = Forest.spawner(ForestSettings);
-                var spawner: Spawner = Spawner.init(allocator);
                 const bounds = Bounds{
                     .min = .{ -4, -4 },
                     .size = .{ 8, 8 },
                 };
-                const spawns = try spawner.gatherSpawnsInBounds(allocator, bounds);
-                var instances = try allocator.alloc(std.ArrayList(Vec4), spawner.trees.len);
+                const spawns = try ForestSpawner.gatherSpawnsInBounds(allocator, props.forest_chunk_cache, bounds);
+                var instances = try allocator.alloc(std.ArrayList(Vec4), ForestSpawner.length);
                 for (instances) |*instance| {
                     instance.* = std.ArrayList(Vec4).init(allocator);
                 }
                 for (spawns) |spawn| {
                     try instances[@intFromEnum(spawn.id)].append(spawn.position);
                 }
-                const instances_items = try allocator.alloc(game.types.ModelInstances, spawner.trees.len);
+                const instances_items = try allocator.alloc(game.types.ModelInstances, ForestSpawner.length);
                 const PointFlattener = mesh_helper.VecSliceFlattener(4, 3);
                 for (instances_items, @typeInfo(ForestSettings).@"struct".decls, 0..) |*instance, decl, i| {
                     instance.* = .{
@@ -268,6 +271,17 @@ pub const interface = struct {
                 };
             }
 
+            // pub fn sampleTerrainStamps(pos_2d: Vec2) f32 {
+            //     const Spawner = Forest.spawner(struct {
+            //         pub const Hemisphere = Forest.Tree{
+            //             .density_tier = 1,
+            //             .likelihood = 1,
+            //             .scale_range = .{ .x_range = .{ 0, 1 }, .y_values = &.{ 0.8, 1.0 } },
+            //         };
+            //     });
+            //     var spawner: Spawner = Spawner.init(allocator);
+            // }
+
             pub fn displayTerrain(
                 allocator: std.mem.Allocator,
                 props: struct {},
@@ -275,14 +289,6 @@ pub const interface = struct {
                 terrain_mesh: game.types.GreyboxMesh,
                 terrain_instance: game.types.ModelInstances,
             } {
-                const Spawner = Forest.spawner(struct {
-                    pub const Hemisphere = Forest.Tree{
-                        .density_tier = 1,
-                        .likelihood = 1,
-                        .scale_range = .{ .x_range = .{ 0, 1 }, .y_values = &.{ 0.8, 1.0 } },
-                    };
-                });
-                var spawner: Spawner = Spawner.init(allocator);
                 // const spawns = try spawner.gatherSpawnsInBounds(allocator, bounds);
                 // var instances = try allocator.alloc(std.ArrayList(Vec4), spawner.trees.len);
                 // for (instances) |*instance| {
@@ -307,9 +313,18 @@ pub const interface = struct {
 
                 var vertex_iterator = CoordIterator.init(@splat(0), @splat(terrain_resolution + 1));
                 var positions = std.ArrayList(Vec4).init(allocator);
-                var prng = std.Random.DefaultPrng.init(0);
                 while (vertex_iterator.next()) |vertex_coord| {
-                    const vertex: Vec4 = .{ @floatFromInt(vertex_coord[0]), prng.random().float(f32), @floatFromInt(vertex_coord[1]), 1 };
+                    const pos_2d: Vec2 = bounds.min +
+                        @as(Vec2, @floatFromInt(vertex_coord)) *
+                        bounds.size /
+                        @as(Vec2, @splat(terrain_resolution));
+                    const height = 0;
+                    const vertex: Vec4 = .{
+                        pos_2d[0],
+                        height,
+                        pos_2d[1],
+                        1,
+                    };
                     try positions.append(vertex);
                 }
                 var quad_iterator = CoordIterator.init(@splat(0), @splat(terrain_resolution));
@@ -331,7 +346,7 @@ pub const interface = struct {
                 _ = .{
                     props,
                     bounds,
-                    &spawner,
+                    // &spawner,
                 };
                 const normals = mesh_helper.Polygon(.Quad).calculateNormals(allocator, positions.items, quads.items);
                 const indices = mesh_helper.Polygon(.Quad).toTriangleIndices(allocator, quads.items);
