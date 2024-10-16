@@ -51,7 +51,6 @@ pub fn Forest(comptime chunk_size: i32) type {
 
             const DensityTier = struct {
                 const context = {};
-                const rng = std.Random.DefaultPrng;
                 const hashFn = std.hash_map.getAutoHashFn(struct { DensityCoord, u32 }, @TypeOf(context));
 
                 cache: ChunkCache,

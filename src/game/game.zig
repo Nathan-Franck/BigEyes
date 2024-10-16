@@ -82,7 +82,7 @@ pub const interface = struct {
                 };
 
                 var trees = std.ArrayList(game.types.TreeMesh).init(allocator);
-                inline for (@typeInfo(Trees).@"struct".decls) |decl| {
+                inline for (@typeInfo(ForestSettings).@"struct".decls) |decl| {
                     const tree_blueprint = @field(Trees, decl.name);
                     const tree_skeleton = try tree.generateStructure(allocator, tree_blueprint.structure);
                     try trees.append(game.types.TreeMesh{
@@ -275,14 +275,14 @@ pub const interface = struct {
                 terrain_mesh: game.types.GreyboxMesh,
                 terrain_instance: game.types.ModelInstances,
             } {
-                // const Spawner = Forest.spawner(struct {
-                //     pub const Hemisphere = Forest.Tree{
-                //         .density_tier = 1,
-                //         .likelihood = 1,
-                //         .scale_range = .{ .x_range = .{ 0, 1 }, .y_values = &.{ 0.8, 1.0 } },
-                //     };
-                // });
-                // var spawner: Spawner = Spawner.init(allocator);
+                const Spawner = Forest.spawner(struct {
+                    pub const Hemisphere = Forest.Tree{
+                        .density_tier = 1,
+                        .likelihood = 1,
+                        .scale_range = .{ .x_range = .{ 0, 1 }, .y_values = &.{ 0.8, 1.0 } },
+                    };
+                });
+                var spawner: Spawner = Spawner.init(allocator);
                 // const spawns = try spawner.gatherSpawnsInBounds(allocator, bounds);
                 // var instances = try allocator.alloc(std.ArrayList(Vec4), spawner.trees.len);
                 // for (instances) |*instance| {
@@ -303,48 +303,44 @@ pub const interface = struct {
                     .min = .{ -4, -4 },
                     .size = .{ 8, 8 },
                 };
-                const terrain_resolution = 1;
+                const terrain_resolution = 3;
 
                 var vertex_iterator = CoordIterator.init(@splat(0), @splat(terrain_resolution + 1));
                 var positions = std.ArrayList(Vec4).init(allocator);
-                var normals = std.ArrayList(Vec4).init(allocator);
+                var prng = std.Random.DefaultPrng.init(0);
                 while (vertex_iterator.next()) |vertex_coord| {
-                    const vertex: Vec4 = .{ @floatFromInt(vertex_coord[0]), 0, @floatFromInt(vertex_coord[1]), 1 };
-                    // const vertex: Vec4 = @as(Vec4, @floatFromInt(vertex_coord));
+                    const vertex: Vec4 = .{ @floatFromInt(vertex_coord[0]), prng.random().float(f32), @floatFromInt(vertex_coord[1]), 1 };
                     try positions.append(vertex);
-                    try normals.append(.{ 0, 0, 0, 0 });
                 }
                 var quad_iterator = CoordIterator.init(@splat(0), @splat(terrain_resolution));
-                var indices = std.ArrayList(u32).init(allocator);
+                var quads = std.ArrayList([4]u32).init(allocator);
                 while (quad_iterator.next()) |quad_coord| {
-                    const triangle_indices = &.{
-                        0, 1, 2,
-                        0, 2, 3,
-                    };
                     const quad_corners = &[_]Coord{
                         .{ 0, 0 },
                         .{ 1, 0 },
                         .{ 1, 1 },
                         .{ 0, 1 },
                     };
-                    inline for (triangle_indices) |triangle_index| {
-                        const quad_corner = quad_coord + quad_corners[triangle_index];
-
-                        try indices.append(
-                            @intCast(quad_corner[0] + quad_corner[1] * vertex_iterator.width()),
-                        );
+                    var quad: [4]u32 = undefined;
+                    inline for (0..4) |quad_index| {
+                        const quad_corner = quad_coord + quad_corners[quad_index];
+                        quad[quad_index] = @intCast(quad_corner[0] + quad_corner[1] * vertex_iterator.width());
                     }
+                    try quads.append(quad);
                 }
                 _ = .{
                     props,
                     bounds,
+                    &spawner,
                 };
+                const normals = mesh_helper.Polygon(.Quad).calculateNormals(allocator, positions.items, quads.items);
+                const indices = mesh_helper.Polygon(.Quad).toTriangleIndices(allocator, quads.items);
                 const PointFlattener = mesh_helper.VecSliceFlattener(4, 3);
                 return .{
                     .terrain_mesh = game.types.GreyboxMesh{
-                        .indices = indices.items,
+                        .indices = indices,
                         .position = PointFlattener.convert(allocator, positions.items),
-                        .normal = PointFlattener.convert(allocator, normals.items),
+                        .normal = PointFlattener.convert(allocator, normals),
                     },
                     .terrain_instance = game.types.ModelInstances{
                         .label = "terrain",
