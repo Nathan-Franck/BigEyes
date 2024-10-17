@@ -2,7 +2,9 @@ const Image = @import("../Image.zig");
 const mesh_helper = @import("../mesh_helper.zig");
 const subdiv = @import("../subdiv.zig");
 const tree = @import("../tree.zig");
+const forest = @import("../forest.zig");
 const zm = @import("../zmath/main.zig");
+const raytrace = @import("../raytrace.zig");
 
 pub const GreyboxMesh = struct {
     indices: []const u32,
@@ -43,6 +45,7 @@ pub const OrbitCamera = struct {
 
 pub const TreeMesh = struct {
     label: []const u8,
+    bounds: raytrace.Bounds,
     skeleton: tree.Skeleton,
     leaf_mesh: tree.Mesh,
     bark_mesh: tree.Mesh,

@@ -11,15 +11,6 @@ pub const Ray = struct {
 pub const Bounds = struct {
     min: Vec,
     max: Vec,
-    pub fn initEncompass(points: []const Vec) Bounds {
-        var min = Vec{ std.math.inf(f32), std.math.inf(f32), std.math.inf(f32), 0 };
-        var max = Vec{ -std.math.inf(f32), -std.math.inf(f32), -std.math.inf(f32), 0 };
-        for (points) |point| {
-            min = @min(min, point);
-            max = @max(max, point);
-        }
-        return Bounds{ .min = min, .max = max };
-    }
     pub fn size(self: Bounds) Vec {
         return @select(
             f32,
@@ -33,6 +24,21 @@ pub const Bounds = struct {
     }
     pub fn toBoundsSpace(self: Bounds, point: Vec) Vec {
         return (point - self.min) / self.size();
+    }
+    pub fn encompassBounds(first: Bounds, second: Bounds) Bounds {
+        return .{
+            .min = @min(first.min, second.min),
+            .max = @max(first.max, second.max),
+        };
+    }
+    pub fn encompassPoints(points: []const Vec) Bounds {
+        var min = Vec{ std.math.inf(f32), std.math.inf(f32), std.math.inf(f32), 0 };
+        var max = Vec{ -std.math.inf(f32), -std.math.inf(f32), -std.math.inf(f32), 0 };
+        for (points) |point| {
+            min = @min(min, point);
+            max = @max(max, point);
+        }
+        return Bounds{ .min = min, .max = max };
     }
 };
 
@@ -249,7 +255,7 @@ test "Triangle in a Bin" {
     };
     const grid_bounds = GridBounds(16){
         // .bounds = .{ .min = .{ 0, 0, 0, 0 }, .max = .{ 4, 4, 4, 0 } },
-        .bounds = Bounds.initEncompass(&my_triangle),
+        .bounds = Bounds.encompassPoints(&my_triangle),
     };
     const allocator = std.heap.page_allocator;
     const triangles = &.{my_triangle};
@@ -307,7 +313,7 @@ pub fn GridBounds(grid_width: usize) type {
                 bins[i] = null;
 
             for (triangles) |*triangle| {
-                const triangle_bounds = Bounds.initEncompass(triangle);
+                const triangle_bounds = Bounds.encompassPoints(triangle);
                 const min: @Vector(4, usize) = @intFromFloat(@floor(self.transformPoint(triangle_bounds.min)));
                 const max = @min(
                     @as(@Vector(4, usize), @intFromFloat(@floor(self.transformPoint(triangle_bounds.max)))) +
@@ -333,7 +339,7 @@ pub fn GridBounds(grid_width: usize) type {
         pub fn voxelizeTriangles(self: @This(), triangles: []Triangle) [array_size]bool {
             var bins: [array_size]bool = .{false} ** array_size;
             for (triangles) |*triangle| {
-                const triangle_bounds = Bounds.initEncompass(triangle);
+                const triangle_bounds = Bounds.encompassPoints(triangle);
                 const min: @Vector(4, usize) = @intFromFloat(@floor(self.transformPoint(triangle_bounds.min)));
                 const max: @Vector(4, usize) = @intFromFloat(@ceil(self.transformPoint(triangle_bounds.max)));
                 for (min[2]..max[2] + 1) |z|

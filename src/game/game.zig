@@ -96,11 +96,18 @@ pub const interface = struct {
                 inline for (@typeInfo(ForestSettings).@"struct".decls) |decl| {
                     const tree_blueprint = @field(Trees, decl.name);
                     const tree_skeleton = try tree.generateStructure(allocator, tree_blueprint.structure);
+                    const bark_mesh = try tree.generateTaperedWood(allocator, tree_skeleton, tree_blueprint.mesh);
+                    const leaf_mesh = try tree.generateLeaves(allocator, tree_skeleton, tree_blueprint.mesh);
+                    const bounds = raytrace.Bounds.encompassBounds(
+                        raytrace.Bounds.encompassPoints(bark_mesh.vertices),
+                        raytrace.Bounds.encompassPoints(leaf_mesh.vertices),
+                    );
                     try trees.append(game.types.TreeMesh{
                         .label = decl.name,
                         .skeleton = tree_skeleton,
-                        .bark_mesh = try tree.generateTaperedWood(allocator, tree_skeleton, tree_blueprint.mesh),
-                        .leaf_mesh = try tree.generateLeaves(allocator, tree_skeleton, tree_blueprint.mesh),
+                        .bark_mesh = bark_mesh,
+                        .leaf_mesh = leaf_mesh,
+                        .bounds = bounds,
                     });
                 }
 
@@ -281,12 +288,13 @@ pub const interface = struct {
 
             const Stamp = struct {
                 // Starting on the assumption that all stamps are centered, so no offset is needed
-                size: Vec2,
+                size: f32,
                 resolution: struct { x: u32, y: u32 },
                 heights: []f32,
+                // mask: []f32, // Do we need a mask?
             };
             const TerrainStamps = struct {
-                pub const Hemisphere = blk: {
+                pub const Hemisphere: Stamp = blk: {
                     const resolution = .{ .x = 16, .y = 16 };
                     var heights: [resolution.x * resolution.y]f32 = undefined;
                     for (0..resolution.y) |y| {
@@ -299,34 +307,48 @@ pub const interface = struct {
                     break :blk .{
                         .resolution = resolution,
                         .heights = heights,
-                        .size = .{ 1, 1 },
+                        .size = 1,
                     };
                 };
             };
-            pub fn sampleTerrainStamps(
+            // pub fn sampleTerrainStamps(
+            //     allocator: std.mem.Allocator,
+            //     pos_2d: Vec2,
+            //     terrain_chunk_cache: *TerrainSpawner.ChunkCache,
+            // ) f32 {
+            //     const bounds =
+            //     const spawns = try TerrainSpawner.gatherSpawnsInBounds(allocator, bounds);
+            //     var instances = try allocator.alloc(std.ArrayList(Vec4), spawner.trees.len);
+            //     for (instances) |*instance| {
+            //         instance.* = std.ArrayList(Vec4).init(allocator);
+            //     }
+            //     for (spawns) |spawn| {
+            //         try instances[@intFromEnum(spawn.id)].append(spawn.position);
+            //     }
+            //     const instances_items = try allocator.alloc(game.types.ForestData, spawner.trees.len);
+            //     const PointFlattener = mesh_helper.VecSliceFlattener(4, 3);
+            //     for (instances_items, @typeInfo(ForestSettings).@"struct".decls, 0..) |*instance, decl, i| {
+            //         instance.* = .{
+            //             .label = decl.name,
+            //             .positions = PointFlattener.convert(allocator, instances[i].items),
+            //         };
+            //     }
+            // }
+
+            pub fn calculateTerrainDensityInfluenceBounds(
                 allocator: std.mem.Allocator,
-                pos_2d: Vec2,
-                terrain_chunk_cache: *TerrainSpawner.ChunkCache,
-            ) f32 {
-                _ = .{ allocator, pos_2d, terrain_chunk_cache, TerrainStamps.Hemisphere };
-                return 0;
-                // // const bounds =
-                // const spawns = try TerrainSpawner.gatherSpawnsInBounds(allocator, bounds);
-                // var instances = try allocator.alloc(std.ArrayList(Vec4), spawner.trees.len);
-                // for (instances) |*instance| {
-                //     instance.* = std.ArrayList(Vec4).init(allocator);
-                // }
-                // for (spawns) |spawn| {
-                //     try instances[@intFromEnum(spawn.id)].append(spawn.position);
-                // }
-                // const instances_items = try allocator.alloc(game.types.ForestData, spawner.trees.len);
-                // const PointFlattener = mesh_helper.VecSliceFlattener(4, 3);
-                // for (instances_items, @typeInfo(ForestSettings).@"struct".decls, 0..) |*instance, decl, i| {
-                //     instance.* = .{
-                //         .label = decl.name,
-                //         .positions = PointFlattener.convert(allocator, instances[i].items),
-                //     };
-                // }
+                _: struct {},
+            ) struct {} {
+                for (TerrainSpawner.density_tiers) |maybe_tier| if (maybe_tier) |tier| {
+                    var trees_in_density = std.AutoArrayHashMap(TerrainSpawner.TreeId, void).init(allocator);
+                    for (tier.tree_range) |tree_id| {
+                        trees_in_density.put(tree_id, {});
+                    }
+                } else continue;
+                for (@typeInfo(TerrainStamps).decls) |decl| {
+                    const stamp = @field(TerrainStamps, decl.name);
+                    stamp.size;
+                }
             }
 
             pub fn displayTerrain(
@@ -351,7 +373,8 @@ pub const interface = struct {
                         @as(Vec2, @floatFromInt(vertex_coord)) *
                         bounds.size /
                         @as(Vec2, @splat(terrain_resolution));
-                    const height = sampleTerrainStamps(allocator, pos_2d, props.terrain_chunk_cache);
+                    // const height = sampleTerrainStamps(allocator, pos_2d, props.terrain_chunk_cache);
+                    const height = 0;
                     const vertex: Vec4 = .{
                         pos_2d[0],
                         height,
