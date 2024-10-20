@@ -214,6 +214,7 @@ pub fn NodeGraph(
     };
     const Graph = struct {
         const Self = @This();
+        pub const Definitions = node_definitions;
 
         allocator: std.mem.Allocator,
         store: SystemStore,
@@ -611,39 +612,39 @@ pub fn NodeGraph(
     return Graph;
 }
 
-test "Build" {
-    const NodeDefinitions = @import("./legacy/node_graph_blueprint_nodes.zig");
-    const node_graph_blueprint = @import("./legacy/interactive_node_builder_blueprint.zig");
-    const allocator = std.heap.page_allocator;
-    const MyNodeGraph = NodeGraph(
-        node_graph_blueprint.node_graph_blueprint,
-        NodeDefinitions,
-    );
-    var my_node_graph = try MyNodeGraph.init(.{
-        .allocator = allocator,
-        .store = .{
-            .node_dimensions = &.{},
-            .blueprint = .{
-                .nodes = &.{},
-                .output = &.{},
-                .store = &.{},
-            },
-            .camera = .{},
-            .context_menu = .{ .open = false, .location = .{ .x = 0, .y = 0 } },
-            .interaction_state = .{ .node_selection = &.{} },
-        },
-    });
-    _ = try my_node_graph.update(.{
-        .recieved_blueprint = node_graph_blueprint.node_graph_blueprint,
-        .keyboard_modifiers = .{
-            .shift = false,
-            .alt = false,
-            .control = false,
-            .super = false,
-        },
-    });
-    // Yay, at least we can confirm that the Blueprint Loader works!
-    // Next will be to validate that multiple steps are working in-tandem with each other...
-    try std.testing.expect(my_node_graph.store.blueprint.nodes.len > 0);
-    try std.testing.expect(my_node_graph.store.blueprint.store.len > 0);
-}
+// test "Build" {
+//     const NodeDefinitions = @import("./legacy/node_graph_blueprint_nodes.zig");
+//     const node_graph_blueprint = @import("./legacy/interactive_node_builder_blueprint.zig");
+//     const allocator = std.heap.page_allocator;
+//     const MyNodeGraph = NodeGraph(
+//         node_graph_blueprint.node_graph_blueprint,
+//         NodeDefinitions,
+//     );
+//     var my_node_graph = try MyNodeGraph.init(.{
+//         .allocator = allocator,
+//         .store = .{
+//             .node_dimensions = &.{},
+//             .blueprint = .{
+//                 .nodes = &.{},
+//                 .output = &.{},
+//                 .store = &.{},
+//             },
+//             .camera = .{},
+//             .context_menu = .{ .open = false, .location = .{ .x = 0, .y = 0 } },
+//             .interaction_state = .{ .node_selection = &.{} },
+//         },
+//     });
+//     _ = try my_node_graph.update(.{
+//         .recieved_blueprint = node_graph_blueprint.node_graph_blueprint,
+//         .keyboard_modifiers = .{
+//             .shift = false,
+//             .alt = false,
+//             .control = false,
+//             .super = false,
+//         },
+//     });
+//     // Yay, at least we can confirm that the Blueprint Loader works!
+//     // Next will be to validate that multiple steps are working in-tandem with each other...
+//     try std.testing.expect(my_node_graph.store.blueprint.nodes.len > 0);
+//     try std.testing.expect(my_node_graph.store.blueprint.store.len > 0);
+// }

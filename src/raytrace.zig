@@ -1,4 +1,4 @@
-const zm = @import("zmath/main.zig");
+const zm = @import("zmath");
 const std = @import("std");
 const Vec = zm.Vec;
 

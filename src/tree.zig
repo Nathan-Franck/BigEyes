@@ -1,6 +1,6 @@
 const std = @import("std");
 const math = std.math;
-const zm = @import("./zmath/main.zig");
+const zm = @import("zmath");
 const Allocator = std.mem.Allocator;
 const wasm_entry = @import("wasm_entry.zig");
 
@@ -407,5 +407,5 @@ test "Build a tree" {
     _ = bark_mesh;
     _ = leaf_mesh;
 
-    std.debug.print("{any}", .{skeleton.nodes});
+    // std.debug.print("{any}", .{skeleton.nodes});
 }

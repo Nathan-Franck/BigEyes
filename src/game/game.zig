@@ -6,7 +6,7 @@ const Image = @import("../Image.zig");
 const raytrace = @import("../raytrace.zig");
 const mesh_helper = @import("../mesh_helper.zig");
 const MeshSpec = @import("../MeshSpec.zig");
-const zm = @import("../zmath/main.zig");
+const zm = @import("zmath");
 const tree = @import("../tree.zig");
 const Forest = @import("../forest.zig").Forest(16);
 const Bounds = @import("../forest.zig").Bounds;
@@ -29,6 +29,10 @@ const TerrainSpawner = Forest.spawner(struct {
     };
 });
 
+test "thinger" {
+    const definitions = interface.NodeGraph.Definitions;
+    _ = try definitions.calculateTerrainDensityInfluenceBounds(std.testing.allocator, .{});
+}
 pub const InterfaceEnum = std.meta.DeclEnum(interface);
 pub const interface = struct {
     var node_graph: NodeGraph = undefined;
@@ -290,11 +294,12 @@ pub const interface = struct {
                 // Starting on the assumption that all stamps are centered, so no offset is needed
                 size: f32,
                 resolution: struct { x: u32, y: u32 },
-                heights: []f32,
+                heights: []const f32,
                 // mask: []f32, // Do we need a mask?
             };
             const TerrainStamps = struct {
                 pub const Hemisphere: Stamp = blk: {
+                    @setEvalBranchQuota(10000);
                     const resolution = .{ .x = 16, .y = 16 };
                     var heights: [resolution.x * resolution.y]f32 = undefined;
                     for (0..resolution.y) |y| {
@@ -304,9 +309,10 @@ pub const interface = struct {
                             heights[x + y * resolution.x] = @max(1 - zm.length2(v)[0], 0);
                         }
                     }
+                    const heights_static = heights;
                     break :blk .{
                         .resolution = resolution,
-                        .heights = heights,
+                        .heights = &heights_static,
                         .size = 1,
                     };
                 };
@@ -338,17 +344,18 @@ pub const interface = struct {
             pub fn calculateTerrainDensityInfluenceBounds(
                 allocator: std.mem.Allocator,
                 _: struct {},
-            ) struct {} {
+            ) !struct {} {
                 for (TerrainSpawner.density_tiers) |maybe_tier| if (maybe_tier) |tier| {
                     var trees_in_density = std.AutoArrayHashMap(TerrainSpawner.TreeId, void).init(allocator);
-                    for (tier.tree_range) |tree_id| {
-                        trees_in_density.put(tree_id, {});
-                    }
+                    for (tier.tree_range) |maybe_tree_id| if (maybe_tree_id) |tree_id| {
+                        try trees_in_density.put(tree_id, {});
+                    } else continue;
                 } else continue;
-                for (@typeInfo(TerrainStamps).decls) |decl| {
+                inline for (@typeInfo(TerrainStamps).@"struct".decls) |decl| {
                     const stamp = @field(TerrainStamps, decl.name);
-                    stamp.size;
+                    _ = stamp.size;
                 }
+                return .{};
             }
 
             pub fn displayTerrain(

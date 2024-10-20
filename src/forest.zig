@@ -1,5 +1,5 @@
 const std = @import("std");
-const zm = @import("./zmath/main.zig");
+const zm = @import("zmath");
 const util = .{
     .tree = @import("./tree.zig"),
 };
@@ -229,7 +229,7 @@ pub fn Forest(comptime chunk_size: i32) type {
                 pub const ChunkCache = local.ChunkCache;
                 pub const Settings = ForestSettings;
                 pub const length = trees.len;
-                pub const density_tiers = local.density_tiers;
+                pub const density_tiers = density_local.density_tiers;
                 pub const TreeId = local.TreeId;
                 // pub const trees = trees;
 

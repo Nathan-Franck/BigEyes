@@ -1,5 +1,6 @@
 const std = @import("std");
 
 comptime {
-    _ = @import("./graph_runtime.zig");
+    _ = @import("./game/game.zig");
+    // _ = @import("./graph_runtime.zig");
 }

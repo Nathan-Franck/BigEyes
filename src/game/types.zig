@@ -3,7 +3,7 @@ const mesh_helper = @import("../mesh_helper.zig");
 const subdiv = @import("../subdiv.zig");
 const tree = @import("../tree.zig");
 const forest = @import("../forest.zig");
-const zm = @import("../zmath/main.zig");
+const zm = @import("zmath");
 const raytrace = @import("../raytrace.zig");
 
 pub const GreyboxMesh = struct {

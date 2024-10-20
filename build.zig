@@ -118,8 +118,10 @@ pub fn build(
     // Tests (default)
     {
         const main_tests = b.addTest(.{ .root_source_file = .{ .cwd_relative = "src/tests.zig" } });
+        const zmath = b.dependency("zmath", .{});
+        main_tests.root_module.addImport("zmath", zmath.module("root"));
         const run_unit_tests = b.addRunArtifact(main_tests);
-        const test_step = b.step("exe-test", "run tests");
+        const test_step = b.step("test", "run tests");
         test_step.dependOn(&run_unit_tests.step);
         b.default_step.dependOn(test_step);
     }
@@ -132,6 +134,8 @@ pub fn build(
             .name = "check_exe",
             .root_source_file = b.path("src/wasm_entry.zig"),
         });
+        const zmath = b.dependency("zmath", .{});
+        exe_check.root_module.addImport("zmath", zmath.module("root"));
 
         const check = b.step("check", "Check if wasm compiles");
         check.dependOn(&exe_check.step);
@@ -145,6 +149,9 @@ pub fn build(
             .name = "game",
             .root_source_file = b.path("src/wasm_entry.zig"),
         });
+
+        const zmath = b.dependency("zmath", .{});
+        exe.root_module.addImport("zmath", zmath.module("root"));
 
         // Latest wasm hack - https://github.com/ringtailsoftware/zig-wasm-audio-framebuffer/blob/master/build.zig
         exe.entry = .disabled;
