@@ -182,9 +182,7 @@ pub fn NodeGraph(
 
                 // Get this node's index from our definitions
                 const node_index = for (graph.nodes, 0..) |node, index|
-                    if (std.mem.eql(u8, node.name, current_node.name)) break index else continue
-                else
-                    @panic("trump tart");
+                    if (std.mem.eql(u8, node.name, current_node.name)) break index else continue;
 
                 // Register this node with the priorities list (the final output we're looking for)
                 node_priorities[node_index] = @max(node_priorities[node_index], current_node.priority);
@@ -210,7 +208,6 @@ pub fn NodeGraph(
                 }
             }
         }
-        @compileLog(node_priorities);
         comptime var node_order: []const u16 = &.{};
         @setEvalBranchQuota(9000);
         inline for (0..max_node_priority) |current_priority|
@@ -218,7 +215,6 @@ pub fn NodeGraph(
                 if (node_priority == current_priority)
                     node_order = comptime node_order ++ .{node_index};
             };
-        @compileLog(node_order);
         break :precalculate node_order;
     };
     const Graph = struct {
