@@ -44,6 +44,7 @@ const ExportMeshes = struct {
             var timer = try std.time.Timer.start();
             const res = try std.process.Child.run(.{
                 .allocator = self.allocator,
+                .cwd = try std.process.getCwdAlloc(self.allocator),
                 .argv = &[_][]const u8{
                     "blender",
                     full_path,
@@ -51,7 +52,6 @@ const ExportMeshes = struct {
                     "--python",
                     content_dir ++ "/custom-gltf.py",
                 },
-                .cwd = try std.process.getCwdAlloc(self.allocator),
             });
             std.debug.print("stdout: {s}\n", .{res.stdout});
             if (res.stderr.len > 0) {

@@ -164,52 +164,61 @@ pub fn NodeGraph(
         var max_node_priority: u16 = 0;
         var node_priorities = [_]u16{0} ** graph.nodes.len;
         var next_nodes: []const struct { name: []const u8, priority: u16 } = &.{};
+
         gather_initial_nodes: inline for (graph.nodes) |node| {
-            inline for (node.input_links) |link| switch (link.source) {
-                else => {},
-                .input_field => {
-                    next_nodes = comptime next_nodes ++ .{.{ .name = node.name, .priority = 0 }};
-                    continue :gather_initial_nodes;
-                },
-            };
+            if (node.input_links.len > 0)
+                inline for (node.input_links) |link|
+                    switch (link.source) {
+                        .input_field => continue,
+                        else => continue :gather_initial_nodes,
+                    };
+            next_nodes = comptime next_nodes ++ .{.{ .name = node.name, .priority = 0 }};
         }
+
         inline while (next_nodes.len > 0) {
             const current_nodes = next_nodes;
             next_nodes = &.{};
             inline for (current_nodes) |current_node| {
+
+                // Get this node's index from our definitions
                 const node_index = for (graph.nodes, 0..) |node, index|
                     if (std.mem.eql(u8, node.name, current_node.name)) break index else continue
                 else
                     @panic("trump tart");
+
+                // Register this node with the priorities list (the final output we're looking for)
                 node_priorities[node_index] = @max(node_priorities[node_index], current_node.priority);
+
+                // Figure out what nodes connect to this current one and queue them up for next iteration with a priority + 1
                 @setEvalBranchQuota(9000);
-                inline for (graph.nodes) |node|
-                    if (std.mem.eql(u8, node.name, current_node.name))
-                        inline for (graph.nodes) |next_node| {
-                            if (is_output_node: for (next_node.input_links) |link| switch (link.source) {
-                                else => continue,
-                                .node => |input_node| if (std.mem.eql(
-                                    u8,
-                                    input_node.name,
-                                    current_node.name,
-                                )) break :is_output_node true else continue,
-                            } else break :is_output_node false)
-                                next_nodes = comptime next_nodes ++ .{.{
-                                    .name = next_node.name,
-                                    .priority = current_node.priority + 1,
-                                }};
-                            max_node_priority = @max(max_node_priority, current_node.priority + 1);
-                        };
+                inline for (graph.nodes) |next_node| {
+                    if (is_next_connected: for (next_node.input_links) |link| {
+                        switch (link.source) {
+                            else => {},
+                            .node => |input_node| if (std.mem.eql(
+                                u8,
+                                input_node.name,
+                                current_node.name,
+                            )) break :is_next_connected true,
+                        }
+                    } else break :is_next_connected false)
+                        next_nodes = comptime next_nodes ++ .{.{
+                            .name = next_node.name,
+                            .priority = current_node.priority + 1,
+                        }};
+                    max_node_priority = @max(max_node_priority, current_node.priority + 1);
+                }
             }
         }
+        @compileLog(node_priorities);
         comptime var node_order: []const u16 = &.{};
         @setEvalBranchQuota(9000);
-        inline for (0..max_node_priority) |current_priority| {
+        inline for (0..max_node_priority) |current_priority|
             inline for (node_priorities, 0..) |node_priority, node_index| {
                 if (node_priority == current_priority)
                     node_order = comptime node_order ++ .{node_index};
-            }
-        }
+            };
+        @compileLog(node_order);
         break :precalculate node_order;
     };
     const Graph = struct {
@@ -464,6 +473,36 @@ pub fn NodeGraph(
                     } });
                 } = undefined;
 
+                const function_params = @typeInfo(
+                    @TypeOf(@field(node_definitions, node.function)),
+                ).@"fn".params;
+
+                comptime {
+                    var unhandled_inputs: []const []const u8 = &.{};
+
+                    for (@typeInfo(switch (function_params.len) {
+                        else => @compileError("Unsupported number of function parameters for node"),
+                        1 => function_params[0].type.?,
+                        2 => function_params[1].type.?,
+                    }).@"struct".fields) |field| {
+                        unhandled_inputs = unhandled_inputs ++ .{field.name};
+                    }
+                    for (node.input_links) |link| {
+                        var next_unhandled_inputs: []const []const u8 = &.{};
+                        for (unhandled_inputs) |unhandled_input| {
+                            if (!std.mem.eql(u8, unhandled_input, link.field))
+                                next_unhandled_inputs = next_unhandled_inputs ++ .{unhandled_input};
+                        }
+                        unhandled_inputs = next_unhandled_inputs;
+                    }
+                    if (unhandled_inputs.len > 0) {
+                        @compileError(std.fmt.comptimePrint(
+                            "Node {s} missing input fields {s}",
+                            .{ node.name, unhandled_inputs },
+                        ));
+                    }
+                }
+
                 inline for (node.input_links) |link| {
                     const node_input_field = switch (link.source) {
                         .input_field => |input_field| node_input: {
@@ -535,9 +574,7 @@ pub fn NodeGraph(
                     const function_output = @call(
                         .auto,
                         @field(node_definitions, node.function),
-                        if (@typeInfo(
-                            @TypeOf(@field(node_definitions, node.function)),
-                        ).@"fn".params.len == 1)
+                        if (function_params.len == 1)
                             .{
                                 node_inputs,
                             }

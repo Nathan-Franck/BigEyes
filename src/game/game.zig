@@ -31,7 +31,7 @@ const TerrainSpawner = Forest.spawner(struct {
 
 test "thinger" {
     const definitions = interface.NodeGraph.Definitions;
-    _ = try definitions.calculateTerrainDensityInfluenceBounds(std.testing.allocator, .{});
+    _ = try definitions.calculateTerrainDensityInfluenceRange(std.testing.allocator, .{});
 }
 pub const InterfaceEnum = std.meta.DeclEnum(interface);
 pub const interface = struct {
@@ -227,7 +227,7 @@ pub const interface = struct {
                     instance.* = std.ArrayList(Vec4).init(allocator);
                 }
                 for (spawns) |spawn| {
-                    try instances[@intFromEnum(spawn.id)].append(spawn.position);
+                    try instances[spawn.id].append(spawn.position);
                 }
                 const instances_items = try allocator.alloc(game.types.ModelInstances, ForestSpawner.length);
                 const PointFlattener = mesh_helper.VecSliceFlattener(4, 3);
@@ -317,50 +317,99 @@ pub const interface = struct {
                     };
                 };
             };
-            // pub fn sampleTerrainStamps(
-            //     allocator: std.mem.Allocator,
-            //     pos_2d: Vec2,
-            //     terrain_chunk_cache: *TerrainSpawner.ChunkCache,
-            // ) f32 {
-            //     const bounds =
-            //     const spawns = try TerrainSpawner.gatherSpawnsInBounds(allocator, bounds);
-            //     var instances = try allocator.alloc(std.ArrayList(Vec4), spawner.trees.len);
-            //     for (instances) |*instance| {
-            //         instance.* = std.ArrayList(Vec4).init(allocator);
-            //     }
-            //     for (spawns) |spawn| {
-            //         try instances[@intFromEnum(spawn.id)].append(spawn.position);
-            //     }
-            //     const instances_items = try allocator.alloc(game.types.ForestData, spawner.trees.len);
-            //     const PointFlattener = mesh_helper.VecSliceFlattener(4, 3);
-            //     for (instances_items, @typeInfo(ForestSettings).@"struct".decls, 0..) |*instance, decl, i| {
-            //         instance.* = .{
-            //             .label = decl.name,
-            //             .positions = PointFlattener.convert(allocator, instances[i].items),
-            //         };
-            //     }
-            // }
 
-            pub fn calculateTerrainDensityInfluenceBounds(
+            pub fn sampleTerrainStamps(
+                allocator: std.mem.Allocator,
+                terrain_chunk_cache: *TerrainSpawner.ChunkCache,
+                tier_index_to_influence_range: []const f32,
+                pos_2d: Vec2,
+            ) !f32 {
+                wasm_entry.dumpDebugLogFmt("Sampling terrain stamps at position ({d}, {d})", .{ pos_2d[0], pos_2d[1] });
+
+                const bounds = blk: {
+                    var bounds = try allocator.alloc(Bounds, tier_index_to_influence_range.len);
+                    for (tier_index_to_influence_range, 0..) |influence_range, tier_index| {
+                        const size_2d = @as(Vec2, @splat(influence_range));
+                        bounds[tier_index] = Bounds{ .min = pos_2d - size_2d, .size = size_2d };
+                    }
+                    wasm_entry.dumpDebugLogFmt("Created {d} bounds for tiers", .{tier_index_to_influence_range.len});
+                    break :blk bounds;
+                };
+                const spawns = try TerrainSpawner.gatherSpawnsInBoundsPerTier(allocator, terrain_chunk_cache, bounds);
+                wasm_entry.dumpDebugLogFmt("Gathered {d} total spawns across all tiers", .{spawns.len});
+
+                var height: f32 = 0;
+                const Stamps = @typeInfo(TerrainStamps).@"struct".decls;
+                var index_to_stamp_data: [Stamps.len]Stamp = undefined;
+                inline for (Stamps, 0..) |decl, stamp_index| {
+                    index_to_stamp_data[stamp_index] = @field(TerrainStamps, decl.name);
+                }
+
+                for (spawns) |spawn| {
+                    const stamp = index_to_stamp_data[spawn.id];
+                    const spawn_pos = Vec2{ spawn.position[0], spawn.position[1] };
+                    const rel_pos = (pos_2d - spawn_pos) / @as(Vec2, @splat(stamp.size));
+
+                    wasm_entry.dumpDebugLogFmt("Checking stamp {d} at position ({d}, {d})", .{ spawn.id, spawn_pos[0], spawn_pos[1] });
+
+                    // Check if point is within stamp bounds
+                    if (@reduce(.Or, @abs(rel_pos) > @as(Vec2, @splat(0.5)))) {
+                        wasm_entry.dumpDebugLogFmt("Point outside stamp bounds, skipping", .{});
+                        continue;
+                    }
+
+                    // Convert to stamp coordinates
+                    const stamp_x = @as(u32, @intFromFloat((rel_pos[0] + 0.5) * @as(f32, @floatFromInt(stamp.resolution.x - 1))));
+                    const stamp_y = @as(u32, @intFromFloat((rel_pos[1] + 0.5) * @as(f32, @floatFromInt(stamp.resolution.y - 1))));
+                    const stamp_height = stamp.heights[stamp_x + stamp_y * stamp.resolution.x];
+
+                    wasm_entry.dumpDebugLogFmt("Stamp height at ({d}, {d}): {d}", .{ stamp_x, stamp_y, stamp_height });
+                    height = @max(height, stamp_height);
+                }
+
+                wasm_entry.dumpDebugLogFmt("Final sampled height: {d}", .{height});
+                return height;
+            }
+
+            pub fn calculateTerrainDensityInfluenceRange(
                 allocator: std.mem.Allocator,
                 _: struct {},
-            ) !struct {} {
+            ) !struct {
+                tier_index_to_influence_range: []const f32,
+            } {
+                wasm_entry.dumpDebugLogFmt("Calculating terrain density influence range", .{});
+                var tier_index_to_influence_range = std.ArrayList(f32).init(allocator);
                 for (TerrainSpawner.density_tiers) |maybe_tier| if (maybe_tier) |tier| {
-                    var trees_in_density = std.AutoArrayHashMap(TerrainSpawner.TreeId, void).init(allocator);
-                    for (tier.tree_range) |maybe_tree_id| if (maybe_tree_id) |tree_id| {
-                        try trees_in_density.put(tree_id, {});
-                    } else continue;
-                } else continue;
-                inline for (@typeInfo(TerrainStamps).@"struct".decls) |decl| {
-                    const stamp = @field(TerrainStamps, decl.name);
-                    _ = stamp.size;
-                }
-                return .{};
+                    wasm_entry.dumpDebugLogFmt("Calculating influence range for tier {d}", .{tier.density});
+                    try tier_index_to_influence_range.append(blk: {
+                        var trees = std.AutoArrayHashMap(TerrainSpawner.TreeId, void).init(allocator);
+                        for (tier.tree_range) |maybe_tree_id| if (maybe_tree_id) |tree_id| {
+                            const enum_tree_id: TerrainSpawner.TreeId = @enumFromInt(tree_id);
+                            try trees.put(enum_tree_id, {});
+                        } else continue;
+                        const Stamps = @typeInfo(TerrainStamps).@"struct".decls;
+                        var index_to_stamp_data: [Stamps.len]Stamp = undefined;
+                        inline for (Stamps, 0..) |decl, stamp_index| {
+                            index_to_stamp_data[stamp_index] = @field(TerrainStamps, decl.name);
+                        }
+                        var max_size: f32 = 0;
+                        for (trees.keys()) |tree_index| {
+                            const size = index_to_stamp_data[@intFromEnum(tree_index)].size;
+                            max_size = @max(max_size, size);
+                        }
+                        break :blk max_size;
+                    });
+                };
+
+                return .{
+                    .tier_index_to_influence_range = tier_index_to_influence_range.items,
+                };
             }
 
             pub fn displayTerrain(
                 allocator: std.mem.Allocator,
                 props: struct {
+                    tier_index_to_influence_range: []const f32,
                     terrain_chunk_cache: *TerrainSpawner.ChunkCache,
                 },
             ) !struct {
@@ -380,8 +429,13 @@ pub const interface = struct {
                         @as(Vec2, @floatFromInt(vertex_coord)) *
                         bounds.size /
                         @as(Vec2, @splat(terrain_resolution));
-                    // const height = sampleTerrainStamps(allocator, pos_2d, props.terrain_chunk_cache);
-                    const height = 0;
+                    const height = try sampleTerrainStamps(
+                        allocator,
+                        props.terrain_chunk_cache,
+                        props.tier_index_to_influence_range,
+                        pos_2d,
+                    );
+                    // const height = 0;
                     const vertex: Vec4 = .{
                         pos_2d[0],
                         height,

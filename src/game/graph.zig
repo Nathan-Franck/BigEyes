@@ -34,7 +34,11 @@ pub const blueprint = runtime.Blueprint{
             .{ .field = "terrain_chunk_cache", .source = .{
                 .store_field = "terrain_chunk_cache",
             } },
+            .{ .field = "tier_index_to_influence_range", .source = .{
+                .node = .{ .name = "calculateTerrainDensityInfluenceRange", .field = "tier_index_to_influence_range" },
+            } },
         } },
+        .{ .name = "calculateTerrainDensityInfluenceRange", .function = "calculateTerrainDensityInfluenceRange", .input_links = &[_]runtime.InputLink{} },
         .{ .name = "getScreenspaceMesh", .function = "getScreenspaceMesh", .input_links = &[_]runtime.InputLink{
             .{ .field = "camera_position", .source = .{
                 .node = .{ .name = "orbit", .field = "camera_position" },
