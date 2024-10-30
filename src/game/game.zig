@@ -305,8 +305,9 @@ pub const interface = struct {
                     for (0..resolution.y) |y| {
                         for (0..resolution.x) |x| {
                             const v = Vec4{ @floatFromInt(x), @floatFromInt(y), 0, 0 } /
-                                @as(Vec4, @splat(@floatFromInt(@max(resolution.x, resolution.y))));
-                            heights[x + y * resolution.x] = @max(1 - zm.length2(v)[0], 0);
+                                @as(Vec4, @splat(@floatFromInt(@max(resolution.x, resolution.y)))) -
+                                @as(Vec4, @splat(0.5));
+                            heights[x + y * resolution.x] = @max(1 - zm.length2(v)[0] * 2, 0);
                         }
                     }
                     const heights_static = heights;
@@ -346,14 +347,14 @@ pub const interface = struct {
                     const spawn_pos = Vec2{ spawn.position[0], spawn.position[2] };
                     const rel_pos = (pos_2d - spawn_pos) / @as(Vec2, @splat(stamp.size));
 
-                    // Check if point is within stamp bounds
-                    if (@reduce(.Or, @abs(rel_pos) > @as(Vec2, @splat(0.5)))) {
+                    const stamp_x = @as(u32, @intFromFloat((rel_pos[0] + 0.5) * @as(f32, @floatFromInt(stamp.resolution.x - 1))));
+                    const stamp_y = @as(u32, @intFromFloat((rel_pos[1] + 0.5) * @as(f32, @floatFromInt(stamp.resolution.y - 1))));
+                    if (stamp_x < 0 or stamp_x >= stamp.resolution.x or
+                        stamp_y < 0 or stamp_y >= stamp.resolution.y)
+                    {
                         continue;
                     }
 
-                    // Convert to stamp coordinates
-                    const stamp_x = @as(u32, @intFromFloat((rel_pos[0] + 0.5) * @as(f32, @floatFromInt(stamp.resolution.x - 1))));
-                    const stamp_y = @as(u32, @intFromFloat((rel_pos[1] + 0.5) * @as(f32, @floatFromInt(stamp.resolution.y - 1))));
                     const stamp_height = stamp.heights[stamp_x + stamp_y * stamp.resolution.x];
 
                     height = @max(height, stamp_height);
@@ -411,7 +412,7 @@ pub const interface = struct {
                     .min = .{ -4, -4 },
                     .size = .{ 8, 8 },
                 };
-                const terrain_resolution = 128;
+                const terrain_resolution = 512;
 
                 var vertex_iterator = CoordIterator.init(@splat(0), @splat(terrain_resolution + 1));
                 var positions = std.ArrayList(Vec4).init(allocator);
