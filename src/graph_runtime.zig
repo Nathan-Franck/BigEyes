@@ -142,6 +142,7 @@ pub fn NodeGraph(
             .is_tuple = false,
         } });
     };
+
     const NodesDirtyFlags = build_type: {
         comptime var fields: []const std.builtin.Type.StructField = &.{};
         inline for (graph.nodes) |node| {
@@ -160,6 +161,7 @@ pub fn NodeGraph(
             .is_tuple = false,
         } });
     };
+
     const node_order = precalculate: {
         var max_node_priority: u16 = 0;
         var node_priorities = [_]u16{0} ** graph.nodes.len;
@@ -217,6 +219,7 @@ pub fn NodeGraph(
             };
         break :precalculate node_order;
     };
+
     const Graph = struct {
         const Self = @This();
         pub const Definitions = node_definitions;

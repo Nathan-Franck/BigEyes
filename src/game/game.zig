@@ -324,19 +324,15 @@ pub const interface = struct {
                 tier_index_to_influence_range: []const f32,
                 pos_2d: Vec2,
             ) !f32 {
-                wasm_entry.dumpDebugLogFmt("Sampling terrain stamps at position ({d}, {d})", .{ pos_2d[0], pos_2d[1] });
-
                 const bounds = blk: {
                     var bounds = try allocator.alloc(Bounds, tier_index_to_influence_range.len);
                     for (tier_index_to_influence_range, 0..) |influence_range, tier_index| {
                         const size_2d = @as(Vec2, @splat(influence_range));
                         bounds[tier_index] = Bounds{ .min = pos_2d - size_2d, .size = size_2d };
                     }
-                    wasm_entry.dumpDebugLogFmt("Created {d} bounds for tiers", .{tier_index_to_influence_range.len});
                     break :blk bounds;
                 };
                 const spawns = try TerrainSpawner.gatherSpawnsInBoundsPerTier(allocator, terrain_chunk_cache, bounds);
-                wasm_entry.dumpDebugLogFmt("Gathered {d} total spawns across all tiers", .{spawns.len});
 
                 var height: f32 = 0;
                 const Stamps = @typeInfo(TerrainStamps).@"struct".decls;
@@ -347,14 +343,11 @@ pub const interface = struct {
 
                 for (spawns) |spawn| {
                     const stamp = index_to_stamp_data[spawn.id];
-                    const spawn_pos = Vec2{ spawn.position[0], spawn.position[1] };
+                    const spawn_pos = Vec2{ spawn.position[0], spawn.position[2] };
                     const rel_pos = (pos_2d - spawn_pos) / @as(Vec2, @splat(stamp.size));
-
-                    wasm_entry.dumpDebugLogFmt("Checking stamp {d} at position ({d}, {d})", .{ spawn.id, spawn_pos[0], spawn_pos[1] });
 
                     // Check if point is within stamp bounds
                     if (@reduce(.Or, @abs(rel_pos) > @as(Vec2, @splat(0.5)))) {
-                        wasm_entry.dumpDebugLogFmt("Point outside stamp bounds, skipping", .{});
                         continue;
                     }
 
@@ -363,11 +356,9 @@ pub const interface = struct {
                     const stamp_y = @as(u32, @intFromFloat((rel_pos[1] + 0.5) * @as(f32, @floatFromInt(stamp.resolution.y - 1))));
                     const stamp_height = stamp.heights[stamp_x + stamp_y * stamp.resolution.x];
 
-                    wasm_entry.dumpDebugLogFmt("Stamp height at ({d}, {d}): {d}", .{ stamp_x, stamp_y, stamp_height });
                     height = @max(height, stamp_height);
                 }
 
-                wasm_entry.dumpDebugLogFmt("Final sampled height: {d}", .{height});
                 return height;
             }
 
@@ -420,7 +411,7 @@ pub const interface = struct {
                     .min = .{ -4, -4 },
                     .size = .{ 8, 8 },
                 };
-                const terrain_resolution = 3;
+                const terrain_resolution = 128;
 
                 var vertex_iterator = CoordIterator.init(@splat(0), @splat(terrain_resolution + 1));
                 var positions = std.ArrayList(Vec4).init(allocator);
@@ -435,7 +426,6 @@ pub const interface = struct {
                         props.tier_index_to_influence_range,
                         pos_2d,
                     );
-                    // const height = 0;
                     const vertex: Vec4 = .{
                         pos_2d[0],
                         height,
