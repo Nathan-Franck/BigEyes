@@ -329,7 +329,7 @@ pub const interface = struct {
                     var bounds = try allocator.alloc(Bounds, tier_index_to_influence_range.len);
                     for (tier_index_to_influence_range, 0..) |influence_range, tier_index| {
                         const size_2d = @as(Vec2, @splat(influence_range));
-                        bounds[tier_index] = Bounds{ .min = pos_2d - size_2d, .size = size_2d };
+                        bounds[tier_index] = Bounds{ .min = pos_2d - size_2d * @as(Vec2, @splat(0.5)), .size = size_2d };
                     }
                     break :blk bounds;
                 };
@@ -398,7 +398,7 @@ pub const interface = struct {
                 };
             }
 
-            pub fn displayTerrain(
+            pub noinline fn displayTerrain(
                 allocator: std.mem.Allocator,
                 props: struct {
                     tier_index_to_influence_range: []const f32,
