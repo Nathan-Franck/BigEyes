@@ -23,7 +23,7 @@ const game = struct {
 const ForestSpawner = Forest.spawner(ForestSettings);
 const TerrainSpawner = Forest.spawner(struct {
     pub const Hemisphere = Forest.Tree{
-        .density_tier = 1,
+        .density_tier = -1,
         .likelihood = 1,
         .scale_range = .{ .x_range = .{ 0, 1 }, .y_values = &.{ 0.8, 1.0 } },
     };
@@ -296,6 +296,12 @@ pub const interface = struct {
                 resolution: struct { x: u32, y: u32 },
                 heights: []const f32,
                 // mask: []f32, // Do we need a mask?
+                fn sample(self: @This(), coord: Coord) f32 {
+                    if (coord[0] < 0 or coord[1] < 0 or coord[0] >= self.resolution.x or coord[1] >= self.resolution.y)
+                        return 0;
+                    const index = @as(usize, @intCast(coord[0] + coord[1] * @as(i32, @intCast(self.resolution.x))));
+                    return self.heights[index];
+                }
             };
             const TerrainStamps = struct {
                 pub const Hemisphere: Stamp = blk: {
@@ -307,7 +313,7 @@ pub const interface = struct {
                             const v = Vec4{ @floatFromInt(x), @floatFromInt(y), 0, 0 } /
                                 @as(Vec4, @splat(@floatFromInt(@max(resolution.x, resolution.y)))) -
                                 @as(Vec4, @splat(0.5));
-                            heights[x + y * resolution.x] = @max(1 - zm.length2(v)[0] * 2, 0);
+                            heights[x + y * resolution.x] = @max(1 - zm.length2(v)[0] * 2, 0) * 0.5;
                         }
                     }
                     const heights_static = heights;
@@ -329,7 +335,10 @@ pub const interface = struct {
                     var bounds = try allocator.alloc(Bounds, tier_index_to_influence_range.len);
                     for (tier_index_to_influence_range, 0..) |influence_range, tier_index| {
                         const size_2d = @as(Vec2, @splat(influence_range));
-                        bounds[tier_index] = Bounds{ .min = pos_2d - size_2d * @as(Vec2, @splat(0.5)), .size = size_2d };
+                        bounds[tier_index] = Bounds{
+                            .min = pos_2d - size_2d * @as(Vec2, @splat(0.5)),
+                            .size = size_2d,
+                        };
                     }
                     break :blk bounds;
                 };
@@ -347,15 +356,29 @@ pub const interface = struct {
                     const spawn_pos = Vec2{ spawn.position[0], spawn.position[2] };
                     const rel_pos = (pos_2d - spawn_pos) / @as(Vec2, @splat(stamp.size));
 
-                    const stamp_x = @as(u32, @intFromFloat((rel_pos[0] + 0.5) * @as(f32, @floatFromInt(stamp.resolution.x - 1))));
-                    const stamp_y = @as(u32, @intFromFloat((rel_pos[1] + 0.5) * @as(f32, @floatFromInt(stamp.resolution.y - 1))));
-                    if (stamp_x < 0 or stamp_x >= stamp.resolution.x or
-                        stamp_y < 0 or stamp_y >= stamp.resolution.y)
+                    const stamp_pos = (rel_pos + @as(Vec2, @splat(0.5))) * Vec2{
+                        @floatFromInt(stamp.resolution.x - 1),
+                        @floatFromInt(stamp.resolution.y - 1),
+                    };
+
+                    if (stamp_pos[0] < 0 or stamp_pos[0] > @as(f32, @floatFromInt(stamp.resolution.x)) or
+                        stamp_pos[1] < 0 or stamp_pos[1] > @as(f32, @floatFromInt(stamp.resolution.y)))
                     {
                         continue;
                     }
+                    const pos0 = @floor(stamp_pos);
+                    const pos_int: Coord = @intFromFloat(pos0);
+                    const fract = stamp_pos - pos0;
 
-                    const stamp_height = stamp.heights[stamp_x + stamp_y * stamp.resolution.x];
+                    const h00 = stamp.sample(pos_int + Coord{ 0, 0 });
+                    const h10 = stamp.sample(pos_int + Coord{ 1, 0 });
+                    const h01 = stamp.sample(pos_int + Coord{ 0, 1 });
+                    const h11 = stamp.sample(pos_int + Coord{ 1, 1 });
+
+                    // Interpolate using vector operations
+                    const h0 = h00 * (1 - fract[0]) + h10 * fract[0];
+                    const h1 = h01 * (1 - fract[0]) + h11 * fract[0];
+                    const stamp_height = h0 * (1 - fract[1]) + h1 * fract[1];
 
                     height = @max(height, stamp_height);
                 }
