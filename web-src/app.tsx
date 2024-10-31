@@ -86,6 +86,7 @@ let controllerInputs: NonNullable<typeof graphInputs.input> = { mouse_delta: [0,
 
 export function App() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const divRef = useRef<HTMLDivElement | null>(null);
 
   const [windowSize, setWindowSize] = useState({
     width: window.innerWidth,
@@ -114,6 +115,11 @@ export function App() {
     return () => {
       window.removeEventListener("resize", resizeHandler);
     };
+  }, []);
+
+  useEffect(() => {
+    // Focus the div when component mounts
+    divRef.current?.focus();
   }, []);
 
   useEffect(() => {
@@ -355,6 +361,7 @@ export function App() {
     <>
       <style>{encodedStyle}</style>
       <div
+        tabIndex={0}
         style={{
           width: "100%",
           height: "100%",
@@ -362,16 +369,20 @@ export function App() {
           position: "absolute",
           left: 0,
           top: 0,
+          outline: 'none',
         }}
-        onClick={(event) => {
+        onMouseDown={(event) => {
+          console.log(event.button);
           if (event.button == 1) {
             updateGraph({
               selected_camera: "orbit",
             });
+            event.preventDefault();
           } else if (event.button == 2) {
             updateGraph({
               selected_camera: "first_person",
             });
+            event.preventDefault();
           }
         }}
         onKeyDown={(event) => {

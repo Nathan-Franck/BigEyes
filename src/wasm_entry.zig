@@ -68,7 +68,10 @@ fn callWithJsonErr(name_ptr: [*]const u8, name_len: usize, args_ptr: [*]const u8
             scanner.enableDiagnostics(&diagnostics);
 
             const args = std.json.parseFromTokenSource(Args(func), allocator, &scanner, .{}) catch |err| {
-                dumpDebugLog(try std.fmt.allocPrint(allocator, "Something in here isn't parsing right: {s}", .{args_string[0..@intCast(diagnostics.getByteOffset())]}));
+                dumpDebugLogFmt("Something in here isn't parsing right: {s}\nError: {any}\n", .{
+                    args_string[0..@intCast(diagnostics.getByteOffset())],
+                    err,
+                });
                 return err;
             };
             const result = switch (@typeInfo(@typeInfo(@TypeOf(func)).@"fn".return_type.?)) {

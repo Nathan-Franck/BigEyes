@@ -146,10 +146,10 @@ pub const interface = struct {
                     input: struct {
                         mouse_delta: zm.Vec,
                         movement: struct {
-                            left: ?u32,
-                            right: ?u32,
-                            forward: ?u32,
-                            backward: ?u32,
+                            left: ?u64,
+                            right: ?u64,
+                            forward: ?u64,
+                            backward: ?u64,
                         },
                     },
                     orbit_camera: *game.types.OrbitCamera,
@@ -193,6 +193,7 @@ pub const interface = struct {
                         };
                     },
                     .first_person => {
+                        wasm_entry.dumpDebugLogFmt("Wow, it's first person! {any}\n", .{props.input.movement});
                         // Update rotation based on mouse input
                         props.player.rotation[0] += props.input.mouse_delta[0] * -props.player_settings.look_speed;
                         props.player.rotation[1] = @min(
