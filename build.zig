@@ -126,6 +126,31 @@ pub fn build(
         b.default_step.dependOn(test_step);
     }
 
+    // Typescript definitions
+    {
+        const exe = b.addExecutable(.{
+            .name = "build_types",
+            .root_source_file = .{ .cwd_relative = "src/tool_game_build_type_definitions.zig" },
+            .target = target,
+            .optimize = optimize,
+        });
+        exe.step.dependOn(&export_meshes.step);
+
+        const zmath = b.dependency("zmath", .{});
+        exe.root_module.addImport("zmath", zmath.module("root"));
+
+        const install_artifact = b.addInstallArtifact(exe, .{});
+        const run_cmd = b.addRunArtifact(exe);
+        run_cmd.step.dependOn(&install_artifact.step);
+        if (b.args) |args| {
+            run_cmd.addArgs(args);
+        }
+        run_cmd.step.dependOn(&install_artifact.step);
+
+        const run_step = b.step("build_types", "Build the typescript types for use from the frontend");
+        run_step.dependOn(&run_cmd.step);
+    }
+
     // Check
     {
         const exe_check = b.addExecutable(.{

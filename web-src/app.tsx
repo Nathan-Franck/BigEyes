@@ -73,6 +73,7 @@ let updateRender:
   | ((graphOutputs: GraphOutputs) => () => void)
   | null = null;
 
+
 function updateGraph(newInputs: typeof graphInputs) {
   var graphInputs = newInputs;
   const graphResult = callWasm("updateNodeGraph", graphInputs);
@@ -81,6 +82,7 @@ function updateGraph(newInputs: typeof graphInputs) {
 }
 
 let lastMousePosition: { x: number; y: number } | null = null;
+let controllerInputs: NonNullable<typeof graphInputs.input> = { mouse_delta: [0, 0, 0, 0], movement: { left: 0, right: 0, forward: 0, backward: 0 } };
 
 export function App() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -342,6 +344,13 @@ export function App() {
     return () => (animationRunning = false);
   }, []);
 
+  const keyToDirection = {
+    "w": "forward",
+    "s": "backward",
+    "a": "left",
+    "d": "right",
+  } as const;
+
   return (
     <>
       <style>{encodedStyle}</style>
@@ -354,6 +363,37 @@ export function App() {
           left: 0,
           top: 0,
         }}
+        onClick={(event) => {
+          if (event.button == 1) {
+            updateGraph({
+              selected_camera: "orbit",
+            });
+          } else if (event.button == 2) {
+            updateGraph({
+              selected_camera: "first_person",
+            });
+          }
+        }}
+        onKeyDown={(event) => {
+          const direction = keyToDirection[event.key as keyof typeof keyToDirection];
+          if (direction != null) {
+            controllerInputs.mouse_delta = [0, 0, 0, 0];
+            controllerInputs.movement[direction] = Date.now();
+            updateGraph({
+              input: controllerInputs,
+            });
+          }
+        }}
+        onKeyUp={(event) => {
+          const direction = keyToDirection[event.key as keyof typeof keyToDirection];
+          if (direction != null) {
+            controllerInputs.mouse_delta = [0, 0, 0, 0];
+            controllerInputs.movement[direction] = null;
+            updateGraph({
+              input: controllerInputs,
+            });
+          }
+        }}
         onMouseMove={(event) => {
           const currentMouse = { x: event.clientX, y: event.clientY };
           const mouseDelta =
@@ -363,10 +403,11 @@ export function App() {
                 x: currentMouse.x - lastMousePosition.x,
                 y: currentMouse.y - lastMousePosition.y,
               };
+          controllerInputs.mouse_delta = [mouseDelta.x, mouseDelta.y, 0, 0];
           lastMousePosition = currentMouse;
           if (event.buttons) {
             updateGraph({
-              input: { mouse_delta: [mouseDelta.x, mouseDelta.y, 0, 0] },
+              input: controllerInputs,
             });
           }
         }}

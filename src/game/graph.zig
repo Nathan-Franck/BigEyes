@@ -16,6 +16,15 @@ pub const blueprint = runtime.Blueprint{
             .{ .field = "orbit_camera", .source = .{
                 .store_field = "orbit_camera",
             } },
+            .{ .field = "selected_camera", .source = .{
+                .input_field = "selected_camera",
+            } },
+            .{ .field = "player_settings", .source = .{
+                .input_field = "player_settings",
+            } },
+            .{ .field = "player", .source = .{
+                .store_field = "player",
+            } },
         } },
         .{ .name = "displayTrees", .function = "displayTrees", .input_links = &[_]runtime.InputLink{
             .{ .field = "cutout_leaf", .source = .{
@@ -56,6 +65,7 @@ pub const blueprint = runtime.Blueprint{
     },
     .store = &[_]runtime.SystemSink{
         .{ .output_node = "orbit", .output_field = "orbit_camera", .system_field = "orbit_camera" },
+        .{ .output_node = "orbit", .output_field = "player", .system_field = "player" },
         .{ .output_node = "displayForest", .output_field = "forest_chunk_cache", .system_field = "forest_chunk_cache" },
         .{ .output_node = "displayTerrain", .output_field = "terrain_chunk_cache", .system_field = "terrain_chunk_cache" },
     },

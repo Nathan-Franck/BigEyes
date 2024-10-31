@@ -41,13 +41,30 @@ pub const interface = struct {
         node_graph = try NodeGraph.init(.{
             .allocator = std.heap.page_allocator,
             .inputs = .{
-                .input = null,
+                .input = .{
+                    .mouse_delta = .{ 0, 0, 0, 0 },
+                    .movement = .{
+                        .left = 0,
+                        .right = 0,
+                        .forward = 0,
+                        .backward = 0,
+                    },
+                },
                 .orbit_speed = 0.01,
+                .selected_camera = .orbit,
+                .player_settings = .{
+                    .look_speed = 0.01,
+                    .movement_speed = 5,
+                },
                 .render_resolution = .{ .x = 0, .y = 0 },
             },
             .store = .{
                 .forest_chunk_cache = ForestSpawner.ChunkCache.init(std.heap.page_allocator),
                 .terrain_chunk_cache = TerrainSpawner.ChunkCache.init(std.heap.page_allocator),
+                .player = .{
+                    .position = .{ 0, -0.75, 0, 1 },
+                    .rotation = .{ 0, 0, 0, 1 },
+                },
                 .orbit_camera = .{
                     .position = .{ 0, -0.75, 0, 1 },
                     .rotation = .{ 0, 0, 0, 1 },
@@ -126,43 +143,148 @@ pub const interface = struct {
                 props: struct {
                     orbit_speed: f32,
                     render_resolution: struct { x: i32, y: i32 },
-                    input: ?struct { mouse_delta: zm.Vec },
+                    input: struct {
+                        mouse_delta: zm.Vec,
+                        movement: struct {
+                            left: ?u32,
+                            right: ?u32,
+                            forward: ?u32,
+                            backward: ?u32,
+                        },
+                    },
                     orbit_camera: *game.types.OrbitCamera,
+                    selected_camera: enum { orbit, first_person },
+                    player_settings: struct { movement_speed: f32, look_speed: f32 },
+                    player: *struct { position: Vec4, rotation: Vec4 },
                 },
             ) !struct {
                 camera_position: Vec4,
                 world_matrix: zm.Mat,
             } {
-                if (props.input) |found_input| {
-                    props.orbit_camera.rotation = props.orbit_camera.rotation +
-                        found_input.mouse_delta *
-                        @as(zm.Vec, @splat(-props.orbit_speed));
-                }
-                const view_projection = zm.perspectiveFovLh(
-                    0.25 * 3.14151,
-                    @as(f32, @floatFromInt(props.render_resolution.x)) /
-                        @as(f32, @floatFromInt(props.render_resolution.y)),
-                    0.1,
-                    500,
-                );
-                const location = zm.mul(
-                    zm.translationV(props.orbit_camera.position),
-                    zm.mul(
-                        zm.mul(
-                            zm.matFromRollPitchYaw(0, props.orbit_camera.rotation[0], 0),
-                            zm.matFromRollPitchYaw(props.orbit_camera.rotation[1], 0, 0),
-                        ),
-                        zm.translationV(zm.loadArr3(.{ 0.0, 0.0, props.orbit_camera.track_distance })),
-                    ),
-                );
+                switch (props.selected_camera) {
+                    .orbit => {
+                        props.orbit_camera.rotation = props.orbit_camera.rotation +
+                            props.input.mouse_delta *
+                            @as(zm.Vec, @splat(-props.orbit_speed));
+                        const view_projection = zm.perspectiveFovLh(
+                            0.25 * 3.14151,
+                            @as(f32, @floatFromInt(props.render_resolution.x)) /
+                                @as(f32, @floatFromInt(props.render_resolution.y)),
+                            0.1,
+                            500,
+                        );
+                        const location = zm.mul(
+                            zm.translationV(props.orbit_camera.position),
+                            zm.mul(
+                                zm.mul(
+                                    zm.matFromRollPitchYaw(0, props.orbit_camera.rotation[0], 0),
+                                    zm.matFromRollPitchYaw(props.orbit_camera.rotation[1], 0, 0),
+                                ),
+                                zm.translationV(zm.loadArr3(.{ 0.0, 0.0, props.orbit_camera.track_distance })),
+                            ),
+                        );
 
-                return .{
-                    .camera_position = zm.mul(zm.inverse(location), Vec4{ 0, 0, 0, 1 }),
-                    .world_matrix = zm.mul(
-                        location,
-                        view_projection,
-                    ),
-                };
+                        return .{
+                            .camera_position = zm.mul(zm.inverse(location), Vec4{ 0, 0, 0, 1 }),
+                            .world_matrix = zm.mul(
+                                location,
+                                view_projection,
+                            ),
+                        };
+                    },
+                    .first_person => {
+                        // Update rotation based on mouse input
+                        props.player.rotation[0] += props.input.mouse_delta[0] * -props.player_settings.look_speed;
+                        props.player.rotation[1] = @min(
+                            0.49 * std.math.pi,
+                            @max(
+                                -0.49 * std.math.pi,
+                                props.player.rotation[1] + props.input.mouse_delta[1] * -props.player_settings.look_speed,
+                            ),
+                        );
+
+                        // Create rotation matrix for movement direction
+                        const rotation_matrix = zm.matFromRollPitchYaw(0, props.player.rotation[0], 0);
+
+                        // Get forward and right vectors from rotation matrix
+                        const forward = zm.normalize3(zm.mul(Vec4{ 0, 0, 1, 0 }, rotation_matrix));
+                        const right = zm.normalize3(zm.mul(Vec4{ 1, 0, 0, 0 }, rotation_matrix));
+
+                        // Process horizontal movement (left/right)
+                        var horizontal_movement = Vec4{ 0, 0, 0, 0 };
+                        const movement = props.input.movement;
+
+                        if (movement.left != null and movement.right != null) {
+                            // Both keys pressed, use most recent
+                            if (movement.left.? > movement.right.?) {
+                                horizontal_movement = horizontal_movement - right;
+                            } else {
+                                horizontal_movement = horizontal_movement + right;
+                            }
+                        } else if (movement.left != null) {
+                            horizontal_movement = horizontal_movement - right;
+                        } else if (movement.right != null) {
+                            horizontal_movement = horizontal_movement + right;
+                        }
+
+                        // Process vertical movement (forward/backward)
+                        var vertical_movement = Vec4{ 0, 0, 0, 0 };
+                        if (movement.forward != null and movement.backward != null) {
+                            // Both keys pressed, use most recent
+                            if (movement.forward.? > movement.backward.?) {
+                                vertical_movement = vertical_movement + forward;
+                            } else {
+                                vertical_movement = vertical_movement - forward;
+                            }
+                        } else if (movement.forward != null) {
+                            vertical_movement = vertical_movement + forward;
+                        } else if (movement.backward != null) {
+                            vertical_movement = vertical_movement - forward;
+                        }
+
+                        // Combine movements
+                        var final_movement = horizontal_movement + vertical_movement;
+
+                        // Normalize and scale movement if there is any input
+                        if (zm.length3(final_movement)[0] > 0.001) {
+                            final_movement = zm.normalize3(final_movement) * @as(Vec4, @splat(props.player_settings.movement_speed));
+
+                            // Update position (only X and Z components)
+                            var new_position = props.player.position;
+                            new_position[0] += final_movement[0];
+                            new_position[2] += final_movement[2];
+
+                            // Sample terrain height at new position and adjust Y component
+                            // const terrain_height = try sampleTerrain(Vec2{ new_position[0], new_position[2] });
+                            const terrain_height = 0;
+                            new_position[1] = terrain_height + 1.7; // Add eye height offset
+                            props.player.position = new_position;
+                        }
+
+                        // Create view matrix
+                        const view_projection = zm.perspectiveFovLh(
+                            0.25 * 3.14151,
+                            @as(f32, @floatFromInt(props.render_resolution.x)) /
+                                @as(f32, @floatFromInt(props.render_resolution.y)),
+                            0.1,
+                            500,
+                        );
+
+                        const pitch_matrix = zm.matFromRollPitchYaw(props.player.rotation[1], 0, 0);
+                        const yaw_matrix = zm.matFromRollPitchYaw(0, props.player.rotation[0], 0);
+                        const rotation = zm.mul(pitch_matrix, yaw_matrix);
+                        const translation = zm.translationV(props.player.position);
+                        const location = zm.mul(translation, rotation);
+
+                        return .{
+                            .camera_position = props.player.position,
+                            .world_matrix = zm.mul(
+                                location,
+                                view_projection,
+                            ),
+                        };
+                    },
+                }
             }
 
             pub fn getScreenspaceMesh(
