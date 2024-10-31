@@ -213,21 +213,31 @@ pub const interface = struct {
                 allocator: std.mem.Allocator,
                 props: struct {
                     forest_chunk_cache: *ForestSpawner.ChunkCache,
+                    terrain_chunk_cache: *TerrainSpawner.ChunkCache,
+                    tier_index_to_influence_range: []const f32,
                 },
             ) !struct {
                 forest_data: []const game.types.ModelInstances,
             } {
-                const bounds = Bounds{
-                    .min = .{ -4, -4 },
-                    .size = .{ 8, 8 },
-                };
-                const spawns = try ForestSpawner.gatherSpawnsInBounds(allocator, props.forest_chunk_cache, bounds);
+                const spawns = try ForestSpawner.gatherSpawnsInBounds(
+                    allocator,
+                    props.forest_chunk_cache,
+                    demo_terrain_bounds,
+                );
                 var instances = try allocator.alloc(std.ArrayList(Vec4), ForestSpawner.length);
                 for (instances) |*instance| {
                     instance.* = std.ArrayList(Vec4).init(allocator);
                 }
                 for (spawns) |spawn| {
-                    try instances[spawn.id].append(spawn.position);
+                    const pos_2d = Vec2{ spawn.position[0], spawn.position[2] };
+                    const height = try sampleTerrainStamps(
+                        allocator,
+                        props.terrain_chunk_cache,
+                        props.tier_index_to_influence_range,
+                        pos_2d,
+                    );
+                    const position = Vec4{ spawn.position[0], height, spawn.position[2], 1 };
+                    try instances[spawn.id].append(position);
                 }
                 const instances_items = try allocator.alloc(game.types.ModelInstances, ForestSpawner.length);
                 const PointFlattener = mesh_helper.VecSliceFlattener(4, 3);
@@ -305,7 +315,7 @@ pub const interface = struct {
             };
             const TerrainStamps = struct {
                 pub const Hemisphere: Stamp = blk: {
-                    @setEvalBranchQuota(10000);
+                    @setEvalBranchQuota(100000);
                     const resolution = .{ .x = 16, .y = 16 };
                     var heights: [resolution.x * resolution.y]f32 = undefined;
                     for (0..resolution.y) |y| {
@@ -313,7 +323,12 @@ pub const interface = struct {
                             const v = Vec4{ @floatFromInt(x), @floatFromInt(y), 0, 0 } /
                                 @as(Vec4, @splat(@floatFromInt(@max(resolution.x, resolution.y)))) -
                                 @as(Vec4, @splat(0.5));
-                            heights[x + y * resolution.x] = @max(1 - zm.length2(v)[0] * 2, 0) * 0.5;
+                            heights[x + y * resolution.x] = @max(
+                                0,
+                                std.math.sqrt(
+                                    1 - std.math.pow(f32, zm.length2(v)[0] * 2, 2),
+                                ),
+                            ) * 0.5;
                         }
                     }
                     const heights_static = heights;
@@ -421,6 +436,10 @@ pub const interface = struct {
                 };
             }
 
+            const demo_terrain_bounds = Bounds{
+                .min = .{ -16, -16 },
+                .size = .{ 32, 32 },
+            };
             pub noinline fn displayTerrain(
                 allocator: std.mem.Allocator,
                 props: struct {
@@ -431,18 +450,14 @@ pub const interface = struct {
                 terrain_mesh: game.types.GreyboxMesh,
                 terrain_instance: game.types.ModelInstances,
             } {
-                const bounds = Bounds{
-                    .min = .{ -4, -4 },
-                    .size = .{ 8, 8 },
-                };
                 const terrain_resolution = 512;
 
                 var vertex_iterator = CoordIterator.init(@splat(0), @splat(terrain_resolution + 1));
                 var positions = std.ArrayList(Vec4).init(allocator);
                 while (vertex_iterator.next()) |vertex_coord| {
-                    const pos_2d: Vec2 = bounds.min +
+                    const pos_2d: Vec2 = demo_terrain_bounds.min +
                         @as(Vec2, @floatFromInt(vertex_coord)) *
-                        bounds.size /
+                        demo_terrain_bounds.size /
                         @as(Vec2, @splat(terrain_resolution));
                     const height = try sampleTerrainStamps(
                         allocator,
@@ -474,11 +489,6 @@ pub const interface = struct {
                     }
                     try quads.append(quad);
                 }
-                _ = .{
-                    props,
-                    bounds,
-                    // &spawner,
-                };
                 const normals = mesh_helper.Polygon(.Quad).calculateNormals(allocator, positions.items, quads.items);
                 const indices = mesh_helper.Polygon(.Quad).toTriangleIndices(allocator, quads.items);
                 const PointFlattener = mesh_helper.VecSliceFlattener(4, 3);

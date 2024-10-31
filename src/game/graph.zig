@@ -29,6 +29,12 @@ pub const blueprint = runtime.Blueprint{
             .{ .field = "forest_chunk_cache", .source = .{
                 .store_field = "forest_chunk_cache",
             } },
+            .{ .field = "terrain_chunk_cache", .source = .{
+                .store_field = "terrain_chunk_cache",
+            } },
+            .{ .field = "tier_index_to_influence_range", .source = .{
+                .node = .{ .name = "calculateTerrainDensityInfluenceRange", .field = "tier_index_to_influence_range" },
+            } },
         } },
         .{ .name = "displayTerrain", .function = "displayTerrain", .input_links = &[_]runtime.InputLink{
             .{ .field = "terrain_chunk_cache", .source = .{
