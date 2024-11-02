@@ -67,10 +67,9 @@ pub const interface = struct {
             .store = .{
                 .last_time = 0,
                 .forest_chunk_cache = ForestSpawner.ChunkCache.init(std.heap.page_allocator),
-                .terrain_chunk_cache = TerrainSpawner.ChunkCache.init(std.heap.page_allocator),
                 .player = .{
                     .position = .{ 0, -0.75, 0, 1 },
-                    .rotation = .{ 0, 0, 0, 1 },
+                    .euler_rotation = .{ 0, 0, 0, 1 },
                 },
                 .orbit_camera = .{
                     .position = .{ 0, -0.75, 0, 1 },
@@ -165,8 +164,7 @@ pub const interface = struct {
                     orbit_camera: *game.types.OrbitCamera,
                     selected_camera: enum { orbit, first_person },
                     player_settings: struct { movement_speed: f32, look_speed: f32 },
-                    player: *struct { position: Vec4, rotation: Vec4 },
-                    terrain_chunk_cache: *TerrainSpawner.ChunkCache,
+                    player: *struct { position: Vec4, euler_rotation: Vec4 },
                     tier_index_to_influence_range: []const f32,
                 },
             ) !struct {
@@ -178,7 +176,7 @@ pub const interface = struct {
                     .orbit => {
                         props.orbit_camera.rotation = props.orbit_camera.rotation +
                             props.input.mouse_delta *
-                            @as(zm.Vec, @splat(-props.orbit_speed));
+                            zm.splat(Vec4, -props.orbit_speed);
                         const view_projection = zm.perspectiveFovLh(
                             0.25 * 3.14151,
                             @as(f32, @floatFromInt(props.render_resolution.x)) /
@@ -207,19 +205,18 @@ pub const interface = struct {
                         };
                     },
                     .first_person => {
+                        var terrain_chunk_cache = TerrainSpawner.ChunkCache.init(allocator);
+
                         // Update rotation based on mouse input
-                        props.player.rotation = props.player.rotation +
+                        props.player.euler_rotation = props.player.euler_rotation +
                             props.input.mouse_delta *
-                            @as(zm.Vec, @splat(-props.player_settings.look_speed));
+                            zm.splat(Vec4, -props.player_settings.look_speed);
 
                         // Create rotation matrix for movement direction
-                        const rotation_matrix = zm.matFromRollPitchYaw(-props.player.rotation[1], -props.player.rotation[0], 0);
-
-                        // Get forward and right vectors from rotation matrix
-                        const forward = Vec4{ 0, 0, 1, 0 };
-                        const right = Vec4{ 1, 0, 0, 0 };
+                        const rotation_matrix = zm.matFromRollPitchYaw(-props.player.euler_rotation[1], -props.player.euler_rotation[0], 0);
 
                         // Process horizontal movement (left/right)
+                        const right = Vec4{ 1, 0, 0, 0 };
                         var horizontal_movement = Vec4{ 0, 0, 0, 0 };
                         const movement = props.input.movement;
 
@@ -237,6 +234,7 @@ pub const interface = struct {
                         }
 
                         // Process vertical movement (forward/backward)
+                        const forward = Vec4{ 0, 0, 1, 0 };
                         var vertical_movement = Vec4{ 0, 0, 0, 0 };
                         if (movement.forward != null and movement.backward != null) {
                             // Both keys pressed, use most recent
@@ -254,30 +252,20 @@ pub const interface = struct {
                         // Combine movements
                         const combined_movement = horizontal_movement + vertical_movement;
 
-                        const delta_time = @as(f32, @floatFromInt(props.time - props.last_time)) / 1000.0;
-
-                        // Normalize and scale movement if there is any input
                         if (zm.length3(combined_movement)[0] > 0.001) {
-                            var blah = zm.normalize3(combined_movement);
-                            wasm_entry.dumpDebugLogFmt("blah {d}", .{blah});
-                            blah[3] = 1;
+                            const delta_time = @as(f32, @floatFromInt(props.time - props.last_time)) / 1000.0;
+                            const final_movement = zm.mul(
+                                zm.normalize3(combined_movement),
+                                rotation_matrix,
+                            ) * zm.splat(Vec4, props.player_settings.movement_speed * delta_time);
 
-                            const final_movement = blah
-                            //     zm.rotate(
-                            //     // zm.qidentity(),
-                            //     props.player.rotation,
-                            //     blah,
-                            // )
-                            * @as(Vec4, @splat(props.player_settings.movement_speed)) * @as(Vec4, @splat(delta_time));
-
-                            // Update position (only X and Z components)
                             var new_position = props.player.position;
                             new_position[0] += final_movement[0];
                             new_position[2] += final_movement[2];
 
                             const terrain_height = try sampleTerrainStamps(
                                 allocator,
-                                props.terrain_chunk_cache,
+                                &terrain_chunk_cache,
                                 props.tier_index_to_influence_range,
                                 Vec2{ new_position[0], new_position[2] },
                             );
@@ -359,7 +347,6 @@ pub const interface = struct {
                 allocator: std.mem.Allocator,
                 props: struct {
                     forest_chunk_cache: *ForestSpawner.ChunkCache,
-                    terrain_chunk_cache: *TerrainSpawner.ChunkCache,
                     tier_index_to_influence_range: []const f32,
                 },
             ) !struct {
@@ -374,11 +361,12 @@ pub const interface = struct {
                 for (instances) |*instance| {
                     instance.* = std.ArrayList(Vec4).init(allocator);
                 }
+                var terrain_chunk_cache = TerrainSpawner.ChunkCache.init(allocator);
                 for (spawns) |spawn| {
                     const pos_2d = Vec2{ spawn.position[0], spawn.position[2] };
                     const height = try sampleTerrainStamps(
                         allocator,
-                        props.terrain_chunk_cache,
+                        &terrain_chunk_cache,
                         props.tier_index_to_influence_range,
                         pos_2d,
                     );
@@ -467,8 +455,8 @@ pub const interface = struct {
                     for (0..resolution.y) |y| {
                         for (0..resolution.x) |x| {
                             const v = Vec4{ @floatFromInt(x), @floatFromInt(y), 0, 0 } /
-                                @as(Vec4, @splat(@floatFromInt(@max(resolution.x, resolution.y)))) -
-                                @as(Vec4, @splat(0.5));
+                                zm.splat(Vec4, @floatFromInt(@max(resolution.x, resolution.y))) -
+                                zm.splat(Vec4, 0.5);
                             heights[x + y * resolution.x] = @max(
                                 0,
                                 std.math.sqrt(
@@ -491,8 +479,8 @@ pub const interface = struct {
                     for (0..resolution.y) |y| {
                         for (0..resolution.x) |x| {
                             const v = Vec4{ @floatFromInt(x), @floatFromInt(y), 0, 0 } /
-                                @as(Vec4, @splat(@floatFromInt(@max(resolution.x, resolution.y)))) -
-                                @as(Vec4, @splat(0.5));
+                                zm.splat(Vec4, @floatFromInt(@max(resolution.x, resolution.y))) -
+                                zm.splat(Vec4, 0.5);
                             heights[x + y * resolution.x] = @max(
                                 0,
                                 std.math.sqrt(
@@ -626,12 +614,12 @@ pub const interface = struct {
                 allocator: std.mem.Allocator,
                 props: struct {
                     tier_index_to_influence_range: []const f32,
-                    terrain_chunk_cache: *TerrainSpawner.ChunkCache,
                 },
             ) !struct {
                 terrain_mesh: game.types.GreyboxMesh,
                 terrain_instance: game.types.ModelInstances,
             } {
+                var terrain_chunk_cache = TerrainSpawner.ChunkCache.init(allocator);
                 const terrain_resolution = 512;
 
                 var vertex_iterator = CoordIterator.init(@splat(0), @splat(terrain_resolution + 1));
@@ -643,7 +631,7 @@ pub const interface = struct {
                         @as(Vec2, @splat(terrain_resolution));
                     const height = try sampleTerrainStamps(
                         allocator,
-                        props.terrain_chunk_cache,
+                        &terrain_chunk_cache,
                         props.tier_index_to_influence_range,
                         pos_2d,
                     );

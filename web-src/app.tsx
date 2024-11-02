@@ -340,16 +340,17 @@ export function App() {
     updateGraph(graphInputs);
 
     let animationRunning = true;
-    const intervalID = setInterval(() => {
-      if (!animationRunning) clearInterval(intervalID);
+    const update = () => {
       if (document.hasFocus()) {
-        controllerInputs.mouse_delta = [0, 0, 0, 0];
         updateGraph({
           input: controllerInputs,
           time: Date.now()
         });
+        controllerInputs.mouse_delta = [0, 0, 0, 0];
       }
-    }, 1000.0 / 24.0);
+      if (animationRunning) requestAnimationFrame(update);
+    }
+    requestAnimationFrame(update);
 
     return () => (animationRunning = false);
   }, []);
@@ -394,10 +395,6 @@ export function App() {
           if (direction != null) {
             controllerInputs.mouse_delta = [0, 0, 0, 0];
             controllerInputs.movement[direction] = Date.now();
-            updateGraph({
-              time: Date.now(),
-              input: controllerInputs,
-            });
           }
         }}
         onKeyUp={(event) => {
@@ -405,29 +402,21 @@ export function App() {
           if (direction != null) {
             controllerInputs.mouse_delta = [0, 0, 0, 0];
             controllerInputs.movement[direction] = null;
-            updateGraph({
-              time: Date.now(),
-              input: controllerInputs,
-            });
           }
         }}
         onMouseMove={(event) => {
           const currentMouse = { x: event.clientX, y: event.clientY };
-          const mouseDelta =
-            lastMousePosition == null
-              ? currentMouse
-              : {
-                x: currentMouse.x - lastMousePosition.x,
-                y: currentMouse.y - lastMousePosition.y,
-              };
-          controllerInputs.mouse_delta = [mouseDelta.x, mouseDelta.y, 0, 0];
-          lastMousePosition = currentMouse;
           if (event.buttons) {
-            updateGraph({
-              time: Date.now(),
-              input: controllerInputs,
-            });
+            const mouseDelta =
+              lastMousePosition == null
+                ? currentMouse
+                : {
+                  x: currentMouse.x - lastMousePosition.x,
+                  y: currentMouse.y - lastMousePosition.y,
+                };
+            controllerInputs.mouse_delta = [mouseDelta.x, mouseDelta.y, 0, 0];
           }
+          lastMousePosition = currentMouse;
         }}
       >
         <div class={classes.stats}>

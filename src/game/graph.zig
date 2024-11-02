@@ -31,9 +31,6 @@ pub const blueprint = runtime.Blueprint{
             .{ .field = "player", .source = .{
                 .store_field = "player",
             } },
-            .{ .field = "terrain_chunk_cache", .source = .{
-                .store_field = "terrain_chunk_cache",
-            } },
             .{ .field = "tier_index_to_influence_range", .source = .{
                 .node = .{ .name = "calculateTerrainDensityInfluenceRange", .field = "tier_index_to_influence_range" },
             } },
@@ -50,17 +47,11 @@ pub const blueprint = runtime.Blueprint{
             .{ .field = "forest_chunk_cache", .source = .{
                 .store_field = "forest_chunk_cache",
             } },
-            .{ .field = "terrain_chunk_cache", .source = .{
-                .store_field = "terrain_chunk_cache",
-            } },
             .{ .field = "tier_index_to_influence_range", .source = .{
                 .node = .{ .name = "calculateTerrainDensityInfluenceRange", .field = "tier_index_to_influence_range" },
             } },
         } },
         .{ .name = "displayTerrain", .function = "displayTerrain", .input_links = &[_]runtime.InputLink{
-            .{ .field = "terrain_chunk_cache", .source = .{
-                .store_field = "terrain_chunk_cache",
-            } },
             .{ .field = "tier_index_to_influence_range", .source = .{
                 .node = .{ .name = "calculateTerrainDensityInfluenceRange", .field = "tier_index_to_influence_range" },
             } },
@@ -80,7 +71,6 @@ pub const blueprint = runtime.Blueprint{
         .{ .output_node = "orbit", .output_field = "last_time", .system_field = "last_time" },
         .{ .output_node = "orbit", .output_field = "player", .system_field = "player" },
         .{ .output_node = "displayForest", .output_field = "forest_chunk_cache", .system_field = "forest_chunk_cache" },
-        .{ .output_node = "displayTerrain", .output_field = "terrain_chunk_cache", .system_field = "terrain_chunk_cache" },
     },
     .output = &[_]runtime.SystemSink{
         .{ .output_node = "getResources", .output_field = "skybox", .system_field = "skybox" },
