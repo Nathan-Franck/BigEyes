@@ -12,8 +12,8 @@ const Forest = @import("../forest.zig").Forest(16);
 const Bounds = @import("../forest.zig").Bounds;
 const Coord = @import("../forest.zig").Coord;
 const Vec2 = @import("../forest.zig").Vec2;
-const wasm_entry = @import("../wasm_entry.zig");
 const CoordIterator = @import("../CoordIterator.zig");
+const wasm_entry = @import("../wasm_entry.zig");
 
 const game = struct {
     pub const graph = @import("./graph.zig");
@@ -24,6 +24,11 @@ const ForestSpawner = Forest.spawner(ForestSettings);
 const TerrainSpawner = Forest.spawner(struct {
     pub const Hemisphere = Forest.Tree{
         .density_tier = -1,
+        .likelihood = 1,
+        .scale_range = .{ .x_range = .{ 0, 1 }, .y_values = &.{ 0.8, 1.0 } },
+    };
+    pub const BigHemisphere = Forest.Tree{
+        .density_tier = 2,
         .likelihood = 1,
         .scale_range = .{ .x_range = .{ 0, 1 }, .y_values = &.{ 0.8, 1.0 } },
     };
@@ -41,24 +46,26 @@ pub const interface = struct {
         node_graph = try NodeGraph.init(.{
             .allocator = std.heap.page_allocator,
             .inputs = .{
+                .time = 0,
                 .input = .{
                     .mouse_delta = .{ 0, 0, 0, 0 },
                     .movement = .{
-                        .left = 0,
-                        .right = 0,
-                        .forward = 0,
-                        .backward = 0,
+                        .left = null,
+                        .right = null,
+                        .forward = null,
+                        .backward = null,
                     },
                 },
                 .orbit_speed = 0.01,
                 .selected_camera = .orbit,
                 .player_settings = .{
                     .look_speed = 0.01,
-                    .movement_speed = 5,
+                    .movement_speed = 0.8,
                 },
                 .render_resolution = .{ .x = 0, .y = 0 },
             },
             .store = .{
+                .last_time = 0,
                 .forest_chunk_cache = ForestSpawner.ChunkCache.init(std.heap.page_allocator),
                 .terrain_chunk_cache = TerrainSpawner.ChunkCache.init(std.heap.page_allocator),
                 .player = .{
@@ -140,7 +147,10 @@ pub const interface = struct {
             }
 
             pub fn orbit(
+                allocator: std.mem.Allocator,
                 props: struct {
+                    time: u64,
+                    last_time: u64,
                     orbit_speed: f32,
                     render_resolution: struct { x: i32, y: i32 },
                     input: struct {
@@ -156,10 +166,13 @@ pub const interface = struct {
                     selected_camera: enum { orbit, first_person },
                     player_settings: struct { movement_speed: f32, look_speed: f32 },
                     player: *struct { position: Vec4, rotation: Vec4 },
+                    terrain_chunk_cache: *TerrainSpawner.ChunkCache,
+                    tier_index_to_influence_range: []const f32,
                 },
             ) !struct {
                 camera_position: Vec4,
                 world_matrix: zm.Mat,
+                last_time: u64,
             } {
                 switch (props.selected_camera) {
                     .orbit => {
@@ -185,6 +198,7 @@ pub const interface = struct {
                         );
 
                         return .{
+                            .last_time = props.time,
                             .camera_position = zm.mul(zm.inverse(location), Vec4{ 0, 0, 0, 1 }),
                             .world_matrix = zm.mul(
                                 location,
@@ -193,23 +207,17 @@ pub const interface = struct {
                         };
                     },
                     .first_person => {
-                        wasm_entry.dumpDebugLogFmt("Wow, it's first person! {any}\n", .{props.input.movement});
                         // Update rotation based on mouse input
-                        props.player.rotation[0] += props.input.mouse_delta[0] * -props.player_settings.look_speed;
-                        props.player.rotation[1] = @min(
-                            0.49 * std.math.pi,
-                            @max(
-                                -0.49 * std.math.pi,
-                                props.player.rotation[1] + props.input.mouse_delta[1] * -props.player_settings.look_speed,
-                            ),
-                        );
+                        props.player.rotation = props.player.rotation +
+                            props.input.mouse_delta *
+                            @as(zm.Vec, @splat(-props.player_settings.look_speed));
 
                         // Create rotation matrix for movement direction
-                        const rotation_matrix = zm.matFromRollPitchYaw(0, props.player.rotation[0], 0);
+                        const rotation_matrix = zm.matFromRollPitchYaw(-props.player.rotation[1], -props.player.rotation[0], 0);
 
                         // Get forward and right vectors from rotation matrix
-                        const forward = zm.normalize3(zm.mul(Vec4{ 0, 0, 1, 0 }, rotation_matrix));
-                        const right = zm.normalize3(zm.mul(Vec4{ 1, 0, 0, 0 }, rotation_matrix));
+                        const forward = Vec4{ 0, 0, 1, 0 };
+                        const right = Vec4{ 1, 0, 0, 0 };
 
                         // Process horizontal movement (left/right)
                         var horizontal_movement = Vec4{ 0, 0, 0, 0 };
@@ -244,21 +252,36 @@ pub const interface = struct {
                         }
 
                         // Combine movements
-                        var final_movement = horizontal_movement + vertical_movement;
+                        const combined_movement = horizontal_movement + vertical_movement;
+
+                        const delta_time = @as(f32, @floatFromInt(props.time - props.last_time)) / 1000.0;
 
                         // Normalize and scale movement if there is any input
-                        if (zm.length3(final_movement)[0] > 0.001) {
-                            final_movement = zm.normalize3(final_movement) * @as(Vec4, @splat(props.player_settings.movement_speed));
+                        if (zm.length3(combined_movement)[0] > 0.001) {
+                            var blah = zm.normalize3(combined_movement);
+                            wasm_entry.dumpDebugLogFmt("blah {d}", .{blah});
+                            blah[3] = 1;
+
+                            const final_movement = blah
+                            //     zm.rotate(
+                            //     // zm.qidentity(),
+                            //     props.player.rotation,
+                            //     blah,
+                            // )
+                            * @as(Vec4, @splat(props.player_settings.movement_speed)) * @as(Vec4, @splat(delta_time));
 
                             // Update position (only X and Z components)
                             var new_position = props.player.position;
                             new_position[0] += final_movement[0];
                             new_position[2] += final_movement[2];
 
-                            // Sample terrain height at new position and adjust Y component
-                            // const terrain_height = try sampleTerrain(Vec2{ new_position[0], new_position[2] });
-                            const terrain_height = 0;
-                            new_position[1] = terrain_height + 1.7; // Add eye height offset
+                            const terrain_height = try sampleTerrainStamps(
+                                allocator,
+                                props.terrain_chunk_cache,
+                                props.tier_index_to_influence_range,
+                                Vec2{ new_position[0], new_position[2] },
+                            );
+                            new_position[1] = terrain_height + 1.2; // Add eye height offset
                             props.player.position = new_position;
                         }
 
@@ -271,14 +294,14 @@ pub const interface = struct {
                             500,
                         );
 
-                        const pitch_matrix = zm.matFromRollPitchYaw(props.player.rotation[1], 0, 0);
-                        const yaw_matrix = zm.matFromRollPitchYaw(0, props.player.rotation[0], 0);
-                        const rotation = zm.mul(pitch_matrix, yaw_matrix);
-                        const translation = zm.translationV(props.player.position);
-                        const location = zm.mul(translation, rotation);
+                        const location = zm.mul(
+                            zm.translationV(-props.player.position),
+                            zm.inverse(rotation_matrix),
+                        );
 
                         return .{
-                            .camera_position = props.player.position,
+                            .last_time = props.time,
+                            .camera_position = zm.mul(zm.inverse(location), Vec4{ 0, 0, 0, 1 }),
                             .world_matrix = zm.mul(
                                 location,
                                 view_projection,
@@ -461,6 +484,30 @@ pub const interface = struct {
                         .size = 1,
                     };
                 };
+                pub const BigHemisphere: Stamp = blk: {
+                    @setEvalBranchQuota(100000);
+                    const resolution = .{ .x = 32, .y = 32 };
+                    var heights: [resolution.x * resolution.y]f32 = undefined;
+                    for (0..resolution.y) |y| {
+                        for (0..resolution.x) |x| {
+                            const v = Vec4{ @floatFromInt(x), @floatFromInt(y), 0, 0 } /
+                                @as(Vec4, @splat(@floatFromInt(@max(resolution.x, resolution.y)))) -
+                                @as(Vec4, @splat(0.5));
+                            heights[x + y * resolution.x] = @max(
+                                0,
+                                std.math.sqrt(
+                                    1 - std.math.pow(f32, zm.length2(v)[0] * 2, 2),
+                                ),
+                            ) * 1.5;
+                        }
+                    }
+                    const heights_static = heights;
+                    break :blk .{
+                        .resolution = resolution,
+                        .heights = &heights_static,
+                        .size = 3,
+                    };
+                };
             };
 
             pub fn sampleTerrainStamps(
@@ -499,11 +546,11 @@ pub const interface = struct {
                         @floatFromInt(stamp.resolution.y - 1),
                     };
 
-                    if (stamp_pos[0] < 0 or stamp_pos[0] > @as(f32, @floatFromInt(stamp.resolution.x)) or
-                        stamp_pos[1] < 0 or stamp_pos[1] > @as(f32, @floatFromInt(stamp.resolution.y)))
-                    {
-                        continue;
-                    }
+                    // if (stamp_pos[0] < 0 or stamp_pos[0] > @as(f32, @floatFromInt(stamp.resolution.x)) or
+                    //     stamp_pos[1] < 0 or stamp_pos[1] > @as(f32, @floatFromInt(stamp.resolution.y)))
+                    // {
+                    //     continue;
+                    // }
                     const pos0 = @floor(stamp_pos);
                     const pos_int: Coord = @intFromFloat(pos0);
                     const fract = stamp_pos - pos0;
@@ -530,11 +577,9 @@ pub const interface = struct {
             ) !struct {
                 tier_index_to_influence_range: []const f32,
             } {
-                wasm_entry.dumpDebugLogFmt("Calculating terrain density influence range", .{});
                 var tier_index_to_influence_range = std.ArrayList(f32).init(allocator);
-                for (TerrainSpawner.density_tiers) |maybe_tier| if (maybe_tier) |tier| {
-                    wasm_entry.dumpDebugLogFmt("Calculating influence range for tier {d}", .{tier.density});
-                    try tier_index_to_influence_range.append(blk: {
+                for (TerrainSpawner.density_tiers) |maybe_tier|
+                    try tier_index_to_influence_range.append(if (maybe_tier) |tier| blk: {
                         var trees = std.AutoArrayHashMap(TerrainSpawner.TreeId, void).init(allocator);
                         for (tier.tree_range) |maybe_tree_id| if (maybe_tree_id) |tree_id| {
                             const enum_tree_id: TerrainSpawner.TreeId = @enumFromInt(tree_id);
@@ -551,9 +596,23 @@ pub const interface = struct {
                             max_size = @max(max_size, size);
                         }
                         break :blk max_size;
-                    });
-                };
+                    } else 0);
 
+                wasm_entry.dumpDebugLogFmt("Tier influence {any}\n", .{tier_index_to_influence_range.items});
+                const pos_2d = Vec2{ 0, 0 };
+                const bounds = blk: {
+                    var bounds = try allocator.alloc(Bounds, tier_index_to_influence_range.items.len);
+                    for (tier_index_to_influence_range.items, 0..) |influence_range, tier_index| {
+                        const size_2d = @as(Vec2, @splat(influence_range));
+                        bounds[tier_index] = Bounds{
+                            .min = pos_2d - size_2d * @as(Vec2, @splat(0.5)),
+                            .size = size_2d,
+                        };
+                    }
+                    wasm_entry.dumpDebugLogFmt("Bounds {any}\n", .{bounds});
+                    break :blk bounds;
+                };
+                _ = bounds;
                 return .{
                     .tier_index_to_influence_range = tier_index_to_influence_range.items,
                 };

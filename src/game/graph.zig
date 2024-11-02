@@ -4,6 +4,12 @@ pub const blueprint = runtime.Blueprint{
     .nodes = &[_]runtime.NodeGraphBlueprintEntry{
         .{ .name = "getResources", .function = "getResources", .input_links = &[_]runtime.InputLink{} },
         .{ .name = "orbit", .function = "orbit", .input_links = &[_]runtime.InputLink{
+            .{ .field = "time", .source = .{
+                .input_field = "time",
+            } },
+            .{ .field = "last_time", .source = .{
+                .store_field = "last_time",
+            } },
             .{ .field = "render_resolution", .source = .{
                 .input_field = "render_resolution",
             } },
@@ -24,6 +30,12 @@ pub const blueprint = runtime.Blueprint{
             } },
             .{ .field = "player", .source = .{
                 .store_field = "player",
+            } },
+            .{ .field = "terrain_chunk_cache", .source = .{
+                .store_field = "terrain_chunk_cache",
+            } },
+            .{ .field = "tier_index_to_influence_range", .source = .{
+                .node = .{ .name = "calculateTerrainDensityInfluenceRange", .field = "tier_index_to_influence_range" },
             } },
         } },
         .{ .name = "displayTrees", .function = "displayTrees", .input_links = &[_]runtime.InputLink{
@@ -65,6 +77,7 @@ pub const blueprint = runtime.Blueprint{
     },
     .store = &[_]runtime.SystemSink{
         .{ .output_node = "orbit", .output_field = "orbit_camera", .system_field = "orbit_camera" },
+        .{ .output_node = "orbit", .output_field = "last_time", .system_field = "last_time" },
         .{ .output_node = "orbit", .output_field = "player", .system_field = "player" },
         .{ .output_node = "displayForest", .output_field = "forest_chunk_cache", .system_field = "forest_chunk_cache" },
         .{ .output_node = "displayTerrain", .output_field = "terrain_chunk_cache", .system_field = "terrain_chunk_cache" },

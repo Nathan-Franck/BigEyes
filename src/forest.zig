@@ -163,81 +163,83 @@ pub fn Forest(comptime chunk_size: i32) type {
                 break :unpack trees;
             };
 
-            const density_local = density_tiers: {
+            const min_tier, const tier_len = blk: {
                 var min_tier: i32 = trees[0].density_tier;
                 var max_tier: i32 = trees[0].density_tier;
                 for (trees[1..]) |tree| {
                     min_tier = @min(min_tier, tree.density_tier);
                     max_tier = @max(max_tier, tree.density_tier);
                 }
-                const tree_decls = @typeInfo(ForestSettings).@"struct".decls;
                 const tier_len = max_tier - min_tier + 1;
-                var tiers: [tier_len]?DensityTier = undefined;
-                for (&tiers, 0..) |*tier, tier_index| {
-                    var tier_tree_ids: []const u32 = &.{};
-                    const density_tier = @as(i32, tier_index) + min_tier;
-                    for (tree_decls, 0..) |tree_decl, decl_index| {
-                        const tree = @field(ForestSettings, tree_decl.name);
-                        if (tree.density_tier == density_tier) {
-                            tier_tree_ids = tier_tree_ids ++ .{decl_index};
-                        }
-                    }
-                    tier.* = if (tier_tree_ids.len == 0) null else tier: {
-                        const total_likelihood = total_likelihood: {
-                            var total: f32 = 0;
-                            for (tier_tree_ids) |tree_id|
-                                total += @field(
-                                    ForestSettings,
-                                    @typeInfo(ForestSettings).@"struct".decls[tree_id].name,
-                                ).likelihood;
-                            break :total_likelihood @max(total, 1);
-                        };
-                        const tree_range = tree_range: {
-                            var range: [quantization]?u32 = .{null} ** quantization;
-                            var current_tree_index: u32 = 0;
-                            var accum_likelihood: f32 = @field(
-                                ForestSettings,
-                                @typeInfo(ForestSettings).@"struct".decls[current_tree_index].name,
-                            ).likelihood;
-                            var next_transition: i32 = @as(i32, @intFromFloat(accum_likelihood / total_likelihood * quantization));
-                            for (&range, 0..) |*cell, cell_index| {
-                                cell.* = if (current_tree_index >= tier_tree_ids.len)
-                                    null
-                                else
-                                    tier_tree_ids[current_tree_index];
-                                if (cell_index >= next_transition) {
-                                    current_tree_index += 1;
-                                    accum_likelihood = if (current_tree_index >= tier_tree_ids.len)
-                                        total_likelihood
-                                    else
-                                        accum_likelihood + @field(
-                                            ForestSettings,
-                                            @typeInfo(ForestSettings).@"struct".decls[current_tree_index].name,
-                                        ).likelihood;
-                                    next_transition = @as(i32, @intFromFloat(accum_likelihood / total_likelihood * quantization));
-                                }
-                            }
-                            break :tree_range range;
-                        };
-                        break :tier .{
-                            .density = density_tier,
-                            .tree_range = tree_range,
-                        };
-                    };
-                }
-                break :density_tiers .{ .density_tiers = tiers, .min_tier = min_tier };
+                break :blk .{ min_tier, tier_len };
             };
 
             return struct {
                 pub const ChunkCache = local.ChunkCache;
                 pub const Settings = ForestSettings;
                 pub const length = trees.len;
-                pub const density_tiers = density_local.density_tiers;
                 pub const TreeId = local.TreeId;
+                pub const density_tiers: [tier_len]?DensityTier = blk: {
+                    var tiers: [tier_len]?DensityTier = undefined;
+                    for (&tiers, 0..) |*tier, tier_index| {
+                        var tier_tree_ids: []const u32 = &.{};
+                        const density_tier = @as(i32, tier_index) + min_tier;
+                        const tree_decls = @typeInfo(ForestSettings).@"struct".decls;
+                        for (tree_decls, 0..) |tree_decl, decl_index| {
+                            const tree = @field(ForestSettings, tree_decl.name);
+                            if (tree.density_tier == density_tier) {
+                                tier_tree_ids = tier_tree_ids ++ .{decl_index};
+                            }
+                        }
+                        tier.* = if (tier_tree_ids.len == 0) null else tier: {
+                            const total_likelihood = total_likelihood: {
+                                var total: f32 = 0;
+                                for (tier_tree_ids) |tree_id|
+                                    total += @field(
+                                        ForestSettings,
+                                        @typeInfo(ForestSettings).@"struct".decls[tree_id].name,
+                                    ).likelihood;
+                                break :total_likelihood @max(total, 1);
+                            };
+                            const tree_range = tree_range: {
+                                var range: [quantization]?u32 = .{null} ** quantization;
+                                var current_tree_index: u32 = 0;
+                                var accum_likelihood: f32 = @field(
+                                    ForestSettings,
+                                    @typeInfo(ForestSettings).@"struct".decls[current_tree_index].name,
+                                ).likelihood;
+                                var next_transition: i32 = @as(i32, @intFromFloat(accum_likelihood / total_likelihood * quantization));
+                                for (&range, 0..) |*cell, cell_index| {
+                                    cell.* = if (current_tree_index >= tier_tree_ids.len)
+                                        null
+                                    else
+                                        tier_tree_ids[current_tree_index];
+                                    if (cell_index >= next_transition) {
+                                        current_tree_index += 1;
+                                        accum_likelihood = if (current_tree_index >= tier_tree_ids.len)
+                                            total_likelihood
+                                        else
+                                            accum_likelihood + @field(
+                                                ForestSettings,
+                                                @typeInfo(ForestSettings).@"struct".decls[current_tree_index].name,
+                                            ).likelihood;
+                                        next_transition = @as(i32, @intFromFloat(accum_likelihood / total_likelihood * quantization));
+                                    }
+                                }
+                                break :tree_range range;
+                            };
+                            break :tier .{
+                                .density = density_tier,
+                                .tree_range = tree_range,
+                            };
+                        };
+                    }
+                    break :blk tiers;
+                };
                 // pub const trees = trees;
 
                 pub fn densityTierToIndex(density_tier: i32) usize {
-                    return @intCast(density_tier - density_local.min_tier);
+                    return @intCast(density_tier - min_tier);
                 }
                 pub fn gatherSpawnsInBoundsPerTier(allocator: std.mem.Allocator, chunk_cache: *ChunkCache, bounds: []const Bounds) ![]const local.Spawn {
                     var spawns = std.ArrayList(local.Spawn).init(allocator);

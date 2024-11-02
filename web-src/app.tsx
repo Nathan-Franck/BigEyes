@@ -82,7 +82,7 @@ function updateGraph(newInputs: typeof graphInputs) {
 }
 
 let lastMousePosition: { x: number; y: number } | null = null;
-let controllerInputs: NonNullable<typeof graphInputs.input> = { mouse_delta: [0, 0, 0, 0], movement: { left: 0, right: 0, forward: 0, backward: 0 } };
+let controllerInputs: NonNullable<typeof graphInputs.input> = { mouse_delta: [0, 0, 0, 0], movement: { left: null, right: null, forward: null, backward: null } };
 
 export function App() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -342,9 +342,13 @@ export function App() {
     let animationRunning = true;
     const intervalID = setInterval(() => {
       if (!animationRunning) clearInterval(intervalID);
-      // if (document.hasFocus()) updateGraph({
-      //   // game_time_ms: Date.now()
-      // });
+      if (document.hasFocus()) {
+        controllerInputs.mouse_delta = [0, 0, 0, 0];
+        updateGraph({
+          input: controllerInputs,
+          time: Date.now()
+        });
+      }
     }, 1000.0 / 24.0);
 
     return () => (animationRunning = false);
@@ -391,6 +395,7 @@ export function App() {
             controllerInputs.mouse_delta = [0, 0, 0, 0];
             controllerInputs.movement[direction] = Date.now();
             updateGraph({
+              time: Date.now(),
               input: controllerInputs,
             });
           }
@@ -401,6 +406,7 @@ export function App() {
             controllerInputs.mouse_delta = [0, 0, 0, 0];
             controllerInputs.movement[direction] = null;
             updateGraph({
+              time: Date.now(),
               input: controllerInputs,
             });
           }
@@ -418,6 +424,7 @@ export function App() {
           lastMousePosition = currentMouse;
           if (event.buttons) {
             updateGraph({
+              time: Date.now(),
               input: controllerInputs,
             });
           }

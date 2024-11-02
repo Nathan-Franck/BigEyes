@@ -511,6 +511,7 @@ pub fn NodeGraph(
                             break :node_input @field(self.system_inputs, input_field);
                         },
                         .store_field => |store_field| @field(self.store, store_field),
+
                         .node => |node_blueprint| input_field: {
                             const node_outputs = @field(self.nodes_outputs, node_blueprint.name);
                             const node_output = @field(node_outputs, node_blueprint.field);
