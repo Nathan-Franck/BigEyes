@@ -72,10 +72,10 @@ pub fn Polygon(comptime poly_selection: enum { Quad, Face }) type {
             }
             for (polygons) |*polygon| {
                 for (polygon.*) |vertex| {
-                    const len = vertex_to_poly_len[vertex];
-                    if (len < max_polys_per_vertex) {
-                        vertex_to_poly[vertex][len] = polygon;
-                        vertex_to_poly_len[vertex] += 1;
+                    const len = &vertex_to_poly_len[vertex];
+                    if (len.* < max_polys_per_vertex) {
+                        vertex_to_poly[vertex][len.*] = polygon;
+                        len.* += 1;
                     }
                 }
             }

@@ -2,13 +2,12 @@ const std = @import("std");
 const PngFormat = @import("./zigimg/src/formats/png.zig");
 const Image = @import("./zigimg/src/Image.zig");
 const Rgba32 = @import("./zigimg/src/color.zig").Rgba32;
-const wasm_entry = @import("./wasm_entry.zig");
 
 const ImageSizeLimit = 4096;
 const Rgba32Image = struct {
     pixels: []const Rgba32,
-    width: u32,
-    height: u32,
+    width: usize,
+    height: usize,
 };
 
 pub fn loadPng(

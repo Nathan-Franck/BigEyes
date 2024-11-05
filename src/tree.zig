@@ -2,7 +2,6 @@ const std = @import("std");
 const math = std.math;
 const zm = @import("zmath");
 const Allocator = std.mem.Allocator;
-const wasm_entry = @import("wasm_entry.zig");
 
 pub const Vec4 = @Vector(4, f32);
 pub const Vec2 = @Vector(2, f32);

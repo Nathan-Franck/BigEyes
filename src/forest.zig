@@ -1,4 +1,3 @@
-const wasm_entry = @import("./wasm_entry.zig");
 const std = @import("std");
 const zm = @import("zmath");
 const util = .{

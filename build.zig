@@ -157,7 +157,8 @@ pub fn build(
             .target = b.resolveTargetQuery(.{ .cpu_arch = .wasm32, .os_tag = .freestanding }),
             .optimize = optimize,
             .name = "check_exe",
-            .root_source_file = b.path("src/wasm_entry.zig"),
+            // .root_source_file = b.path("src/wasm_entry.zig"),
+            .root_source_file = b.path("src/test_perf.zig"),
         });
         const zmath = b.dependency("zmath", .{});
         exe_check.root_module.addImport("zmath", zmath.module("root"));
@@ -204,11 +205,15 @@ pub fn build(
     // Exe
     {
         const exe = b.addExecutable(.{
-            .name = "triangle_wgpu",
-            .root_source_file = .{ .cwd_relative = "src/main.zig" },
+            .name = "test_perf",
+            .root_source_file = .{ .cwd_relative = "src/test_perf.zig" },
             .target = target,
             .optimize = optimize,
         });
+
+        const zmath = b.dependency("zmath", .{});
+        exe.root_module.addImport("zmath", zmath.module("root"));
+
         exe.step.dependOn(&export_meshes.step);
         // Windows hax
         exe.want_lto = false;
@@ -223,10 +228,10 @@ pub fn build(
         }
         run_cmd.step.dependOn(&install_artifact.step);
 
-        const install_step = b.step("exe", "build an exe");
-        install_step.dependOn(&install_artifact.step);
+        // const install_step = b.step("test_perf", "build an exe");
+        // install_step.dependOn(&install_artifact.step);
 
-        const run_step = b.step("exe-run", "run the exe");
+        const run_step = b.step("test_perf", "run the perf");
         run_step.dependOn(&run_cmd.step);
     }
 }
