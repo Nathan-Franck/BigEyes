@@ -350,13 +350,15 @@ pub const nodes = struct {
     ) !struct {
         forest_data: []const game.types.ModelInstances,
     } {
+        var terrain_chunk_cache = game.config.TerrainSpawner.ChunkCache.init(allocator);
+        const terrain_sampler = props.terrain_sampler.loadCache(&terrain_chunk_cache);
+
         const spawns = try game.config.ForestSpawner.gatherSpawnsInBounds(
             allocator,
             props.forest_chunk_cache,
             game.config.demo_terrain_bounds,
         );
-        var terrain_chunk_cache = game.config.TerrainSpawner.ChunkCache.init(allocator);
-        var terrain_sampler = props.terrain_sampler.loadCache(&terrain_chunk_cache);
+
         var instances = try allocator.alloc(std.ArrayList(Vec4), game.config.ForestSpawner.length);
         for (instances) |*instance| {
             instance.* = std.ArrayList(Vec4).init(allocator);

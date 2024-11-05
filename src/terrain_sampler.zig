@@ -16,7 +16,7 @@ pub fn TerrainSampler(
             for (TerrainSpawner.density_tiers, 0..) |maybe_tier, tier_index|
                 tier_index_to_influence_range[tier_index] = if (maybe_tier) |tier| blk: {
                     var trees = std.AutoArrayHashMap(TerrainSpawner.TreeId, void).init(allocator);
-                    for (tier.tree_range) |maybe_tree_id| if (maybe_tree_id) |tree_id| {
+                    for (tier.source.tree_range) |maybe_tree_id| if (maybe_tree_id) |tree_id| {
                         const enum_tree_id: TerrainSpawner.TreeId = @enumFromInt(tree_id);
                         try trees.put(enum_tree_id, {});
                     } else continue;
