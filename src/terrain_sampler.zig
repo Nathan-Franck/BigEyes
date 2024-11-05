@@ -37,7 +37,29 @@ pub fn TerrainSampler(
             };
         }
 
-        pub fn sampleTerrainStamps(
+        const Self = @This();
+
+        pub fn loadCache(
+            self: @This(),
+            terrain_chunk_cache: *TerrainSpawnerInner.ChunkCache,
+        ) struct {
+            source: Self,
+            terrain_chunk_cache: *TerrainSpawnerInner.ChunkCache,
+            pub fn sample(
+                cached: @This(),
+                allocator: std.mem.Allocator,
+                pos_2d: Vec2,
+            ) !f32 {
+                return cached.source.sample(allocator, cached.terrain_chunk_cache, pos_2d);
+            }
+        } {
+            return .{
+                .source = self,
+                .terrain_chunk_cache = terrain_chunk_cache,
+            };
+        }
+
+        pub fn sample(
             self: *const @This(),
             allocator: std.mem.Allocator,
             terrain_chunk_cache: *TerrainSpawnerInner.ChunkCache,

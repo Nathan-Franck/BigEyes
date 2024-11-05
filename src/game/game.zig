@@ -262,7 +262,7 @@ pub const nodes = struct {
                     new_position += final_movement;
 
                     var terrain_chunk_cache = game.config.TerrainSpawner.ChunkCache.init(allocator);
-                    const terrain_height = try props.terrain_sampler.sampleTerrainStamps(
+                    const terrain_height = try props.terrain_sampler.sample(
                         allocator,
                         &terrain_chunk_cache,
                         Vec2{ new_position[0], new_position[2] },
@@ -355,18 +355,15 @@ pub const nodes = struct {
             props.forest_chunk_cache,
             game.config.demo_terrain_bounds,
         );
+        var terrain_chunk_cache = game.config.TerrainSpawner.ChunkCache.init(allocator);
+        var terrain_sampler = props.terrain_sampler.loadCache(&terrain_chunk_cache);
         var instances = try allocator.alloc(std.ArrayList(Vec4), game.config.ForestSpawner.length);
         for (instances) |*instance| {
             instance.* = std.ArrayList(Vec4).init(allocator);
         }
-        var terrain_chunk_cache = game.config.TerrainSpawner.ChunkCache.init(allocator);
         for (spawns) |spawn| {
             const pos_2d = Vec2{ spawn.position[0], spawn.position[1] };
-            const height = try props.terrain_sampler.sampleTerrainStamps(
-                allocator,
-                &terrain_chunk_cache,
-                pos_2d,
-            );
+            const height = try terrain_sampler.sample(allocator, pos_2d);
             const position = Vec4{ spawn.position[0], height, spawn.position[1], 1 };
             try instances[spawn.id].append(position);
         }
@@ -431,6 +428,7 @@ pub const nodes = struct {
     } {
         var terrain_chunk_cache = game.config.TerrainSpawner.ChunkCache.init(allocator);
         try terrain_chunk_cache.ensureTotalCapacity(256);
+        var terrain_sampler = props.terrain_sampler.loadCache(&terrain_chunk_cache);
 
         const terrain_resolution = 512;
         // const terrain_resolution = 256;
@@ -446,17 +444,8 @@ pub const nodes = struct {
                     @as(Vec2, @floatFromInt(vertex_coord)) *
                     game.config.demo_terrain_bounds.size /
                     @as(Vec2, @splat(terrain_resolution));
-                const height = try props.terrain_sampler.sampleTerrainStamps(
-                    stack_allocator.get(),
-                    &terrain_chunk_cache,
-                    pos_2d,
-                );
-                const vertex: Vec4 = .{
-                    pos_2d[0],
-                    height,
-                    pos_2d[1],
-                    1,
-                };
+                const height = try terrain_sampler.sample(stack_allocator.get(), pos_2d);
+                const vertex: Vec4 = .{ pos_2d[0], height, pos_2d[1], 1 };
                 positions[index] = vertex;
             }
             break :blk positions;
