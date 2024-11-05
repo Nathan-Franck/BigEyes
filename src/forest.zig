@@ -99,7 +99,7 @@ pub fn Forest(comptime chunk_size: i32) type {
                     return @as(f32, @floatFromInt(i)) / @as(f32, @floatFromInt(std.math.maxInt(u64)));
                 }
 
-                pub noinline fn gatherSpawnsInBounds(
+                pub fn gatherSpawnsInBounds(
                     self: @This(),
                     chunk_cache: *local.ChunkCache,
                     bounds: Bounds,
@@ -127,7 +127,7 @@ pub fn Forest(comptime chunk_size: i32) type {
                     }
                 }
 
-                pub noinline fn getChunk(
+                pub fn getChunk(
                     self: @This(),
                     cache: *local.ChunkCache,
                     coord: Coord,
@@ -265,7 +265,7 @@ pub fn Forest(comptime chunk_size: i32) type {
                     return @intCast(density_tier - min_tier);
                 }
 
-                pub noinline fn gatherSpawnsInBoundsPerTier(
+                pub fn gatherSpawnsInBoundsPerTier(
                     allocator: std.mem.Allocator,
                     chunk_cache: *ChunkCache,
                     bounds: []const Bounds,
