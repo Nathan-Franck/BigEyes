@@ -4,20 +4,20 @@ const Vec2 = @import("./forest.zig").Vec2;
 const Bounds = @import("./forest.zig").Bounds;
 
 pub fn TerrainSampler(
-    TerrainSpawnerInner: type,
+    TerrainSpawner: type,
     TerrainStamps: type,
 ) type {
     return struct {
-        const length = TerrainSpawnerInner.density_tiers.len;
+        const length = TerrainSpawner.density_tiers.len;
         tier_index_to_influence_range: [length]f32,
 
         pub fn init(allocator: std.mem.Allocator) !@This() {
             var tier_index_to_influence_range: [length]f32 = undefined;
-            for (TerrainSpawnerInner.density_tiers, 0..) |maybe_tier, tier_index|
+            for (TerrainSpawner.density_tiers, 0..) |maybe_tier, tier_index|
                 tier_index_to_influence_range[tier_index] = if (maybe_tier) |tier| blk: {
-                    var trees = std.AutoArrayHashMap(TerrainSpawnerInner.TreeId, void).init(allocator);
+                    var trees = std.AutoArrayHashMap(TerrainSpawner.TreeId, void).init(allocator);
                     for (tier.tree_range) |maybe_tree_id| if (maybe_tree_id) |tree_id| {
-                        const enum_tree_id: TerrainSpawnerInner.TreeId = @enumFromInt(tree_id);
+                        const enum_tree_id: TerrainSpawner.TreeId = @enumFromInt(tree_id);
                         try trees.put(enum_tree_id, {});
                     } else continue;
                     const Stamps = @typeInfo(TerrainStamps).@"struct".decls;
@@ -40,11 +40,11 @@ pub fn TerrainSampler(
         const Self = @This();
 
         pub fn loadCache(
-            self: @This(),
-            terrain_chunk_cache: *TerrainSpawnerInner.ChunkCache,
+            source: @This(),
+            terrain_chunk_cache: *TerrainSpawner.ChunkCache,
         ) struct {
             source: Self,
-            terrain_chunk_cache: *TerrainSpawnerInner.ChunkCache,
+            terrain_chunk_cache: *TerrainSpawner.ChunkCache,
             pub fn sample(
                 cached: @This(),
                 allocator: std.mem.Allocator,
@@ -54,7 +54,7 @@ pub fn TerrainSampler(
             }
         } {
             return .{
-                .source = self,
+                .source = source,
                 .terrain_chunk_cache = terrain_chunk_cache,
             };
         }
@@ -62,11 +62,11 @@ pub fn TerrainSampler(
         pub fn sample(
             self: *const @This(),
             allocator: std.mem.Allocator,
-            terrain_chunk_cache: *TerrainSpawnerInner.ChunkCache,
+            terrain_chunk_cache: *TerrainSpawner.ChunkCache,
             pos_2d: Vec2,
         ) !f32 {
             const bounds = blk: {
-                var bounds: [TerrainSpawnerInner.density_tiers.len]Bounds = undefined;
+                var bounds: [TerrainSpawner.density_tiers.len]Bounds = undefined;
                 for (self.tier_index_to_influence_range, 0..) |influence_range, tier_index| {
                     const size_2d = @as(Vec2, @splat(influence_range));
                     bounds[tier_index] = Bounds{
@@ -77,7 +77,7 @@ pub fn TerrainSampler(
                 break :blk bounds;
             };
 
-            const spawns = try TerrainSpawnerInner.gatherSpawnsInBoundsPerTier(
+            const spawns = try TerrainSpawner.gatherSpawnsInBoundsPerTier(
                 allocator,
                 terrain_chunk_cache,
                 &bounds,
