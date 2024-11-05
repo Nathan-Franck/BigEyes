@@ -451,7 +451,7 @@ pub const interface = struct {
                 }
 
                 fn getHeight(
-                    stamp: @This(),
+                    stamp: *const @This(),
                     spawn_pos: Vec2,
                     pos_2d: Vec2,
                 ) ?f32 {
@@ -634,8 +634,8 @@ pub const interface = struct {
             } {
                 var terrain_chunk_cache = TerrainSpawner.ChunkCache.init(allocator);
                 try terrain_chunk_cache.ensureTotalCapacity(256);
-                // const terrain_resolution = 512;
-                const terrain_resolution = 128;
+                const terrain_resolution = 512;
+                // const terrain_resolution = 128;
 
                 var vertex_iterator = CoordIterator.init(@splat(0), @splat(terrain_resolution + 1));
                 var positions = std.ArrayList(Vec4).init(allocator);

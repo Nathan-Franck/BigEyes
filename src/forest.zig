@@ -100,7 +100,7 @@ pub fn Forest(comptime chunk_size: i32) type {
                 }
 
                 pub fn gatherSpawnsInBounds(
-                    self: @This(),
+                    self: *const @This(),
                     chunk_cache: *local.ChunkCache,
                     bounds: Bounds,
                     spawns: *std.ArrayList(*const local.Spawn),
@@ -128,7 +128,7 @@ pub fn Forest(comptime chunk_size: i32) type {
                 }
 
                 pub fn getChunk(
-                    self: @This(),
+                    self: *const @This(),
                     cache: *local.ChunkCache,
                     coord: Coord,
                 ) !*local.Chunk {
