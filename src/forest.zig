@@ -69,31 +69,26 @@ pub fn Forest(comptime chunk_size: i32) type {
                 density: i32,
                 tree_range: [quantization]?u8,
 
-                pub fn getSpan(density: i32) f32 {
-                    return std.math.pow(f32, 2.0, @floatFromInt(density));
-                }
-
                 fn precalculate(
                     source: *const Self,
                 ) Precalculated {
-                    const coord_span: Vec2 = @splat(getSpan(source.density));
+                    const span = std.math.pow(f32, 2.0, @floatFromInt(source.density));
+                    const coord_span: Vec2 = @splat(span);
                     const chunk_span: Vec2 = coord_span * @as(Vec2, @splat(chunk_size));
-
-                    const inverse_coord_span: Vec2 = @as(Vec2, @splat(1)) / coord_span;
-                    const inverse_chunk_span: Vec2 = @as(Vec2, @splat(1)) / chunk_span;
-
                     return .{
                         .source = source,
+                        .span = span,
                         .coord_span = coord_span,
                         .chunk_span = chunk_span,
-                        .inverse_coord_span = inverse_coord_span,
-                        .inverse_chunk_span = inverse_chunk_span,
+                        .inverse_coord_span = @as(Vec2, @splat(1)) / coord_span,
+                        .inverse_chunk_span = @as(Vec2, @splat(1)) / chunk_span,
                     };
                 }
 
                 const Precalculated = struct {
                     source: *const Self,
 
+                    span: f32,
                     coord_span: Vec2,
                     chunk_span: Vec2,
                     inverse_coord_span: Vec2,
@@ -133,18 +128,20 @@ pub fn Forest(comptime chunk_size: i32) type {
                         cache: *local.ChunkCache,
                         coord: Coord,
                     ) !*local.Chunk {
+                        const density = self.source.density;
+                        const span = self.span;
+
                         const chunk = blk: {
                             const chunk_entry = try cache.getOrPut(local.DensityCoord{
                                 .x = coord[0],
                                 .y = coord[1],
-                                .density = self.source.density,
+                                .density = density,
                             });
                             if (chunk_entry.found_existing) {
                                 return chunk_entry.value_ptr;
                             }
                             break :blk chunk_entry.value_ptr;
                         };
-                        const span = getSpan(self.source.density);
                         const chunk_offset = .{
                             .x = @as(f32, @floatFromInt(coord[0])) * span * chunk_size,
                             .z = @as(f32, @floatFromInt(coord[1])) * span * chunk_size,
@@ -155,7 +152,7 @@ pub fn Forest(comptime chunk_size: i32) type {
                                 const hash_coord: local.DensityCoord = .{
                                     .x = coord[0] * chunk_size + @as(i32, @intCast(x)),
                                     .y = coord[1] * chunk_size + @as(i32, @intCast(y)),
-                                    .density = self.source.density,
+                                    .density = density,
                                 };
                                 const rand = .{
                                     .spawn = hashFn(context, .{ hash_coord, 0 }),
