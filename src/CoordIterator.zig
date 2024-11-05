@@ -1,11 +1,13 @@
 pub const Coord = @Vector(2, i32);
 
+total: usize,
 next_coord: Coord,
 min_coord: Coord,
 max_coord: Coord,
 
 pub fn init(min_coord: Coord, max_coord: Coord) @This() {
     return .{
+        .total = @intCast(@reduce(.Mul, max_coord - min_coord)),
         .next_coord = .{ min_coord[0] - 1, min_coord[1] },
         .min_coord = min_coord,
         .max_coord = max_coord,

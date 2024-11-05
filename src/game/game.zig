@@ -437,49 +437,60 @@ pub const nodes = struct {
         // const terrain_resolution = 128;
 
         var vertex_iterator = CoordIterator.init(@splat(0), @splat(terrain_resolution + 1));
-        var positions = std.ArrayList(Vec4).init(allocator);
-        while (vertex_iterator.next()) |vertex_coord| {
-            var stack_allocator = std.heap.stackFallback(1024, allocator); // TODO: Calculate how big the stack should be, maybe should OOM so that I know when we went to slow-mode (Super cool that one line can save 100ms for a 512*512 terrain)
-            const pos_2d: Vec2 = game.config.demo_terrain_bounds.min +
-                @as(Vec2, @floatFromInt(vertex_coord)) *
-                game.config.demo_terrain_bounds.size /
-                @as(Vec2, @splat(terrain_resolution));
-            const height = try props.terrain_sampler.sampleTerrainStamps(
-                stack_allocator.get(),
-                &terrain_chunk_cache,
-                pos_2d,
-            );
-            const vertex: Vec4 = .{
-                pos_2d[0],
-                height,
-                pos_2d[1],
-                1,
-            };
-            try positions.append(vertex);
-        }
-        var quad_iterator = CoordIterator.init(@splat(0), @splat(terrain_resolution));
-        var quads = std.ArrayList([4]u32).init(allocator);
-        while (quad_iterator.next()) |quad_coord| {
-            const quad_corners = &[_]Coord{
-                .{ 0, 0 },
-                .{ 1, 0 },
-                .{ 1, 1 },
-                .{ 0, 1 },
-            };
-            var quad: [4]u32 = undefined;
-            inline for (0..4) |quad_index| {
-                const quad_corner = quad_coord + quad_corners[quad_index];
-                quad[quad_index] = @intCast(quad_corner[0] + quad_corner[1] * vertex_iterator.width());
+        const positions = blk: {
+            var positions = try allocator.alloc(Vec4, vertex_iterator.total);
+            var index: usize = 0;
+            while (vertex_iterator.next()) |vertex_coord| : (index += 1) {
+                var stack_allocator = std.heap.stackFallback(1024, allocator); // TODO: Calculate how big the stack should be, maybe should OOM so that I know when we went to slow-mode (Super cool that one line can save 100ms for a 512*512 terrain)
+                const pos_2d: Vec2 = game.config.demo_terrain_bounds.min +
+                    @as(Vec2, @floatFromInt(vertex_coord)) *
+                    game.config.demo_terrain_bounds.size /
+                    @as(Vec2, @splat(terrain_resolution));
+                const height = try props.terrain_sampler.sampleTerrainStamps(
+                    stack_allocator.get(),
+                    &terrain_chunk_cache,
+                    pos_2d,
+                );
+                const vertex: Vec4 = .{
+                    pos_2d[0],
+                    height,
+                    pos_2d[1],
+                    1,
+                };
+                positions[index] = vertex;
             }
-            try quads.append(quad);
-        }
-        const normals = mesh_helper.Polygon(.Quad).calculateNormals(allocator, positions.items, quads.items);
-        const indices = mesh_helper.Polygon(.Quad).toTriangleIndices(allocator, quads.items);
+            break :blk positions;
+        };
+
+        const quads = blk: {
+            var quad_iterator = CoordIterator.init(@splat(0), @splat(terrain_resolution));
+            var quads = try allocator.alloc([4]u32, quad_iterator.total);
+            var index: u32 = 0;
+            while (quad_iterator.next()) |quad_coord| : (index += 1) {
+                const quad_corners = &[_]Coord{
+                    .{ 0, 0 },
+                    .{ 1, 0 },
+                    .{ 1, 1 },
+                    .{ 0, 1 },
+                };
+                var quad: [4]u32 = undefined;
+                inline for (0..4) |quad_index| {
+                    const quad_corner = quad_coord + quad_corners[quad_index];
+                    quad[quad_index] = @intCast(quad_corner[0] + quad_corner[1] * vertex_iterator.width());
+                }
+                quads[index] = quad;
+            }
+            break :blk quads;
+        };
+
+        const normals = mesh_helper.Polygon(.Quad).calculateNormals(allocator, positions, quads);
+        const indices = mesh_helper.Polygon(.Quad).toTriangleIndices(allocator, quads);
+
         const PointFlattener = mesh_helper.VecSliceFlattener(4, 3);
         return .{
             .terrain_mesh = game.types.GreyboxMesh{
                 .indices = indices,
-                .position = PointFlattener.convert(allocator, positions.items),
+                .position = PointFlattener.convert(allocator, positions),
                 .normal = PointFlattener.convert(allocator, normals),
             },
             .terrain_instance = game.types.ModelInstances{
