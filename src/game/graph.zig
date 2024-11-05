@@ -82,26 +82,3 @@ pub const blueprint = runtime.Blueprint{
         .{ .output_node = "orbit", .output_field = "world_matrix", .system_field = "world_matrix" },
     },
 };
-
-// const concept = @import("../node_graph_concept.zig");
-// const Node = concept.Node;
-// const something = struct {
-//     pub const nodes = struct {
-//         pub const get_resources = Node(GetResources){ .in = .{} };
-//         pub const orbit = Node(Orbit){ .in = .{
-//             .render_resolution = &input.render_resolution,
-//             .orbit_speed = &input.orbit_speed,
-//             .input = &input.input,
-//             .orbit_camera = &store.out.orbit_camera,
-//         } };
-//         pub const display_tree = Node(DisplayTree){ .in = .{
-//             .cutout_leaf = &get_resources.cutout_leaf,
-//             .tree = &get_resources.tree,
-//         } };
-//         pub const display_forest = Node(DisplayForest){ .in = .{} };
-//         pub const get_screenspace_mesh = Node(GetScreenspaceMesh){ .in = .{
-//             .camera_position = &orbit.camera_position,
-//             .world_matrix = &orbit.world_matrix,
-//         } };
-//     };
-// };

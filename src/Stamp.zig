@@ -1,17 +1,12 @@
 const Coord = @import("./forest.zig").Coord;
 const Vec2 = @import("./forest.zig").Vec2;
 
-// Starting on the assumption that all stamps are centered, so no offset is needed
 size: f32,
 resolution: struct { x: u32, y: u32 },
 heights: []const f32,
 // mask: []f32, // Do we need a mask?
-const safe_check = false; // Don't do this check since we know that it's fine
+
 inline fn sample(self: @This(), coord: Coord) f32 {
-    if (safe_check) {
-        if (coord[0] < 0 or coord[1] < 0 or coord[0] >= self.resolution.x or coord[1] >= self.resolution.y)
-            return 0;
-    }
     const index = @as(usize, @intCast(coord[0] + coord[1] * @as(i32, @intCast(self.resolution.x))));
     return self.heights[index];
 }
@@ -41,7 +36,6 @@ pub fn getHeight(
     const h01 = self.sample(pos_int + Coord{ 0, 1 });
     const h11 = self.sample(pos_int + Coord{ 1, 1 });
 
-    // Interpolate using vector operations
     const h0 = h00 * (1 - fract[0]) + h10 * fract[0];
     const h1 = h01 * (1 - fract[0]) + h11 * fract[0];
     const stamp_height = h0 * (1 - fract[1]) + h1 * fract[1];

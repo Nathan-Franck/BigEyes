@@ -2,12 +2,22 @@ const std = @import("std");
 const zm = @import("zmath");
 const Stamp = @import("../Stamp.zig");
 const Vec4 = @import("../forest.zig").Vec4;
+const Bounds = @import("../forest.zig").Bounds;
 const tree = @import("../tree.zig");
+
+pub const demo_terrain_bounds = Bounds{
+    .min = .{ -16, -16 },
+    .size = .{ 32, 32 },
+};
 
 pub const Forest = @import("../forest.zig").Forest(32);
 
 pub const ForestSpawner = Forest.spawner(ForestSettings);
 
+pub const TerrainSampler = @import("../terrain_sampler.zig").TerrainSampler(
+    TerrainSpawner,
+    TerrainStamps,
+);
 pub const TerrainSpawner = Forest.spawner(struct {
     pub const Hemisphere = Forest.Tree{
         .density_tier = -1,

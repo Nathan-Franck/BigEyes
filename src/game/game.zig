@@ -8,22 +8,21 @@ const mesh_helper = @import("../mesh_helper.zig");
 const MeshSpec = @import("../MeshSpec.zig");
 const zm = @import("zmath");
 const tree = @import("../tree.zig");
-const Forest = @import("../forest.zig").Forest(32);
 const Bounds = @import("../forest.zig").Bounds;
 const Coord = @import("../forest.zig").Coord;
 const Vec2 = @import("../forest.zig").Vec2;
 const Vec4 = @import("../forest.zig").Vec4;
 const CoordIterator = @import("../CoordIterator.zig");
 const Stamp = @import("../Stamp.zig");
-const TerrainSampler = @import("../terrain_sampler.zig").TerrainSampler(
-    game.config.TerrainSpawner,
-    game.config.TerrainStamps,
-);
+
 const game = struct {
     pub const graph = @import("./graph.zig");
     pub const types = @import("./types.zig");
     pub const config = @import("./config.zig");
 };
+const Forest = game.config.Forest;
+const TerrainSampler = game.config.TerrainSampler;
+
 pub const InterfaceEnum = std.meta.DeclEnum(interface);
 pub const interface = struct {
     var node_graph: NodeGraph = undefined;
@@ -83,6 +82,17 @@ pub const NodeGraph = graph_runtime.NodeGraph(
 );
 
 pub const nodes = struct {
+    pub fn calculateTerrainDensityInfluenceRange(
+        allocator: std.mem.Allocator,
+        _: struct {},
+    ) !struct {
+        terrain_sampler: TerrainSampler,
+    } {
+        return .{
+            .terrain_sampler = try TerrainSampler.init(allocator),
+        };
+    }
+
     pub fn getResources(allocator: std.mem.Allocator, _: struct {}) !game.types.Resources {
         const skybox = blk: {
             var images: game.types.ProcessedCubeMap = undefined;
@@ -343,7 +353,7 @@ pub const nodes = struct {
         const spawns = try game.config.ForestSpawner.gatherSpawnsInBounds(
             allocator,
             props.forest_chunk_cache,
-            demo_terrain_bounds,
+            game.config.demo_terrain_bounds,
         );
         var instances = try allocator.alloc(std.ArrayList(Vec4), game.config.ForestSpawner.length);
         for (instances) |*instance| {
@@ -410,32 +420,6 @@ pub const nodes = struct {
         };
     }
 
-    fn raytraceCell(
-        ray: raytrace.Ray,
-        cell: ?*std.ArrayList(*const raytrace.Triangle),
-        closest_distance: *f32,
-    ) void {
-        if (cell) |cell_triangles| for (cell_triangles.items) |triangle| {
-            const hit_distance = raytrace.rayTriangleIntersection(ray, triangle.*);
-            closest_distance.* = @min(closest_distance.*, hit_distance);
-        };
-    }
-
-    pub fn calculateTerrainDensityInfluenceRange(
-        allocator: std.mem.Allocator,
-        _: struct {},
-    ) !struct {
-        terrain_sampler: TerrainSampler,
-    } {
-        return .{
-            .terrain_sampler = try TerrainSampler.init(allocator),
-        };
-    }
-
-    const demo_terrain_bounds = Bounds{
-        .min = .{ -16, -16 },
-        .size = .{ 32, 32 },
-    };
     pub noinline fn displayTerrain(
         allocator: std.mem.Allocator,
         props: struct {
@@ -456,9 +440,9 @@ pub const nodes = struct {
         var positions = std.ArrayList(Vec4).init(allocator);
         while (vertex_iterator.next()) |vertex_coord| {
             var stack_allocator = std.heap.stackFallback(1024, allocator); // TODO: Calculate how big the stack should be, maybe should OOM so that I know when we went to slow-mode (Super cool that one line can save 100ms for a 512*512 terrain)
-            const pos_2d: Vec2 = demo_terrain_bounds.min +
+            const pos_2d: Vec2 = game.config.demo_terrain_bounds.min +
                 @as(Vec2, @floatFromInt(vertex_coord)) *
-                demo_terrain_bounds.size /
+                game.config.demo_terrain_bounds.size /
                 @as(Vec2, @splat(terrain_resolution));
             const height = try props.terrain_sampler.sampleTerrainStamps(
                 stack_allocator.get(),
