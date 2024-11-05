@@ -129,7 +129,6 @@ pub fn Forest(comptime chunk_size: i32) type {
                         coord: Coord,
                     ) !*local.Chunk {
                         const density = self.source.density;
-                        const span = self.span;
 
                         const chunk = blk: {
                             const chunk_entry = try cache.getOrPut(local.DensityCoord{
@@ -143,8 +142,8 @@ pub fn Forest(comptime chunk_size: i32) type {
                             break :blk chunk_entry.value_ptr;
                         };
                         const chunk_offset = .{
-                            .x = @as(f32, @floatFromInt(coord[0])) * span * chunk_size,
-                            .z = @as(f32, @floatFromInt(coord[1])) * span * chunk_size,
+                            .x = @as(f32, @floatFromInt(coord[0])) * self.span * chunk_size,
+                            .z = @as(f32, @floatFromInt(coord[1])) * self.span * chunk_size,
                         };
 
                         for (chunk, 0..) |*row, y| {
@@ -168,8 +167,8 @@ pub fn Forest(comptime chunk_size: i32) type {
                                     break :blk local.Spawn{
                                         .id = tree_id,
                                         .position = .{
-                                            chunk_offset.x + (@as(f32, @floatFromInt(x)) + intToFloatRange(rand.position_x)) * span,
-                                            chunk_offset.z + (@as(f32, @floatFromInt(y)) + intToFloatRange(rand.position_y)) * span,
+                                            chunk_offset.x + (@as(f32, @floatFromInt(x)) + intToFloatRange(rand.position_x)) * self.span,
+                                            chunk_offset.z + (@as(f32, @floatFromInt(y)) + intToFloatRange(rand.position_y)) * self.span,
                                         },
                                         .rotation = zm.quatFromAxisAngle(
                                             zm.loadArr3(.{ 0, 1, 0 }),
