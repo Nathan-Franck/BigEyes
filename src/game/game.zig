@@ -449,6 +449,55 @@ pub const interface = struct {
                     const index = @as(usize, @intCast(coord[0] + coord[1] * @as(i32, @intCast(self.resolution.x))));
                     return self.heights[index];
                 }
+
+                noinline fn getHeight(
+                    stamp: @This(),
+                    spawn_pos: Vec2,
+                    pos_2d: Vec2,
+                    // comptime check_bounds: bool,
+                ) ?f32 {
+                    // Precompute constants that will be reused
+                    const inv_size = @as(Vec2, @splat(1.0 / stamp.size));
+                    const resolution_scaled = Vec2{
+                        @floatFromInt(stamp.resolution.x - 1),
+                        @floatFromInt(stamp.resolution.y - 1),
+                    };
+
+                    // Compute relative position (combined operations)
+                    const stamp_pos = ((pos_2d - spawn_pos) * inv_size + @as(Vec2, @splat(0.5))) * resolution_scaled;
+
+                    // Optional bounds checking
+                    // if (check_bounds) {
+                    if (@reduce(.Or, stamp_pos < @as(Vec2, @splat(0))) or
+                        @reduce(.Or, stamp_pos >= resolution_scaled))
+                    {
+                        return null;
+                    }
+                    // }
+
+                    // Floor operation and get fractional part in one step
+                    const pos0 = @floor(stamp_pos);
+                    const fract = stamp_pos - pos0;
+                    const pos_int: Coord = @intFromFloat(pos0);
+
+                    // Compute weights once
+                    const wx0 = 1 - fract[0];
+                    const wx1 = fract[0];
+                    const wy0 = 1 - fract[1];
+                    const wy1 = fract[1];
+
+                    // Sample all points
+                    const h00 = stamp.sample(pos_int + Coord{ 0, 0 });
+                    const h10 = stamp.sample(pos_int + Coord{ 1, 0 });
+                    const h01 = stamp.sample(pos_int + Coord{ 0, 1 });
+                    const h11 = stamp.sample(pos_int + Coord{ 1, 1 });
+
+                    // Single-step bilinear interpolation
+                    return (h00 * wx0 * wy0 +
+                        h10 * wx1 * wy0 +
+                        h01 * wx0 * wy1 +
+                        h11 * wx1 * wy1);
+                }
             };
             const TerrainStamps = struct {
                 pub const Hemisphere: Stamp = blk: {
@@ -533,33 +582,8 @@ pub const interface = struct {
 
                 for (spawns) |spawn| {
                     const stamp = index_to_stamp_data[spawn.id];
-                    const spawn_pos = Vec2{ spawn.position[0], spawn.position[1] };
-                    const rel_pos = (pos_2d - spawn_pos) / @as(Vec2, @splat(stamp.size));
-                    const stamp_pos = (rel_pos + @as(Vec2, @splat(0.5))) * Vec2{
-                        @floatFromInt(stamp.resolution.x - 1),
-                        @floatFromInt(stamp.resolution.y - 1),
-                    };
-
-                    if (@reduce(.Or, stamp_pos < @as(Vec2, @splat(1))) or
-                        @reduce(.Or, stamp_pos >= @as(Vec2, @splat(@floatFromInt(stamp.resolution.x - 1)))))
-                    {
-                        continue;
-                    }
-                    const pos0 = @floor(stamp_pos);
-                    const pos_int: Coord = @intFromFloat(pos0);
-                    const fract = stamp_pos - pos0;
-
-                    const h00 = stamp.sample(pos_int + Coord{ 0, 0 });
-                    const h10 = stamp.sample(pos_int + Coord{ 1, 0 });
-                    const h01 = stamp.sample(pos_int + Coord{ 0, 1 });
-                    const h11 = stamp.sample(pos_int + Coord{ 1, 1 });
-
-                    // Interpolate using vector operations
-                    const h0 = h00 * (1 - fract[0]) + h10 * fract[0];
-                    const h1 = h01 * (1 - fract[0]) + h11 * fract[0];
-                    const stamp_height = h0 * (1 - fract[1]) + h1 * fract[1];
-
-                    height = @max(height, stamp_height);
+                    if (stamp.getHeight(spawn.position, pos_2d)) |stamp_height|
+                        height = @max(height, stamp_height);
                 }
 
                 return height;
@@ -627,8 +651,8 @@ pub const interface = struct {
             } {
                 var terrain_chunk_cache = TerrainSpawner.ChunkCache.init(allocator);
                 try terrain_chunk_cache.ensureTotalCapacity(256);
-                // const terrain_resolution = 512;
-                const terrain_resolution = 128;
+                const terrain_resolution = 512;
+                // const terrain_resolution = 128;
 
                 var vertex_iterator = CoordIterator.init(@splat(0), @splat(terrain_resolution + 1));
                 var positions = std.ArrayList(Vec4).init(allocator);

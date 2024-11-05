@@ -68,39 +68,60 @@ pub fn Forest(comptime chunk_size: i32) type {
                 density: i32,
                 tree_range: [quantization]?u8,
 
-                pub fn getSpan(self: @This()) f32 {
-                    return std.math.pow(f32, 2.0, @floatFromInt(self.density));
+                coord_span: Vec2,
+                inverse_coord_span: Vec2,
+                chunk_span: Vec2,
+                inverse_chunk_span: Vec2,
+
+                pub fn init(
+                    density: i32,
+                    tree_range: [quantization]?u8,
+                ) @This() {
+                    const coord_span: Vec2 = @splat(getSpan(density));
+                    const inverse_coord_span: Vec2 = @splat(1 / getSpan(density));
+                    const chunk_span: Vec2 = coord_span * @as(Vec2, @splat(chunk_size));
+                    const inverse_chunk_span: Vec2 = @as(Vec2, @splat(1)) / chunk_span;
+                    return .{
+                        .density = density,
+                        .tree_range = tree_range,
+                        .coord_span = coord_span,
+                        .inverse_coord_span = inverse_coord_span,
+                        .chunk_span = chunk_span,
+                        .inverse_chunk_span = inverse_chunk_span,
+                    };
+                }
+
+                pub fn getSpan(density: i32) f32 {
+                    return std.math.pow(f32, 2.0, @floatFromInt(density));
                 }
 
                 pub fn intToFloatRange(i: u64) f32 {
                     return @as(f32, @floatFromInt(i)) / @as(f32, @floatFromInt(std.math.maxInt(u64)));
                 }
 
-                pub fn gatherSpawnsInBounds(
+                pub noinline fn gatherSpawnsInBounds(
                     self: @This(),
                     chunk_cache: *local.ChunkCache,
                     bounds: Bounds,
-                    spawns: *std.ArrayList(local.Spawn),
+                    spawns: *std.ArrayList(*const local.Spawn),
                 ) !void {
-                    const coord_span: Vec2 = @splat(self.getSpan());
-                    const chunk_span = coord_span * @as(Vec2, @splat(chunk_size));
                     var chunk_coords = CoordIterator.init(
-                        @intFromFloat(@floor(bounds.min / chunk_span)),
-                        @intFromFloat(@ceil((bounds.min + bounds.size) / chunk_span)),
+                        @intFromFloat(@floor(bounds.min * self.inverse_chunk_span)),
+                        @intFromFloat(@ceil((bounds.min + bounds.size) * self.inverse_chunk_span)),
                     );
                     while (chunk_coords.next()) |chunk_coord| {
                         const chunk = try self.getChunk(chunk_cache, chunk_coord);
-                        const chunk_offset = @as(Vec2, @floatFromInt(chunk_coord)) * chunk_span;
+                        const chunk_offset = @as(Vec2, @floatFromInt(chunk_coord)) * self.chunk_span;
                         const min: Coord = @splat(0);
                         const max: Coord = @splat(chunk_size);
                         var coords = CoordIterator.init(
-                            std.math.clamp(@as(Coord, @intFromFloat(@floor((bounds.min - chunk_offset) / coord_span))), min, max),
-                            std.math.clamp(@as(Coord, @intFromFloat(@ceil((bounds.min - chunk_offset + bounds.size) / coord_span))), min, max),
+                            std.math.clamp(@as(Coord, @intFromFloat(@floor((bounds.min - chunk_offset) * self.inverse_coord_span))), min, max),
+                            std.math.clamp(@as(Coord, @intFromFloat(@ceil((bounds.min - chunk_offset + bounds.size) * self.inverse_coord_span))), min, max),
                         );
-                        while (coords.next()) |coord| if (chunk[@intCast(coord[1])][@intCast(coord[0])]) |spawn| {
-                            if (spawns.items.len >= spawns.capacity) {
-                                wasm_entry.dumpDebugLogFmt("Too many items! {any} {any}, {any} {d}", .{ bounds, min, max, spawns.items.len });
-                            }
+                        while (coords.next()) |coord| if (chunk[@intCast(coord[1])][@intCast(coord[0])]) |*spawn| {
+                            // if (spawns.items.len >= spawns.capacity) {
+                            //     wasm_entry.dumpDebugLogFmt("Too many items! {any} {any}, {any} {d}", .{ bounds, min, max, spawns.items.len });
+                            // }
                             try spawns.append(spawn);
                         };
                     }
@@ -122,7 +143,7 @@ pub fn Forest(comptime chunk_size: i32) type {
                         }
                         break :blk chunk_entry.value_ptr;
                     };
-                    const span = self.getSpan();
+                    const span = getSpan(self.density);
                     const chunk_offset = .{
                         .x = @as(f32, @floatFromInt(coord[0])) * span * chunk_size,
                         .z = @as(f32, @floatFromInt(coord[1])) * span * chunk_size,
@@ -231,10 +252,10 @@ pub fn Forest(comptime chunk_size: i32) type {
                                 }
                                 break :tree_range range;
                             };
-                            break :tier .{
-                                .density = density_tier,
-                                .tree_range = tree_range,
-                            };
+                            break :tier DensityTier.init(
+                                density_tier,
+                                tree_range,
+                            );
                         };
                     }
                     break :blk tiers;
@@ -248,8 +269,8 @@ pub fn Forest(comptime chunk_size: i32) type {
                     allocator: std.mem.Allocator,
                     chunk_cache: *ChunkCache,
                     bounds: []const Bounds,
-                ) ![]const local.Spawn {
-                    var spawns = try std.ArrayList(local.Spawn).initCapacity(allocator, 16);
+                ) ![]const *const local.Spawn {
+                    var spawns = try std.ArrayList(*const local.Spawn).initCapacity(allocator, 16);
                     for (density_tiers, 0..) |maybe_density_tier, tier_index| if (maybe_density_tier) |density_tier| {
                         try density_tier.gatherSpawnsInBounds(
                             chunk_cache,
@@ -260,8 +281,8 @@ pub fn Forest(comptime chunk_size: i32) type {
                     return spawns.items;
                 }
 
-                pub fn gatherSpawnsInBounds(allocator: std.mem.Allocator, chunk_cache: *ChunkCache, bounds: Bounds) ![]const local.Spawn {
-                    var spawns = try std.ArrayList(local.Spawn).initCapacity(allocator, 16);
+                pub fn gatherSpawnsInBounds(allocator: std.mem.Allocator, chunk_cache: *ChunkCache, bounds: Bounds) ![]const *const local.Spawn {
+                    var spawns = try std.ArrayList(*const local.Spawn).initCapacity(allocator, 16);
                     for (density_tiers) |maybe_density_tier| if (maybe_density_tier) |density_tier| {
                         try density_tier.gatherSpawnsInBounds(
                             chunk_cache,
