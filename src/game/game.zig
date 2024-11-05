@@ -428,7 +428,7 @@ pub const nodes = struct {
     } {
         var terrain_chunk_cache = game.config.TerrainSpawner.ChunkCache.init(allocator);
         try terrain_chunk_cache.ensureTotalCapacity(256);
-        var terrain_sampler = props.terrain_sampler.loadCache(&terrain_chunk_cache);
+        const terrain_sampler = props.terrain_sampler.loadCache(&terrain_chunk_cache);
 
         const terrain_resolution = 512;
         // const terrain_resolution = 256;
