@@ -12,31 +12,18 @@ const Forest = @import("../forest.zig").Forest(32);
 const Bounds = @import("../forest.zig").Bounds;
 const Coord = @import("../forest.zig").Coord;
 const Vec2 = @import("../forest.zig").Vec2;
+const Vec4 = @import("../forest.zig").Vec4;
 const CoordIterator = @import("../CoordIterator.zig");
-
+const Stamp = @import("../Stamp.zig");
+const TerrainSampler = @import("../terrain_sampler.zig").TerrainSampler(
+    game.config.TerrainSpawner,
+    game.config.TerrainStamps,
+);
 const game = struct {
     pub const graph = @import("./graph.zig");
     pub const types = @import("./types.zig");
+    pub const config = @import("./config.zig");
 };
-
-const ForestSpawner = Forest.spawner(ForestSettings);
-const TerrainSpawner = Forest.spawner(struct {
-    pub const Hemisphere = Forest.Tree{
-        .density_tier = -1,
-        .likelihood = 1,
-        .scale_range = .{ .x_range = .{ 0, 1 }, .y_values = &.{ 0.8, 1.0 } },
-    };
-    pub const BigHemisphere = Forest.Tree{
-        .density_tier = 2,
-        .likelihood = 1,
-        .scale_range = .{ .x_range = .{ 0, 1 }, .y_values = &.{ 0.8, 1.0 } },
-    };
-});
-
-test "thinger" {
-    const definitions = interface.NodeGraph.Definitions;
-    _ = try definitions.calculateTerrainDensityInfluenceRange(std.testing.allocator, .{});
-}
 pub const InterfaceEnum = std.meta.DeclEnum(interface);
 pub const interface = struct {
     var node_graph: NodeGraph = undefined;
@@ -65,7 +52,7 @@ pub const interface = struct {
             },
             .store = .{
                 .last_time = 0,
-                .forest_chunk_cache = ForestSpawner.ChunkCache.init(std.heap.page_allocator),
+                .forest_chunk_cache = game.config.ForestSpawner.ChunkCache.init(std.heap.page_allocator),
                 .player = .{
                     .position = .{ 0, -0.75, 0, 1 },
                     .euler_rotation = .{ 0, 0, 0, 1 },
@@ -123,8 +110,8 @@ pub const nodes = struct {
         };
 
         var trees = std.ArrayList(game.types.TreeMesh).init(allocator);
-        inline for (@typeInfo(ForestSettings).@"struct".decls) |decl| {
-            const tree_blueprint = @field(Trees, decl.name);
+        inline for (@typeInfo(game.config.ForestSettings).@"struct".decls) |decl| {
+            const tree_blueprint = @field(game.config.Trees, decl.name);
             const tree_skeleton = try tree.generateStructure(allocator, tree_blueprint.structure);
             const bark_mesh = try tree.generateTaperedWood(allocator, tree_skeleton, tree_blueprint.mesh);
             const leaf_mesh = try tree.generateLeaves(allocator, tree_skeleton, tree_blueprint.mesh);
@@ -168,7 +155,7 @@ pub const nodes = struct {
             selected_camera: enum { orbit, first_person },
             player_settings: struct { movement_speed: f32, look_speed: f32 },
             player: *struct { position: Vec4, euler_rotation: Vec4 },
-            tier_index_to_influence_range: [TerrainSpawner.density_tiers.len]f32,
+            terrain_sampler: TerrainSampler,
         },
     ) !struct {
         camera_position: Vec4,
@@ -262,17 +249,15 @@ pub const nodes = struct {
                     ) * zm.splat(Vec4, props.player_settings.movement_speed * delta_time);
 
                     var new_position = props.player.position;
-                    new_position[0] += final_movement[0];
-                    new_position[2] += final_movement[2];
+                    new_position += final_movement;
 
-                    var terrain_chunk_cache = TerrainSpawner.ChunkCache.init(allocator);
-                    const terrain_height = try sampleTerrainStamps(
+                    var terrain_chunk_cache = game.config.TerrainSpawner.ChunkCache.init(allocator);
+                    const terrain_height = try props.terrain_sampler.sampleTerrainStamps(
                         allocator,
                         &terrain_chunk_cache,
-                        props.tier_index_to_influence_range,
                         Vec2{ new_position[0], new_position[2] },
                     );
-                    new_position[1] = terrain_height + 1.2; // Add eye height offset
+                    new_position[1] = terrain_height + 0.7; // Add eye height offset
                     props.player.position = new_position;
                 }
 
@@ -349,36 +334,35 @@ pub const nodes = struct {
     pub fn displayForest(
         allocator: std.mem.Allocator,
         props: struct {
-            forest_chunk_cache: *ForestSpawner.ChunkCache,
-            tier_index_to_influence_range: [TerrainSpawner.density_tiers.len]f32,
+            forest_chunk_cache: *game.config.ForestSpawner.ChunkCache,
+            terrain_sampler: TerrainSampler,
         },
     ) !struct {
         forest_data: []const game.types.ModelInstances,
     } {
-        const spawns = try ForestSpawner.gatherSpawnsInBounds(
+        const spawns = try game.config.ForestSpawner.gatherSpawnsInBounds(
             allocator,
             props.forest_chunk_cache,
             demo_terrain_bounds,
         );
-        var instances = try allocator.alloc(std.ArrayList(Vec4), ForestSpawner.length);
+        var instances = try allocator.alloc(std.ArrayList(Vec4), game.config.ForestSpawner.length);
         for (instances) |*instance| {
             instance.* = std.ArrayList(Vec4).init(allocator);
         }
-        var terrain_chunk_cache = TerrainSpawner.ChunkCache.init(allocator);
+        var terrain_chunk_cache = game.config.TerrainSpawner.ChunkCache.init(allocator);
         for (spawns) |spawn| {
             const pos_2d = Vec2{ spawn.position[0], spawn.position[1] };
-            const height = try sampleTerrainStamps(
+            const height = try props.terrain_sampler.sampleTerrainStamps(
                 allocator,
                 &terrain_chunk_cache,
-                props.tier_index_to_influence_range,
                 pos_2d,
             );
             const position = Vec4{ spawn.position[0], height, spawn.position[1], 1 };
             try instances[spawn.id].append(position);
         }
-        const instances_items = try allocator.alloc(game.types.ModelInstances, ForestSpawner.length);
+        const instances_items = try allocator.alloc(game.types.ModelInstances, game.config.ForestSpawner.length);
         const PointFlattener = mesh_helper.VecSliceFlattener(4, 3);
-        for (instances_items, @typeInfo(ForestSettings).@"struct".decls, 0..) |*instance, decl, i| {
+        for (instances_items, @typeInfo(game.config.ForestSettings).@"struct".decls, 0..) |*instance, decl, i| {
             instance.* = .{
                 .label = decl.name,
                 .positions = PointFlattener.convert(allocator, instances[i].items),
@@ -437,187 +421,14 @@ pub const nodes = struct {
         };
     }
 
-    const Stamp = struct {
-        // Starting on the assumption that all stamps are centered, so no offset is needed
-        size: f32,
-        resolution: struct { x: u32, y: u32 },
-        heights: []const f32,
-        // mask: []f32, // Do we need a mask?
-        const safe_check = false; // Don't do this check since we know that it's fine
-        inline fn sample(self: @This(), coord: Coord) f32 {
-            if (safe_check) {
-                if (coord[0] < 0 or coord[1] < 0 or coord[0] >= self.resolution.x or coord[1] >= self.resolution.y)
-                    return 0;
-            }
-            const index = @as(usize, @intCast(coord[0] + coord[1] * @as(i32, @intCast(self.resolution.x))));
-            return self.heights[index];
-        }
-
-        fn getHeight(
-            self: *const @This(),
-            spawn_pos: Vec2,
-            pos_2d: Vec2,
-        ) ?f32 {
-            const rel_pos = (pos_2d - spawn_pos) / @as(Vec2, @splat(self.size));
-            const stamp_pos = (rel_pos + @as(Vec2, @splat(0.5))) * Vec2{
-                @floatFromInt(self.resolution.x - 1),
-                @floatFromInt(self.resolution.y - 1),
-            };
-
-            if (@reduce(.Or, stamp_pos < @as(Vec2, @splat(1))) or
-                @reduce(.Or, stamp_pos >= @as(Vec2, @splat(@floatFromInt(self.resolution.x - 1)))))
-            {
-                return null;
-            }
-            const pos0 = @floor(stamp_pos);
-            const pos_int: Coord = @intFromFloat(pos0);
-            const fract = stamp_pos - pos0;
-
-            const h00 = self.sample(pos_int + Coord{ 0, 0 });
-            const h10 = self.sample(pos_int + Coord{ 1, 0 });
-            const h01 = self.sample(pos_int + Coord{ 0, 1 });
-            const h11 = self.sample(pos_int + Coord{ 1, 1 });
-
-            // Interpolate using vector operations
-            const h0 = h00 * (1 - fract[0]) + h10 * fract[0];
-            const h1 = h01 * (1 - fract[0]) + h11 * fract[0];
-            const stamp_height = h0 * (1 - fract[1]) + h1 * fract[1];
-            return stamp_height;
-        }
-    };
-    const TerrainStamps = struct {
-        pub const Hemisphere: Stamp = blk: {
-            @setEvalBranchQuota(100000);
-            const resolution = .{ .x = 16, .y = 16 };
-            var heights: [resolution.x * resolution.y]f32 = undefined;
-            for (0..resolution.y) |y| {
-                for (0..resolution.x) |x| {
-                    const v = Vec4{ @floatFromInt(x), @floatFromInt(y), 0, 0 } /
-                        zm.splat(Vec4, @floatFromInt(@max(resolution.x, resolution.y))) -
-                        zm.splat(Vec4, 0.5);
-                    heights[x + y * resolution.x] = @max(
-                        0,
-                        std.math.sqrt(
-                            1 - std.math.pow(f32, zm.length2(v)[0] * 2, 2),
-                        ),
-                    ) * 0.5;
-                }
-            }
-            const heights_static = heights;
-            break :blk .{
-                .resolution = resolution,
-                .heights = &heights_static,
-                .size = 1,
-            };
-        };
-        pub const BigHemisphere: Stamp = blk: {
-            @setEvalBranchQuota(100000);
-            const resolution = .{ .x = 32, .y = 32 };
-            var heights: [resolution.x * resolution.y]f32 = undefined;
-            for (0..resolution.y) |y| {
-                for (0..resolution.x) |x| {
-                    const v = Vec4{ @floatFromInt(x), @floatFromInt(y), 0, 0 } /
-                        zm.splat(Vec4, @floatFromInt(@max(resolution.x, resolution.y))) -
-                        zm.splat(Vec4, 0.5);
-                    heights[x + y * resolution.x] = @max(
-                        0,
-                        std.math.sqrt(
-                            1 - std.math.pow(f32, zm.length2(v)[0] * 2, 2),
-                        ),
-                    ) * 1.5;
-                }
-            }
-            const heights_static = heights;
-            break :blk .{
-                .resolution = resolution,
-                .heights = &heights_static,
-                .size = 3,
-            };
-        };
-    };
-
-    pub fn sampleTerrainStamps(
-        allocator: std.mem.Allocator,
-        terrain_chunk_cache: *TerrainSpawner.ChunkCache,
-        tier_index_to_influence_range: [TerrainSpawner.density_tiers.len]f32,
-        pos_2d: Vec2,
-    ) !f32 {
-        const bounds = blk: {
-            var bounds: [tier_index_to_influence_range.len]Bounds = undefined;
-            for (tier_index_to_influence_range, 0..) |influence_range, tier_index| {
-                const size_2d = @as(Vec2, @splat(influence_range));
-                bounds[tier_index] = Bounds{
-                    .min = pos_2d - size_2d * @as(Vec2, @splat(0.5)),
-                    .size = size_2d,
-                };
-            }
-            break :blk bounds;
-        };
-
-        const spawns = try TerrainSpawner.gatherSpawnsInBoundsPerTier(
-            allocator,
-            terrain_chunk_cache,
-            &bounds,
-        );
-
-        const Stamps = @typeInfo(TerrainStamps).@"struct".decls;
-        var index_to_stamp_data: [Stamps.len]Stamp = undefined;
-        inline for (Stamps, 0..) |decl, stamp_index| {
-            index_to_stamp_data[stamp_index] = @field(TerrainStamps, decl.name);
-        }
-
-        var height: f32 = 0;
-        for (spawns) |spawn| {
-            const stamp = index_to_stamp_data[spawn.id];
-            if (stamp.getHeight(spawn.position, pos_2d)) |stamp_height|
-                height = @max(height, stamp_height);
-        }
-
-        return height;
-    }
-
     pub fn calculateTerrainDensityInfluenceRange(
         allocator: std.mem.Allocator,
         _: struct {},
     ) !struct {
-        tier_index_to_influence_range: [TerrainSpawner.density_tiers.len]f32,
+        terrain_sampler: TerrainSampler,
     } {
-        var tier_index_to_influence_range = std.ArrayList(f32).init(allocator);
-        for (TerrainSpawner.density_tiers) |maybe_tier|
-            try tier_index_to_influence_range.append(if (maybe_tier) |tier| blk: {
-                var trees = std.AutoArrayHashMap(TerrainSpawner.TreeId, void).init(allocator);
-                for (tier.tree_range) |maybe_tree_id| if (maybe_tree_id) |tree_id| {
-                    const enum_tree_id: TerrainSpawner.TreeId = @enumFromInt(tree_id);
-                    try trees.put(enum_tree_id, {});
-                } else continue;
-                const Stamps = @typeInfo(TerrainStamps).@"struct".decls;
-                var index_to_stamp_data: [Stamps.len]Stamp = undefined;
-                inline for (Stamps, 0..) |decl, stamp_index| {
-                    index_to_stamp_data[stamp_index] = @field(TerrainStamps, decl.name);
-                }
-                var max_size: f32 = 0;
-                for (trees.keys()) |tree_index| {
-                    const size = index_to_stamp_data[@intFromEnum(tree_index)].size;
-                    max_size = @max(max_size, size);
-                }
-                break :blk max_size;
-            } else 0);
-
-        const pos_2d = Vec2{ 0, 0 };
-        const bounds = blk: {
-            var bounds = try allocator.alloc(Bounds, tier_index_to_influence_range.items.len);
-            for (tier_index_to_influence_range.items, 0..) |influence_range, tier_index| {
-                const size_2d = @as(Vec2, @splat(influence_range));
-                bounds[tier_index] = Bounds{
-                    .min = pos_2d - size_2d * @as(Vec2, @splat(0.5)),
-                    .size = size_2d,
-                };
-            }
-            break :blk bounds;
-        };
-        _ = bounds;
         return .{
-            .tier_index_to_influence_range = tier_index_to_influence_range.items[0..TerrainSpawner.density_tiers.len].*,
+            .terrain_sampler = try TerrainSampler.init(allocator),
         };
     }
 
@@ -628,14 +439,15 @@ pub const nodes = struct {
     pub noinline fn displayTerrain(
         allocator: std.mem.Allocator,
         props: struct {
-            tier_index_to_influence_range: [TerrainSpawner.density_tiers.len]f32,
+            terrain_sampler: TerrainSampler,
         },
     ) !struct {
         terrain_mesh: game.types.GreyboxMesh,
         terrain_instance: game.types.ModelInstances,
     } {
-        var terrain_chunk_cache = TerrainSpawner.ChunkCache.init(allocator);
+        var terrain_chunk_cache = game.config.TerrainSpawner.ChunkCache.init(allocator);
         try terrain_chunk_cache.ensureTotalCapacity(256);
+
         const terrain_resolution = 512;
         // const terrain_resolution = 256;
         // const terrain_resolution = 128;
@@ -648,11 +460,9 @@ pub const nodes = struct {
                 @as(Vec2, @floatFromInt(vertex_coord)) *
                 demo_terrain_bounds.size /
                 @as(Vec2, @splat(terrain_resolution));
-            const height = try sampleTerrainStamps(
+            const height = try props.terrain_sampler.sampleTerrainStamps(
                 stack_allocator.get(),
-                // allocator,
                 &terrain_chunk_cache,
-                props.tier_index_to_influence_range,
                 pos_2d,
             );
             const vertex: Vec4 = .{
@@ -694,241 +504,4 @@ pub const nodes = struct {
             },
         };
     }
-};
-const Vec4 = @Vector(4, f32);
-const ForestSettings = struct {
-    pub const grass1 = Forest.Tree{
-        .density_tier = -2,
-        .likelihood = 0.1,
-        .scale_range = .{ .x_range = .{ 0, 1 }, .y_values = &.{ 0.8, 1.0 } },
-    };
-    pub const grass2 = Forest.Tree{
-        .density_tier = -2,
-        .likelihood = 0.05,
-        .scale_range = .{ .x_range = .{ 0, 1 }, .y_values = &.{ 0.8, 1.0 } },
-    };
-    pub const little_tree = Forest.Tree{
-        .density_tier = 1,
-        .likelihood = 1,
-        .scale_range = .{ .x_range = .{ 0, 1 }, .y_values = &.{ 0.8, 1.0 } },
-    };
-    pub const big_tree = Forest.Tree{
-        .density_tier = 2,
-        .likelihood = 1,
-        .scale_range = .{ .x_range = .{ 0, 1 }, .y_values = &.{ 0.8, 1.0 } },
-        .spawn_radii = &[_]Forest.Tree.SpawnRadius{
-            .{
-                .tree = &little_tree,
-                .radius = 10,
-                .likelihood = 1,
-            },
-        },
-    };
-};
-pub const Trees = struct {
-    const Settings = tree.Settings;
-    const DepthDefinition = tree.DepthDefinition;
-    const MeshSettings = tree.MeshSettings;
-    const math = std.math;
-
-    pub const big_tree = .{
-        .structure = Settings{
-            .start_size = 1,
-            .start_growth = 1,
-            .depth_definitions = &[_]DepthDefinition{
-                .{
-                    .split_amount = 10,
-                    .flatness = 0.0,
-                    .size = 0.4,
-                    .height_spread = 0.6,
-                    .branch_pitch = 50.0 * math.rad_per_deg,
-                    .branch_roll = 90.0 * math.rad_per_deg,
-                    .height_to_growth = .{
-                        .y_values = &.{ 1.0, 1.0, 0.0 },
-                        .x_range = .{ 0.0, 1.0 },
-                    },
-                },
-                .{
-                    .split_amount = 6,
-                    .flatness = 0.3,
-                    .size = 0.45,
-                    .height_spread = 0.8,
-                    .branch_pitch = 60.0 * math.rad_per_deg,
-                    .branch_roll = 90.0 * math.rad_per_deg,
-                    .height_to_growth = .{
-                        .y_values = &.{ 1.0, 1.0, 0.0 },
-                        .x_range = .{ 0.0, 1.0 },
-                    },
-                },
-                .{
-                    .split_amount = 10,
-                    .flatness = 0.0,
-                    .size = 0.5,
-                    .height_spread = 0.8,
-                    .branch_pitch = 40.0 * math.rad_per_deg,
-                    .branch_roll = 90.0 * math.rad_per_deg,
-                    .height_to_growth = .{
-                        .y_values = &.{ 1.0, 1.0, 0.0 },
-                        .x_range = .{ 0.0, 1.0 },
-                    },
-                },
-                .{
-                    .split_amount = 10,
-                    .flatness = 0.0,
-                    .size = 0.6,
-                    .height_spread = 0.8,
-                    .branch_pitch = 40.0 * math.rad_per_deg,
-                    .branch_roll = 90.0 * math.rad_per_deg,
-                    .height_to_growth = .{
-                        .y_values = &.{ 0.5, 0.8, 1.0, 0.8, 0.5 },
-                        .x_range = .{ 0.0, 0.5 },
-                    },
-                },
-            },
-        },
-        .mesh = MeshSettings{
-            .thickness = 0.05,
-            .leaves = .{
-                .split_depth = 4,
-                .length = 1.4,
-                .breadth = 0.7,
-            },
-            .growth_to_thickness = .{
-                .y_values = &.{ 0.0025, 0.035 },
-                .x_range = .{ 0.0, 1.0 },
-            },
-        },
-    };
-    pub const little_tree = .{
-        .structure = Settings{
-            .start_size = 0.6,
-            .start_growth = 1,
-            .depth_definitions = &[_]DepthDefinition{
-                .{
-                    .split_amount = 10,
-                    .flatness = 0.0,
-                    .size = 0.4,
-                    .height_spread = 0.6,
-                    .branch_pitch = 50.0 * math.rad_per_deg,
-                    .branch_roll = 90.0 * math.rad_per_deg,
-                    .height_to_growth = .{
-                        .y_values = &.{ 1.0, 1.0, 0.0 },
-                        .x_range = .{ 0.0, 1.0 },
-                    },
-                },
-                .{
-                    .split_amount = 6,
-                    .flatness = 0.3,
-                    .size = 0.45,
-                    .height_spread = 0.8,
-                    .branch_pitch = 60.0 * math.rad_per_deg,
-                    .branch_roll = 90.0 * math.rad_per_deg,
-                    .height_to_growth = .{
-                        .y_values = &.{ 1.0, 1.0, 0.0 },
-                        .x_range = .{ 0.0, 1.0 },
-                    },
-                },
-                .{
-                    .split_amount = 10,
-                    .flatness = 0.0,
-                    .size = 0.5,
-                    .height_spread = 0.8,
-                    .branch_pitch = 40.0 * math.rad_per_deg,
-                    .branch_roll = 90.0 * math.rad_per_deg,
-                    .height_to_growth = .{
-                        .y_values = &.{ 1.0, 1.0, 0.0 },
-                        .x_range = .{ 0.0, 1.0 },
-                    },
-                },
-            },
-        },
-        .mesh = MeshSettings{
-            .thickness = 0.05,
-            .leaves = .{
-                .split_depth = 3,
-                .length = 2.0,
-                .breadth = 1.0,
-            },
-            .growth_to_thickness = .{
-                .y_values = &.{ 0.0025, 0.035 },
-                .x_range = .{ 0.0, 1.0 },
-            },
-        },
-    };
-    pub const grass1 = .{
-        .structure = Settings{
-            .start_size = 0.3,
-            .start_growth = 1,
-            .depth_definitions = &[_]DepthDefinition{
-                .{
-                    .split_amount = 10,
-                    .flatness = 0.0,
-                    .size = 0.4,
-                    .height_spread = 0.6,
-                    .branch_pitch = 50.0 * math.rad_per_deg,
-                    .branch_roll = 90.0 * math.rad_per_deg,
-                    .height_to_growth = .{
-                        .y_values = &.{ 1.0, 1.0, 0.0 },
-                        .x_range = .{ 0.0, 1.0 },
-                    },
-                },
-                .{
-                    .split_amount = 6,
-                    .flatness = 0.3,
-                    .size = 0.45,
-                    .height_spread = 0.8,
-                    .branch_pitch = 60.0 * math.rad_per_deg,
-                    .branch_roll = 90.0 * math.rad_per_deg,
-                    .height_to_growth = .{
-                        .y_values = &.{ 1.0, 1.0, 0.0 },
-                        .x_range = .{ 0.0, 1.0 },
-                    },
-                },
-            },
-        },
-        .mesh = MeshSettings{
-            .thickness = 0.05,
-            .leaves = .{
-                .split_depth = 2,
-                .length = 2.0,
-                .breadth = 1.0,
-            },
-            .growth_to_thickness = .{
-                .y_values = &.{ 0.0025, 0.035 },
-                .x_range = .{ 0.0, 1.0 },
-            },
-        },
-    };
-    pub const grass2 = .{
-        .structure = Settings{
-            .start_size = 0.2,
-            .start_growth = 1,
-            .depth_definitions = &[_]DepthDefinition{
-                .{
-                    .split_amount = 10,
-                    .flatness = 0.0,
-                    .size = 0.4,
-                    .height_spread = 0.6,
-                    .branch_pitch = 50.0 * math.rad_per_deg,
-                    .branch_roll = 90.0 * math.rad_per_deg,
-                    .height_to_growth = .{
-                        .y_values = &.{ 1.0, 1.0, 0.0 },
-                        .x_range = .{ 0.0, 1.0 },
-                    },
-                },
-            },
-        },
-        .mesh = MeshSettings{
-            .thickness = 0.05,
-            .leaves = .{
-                .split_depth = 1,
-                .length = 2.0,
-                .breadth = 1.0,
-            },
-            .growth_to_thickness = .{
-                .y_values = &.{ 0.0025, 0.035 },
-                .x_range = .{ 0.0, 1.0 },
-            },
-        },
-    };
 };

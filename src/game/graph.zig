@@ -31,8 +31,8 @@ pub const blueprint = runtime.Blueprint{
             .{ .field = "player", .source = .{
                 .store_field = "player",
             } },
-            .{ .field = "tier_index_to_influence_range", .source = .{
-                .node = .{ .name = "calculateTerrainDensityInfluenceRange", .field = "tier_index_to_influence_range" },
+            .{ .field = "terrain_sampler", .source = .{
+                .node = .{ .name = "calculateTerrainDensityInfluenceRange", .field = "terrain_sampler" },
             } },
         } },
         .{ .name = "displayTrees", .function = "displayTrees", .input_links = &[_]runtime.InputLink{
@@ -47,13 +47,13 @@ pub const blueprint = runtime.Blueprint{
             .{ .field = "forest_chunk_cache", .source = .{
                 .store_field = "forest_chunk_cache",
             } },
-            .{ .field = "tier_index_to_influence_range", .source = .{
-                .node = .{ .name = "calculateTerrainDensityInfluenceRange", .field = "tier_index_to_influence_range" },
+            .{ .field = "terrain_sampler", .source = .{
+                .node = .{ .name = "calculateTerrainDensityInfluenceRange", .field = "terrain_sampler" },
             } },
         } },
         .{ .name = "displayTerrain", .function = "displayTerrain", .input_links = &[_]runtime.InputLink{
-            .{ .field = "tier_index_to_influence_range", .source = .{
-                .node = .{ .name = "calculateTerrainDensityInfluenceRange", .field = "tier_index_to_influence_range" },
+            .{ .field = "terrain_sampler", .source = .{
+                .node = .{ .name = "calculateTerrainDensityInfluenceRange", .field = "terrain_sampler" },
             } },
         } },
         .{ .name = "calculateTerrainDensityInfluenceRange", .function = "calculateTerrainDensityInfluenceRange", .input_links = &[_]runtime.InputLink{} },
