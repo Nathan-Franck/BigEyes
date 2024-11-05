@@ -60,8 +60,8 @@ fn callWithJsonErr(name_ptr: [*]const u8, name_len: usize, args_ptr: [*]const u8
         return;
     };
     switch (case) {
-        inline else => |fn_name| {
-            const func = @field(game.interface, @tagName(fn_name));
+        inline else => |fn_tag| {
+            const func = @field(game.interface, @tagName(fn_tag));
             var diagnostics = std.json.Diagnostics{};
             var scanner = std.json.Scanner.initCompleteInput(allocator, args_string);
             defer scanner.deinit();
@@ -75,7 +75,9 @@ fn callWithJsonErr(name_ptr: [*]const u8, name_len: usize, args_ptr: [*]const u8
                 return err;
             };
             const result = switch (@typeInfo(@typeInfo(@TypeOf(func)).@"fn".return_type.?)) {
-                .error_union => try @call(.auto, func, args.value),
+                .error_union => @call(.auto, func, args.value) catch |e| {
+                    @panic(try std.fmt.allocPrint(allocator, "An error occured when calling {s} --- {any}\n", .{ @tagName(fn_tag), e }));
+                },
                 else => @call(.auto, func, args.value),
             };
 

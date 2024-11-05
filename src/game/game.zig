@@ -165,7 +165,7 @@ pub const interface = struct {
                     selected_camera: enum { orbit, first_person },
                     player_settings: struct { movement_speed: f32, look_speed: f32 },
                     player: *struct { position: Vec4, euler_rotation: Vec4 },
-                    tier_index_to_influence_range: []const f32,
+                    tier_index_to_influence_range: [TerrainSpawner.density_tiers.len]f32,
                 },
             ) !struct {
                 camera_position: Vec4,
@@ -205,7 +205,6 @@ pub const interface = struct {
                         };
                     },
                     .first_person => {
-                        var terrain_chunk_cache = TerrainSpawner.ChunkCache.init(allocator);
 
                         // Update rotation based on mouse input
                         props.player.euler_rotation = props.player.euler_rotation +
@@ -263,6 +262,7 @@ pub const interface = struct {
                             new_position[0] += final_movement[0];
                             new_position[2] += final_movement[2];
 
+                            var terrain_chunk_cache = TerrainSpawner.ChunkCache.init(allocator);
                             const terrain_height = try sampleTerrainStamps(
                                 allocator,
                                 &terrain_chunk_cache,
@@ -347,7 +347,7 @@ pub const interface = struct {
                 allocator: std.mem.Allocator,
                 props: struct {
                     forest_chunk_cache: *ForestSpawner.ChunkCache,
-                    tier_index_to_influence_range: []const f32,
+                    tier_index_to_influence_range: [TerrainSpawner.density_tiers.len]f32,
                 },
             ) !struct {
                 forest_data: []const game.types.ModelInstances,
@@ -363,14 +363,14 @@ pub const interface = struct {
                 }
                 var terrain_chunk_cache = TerrainSpawner.ChunkCache.init(allocator);
                 for (spawns) |spawn| {
-                    const pos_2d = Vec2{ spawn.position[0], spawn.position[2] };
+                    const pos_2d = Vec2{ spawn.position[0], spawn.position[1] };
                     const height = try sampleTerrainStamps(
                         allocator,
                         &terrain_chunk_cache,
                         props.tier_index_to_influence_range,
                         pos_2d,
                     );
-                    const position = Vec4{ spawn.position[0], height, spawn.position[2], 1 };
+                    const position = Vec4{ spawn.position[0], height, spawn.position[1], 1 };
                     try instances[spawn.id].append(position);
                 }
                 const instances_items = try allocator.alloc(game.types.ModelInstances, ForestSpawner.length);
@@ -423,7 +423,7 @@ pub const interface = struct {
                 };
             }
 
-            noinline fn raytraceCell(
+            fn raytraceCell(
                 ray: raytrace.Ray,
                 cell: ?*std.ArrayList(*const raytrace.Triangle),
                 closest_distance: *f32,
@@ -440,9 +440,12 @@ pub const interface = struct {
                 resolution: struct { x: u32, y: u32 },
                 heights: []const f32,
                 // mask: []f32, // Do we need a mask?
-                fn sample(self: @This(), coord: Coord) f32 {
-                    if (coord[0] < 0 or coord[1] < 0 or coord[0] >= self.resolution.x or coord[1] >= self.resolution.y)
-                        return 0;
+                const safe_check = false; // Don't do this check since we know that it's fine
+                inline fn sample(self: @This(), coord: Coord) f32 {
+                    if (safe_check) {
+                        if (coord[0] < 0 or coord[1] < 0 or coord[0] >= self.resolution.x or coord[1] >= self.resolution.y)
+                            return 0;
+                    }
                     const index = @as(usize, @intCast(coord[0] + coord[1] * @as(i32, @intCast(self.resolution.x))));
                     return self.heights[index];
                 }
@@ -501,11 +504,11 @@ pub const interface = struct {
             pub fn sampleTerrainStamps(
                 allocator: std.mem.Allocator,
                 terrain_chunk_cache: *TerrainSpawner.ChunkCache,
-                tier_index_to_influence_range: []const f32,
+                tier_index_to_influence_range: [TerrainSpawner.density_tiers.len]f32,
                 pos_2d: Vec2,
             ) !f32 {
                 const bounds = blk: {
-                    var bounds = try allocator.alloc(Bounds, tier_index_to_influence_range.len);
+                    var bounds: [tier_index_to_influence_range.len]Bounds = undefined;
                     for (tier_index_to_influence_range, 0..) |influence_range, tier_index| {
                         const size_2d = @as(Vec2, @splat(influence_range));
                         bounds[tier_index] = Bounds{
@@ -515,8 +518,12 @@ pub const interface = struct {
                     }
                     break :blk bounds;
                 };
-                const spawns = try TerrainSpawner.gatherSpawnsInBoundsPerTier(allocator, terrain_chunk_cache, bounds);
 
+                const spawns = try TerrainSpawner.gatherSpawnsInBoundsPerTier(
+                    allocator,
+                    terrain_chunk_cache,
+                    &bounds,
+                );
                 var height: f32 = 0;
                 const Stamps = @typeInfo(TerrainStamps).@"struct".decls;
                 var index_to_stamp_data: [Stamps.len]Stamp = undefined;
@@ -526,19 +533,18 @@ pub const interface = struct {
 
                 for (spawns) |spawn| {
                     const stamp = index_to_stamp_data[spawn.id];
-                    const spawn_pos = Vec2{ spawn.position[0], spawn.position[2] };
+                    const spawn_pos = Vec2{ spawn.position[0], spawn.position[1] };
                     const rel_pos = (pos_2d - spawn_pos) / @as(Vec2, @splat(stamp.size));
-
                     const stamp_pos = (rel_pos + @as(Vec2, @splat(0.5))) * Vec2{
                         @floatFromInt(stamp.resolution.x - 1),
                         @floatFromInt(stamp.resolution.y - 1),
                     };
 
-                    // if (stamp_pos[0] < 0 or stamp_pos[0] > @as(f32, @floatFromInt(stamp.resolution.x)) or
-                    //     stamp_pos[1] < 0 or stamp_pos[1] > @as(f32, @floatFromInt(stamp.resolution.y)))
-                    // {
-                    //     continue;
-                    // }
+                    if (@reduce(.Or, stamp_pos < @as(Vec2, @splat(1))) or
+                        @reduce(.Or, stamp_pos >= @as(Vec2, @splat(@floatFromInt(stamp.resolution.x - 1)))))
+                    {
+                        continue;
+                    }
                     const pos0 = @floor(stamp_pos);
                     const pos_int: Coord = @intFromFloat(pos0);
                     const fract = stamp_pos - pos0;
@@ -563,7 +569,7 @@ pub const interface = struct {
                 allocator: std.mem.Allocator,
                 _: struct {},
             ) !struct {
-                tier_index_to_influence_range: []const f32,
+                tier_index_to_influence_range: [TerrainSpawner.density_tiers.len]f32,
             } {
                 var tier_index_to_influence_range = std.ArrayList(f32).init(allocator);
                 for (TerrainSpawner.density_tiers) |maybe_tier|
@@ -602,7 +608,7 @@ pub const interface = struct {
                 };
                 _ = bounds;
                 return .{
-                    .tier_index_to_influence_range = tier_index_to_influence_range.items,
+                    .tier_index_to_influence_range = tier_index_to_influence_range.items[0..TerrainSpawner.density_tiers.len].*,
                 };
             }
 
@@ -613,24 +619,29 @@ pub const interface = struct {
             pub noinline fn displayTerrain(
                 allocator: std.mem.Allocator,
                 props: struct {
-                    tier_index_to_influence_range: []const f32,
+                    tier_index_to_influence_range: [TerrainSpawner.density_tiers.len]f32,
                 },
             ) !struct {
                 terrain_mesh: game.types.GreyboxMesh,
                 terrain_instance: game.types.ModelInstances,
             } {
                 var terrain_chunk_cache = TerrainSpawner.ChunkCache.init(allocator);
-                const terrain_resolution = 512;
+                try terrain_chunk_cache.ensureTotalCapacity(256);
+                // const terrain_resolution = 512;
+                const terrain_resolution = 128;
 
                 var vertex_iterator = CoordIterator.init(@splat(0), @splat(terrain_resolution + 1));
                 var positions = std.ArrayList(Vec4).init(allocator);
                 while (vertex_iterator.next()) |vertex_coord| {
+                    var stack_allocator = std.heap.stackFallback(1024, allocator); // TODO: Calculate how big the stack should be, maybe should OOM so that I know when we went to slow-mode (Super cool that one line can save 100ms for a 512*512 terrain)
+                    // var buffer: [4096]u8 = undefined;
+                    // var stack_allocator = std.heap.FixedBufferAllocator.init(&buffer);
                     const pos_2d: Vec2 = demo_terrain_bounds.min +
                         @as(Vec2, @floatFromInt(vertex_coord)) *
                         demo_terrain_bounds.size /
                         @as(Vec2, @splat(terrain_resolution));
                     const height = try sampleTerrainStamps(
-                        allocator,
+                        stack_allocator.get(),
                         &terrain_chunk_cache,
                         props.tier_index_to_influence_range,
                         pos_2d,

@@ -1,3 +1,4 @@
+const wasm_entry = @import("./wasm_entry.zig");
 const std = @import("std");
 const zm = @import("zmath");
 const util = .{
@@ -40,10 +41,10 @@ pub fn Forest(comptime chunk_size: i32) type {
                 };
                 const TreeId = std.meta.DeclEnum(ForestSettings);
                 const Spawn = struct {
-                    id: u32,
-                    position: Vec4,
-                    rotation: Vec4,
-                    scale: f32,
+                    id: u8,
+                    position: Vec2,
+                    // rotation: Vec4,
+                    // scale: f32,
                 };
                 const Chunk = [chunk_size][chunk_size]?Spawn;
                 const ChunkCache = std.AutoHashMap(DensityCoord, Chunk);
@@ -51,12 +52,21 @@ pub fn Forest(comptime chunk_size: i32) type {
 
             const quantization = 128;
 
+            const trees = unpack: {
+                const decls: []const std.builtin.Type.Declaration = @typeInfo(ForestSettings).@"struct".decls;
+                var trees: [decls.len]Tree = undefined;
+                for (decls, 0..) |decl_definition, i| {
+                    trees[i] = @field(ForestSettings, decl_definition.name);
+                }
+                break :unpack trees;
+            };
+
             const DensityTier = struct {
                 const context = {};
                 const hashFn = std.hash_map.getAutoHashFn(struct { local.DensityCoord, u32 }, @TypeOf(context));
 
                 density: i32,
-                tree_range: [quantization]?u32,
+                tree_range: [quantization]?u8,
 
                 pub fn getSpan(self: @This()) f32 {
                     return std.math.pow(f32, 2.0, @floatFromInt(self.density));
@@ -65,14 +75,13 @@ pub fn Forest(comptime chunk_size: i32) type {
                 pub fn intToFloatRange(i: u64) f32 {
                     return @as(f32, @floatFromInt(i)) / @as(f32, @floatFromInt(std.math.maxInt(u64)));
                 }
+
                 pub fn gatherSpawnsInBounds(
                     self: @This(),
-                    allocator: std.mem.Allocator,
-                    trees: []const Tree,
                     chunk_cache: *local.ChunkCache,
                     bounds: Bounds,
-                ) ![]const local.Spawn {
-                    var spawns = std.ArrayList(local.Spawn).init(allocator);
+                    spawns: *std.ArrayList(local.Spawn),
+                ) !void {
                     const coord_span: Vec2 = @splat(self.getSpan());
                     const chunk_span = coord_span * @as(Vec2, @splat(chunk_size));
                     var chunk_coords = CoordIterator.init(
@@ -80,7 +89,7 @@ pub fn Forest(comptime chunk_size: i32) type {
                         @intFromFloat(@ceil((bounds.min + bounds.size) / chunk_span)),
                     );
                     while (chunk_coords.next()) |chunk_coord| {
-                        const chunk = try self.getChunk(chunk_cache, trees, chunk_coord);
+                        const chunk = try self.getChunk(chunk_cache, chunk_coord);
                         const chunk_offset = @as(Vec2, @floatFromInt(chunk_coord)) * chunk_span;
                         const min: Coord = @splat(0);
                         const max: Coord = @splat(chunk_size);
@@ -88,34 +97,38 @@ pub fn Forest(comptime chunk_size: i32) type {
                             std.math.clamp(@as(Coord, @intFromFloat(@floor((bounds.min - chunk_offset) / coord_span))), min, max),
                             std.math.clamp(@as(Coord, @intFromFloat(@ceil((bounds.min - chunk_offset + bounds.size) / coord_span))), min, max),
                         );
-                        while (coords.next()) |coord| if (chunk[@intCast(coord[1])][@intCast(coord[0])]) |spawn|
+                        while (coords.next()) |coord| if (chunk[@intCast(coord[1])][@intCast(coord[0])]) |spawn| {
+                            if (spawns.items.len >= spawns.capacity) {
+                                wasm_entry.dumpDebugLogFmt("Too many items! {any} {any}, {any} {d}", .{ bounds, min, max, spawns.items.len });
+                            }
                             try spawns.append(spawn);
+                        };
                     }
-                    return spawns.items;
                 }
 
-                pub fn getChunk(
+                pub noinline fn getChunk(
                     self: @This(),
                     cache: *local.ChunkCache,
-                    trees: []const Tree,
                     coord: Coord,
-                ) !*const local.Chunk {
-                    const chunk_entry = try cache.getOrPut(local.DensityCoord{
-                        .x = coord[0],
-                        .y = coord[1],
-                        .density = self.density,
-                    });
-                    if (chunk_entry.found_existing) {
-                        return chunk_entry.value_ptr;
-                    }
-
+                ) !*local.Chunk {
+                    const chunk = blk: {
+                        const chunk_entry = try cache.getOrPut(local.DensityCoord{
+                            .x = coord[0],
+                            .y = coord[1],
+                            .density = self.density,
+                        });
+                        if (chunk_entry.found_existing) {
+                            return chunk_entry.value_ptr;
+                        }
+                        break :blk chunk_entry.value_ptr;
+                    };
                     const span = self.getSpan();
                     const chunk_offset = .{
                         .x = @as(f32, @floatFromInt(coord[0])) * span * chunk_size,
                         .z = @as(f32, @floatFromInt(coord[1])) * span * chunk_size,
                     };
 
-                    for (chunk_entry.value_ptr, 0..) |*row, y| {
+                    for (chunk, 0..) |*row, y| {
                         for (row, 0..) |*item, x| {
                             const hash_coord: local.DensityCoord = .{
                                 .x = coord[0] * chunk_size + @as(i32, @intCast(x)),
@@ -132,35 +145,25 @@ pub fn Forest(comptime chunk_size: i32) type {
                             item.* = if (self.tree_range[
                                 @intCast(rand.spawn % quantization)
                             ]) |tree_id| blk: {
-                                const tree = trees[tree_id];
+                                // const tree = trees[tree_id];
                                 break :blk local.Spawn{
                                     .id = tree_id,
-                                    .position = zm.loadArr3(.{
+                                    .position = .{
                                         chunk_offset.x + (@as(f32, @floatFromInt(x)) + intToFloatRange(rand.position_x)) * span,
-                                        0, // TODO - conform to a heightmap?
                                         chunk_offset.z + (@as(f32, @floatFromInt(y)) + intToFloatRange(rand.position_y)) * span,
-                                    }),
-                                    .rotation = zm.quatFromAxisAngle(
-                                        zm.loadArr3(.{ 0, 1, 0 }),
-                                        intToFloatRange(rand.rotation) * 360 * std.math.rad_per_deg,
-                                    ),
-                                    .scale = tree.scale_range.sample(intToFloatRange(rand.scale)),
+                                    },
+                                    // .rotation = zm.quatFromAxisAngle(
+                                    //     zm.loadArr3(.{ 0, 1, 0 }),
+                                    //     intToFloatRange(rand.rotation) * 360 * std.math.rad_per_deg,
+                                    // ),
+                                    // .scale = tree.scale_range.sample(intToFloatRange(rand.scale)),
                                 };
                             } else null;
                         }
                     }
 
-                    return chunk_entry.value_ptr;
+                    return chunk;
                 }
-            };
-
-            const trees = unpack: {
-                const decls: []const std.builtin.Type.Declaration = @typeInfo(ForestSettings).@"struct".decls;
-                var trees: [decls.len]Tree = undefined;
-                for (decls, 0..) |decl_definition, i| {
-                    trees[i] = @field(ForestSettings, decl_definition.name);
-                }
-                break :unpack trees;
             };
 
             const min_tier, const tier_len = blk: {
@@ -202,7 +205,7 @@ pub fn Forest(comptime chunk_size: i32) type {
                                 break :total_likelihood @max(total, 1);
                             };
                             const tree_range = tree_range: {
-                                var range: [quantization]?u32 = .{null} ** quantization;
+                                var range: [quantization]?u8 = .{null} ** quantization;
                                 var current_tree_index: u32 = 0;
                                 var accum_likelihood: f32 = @field(
                                     ForestSettings,
@@ -236,33 +239,35 @@ pub fn Forest(comptime chunk_size: i32) type {
                     }
                     break :blk tiers;
                 };
-                // pub const trees = trees;
 
                 pub fn densityTierToIndex(density_tier: i32) usize {
                     return @intCast(density_tier - min_tier);
                 }
-                pub fn gatherSpawnsInBoundsPerTier(allocator: std.mem.Allocator, chunk_cache: *ChunkCache, bounds: []const Bounds) ![]const local.Spawn {
-                    var spawns = std.ArrayList(local.Spawn).init(allocator);
+
+                pub noinline fn gatherSpawnsInBoundsPerTier(
+                    allocator: std.mem.Allocator,
+                    chunk_cache: *ChunkCache,
+                    bounds: []const Bounds,
+                ) ![]const local.Spawn {
+                    var spawns = try std.ArrayList(local.Spawn).initCapacity(allocator, 16);
                     for (density_tiers, 0..) |maybe_density_tier, tier_index| if (maybe_density_tier) |density_tier| {
-                        try spawns.appendSlice(try density_tier.gatherSpawnsInBounds(
-                            allocator,
-                            &trees,
+                        try density_tier.gatherSpawnsInBounds(
                             chunk_cache,
                             bounds[tier_index],
-                        ));
+                            &spawns,
+                        );
                     };
                     return spawns.items;
                 }
 
                 pub fn gatherSpawnsInBounds(allocator: std.mem.Allocator, chunk_cache: *ChunkCache, bounds: Bounds) ![]const local.Spawn {
-                    var spawns = std.ArrayList(local.Spawn).init(allocator);
+                    var spawns = try std.ArrayList(local.Spawn).initCapacity(allocator, 16);
                     for (density_tiers) |maybe_density_tier| if (maybe_density_tier) |density_tier| {
-                        try spawns.appendSlice(try density_tier.gatherSpawnsInBounds(
-                            allocator,
-                            &trees,
+                        try density_tier.gatherSpawnsInBounds(
                             chunk_cache,
                             bounds,
-                        ));
+                            &spawns,
+                        );
                     };
                     return spawns.items;
                 }
