@@ -226,12 +226,15 @@ export function App() {
     let skybox: Binds<typeof skyboxMaterial.globals>;
 
     updateRender = (graphOutputs) => () => {
+      var renderChange = false;
       const worldMatrix = graphOutputs.world_matrix;
       if (worldMatrix) {
+        renderChange = true;
         perspectiveMatrix = worldMatrix.flat() as Mat4;
       }
       const skybox_data = graphOutputs.skybox;
       if (skybox_data) {
+        renderChange = true;
         var texture_data = fromEntries(toEntries(skybox_data).map(([key, value]) => [
           key,
           sliceToArray.Uint8Array(value.data),
@@ -243,6 +246,7 @@ export function App() {
       }
       const screenspace_data = graphOutputs.screen_space_mesh;
       if (screenspace_data) {
+        renderChange = true;
         skybox = {
           ...skybox,
           indices: ShaderBuilder.createElementBuffer(gl, sliceToArray.Uint32Array(screenspace_data.indices)),
@@ -252,6 +256,7 @@ export function App() {
       }
       const forest_data = graphOutputs.forest_data;
       if (forest_data) {
+        renderChange = true;
         for (let data of forest_data) {
           const label = sliceToString(data.label);
           item_positions[label] = ShaderBuilder.createBuffer(gl, sliceToArray.Float32Array(data.positions));
@@ -259,12 +264,13 @@ export function App() {
       }
       const terrain_instance = graphOutputs.terrain_instance;
       if (terrain_instance) {
+        renderChange = true;
         const label = sliceToString(terrain_instance.label);
         item_positions[label] = ShaderBuilder.createBuffer(gl, sliceToArray.Float32Array(terrain_instance.positions));
       }
       const terrain_mesh = graphOutputs.terrain_mesh;
       if (terrain_mesh) {
-        console.log(terrain_mesh.indices.len);
+        renderChange = true;
         models["terrain"] = [
           {
             greybox: {
@@ -276,6 +282,7 @@ export function App() {
         ];
       }
       if (graphOutputs.models != null) {
+        renderChange = true;
         for (let model of graphOutputs.models) {
           const label = sliceToString(model.label);
           const meshes: Model[] = [];
@@ -312,7 +319,9 @@ export function App() {
           }
         }
       }
-      requestAnimationFrame(() => {
+
+      if (renderChange) {
+        console.log("Render! " + Date.now());
         {
           gl.viewport(0, 0, windowSize.width, windowSize.height);
           gl.clearColor(0, 0, 0, 1);
@@ -334,7 +343,7 @@ export function App() {
             }
           }
         }
-      });
+      }
     };
 
     updateGraph(graphInputs);
@@ -377,7 +386,6 @@ export function App() {
           outline: 'none',
         }}
         onMouseDown={(event) => {
-          console.log(event.button);
           if (event.button == 1) {
             updateGraph({
               selected_camera: "orbit",

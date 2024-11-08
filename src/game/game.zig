@@ -1,7 +1,7 @@
 const std = @import("std");
 const wasm_entry = @import("../wasm_entry.zig");
 const graph_runtime = @import("../graph_runtime.zig");
-const utils = @import("../utils.zig");
+const Queryable = @import("../utils.zig").Queryable;
 const subdiv = @import("../subdiv.zig");
 const Image = @import("../Image.zig");
 const raytrace = @import("../raytrace.zig");
@@ -163,7 +163,7 @@ pub const nodes = struct {
     pub fn orbit(
         allocator: std.mem.Allocator,
         props: struct {
-            delta_time: utils.Queryable.Value(f32),
+            delta_time: Queryable.Value(f32),
             orbit_speed: f32,
             render_resolution: struct { x: i32, y: i32 },
             input: struct {
