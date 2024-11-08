@@ -145,10 +145,37 @@ pub const nodes = struct {
         };
     }
 
+    /// Provides an interface a system can send to a function, where the function, when retrieving the containing
+    /// value will signal to the external system that the value has been retrieved.
+    /// For the NodeGraph, this Queryable can be used to retrieve values within a branch of the node's logic,
+    /// so that if the node has chosen a different branch, the value doesn't have to be considered when marking
+    /// the node as dirty.
+    fn Queryable(T: type) type {
+        return struct {
+            touched: *bool,
+            raw: T,
+
+            fn init(
+                touched: *bool,
+                value: T,
+            ) @This() {
+                return .{
+                    .touched = touched,
+                    .raw = value,
+                };
+            }
+
+            fn get(self: @This()) T {
+                self.touched.* = true;
+                return self.raw;
+            }
+        };
+    }
+
     pub fn orbit(
         allocator: std.mem.Allocator,
         props: struct {
-            time: u64,
+            time: Queryable(u64),
             last_time: u64,
             orbit_speed: f32,
             render_resolution: struct { x: i32, y: i32 },
@@ -196,7 +223,7 @@ pub const nodes = struct {
                 );
 
                 return .{
-                    .last_time = props.time,
+                    .last_time = props.last_time,
                     .camera_position = zm.mul(zm.inverse(location), Vec4{ 0, 0, 0, 1 }),
                     .world_matrix = zm.mul(
                         location,
@@ -252,7 +279,7 @@ pub const nodes = struct {
                 const combined_movement = horizontal_movement + vertical_movement;
 
                 if (zm.length3(combined_movement)[0] > 0.001) {
-                    const delta_time = @as(f32, @floatFromInt(props.time - props.last_time)) / 1000.0;
+                    const delta_time = @as(f32, @floatFromInt(props.time.get() - props.last_time)) / 1000.0;
                     const final_movement = zm.mul(
                         zm.normalize3(combined_movement),
                         rotation_matrix,
@@ -284,7 +311,7 @@ pub const nodes = struct {
                 );
 
                 return .{
-                    .last_time = props.time,
+                    .last_time = props.time.get(),
                     .camera_position = zm.mul(zm.inverse(location), Vec4{ 0, 0, 0, 1 }),
                     .world_matrix = zm.mul(
                         location,
