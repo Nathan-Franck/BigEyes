@@ -185,7 +185,6 @@ pub const nodes = struct {
         camera_position: Vec4,
         world_matrix: zm.Mat,
     } {
-        wasm_entry.dumpDebugLog("update!");
         switch (props.selected_camera) {
             .orbit => {
                 props.orbit_camera.rotation = props.orbit_camera.rotation +

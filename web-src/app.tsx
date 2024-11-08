@@ -321,7 +321,6 @@ export function App() {
       }
 
       if (renderChange) {
-        console.log("Render! " + Date.now());
         {
           gl.viewport(0, 0, windowSize.width, windowSize.height);
           gl.clearColor(0, 0, 0, 1);
