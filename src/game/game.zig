@@ -146,11 +146,24 @@ pub const nodes = struct {
         };
     }
 
+    pub fn timing(props: struct {
+        time: u64,
+        last_time: u64,
+    }) struct {
+        last_time: u64,
+        delta_time: f32,
+    } {
+        const delta_time = @as(f32, @floatFromInt(props.time - props.last_time)) / 1000.0;
+        return .{
+            .last_time = props.time,
+            .delta_time = delta_time,
+        };
+    }
+
     pub fn orbit(
         allocator: std.mem.Allocator,
         props: struct {
-            time: utils.Queryable.Value(u64),
-            last_time: u64,
+            delta_time: utils.Queryable.Value(f32),
             orbit_speed: f32,
             render_resolution: struct { x: i32, y: i32 },
             input: struct {
@@ -171,7 +184,6 @@ pub const nodes = struct {
     ) !struct {
         camera_position: Vec4,
         world_matrix: zm.Mat,
-        last_time: u64,
     } {
         wasm_entry.dumpDebugLog("update!");
         switch (props.selected_camera) {
@@ -198,7 +210,6 @@ pub const nodes = struct {
                 );
 
                 return .{
-                    .last_time = props.last_time,
                     .camera_position = zm.mul(zm.inverse(location), Vec4{ 0, 0, 0, 1 }),
                     .world_matrix = zm.mul(
                         location,
@@ -254,11 +265,10 @@ pub const nodes = struct {
                 const combined_movement = horizontal_movement + vertical_movement;
 
                 if (zm.length3(combined_movement)[0] > 0.001) {
-                    const delta_time = @as(f32, @floatFromInt(props.time.get() - props.last_time)) / 1000.0;
                     const final_movement = zm.mul(
                         zm.normalize3(combined_movement),
                         rotation_matrix,
-                    ) * zm.splat(Vec4, props.player_settings.movement_speed * delta_time);
+                    ) * zm.splat(Vec4, props.player_settings.movement_speed * props.delta_time.get());
 
                     var new_position = props.player.position;
                     new_position += final_movement;
@@ -286,7 +296,6 @@ pub const nodes = struct {
                 );
 
                 return .{
-                    .last_time = props.time.raw,
                     .camera_position = zm.mul(zm.inverse(location), Vec4{ 0, 0, 0, 1 }),
                     .world_matrix = zm.mul(
                         location,
