@@ -1,4 +1,5 @@
 const std = @import("std");
+const wasm_entry = @import("../wasm_entry.zig");
 const graph_runtime = @import("../graph_runtime.zig");
 const utils = @import("../utils.zig");
 const subdiv = @import("../subdiv.zig");
@@ -172,6 +173,7 @@ pub const nodes = struct {
         world_matrix: zm.Mat,
         last_time: u64,
     } {
+        wasm_entry.dumpDebugLog("update!");
         switch (props.selected_camera) {
             .orbit => {
                 props.orbit_camera.rotation = props.orbit_camera.rotation +

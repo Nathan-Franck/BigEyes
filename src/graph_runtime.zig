@@ -399,12 +399,13 @@ pub fn NodeGraph(
                 .nodes_arenas = undefined,
                 .nodes_outputs = undefined,
                 .nodes_dirty_flags = undefined,
+                .nodes_queried_flags = undefined,
             };
             inline for (graph.nodes, 0..) |node, index| {
                 self.nodes_arenas[index] = std.heap.ArenaAllocator.init(props.allocator);
                 @field(self.nodes_dirty_flags, node.name) = true;
                 const queried_flags = &@field(self.nodes_queried_flags, node.name);
-                for (@typeInfo(@TypeOf(queried_flags)).@"struct".fields) |field| {
+                inline for (@typeInfo(@TypeOf(queried_flags.*)).@"struct".fields) |field| {
                     @field(queried_flags, field.name) = true;
                 }
             }
@@ -556,9 +557,10 @@ pub fn NodeGraph(
                         },
                     };
                     if (comptime utils.Queryable.isValue(TargetInputField)) {
-                        const queried = &@field(self.nodes_queried_flags, node.name);
+                        const queried = &@field(@field(self.nodes_queried_flags, node.name), link.field);
                         if (!queried.*)
                             is_field_dirty = false;
+                        queried.* = false;
                         target_input_field.* = TargetInputField{ .raw = value, .queried = queried };
                     } else {
                         target_input_field.* = value;
