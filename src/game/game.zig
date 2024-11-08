@@ -286,7 +286,7 @@ pub const nodes = struct {
                 );
 
                 return .{
-                    .last_time = props.time.get(),
+                    .last_time = props.time.raw,
                     .camera_position = zm.mul(zm.inverse(location), Vec4{ 0, 0, 0, 1 }),
                     .world_matrix = zm.mul(
                         location,
