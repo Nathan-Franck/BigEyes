@@ -39,42 +39,6 @@ const Input = struct {
     type: type,
 };
 
-inline fn IsEventType(the_type: type) bool {
-    return switch (@typeInfo(the_type)) {
-        else => false,
-        .optional => |optional| switch (@typeInfo(optional.child)) {
-            else => false,
-            .Union => true,
-        },
-    };
-}
-
-fn EventCast(InputType: type, OutputType: type, value: InputType) ?OutputType {
-    if (value) |non_null_value| blk: {
-        const active_tag_index = @intFromEnum(non_null_value);
-        inline for (
-            @typeInfo(
-                @typeInfo(InputType).Optional.child,
-            ).Union.fields,
-            0..,
-        ) |field_candidate, field_index| {
-            if (active_tag_index == field_index) {
-                const OutputNonNull = @typeInfo(OutputType).Optional.child;
-                inline for (@typeInfo(OutputNonNull).Union.fields) |output_field| {
-                    if (field_candidate.type == output_field.type) {
-                        break :blk @unionInit(
-                            OutputNonNull,
-                            output_field.name,
-                            @field(non_null_value, field_candidate.name),
-                        );
-                    }
-                }
-            }
-        }
-        break :blk null;
-    } else null;
-}
-
 pub fn NodeGraph(
     comptime graph: Blueprint,
     comptime node_definitions: anytype,
@@ -244,7 +208,10 @@ pub fn NodeGraph(
                             ).@"fn".params;
                             const output_node_type = node_params[node_params.len - 1].type.?;
                             break :blk for (@typeInfo(output_node_type).@"struct".fields) |field|
-                                if (std.mem.eql(u8, field.name, input_field)) break field.type else continue
+                                if (std.mem.eql(u8, field.name, input_field))
+                                    break utils.Queryable.getSourceOrNull(field.type) orelse field.type
+                                else
+                                    continue
                             else
                                 @compileError(std.fmt.comptimePrint("Can't find the field {s} in type {any}", .{
                                     input_field,
@@ -515,22 +482,17 @@ pub fn NodeGraph(
                         .node => |node_blueprint| input_field: {
                             const node_outputs = @field(self.nodes_outputs, node_blueprint.name);
                             const node_output = @field(node_outputs, node_blueprint.field);
-                            const InputType = @TypeOf(node_output);
-                            const OutputType = @TypeOf(@field(node_inputs, link.field));
                             if (@field(self.nodes_dirty_flags, node_blueprint.name)) {
                                 is_dirty.* = true;
                             }
-                            break :input_field if (IsEventType(InputType))
-                                EventCast(InputType, OutputType, node_output)
-                            else
-                                node_output;
+                            break :input_field node_output;
                         },
                     };
                     const target_input_field = &@field(node_inputs, link.field);
-                    target_input_field.* = switch (@typeInfo(@TypeOf(target_input_field.*))) {
+                    const TargetInputField = @TypeOf(target_input_field.*);
+                    const value = switch (@typeInfo(TargetInputField)) {
                         else => node_input_field,
                         .pointer => |pointer| switch (pointer.size) {
-                            else => ("OI!"),
                             .One => deferred_clone: {
                                 @field(mutable_fields, link.field) = &node_input_field;
                                 break :deferred_clone undefined;
@@ -539,8 +501,15 @@ pub fn NodeGraph(
                                 @field(mutable_fields, link.field) = node_input_field;
                                 break :deferred_clone undefined;
                             },
+                            else => @compileError("Unsupported pointer type"),
                         },
                     };
+                    if (comptime utils.Queryable.isValue(TargetInputField)) {
+                        var touched = false; // TODO - Actually care if this is touched!
+                        target_input_field.* = TargetInputField{ .raw = value, .touched = &touched };
+                    } else {
+                        target_input_field.* = value;
+                    }
                 }
 
                 const target = &@field(self.nodes_outputs, node.name);

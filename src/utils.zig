@@ -1,5 +1,39 @@
 const std = @import("std");
 
+/// Provides an interface a system can send to a function, where the function, when retrieving the containing
+/// value will signal to the external system that the value has been retrieved.
+/// For the NodeGraph, this Queryable can be used to retrieve values within a branch of the node's logic,
+/// so that if the node has chosen a different branch, the value doesn't have to be considered when marking
+/// the node as dirty.
+pub const Queryable = struct {
+    pub fn isValue(candidate: type) bool {
+        return switch (@typeInfo(candidate)) {
+            .@"struct" => @hasDecl(candidate, "QueryableSource"),
+            else => false,
+        };
+    }
+    pub fn getSourceOrNull(candidate: type) ?type {
+        return if (isValue(candidate))
+            @field(candidate, "QueryableSource")
+        else
+            null;
+    }
+
+    pub fn Value(T: type) type {
+        return struct {
+            pub const QueryableSource = T;
+
+            touched: *bool,
+            raw: T,
+
+            pub fn get(self: @This()) T {
+                self.touched.* = true;
+                return self.raw;
+            }
+        };
+    }
+};
+
 pub fn FunctionArgs(comptime func: anytype) type {
     const ParamInfo = @typeInfo(@TypeOf(func)).Fn.params;
     var fields: []const std.builtin.Type.StructField = &.{};

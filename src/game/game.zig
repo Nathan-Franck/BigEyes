@@ -145,37 +145,10 @@ pub const nodes = struct {
         };
     }
 
-    /// Provides an interface a system can send to a function, where the function, when retrieving the containing
-    /// value will signal to the external system that the value has been retrieved.
-    /// For the NodeGraph, this Queryable can be used to retrieve values within a branch of the node's logic,
-    /// so that if the node has chosen a different branch, the value doesn't have to be considered when marking
-    /// the node as dirty.
-    fn Queryable(T: type) type {
-        return struct {
-            touched: *bool,
-            raw: T,
-
-            fn init(
-                touched: *bool,
-                value: T,
-            ) @This() {
-                return .{
-                    .touched = touched,
-                    .raw = value,
-                };
-            }
-
-            fn get(self: @This()) T {
-                self.touched.* = true;
-                return self.raw;
-            }
-        };
-    }
-
     pub fn orbit(
         allocator: std.mem.Allocator,
         props: struct {
-            time: Queryable(u64),
+            time: utils.Queryable.Value(u64),
             last_time: u64,
             orbit_speed: f32,
             render_resolution: struct { x: i32, y: i32 },
