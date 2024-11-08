@@ -385,7 +385,7 @@ pub const nodes = struct {
         allocator: std.mem.Allocator,
         props: struct {
             cutout_leaf: Image.Processed,
-            trees: []game.types.TreeMesh,
+            trees: []const game.types.TreeMesh,
         },
     ) !struct {
         models: []const game.types.GameModel,

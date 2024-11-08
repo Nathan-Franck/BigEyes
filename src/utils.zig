@@ -23,11 +23,11 @@ pub const Queryable = struct {
         return struct {
             pub const QueryableSource = T;
 
-            touched: *bool,
+            queried: *bool,
             raw: T,
 
             pub fn get(self: @This()) T {
-                self.touched.* = true;
+                self.queried.* = true;
                 return self.raw;
             }
         };

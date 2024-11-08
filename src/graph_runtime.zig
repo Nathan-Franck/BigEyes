@@ -55,23 +55,26 @@ pub fn NodeGraph(
                 else => node_outputs,
                 .error_union => |error_union| error_union.payload,
             };
+
+            // Most outputs from node come from return structure of function.
             comptime var output_fields: []const std.builtin.Type.StructField =
                 @typeInfo(non_error_outputs).@"struct".fields;
+
+            // Input fields that are non-constant pointers are also considered outputs from this node.
             for (@typeInfo(
                 node_inputs[node_inputs.len - 1].type.?,
             ).@"struct".fields) |input_field| switch (@typeInfo(input_field.type)) {
                 else => {},
-                .pointer => |pointer| switch (pointer.size) {
+                .pointer => |pointer| if (!pointer.is_const) switch (pointer.size) {
                     else => {},
                     .One => {
-                        if (!pointer.is_const)
-                            output_fields = comptime output_fields ++ .{.{
-                                .name = input_field.name,
-                                .type = pointer.child,
-                                .default_value = null,
-                                .is_comptime = false,
-                                .alignment = @alignOf(input_field.type),
-                            }};
+                        output_fields = comptime output_fields ++ .{.{
+                            .name = input_field.name,
+                            .type = pointer.child,
+                            .default_value = null,
+                            .is_comptime = false,
+                            .alignment = @alignOf(input_field.type),
+                        }};
                     },
                     .Slice => {
                         output_fields = comptime output_fields ++ .{.{
@@ -91,6 +94,7 @@ pub fn NodeGraph(
                 .decls = &.{},
                 .is_tuple = false,
             } });
+
             node_output_fields = comptime node_output_fields ++ .{.{
                 .name = node.name[0.. :0],
                 .type = non_error_outputs_and_pointers,
@@ -121,6 +125,45 @@ pub fn NodeGraph(
         break :build_type @Type(std.builtin.Type{ .@"struct" = .{
             .layout = .auto,
             .fields = fields,
+            .decls = &.{},
+            .is_tuple = false,
+        } });
+    };
+
+    const NodesQueriedFlags = build_type: {
+        var node_fields: []const std.builtin.Type.StructField = &.{};
+        inline for (graph.nodes) |node| {
+            const node_defn = @field(node_definitions, node.name);
+            const node_params = @typeInfo(@TypeOf(node_defn)).@"fn".params;
+            const node_input_fields = @typeInfo(node_params[node_params.len - 1].type.?).@"struct".fields;
+            var fields: []const std.builtin.Type.StructField = &.{};
+            inline for (node_input_fields) |field| {
+                if (utils.Queryable.getSourceOrNull(field.type) != null) {
+                    fields = fields ++ .{std.builtin.Type.StructField{
+                        .name = field.name,
+                        .type = bool,
+                        .alignment = @alignOf(bool),
+                        .default_value = null,
+                        .is_comptime = false,
+                    }};
+                }
+            }
+            node_fields = node_fields ++ .{.{
+                .name = node.name[0.. :0],
+                .type = @Type(std.builtin.Type{ .@"struct" = .{
+                    .layout = .auto,
+                    .fields = fields,
+                    .decls = &.{},
+                    .is_tuple = false,
+                } }),
+                .default_value = null,
+                .is_comptime = false,
+                .alignment = @alignOf(bool),
+            }};
+        }
+        break :build_type @Type(std.builtin.Type{ .@"struct" = .{
+            .layout = .auto,
+            .fields = node_fields,
             .decls = &.{},
             .is_tuple = false,
         } });
@@ -195,6 +238,7 @@ pub fn NodeGraph(
         nodes_arenas: [graph.nodes.len]std.heap.ArenaAllocator,
         nodes_outputs: NodeOutputs,
         nodes_dirty_flags: NodesDirtyFlags,
+        nodes_queried_flags: NodesQueriedFlags,
 
         pub const SystemInputs = build_type: {
             var fields: []const std.builtin.Type.StructField = &.{};
@@ -357,8 +401,12 @@ pub fn NodeGraph(
                 .nodes_dirty_flags = undefined,
             };
             inline for (graph.nodes, 0..) |node, index| {
-                @field(self.nodes_dirty_flags, node.name) = true;
                 self.nodes_arenas[index] = std.heap.ArenaAllocator.init(props.allocator);
+                @field(self.nodes_dirty_flags, node.name) = true;
+                const queried_flags = &@field(self.nodes_queried_flags, node.name);
+                for (@typeInfo(@TypeOf(queried_flags)).@"struct".fields) |field| {
+                    @field(queried_flags, field.name) = true;
+                }
             }
             return self;
         }
@@ -409,7 +457,7 @@ pub fn NodeGraph(
                     for (node.input_links) |link|
                         switch (@typeInfo(@TypeOf(@field(node_inputs, link.field)))) {
                             else => {},
-                            .pointer => |pointer| switch (pointer.size) {
+                            .pointer => |pointer| if (!pointer.is_const) switch (pointer.size) {
                                 else => {},
                                 .One => {
                                     mutable_fields = mutable_fields ++ .{.{
@@ -470,10 +518,11 @@ pub fn NodeGraph(
                 }
 
                 inline for (node.input_links) |link| {
+                    var is_field_dirty = false;
                     const node_input_field = switch (link.source) {
                         .input_field => |input_field| node_input: {
                             if (@field(inputs_dirty, input_field)) {
-                                is_dirty.* = true;
+                                is_field_dirty = true;
                             }
                             break :node_input @field(self.system_inputs, input_field);
                         },
@@ -483,15 +532,17 @@ pub fn NodeGraph(
                             const node_outputs = @field(self.nodes_outputs, node_blueprint.name);
                             const node_output = @field(node_outputs, node_blueprint.field);
                             if (@field(self.nodes_dirty_flags, node_blueprint.name)) {
-                                is_dirty.* = true;
+                                is_field_dirty = true;
                             }
                             break :input_field node_output;
                         },
                     };
                     const target_input_field = &@field(node_inputs, link.field);
                     const TargetInputField = @TypeOf(target_input_field.*);
-                    const value = switch (@typeInfo(TargetInputField)) {
-                        else => node_input_field,
+                    const value = if (!@hasField(@TypeOf(mutable_fields), link.field))
+                        node_input_field
+                    else switch (@typeInfo(TargetInputField)) {
+                        else => @compileError("Mutable field mismatch"),
                         .pointer => |pointer| switch (pointer.size) {
                             .One => deferred_clone: {
                                 @field(mutable_fields, link.field) = &node_input_field;
@@ -505,11 +556,16 @@ pub fn NodeGraph(
                         },
                     };
                     if (comptime utils.Queryable.isValue(TargetInputField)) {
-                        var touched = false; // TODO - Actually care if this is touched!
-                        target_input_field.* = TargetInputField{ .raw = value, .touched = &touched };
+                        const queried = &@field(self.nodes_queried_flags, node.name);
+                        if (!queried.*)
+                            is_field_dirty = false;
+                        target_input_field.* = TargetInputField{ .raw = value, .queried = queried };
                     } else {
                         target_input_field.* = value;
                     }
+
+                    // Accumulate dirtiness on dirty fields
+                    if (is_field_dirty) is_dirty.* = true;
                 }
 
                 const target = &@field(self.nodes_outputs, node.name);
