@@ -262,11 +262,9 @@ pub const nodes = struct {
                     new_position += final_movement;
 
                     var terrain_chunk_cache = game.config.TerrainSpawner.ChunkCache.init(allocator);
-                    const terrain_height = try props.terrain_sampler.sample(
-                        allocator,
-                        &terrain_chunk_cache,
-                        Vec2{ new_position[0], new_position[2] },
-                    );
+                    const terrain_height = try props.terrain_sampler
+                        .loadCache(&terrain_chunk_cache)
+                        .sample(allocator, Vec2{ new_position[0], new_position[2] });
                     new_position[1] = terrain_height + 0.7; // Add eye height offset
                     props.player.position = new_position;
                 }

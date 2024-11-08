@@ -42,61 +42,55 @@ pub fn TerrainSampler(
         pub fn loadCache(
             source: @This(),
             terrain_chunk_cache: *TerrainSpawner.ChunkCache,
-        ) struct {
-            source: Self,
-            terrain_chunk_cache: *TerrainSpawner.ChunkCache,
-            pub fn sample(
-                cached: @This(),
-                allocator: std.mem.Allocator,
-                pos_2d: Vec2,
-            ) !f32 {
-                return cached.source.sample(allocator, cached.terrain_chunk_cache, pos_2d);
-            }
-        } {
+        ) Cached {
             return .{
                 .source = source,
                 .terrain_chunk_cache = terrain_chunk_cache,
             };
         }
 
-        pub fn sample(
-            self: *const @This(),
-            allocator: std.mem.Allocator,
+        pub const Cached = struct {
+            source: Self,
             terrain_chunk_cache: *TerrainSpawner.ChunkCache,
-            pos_2d: Vec2,
-        ) !f32 {
-            const bounds = blk: {
-                var bounds: [TerrainSpawner.density_tiers.len]Bounds = undefined;
-                for (self.tier_index_to_influence_range, 0..) |influence_range, tier_index| {
-                    const size_2d = @as(Vec2, @splat(influence_range));
-                    bounds[tier_index] = Bounds{
-                        .min = pos_2d - size_2d * @as(Vec2, @splat(0.5)),
-                        .size = size_2d,
-                    };
+
+            pub fn sample(
+                self: @This(),
+                allocator: std.mem.Allocator,
+                pos_2d: Vec2,
+            ) !f32 {
+                const bounds = blk: {
+                    var bounds: [TerrainSpawner.density_tiers.len]Bounds = undefined;
+                    for (self.source.tier_index_to_influence_range, 0..) |influence_range, tier_index| {
+                        const size_2d = @as(Vec2, @splat(influence_range));
+                        bounds[tier_index] = Bounds{
+                            .min = pos_2d - size_2d * @as(Vec2, @splat(0.5)),
+                            .size = size_2d,
+                        };
+                    }
+                    break :blk bounds;
+                };
+
+                const spawns = try TerrainSpawner.gatherSpawnsInBoundsPerTier(
+                    allocator,
+                    self.terrain_chunk_cache,
+                    &bounds,
+                );
+
+                const Stamps = @typeInfo(TerrainStamps).@"struct".decls;
+                var index_to_stamp_data: [Stamps.len]Stamp = undefined;
+                inline for (Stamps, 0..) |decl, stamp_index| {
+                    index_to_stamp_data[stamp_index] = @field(TerrainStamps, decl.name);
                 }
-                break :blk bounds;
-            };
 
-            const spawns = try TerrainSpawner.gatherSpawnsInBoundsPerTier(
-                allocator,
-                terrain_chunk_cache,
-                &bounds,
-            );
+                var height: f32 = 0;
+                for (spawns) |spawn| {
+                    const stamp = index_to_stamp_data[spawn.id];
+                    if (stamp.getHeight(spawn.position, pos_2d)) |stamp_height|
+                        height = @max(height, stamp_height);
+                }
 
-            const Stamps = @typeInfo(TerrainStamps).@"struct".decls;
-            var index_to_stamp_data: [Stamps.len]Stamp = undefined;
-            inline for (Stamps, 0..) |decl, stamp_index| {
-                index_to_stamp_data[stamp_index] = @field(TerrainStamps, decl.name);
+                return height;
             }
-
-            var height: f32 = 0;
-            for (spawns) |spawn| {
-                const stamp = index_to_stamp_data[spawn.id];
-                if (stamp.getHeight(spawn.position, pos_2d)) |stamp_height|
-                    height = @max(height, stamp_height);
-            }
-
-            return height;
-        }
+        };
     };
 }

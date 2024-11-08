@@ -20,12 +20,12 @@ pub const TerrainSampler = @import("../terrain_sampler.zig").TerrainSampler(
 );
 pub const TerrainSpawner = Forest.spawner(struct {
     pub const Hemisphere = Forest.Tree{
-        .density_tier = -1,
+        .density = -1,
         .likelihood = 1,
         .scale_range = .{ .x_range = .{ 0, 1 }, .y_values = &.{ 0.8, 1.0 } },
     };
     pub const BigHemisphere = Forest.Tree{
-        .density_tier = 2,
+        .density = 2,
         .likelihood = 1,
         .scale_range = .{ .x_range = .{ 0, 1 }, .y_values = &.{ 0.8, 1.0 } },
     };
@@ -83,22 +83,22 @@ pub const TerrainStamps = struct {
 };
 pub const ForestSettings = struct {
     pub const grass1 = Forest.Tree{
-        .density_tier = -2,
+        .density = -2,
         .likelihood = 0.1,
         .scale_range = .{ .x_range = .{ 0, 1 }, .y_values = &.{ 0.8, 1.0 } },
     };
     pub const grass2 = Forest.Tree{
-        .density_tier = -2,
+        .density = -2,
         .likelihood = 0.05,
         .scale_range = .{ .x_range = .{ 0, 1 }, .y_values = &.{ 0.8, 1.0 } },
     };
     pub const little_tree = Forest.Tree{
-        .density_tier = 1,
+        .density = 1,
         .likelihood = 1,
         .scale_range = .{ .x_range = .{ 0, 1 }, .y_values = &.{ 0.8, 1.0 } },
     };
     pub const big_tree = Forest.Tree{
-        .density_tier = 2,
+        .density = 2,
         .likelihood = 1,
         .scale_range = .{ .x_range = .{ 0, 1 }, .y_values = &.{ 0.8, 1.0 } },
         .spawn_radii = &[_]Forest.Tree.SpawnRadius{

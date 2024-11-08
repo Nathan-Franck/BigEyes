@@ -26,7 +26,7 @@ pub fn Forest(comptime chunk_size: i32) type {
                 likelihood: f32,
             };
             spawn_radii: ?[]const SpawnRadius = null,
-            density_tier: i32,
+            density: i32,
             likelihood: f32,
             scale_range: util.tree.SmoothCurve,
         };
@@ -186,11 +186,11 @@ pub fn Forest(comptime chunk_size: i32) type {
             };
 
             const min_tier, const tier_len = blk: {
-                var min_tier: i32 = trees[0].density_tier;
-                var max_tier: i32 = trees[0].density_tier;
+                var min_tier: i32 = trees[0].density;
+                var max_tier: i32 = trees[0].density;
                 for (trees[1..]) |tree| {
-                    min_tier = @min(min_tier, tree.density_tier);
-                    max_tier = @max(max_tier, tree.density_tier);
+                    min_tier = @min(min_tier, tree.density);
+                    max_tier = @max(max_tier, tree.density);
                 }
                 const tier_len = max_tier - min_tier + 1;
                 break :blk .{ min_tier, tier_len };
@@ -205,55 +205,55 @@ pub fn Forest(comptime chunk_size: i32) type {
                     var tiers: [tier_len]?DensityTier.Precalculated = undefined;
                     for (&tiers, 0..) |*tier, tier_index| {
                         var tier_tree_ids: []const u32 = &.{};
-                        const density_tier = @as(i32, tier_index) + min_tier;
+                        const density = @as(i32, tier_index) + min_tier;
                         const tree_decls = @typeInfo(ForestSettings).@"struct".decls;
                         for (tree_decls, 0..) |tree_decl, decl_index| {
                             const tree = @field(ForestSettings, tree_decl.name);
-                            if (tree.density_tier == density_tier) {
+                            if (tree.density == density) {
                                 tier_tree_ids = tier_tree_ids ++ .{decl_index};
                             }
                         }
                         tier.* = if (tier_tree_ids.len == 0) null else tier: {
-                            const total_likelihood = total_likelihood: {
-                                var total: f32 = 0;
-                                for (tier_tree_ids) |tree_id|
-                                    total += @field(
+                            const density_tier = DensityTier{
+                                .density = density,
+                                .tree_range = tree_range: {
+                                    var range: [quantization]?u8 = .{null} ** quantization;
+                                    var current_tree_index: u32 = 0;
+                                    var accum_likelihood: f32 = @field(
                                         ForestSettings,
-                                        @typeInfo(ForestSettings).@"struct".decls[tree_id].name,
+                                        @typeInfo(ForestSettings).@"struct".decls[current_tree_index].name,
                                     ).likelihood;
-                                break :total_likelihood @max(total, 1);
-                            };
-                            const tree_range = tree_range: {
-                                var range: [quantization]?u8 = .{null} ** quantization;
-                                var current_tree_index: u32 = 0;
-                                var accum_likelihood: f32 = @field(
-                                    ForestSettings,
-                                    @typeInfo(ForestSettings).@"struct".decls[current_tree_index].name,
-                                ).likelihood;
-                                var next_transition: i32 = @as(i32, @intFromFloat(accum_likelihood / total_likelihood * quantization));
-                                for (&range, 0..) |*cell, cell_index| {
-                                    cell.* = if (current_tree_index >= tier_tree_ids.len)
-                                        null
-                                    else
-                                        tier_tree_ids[current_tree_index];
-                                    if (cell_index >= next_transition) {
-                                        current_tree_index += 1;
-                                        accum_likelihood = if (current_tree_index >= tier_tree_ids.len)
-                                            total_likelihood
-                                        else
-                                            accum_likelihood + @field(
+                                    const total_likelihood = total_likelihood: {
+                                        var total: f32 = 0;
+                                        for (tier_tree_ids) |tree_id|
+                                            total += @field(
                                                 ForestSettings,
-                                                @typeInfo(ForestSettings).@"struct".decls[current_tree_index].name,
+                                                @typeInfo(ForestSettings).@"struct".decls[tree_id].name,
                                             ).likelihood;
-                                        next_transition = @as(i32, @intFromFloat(accum_likelihood / total_likelihood * quantization));
+                                        break :total_likelihood @max(total, 1);
+                                    };
+                                    var next_transition: i32 = @as(i32, @intFromFloat(accum_likelihood / total_likelihood * quantization));
+                                    for (&range, 0..) |*cell, cell_index| {
+                                        cell.* = if (current_tree_index >= tier_tree_ids.len)
+                                            null
+                                        else
+                                            tier_tree_ids[current_tree_index];
+                                        if (cell_index >= next_transition) {
+                                            current_tree_index += 1;
+                                            accum_likelihood = if (current_tree_index >= tier_tree_ids.len)
+                                                total_likelihood
+                                            else
+                                                accum_likelihood + @field(
+                                                    ForestSettings,
+                                                    @typeInfo(ForestSettings).@"struct".decls[current_tree_index].name,
+                                                ).likelihood;
+                                            next_transition = @as(i32, @intFromFloat(accum_likelihood / total_likelihood * quantization));
+                                        }
                                     }
-                                }
-                                break :tree_range range;
+                                    break :tree_range range;
+                                },
                             };
-                            break :tier (DensityTier{
-                                .density = density_tier,
-                                .tree_range = tree_range,
-                            }).precalculate();
+                            break :tier density_tier.precalculate();
                         };
                     }
                     break :blk tiers;
@@ -308,22 +308,22 @@ pub fn main() !void {
     const AsciiForest = Forest(16);
     const Spawner = AsciiForest.spawner(struct {
         pub const grass1 = AsciiForest.Tree{
-            .density_tier = -2,
+            .density = -2,
             .likelihood = 0.05,
             .scale_range = .{ .x_range = .{ 0, 1 }, .y_values = &.{ 0.8, 1.0 } },
         };
         pub const grass2 = AsciiForest.Tree{
-            .density_tier = -2,
+            .density = -2,
             .likelihood = 0.05,
             .scale_range = .{ .x_range = .{ 0, 1 }, .y_values = &.{ 0.8, 1.0 } },
         };
         pub const little_tree = AsciiForest.Tree{
-            .density_tier = 1,
+            .density = 1,
             .likelihood = 0.25,
             .scale_range = .{ .x_range = .{ 0, 1 }, .y_values = &.{ 0.8, 1.0 } },
         };
         pub const big_tree = AsciiForest.Tree{
-            .density_tier = 2,
+            .density = 2,
             .likelihood = 0.5,
             .scale_range = .{ .x_range = .{ 0, 1 }, .y_values = &.{ 0.8, 1.0 } },
             .spawn_radii = &[_]AsciiForest.Tree.SpawnRadius{
