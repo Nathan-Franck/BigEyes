@@ -157,8 +157,8 @@ pub fn build(
             .target = b.resolveTargetQuery(.{ .cpu_arch = .wasm32, .os_tag = .freestanding }),
             .optimize = optimize,
             .name = "check_exe",
-            // .root_source_file = b.path("src/wasm_entry.zig"),
-            .root_source_file = b.path("src/test_perf.zig"),
+            .root_source_file = b.path("src/wasm_entry.zig"),
+            // .root_source_file = b.path("src/test_perf.zig"),
         });
         const zmath = b.dependency("zmath", .{});
         exe_check.root_module.addImport("zmath", zmath.module("root"));

@@ -1,8 +1,9 @@
 const Coord = @import("./forest.zig").Coord;
 const Vec2 = @import("./forest.zig").Vec2;
+pub const Resolution = struct { x: u32, y: u32 };
 
 size: f32,
-resolution: struct { x: u32, y: u32 },
+resolution: Resolution,
 heights: []const f32,
 // mask: []f32, // Do we need a mask?
 

@@ -68,7 +68,7 @@ pub fn NodeGraph(
                 .pointer => |pointer| if (!pointer.is_const) switch (pointer.size) {
                     else => {},
                     .One => {
-                        output_fields = comptime output_fields ++ .{.{
+                        output_fields = comptime output_fields ++ .{std.builtin.Type.StructField{
                             .name = input_field.name,
                             .type = pointer.child,
                             .default_value = null,
@@ -95,7 +95,7 @@ pub fn NodeGraph(
                 .is_tuple = false,
             } });
 
-            node_output_fields = comptime node_output_fields ++ .{.{
+            node_output_fields = comptime node_output_fields ++ .{std.builtin.Type.StructField{
                 .name = node.name[0.. :0],
                 .type = non_error_outputs_and_pointers,
                 .default_value = null,
@@ -114,7 +114,7 @@ pub fn NodeGraph(
     const NodesDirtyFlags = build_type: {
         comptime var fields: []const std.builtin.Type.StructField = &.{};
         inline for (graph.nodes) |node| {
-            fields = comptime fields ++ .{.{
+            fields = comptime fields ++ .{std.builtin.Type.StructField{
                 .name = node.name[0.. :0],
                 .type = bool,
                 .default_value = null,
@@ -148,7 +148,7 @@ pub fn NodeGraph(
                     }};
                 }
             }
-            node_fields = node_fields ++ .{.{
+            node_fields = node_fields ++ .{std.builtin.Type.StructField{
                 .name = node.name[0.. :0],
                 .type = @Type(std.builtin.Type{ .@"struct" = .{
                     .layout = .auto,
@@ -172,7 +172,8 @@ pub fn NodeGraph(
     const node_order = precalculate: {
         var max_node_priority: u16 = 0;
         var node_priorities = [_]u16{0} ** graph.nodes.len;
-        var next_nodes: []const struct { name: []const u8, priority: u16 } = &.{};
+        const Node = struct { name: []const u8, priority: u16 };
+        var next_nodes: []const Node = &.{};
 
         gather_initial_nodes: inline for (graph.nodes) |node| {
             if (node.input_links.len > 0)
@@ -181,7 +182,7 @@ pub fn NodeGraph(
                         .input_field => continue,
                         else => continue :gather_initial_nodes,
                     };
-            next_nodes = comptime next_nodes ++ .{.{ .name = node.name, .priority = 0 }};
+            next_nodes = comptime next_nodes ++ .{Node{ .name = node.name, .priority = 0 }};
         }
 
         inline while (next_nodes.len > 0) {
@@ -209,7 +210,7 @@ pub fn NodeGraph(
                             )) break :is_next_connected true,
                         }
                     } else break :is_next_connected false)
-                        next_nodes = comptime next_nodes ++ .{.{
+                        next_nodes = comptime next_nodes ++ .{Node{
                             .name = next_node.name,
                             .priority = current_node.priority + 1,
                         }};
@@ -343,7 +344,7 @@ pub fn NodeGraph(
                 else
                     @compileError("Node not found " ++ node_id);
                 const field_type = getOutputFieldTypeFromNode(node, output_defn.output_field);
-                fields = fields ++ .{.{
+                fields = fields ++ .{std.builtin.Type.StructField{
                     .name = name[0.. :0],
                     .type = ?field_type,
                     .default_value = null,
@@ -370,7 +371,7 @@ pub fn NodeGraph(
                 else
                     @compileError("Node not found " ++ node_id);
                 const field_type = getOutputFieldTypeFromNode(node, store_field.output_field);
-                system_store_fields = system_store_fields ++ .{.{
+                system_store_fields = system_store_fields ++ .{std.builtin.Type.StructField{
                     .name = name[0.. :0],
                     .type = field_type,
                     .default_value = null,
@@ -461,7 +462,7 @@ pub fn NodeGraph(
                             .pointer => |pointer| if (!pointer.is_const) switch (pointer.size) {
                                 else => {},
                                 .One => {
-                                    mutable_fields = mutable_fields ++ .{.{
+                                    mutable_fields = mutable_fields ++ .{std.builtin.Type.StructField{
                                         .name = link.field[0.. :0],
                                         .type = *const pointer.child,
                                         .default_value = null,

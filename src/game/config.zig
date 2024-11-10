@@ -32,9 +32,9 @@ pub const TerrainSpawner = Forest.spawner(struct {
 });
 
 pub const TerrainStamps = struct {
-    pub const Hemisphere: Stamp = blk: {
+    pub const Hemisphere = blk: {
         @setEvalBranchQuota(100000);
-        const resolution = .{ .x = 16, .y = 16 };
+        const resolution = Stamp.Resolution{ .x = 16, .y = 16 };
         var heights: [resolution.x * resolution.y]f32 = undefined;
         for (0..resolution.y) |y| {
             for (0..resolution.x) |x| {
@@ -50,15 +50,15 @@ pub const TerrainStamps = struct {
             }
         }
         const heights_static = heights;
-        break :blk .{
+        break :blk Stamp{
             .resolution = resolution,
             .heights = &heights_static,
             .size = 1,
         };
     };
-    pub const BigHemisphere: Stamp = blk: {
+    pub const BigHemisphere = blk: {
         @setEvalBranchQuota(100000);
-        const resolution = .{ .x = 32, .y = 32 };
+        const resolution = Stamp.Resolution{ .x = 32, .y = 32 };
         var heights: [resolution.x * resolution.y]f32 = undefined;
         for (0..resolution.y) |y| {
             for (0..resolution.x) |x| {
@@ -74,7 +74,7 @@ pub const TerrainStamps = struct {
             }
         }
         const heights_static = heights;
-        break :blk .{
+        break :blk Stamp{
             .resolution = resolution,
             .heights = &heights_static,
             .size = 3,

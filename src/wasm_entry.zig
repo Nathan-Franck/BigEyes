@@ -98,10 +98,19 @@ export fn callWithJson(name_ptr: [*]const u8, name_len: usize, args_ptr: [*]cons
     };
 }
 
-pub fn panic(msg: []const u8, stack_trace: ?*std.builtin.StackTrace, starting_address: ?usize) noreturn {
-    dumpDebugLogFmt("{s}", .{msg});
-    if (stack_trace) |trace| {
-        dumpDebugLogFmt("{any}", .{trace});
+pub const Panic = struct {
+    pub fn call(msg: []const u8, stack_trace: ?*std.builtin.StackTrace, starting_address: ?usize) noreturn {
+        dumpDebugLogFmt("{s}", .{msg});
+        if (stack_trace) |trace| {
+            dumpDebugLogFmt("{any}", .{trace});
+        }
+        std.debug.FormattedPanic.call(msg, stack_trace, starting_address);
     }
-    std.builtin.default_panic(msg, stack_trace, starting_address);
-}
+
+    pub const messages = std.debug.FormattedPanic.messages;
+    pub const inactiveUnionField = std.debug.FormattedPanic.inactiveUnionField;
+    pub const outOfBounds = std.debug.FormattedPanic.outOfBounds;
+    pub const sentinelMismatch = std.debug.FormattedPanic.sentinelMismatch;
+    pub const startGreaterThanEnd = std.debug.FormattedPanic.startGreaterThanEnd;
+    pub const unwrapError = std.debug.FormattedPanic.unwrapError;
+};

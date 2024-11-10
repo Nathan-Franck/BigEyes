@@ -4,8 +4,8 @@ const Image = @import("./zigimg/src/Image.zig");
 const Rgba32 = @import("./zigimg/src/color.zig").Rgba32;
 
 const ImageSizeLimit = 4096;
-const Rgba32Image = struct {
-    pixels: []const Rgba32,
+pub const Rgba32Image = struct {
+    pixels: []Rgba32,
     width: usize,
     height: usize,
 };
