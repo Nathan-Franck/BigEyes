@@ -3,7 +3,7 @@ const std = @import("std");
 
 pub fn main() !void {
     const allocator = std.heap.page_allocator;
-    const defins = game.nodes;
+    const defins = game.graph_nodes;
     const influence_ranges = try defins.calculateTerrainDensityInfluenceRange(allocator, .{});
     {
         var timer = try std.time.Timer.start();

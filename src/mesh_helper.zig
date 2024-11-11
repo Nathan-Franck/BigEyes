@@ -1,9 +1,9 @@
 const std = @import("std");
 const zmath = @import("zmath");
-const spec = @import("MeshSpec.zig");
-const Point = spec.Point;
-const Quad = spec.Quad;
-const Face = spec.Face;
+
+pub const Point = @Vector(4, f32);
+pub const Face = []const u32;
+pub const Quad = [4]u32;
 
 fn hexToFloat(hex_str: []const u8) f32 {
     var bytes: [4]u8 = undefined;
@@ -11,7 +11,7 @@ fn hexToFloat(hex_str: []const u8) f32 {
     return @as(f32, @bitCast(bytes));
 }
 
-pub fn decodeVertexDataFromHexidecimal(allocator: std.mem.Allocator, hex_str: []const u8) []const spec.Point {
+pub fn decodeVertexDataFromHexidecimal(allocator: std.mem.Allocator, hex_str: []const u8) []const Point {
     var result = std.ArrayList(Point).init(allocator);
     var i: u32 = 0;
     while (i < hex_str.len) {
@@ -26,7 +26,7 @@ pub fn decodeVertexDataFromHexidecimal(allocator: std.mem.Allocator, hex_str: []
     return result.items;
 }
 
-pub fn flipYZ(allocator: std.mem.Allocator, points: []const spec.Point) []const Point {
+pub fn flipYZ(allocator: std.mem.Allocator, points: []const Point) []const Point {
     var flipped = std.ArrayList(Point).init(allocator);
     for (points) |point| {
         flipped.append(Point{ point[0], -point[2], point[1], point[3] }) catch unreachable;

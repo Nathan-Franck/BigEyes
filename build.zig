@@ -50,7 +50,7 @@ const ExportMeshes = struct {
                     full_path,
                     "--background",
                     "--python",
-                    content_dir ++ "/custom-gltf.py",
+                    content_dir ++ "/blend-to-json.py",
                 },
             });
             std.debug.print("stdout: {s}\n", .{res.stdout});
@@ -113,7 +113,7 @@ pub fn build(
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
-    const export_meshes = ExportMeshes.create(b, &.{});
+    const export_meshes = ExportMeshes.create(b, &.{"ebike"});
 
     // Tests (default)
     {
@@ -187,6 +187,7 @@ pub fn build(
         // exe.global_base = 6560;
         // exe.import_memory = true;
         exe.stack_size = std.wasm.page_size * 128;
+        // exe.use_llvm = false;
 
         // // Number of pages reserved for heap memory.
         // // This must match the number of pages used in script.js.
@@ -202,7 +203,7 @@ pub fn build(
         install_step.dependOn(&install_artifact.step);
     }
 
-    // Exe
+    // Test Perf in Terminal
     {
         const exe = b.addExecutable(.{
             .name = "test_perf",
@@ -217,6 +218,7 @@ pub fn build(
         exe.step.dependOn(&export_meshes.step);
         // Windows hax
         exe.want_lto = false;
+        // exe.use_llvm = false;
         // if (exe.optimize == .ReleaseFast)
         //     exe.strip = true;
 

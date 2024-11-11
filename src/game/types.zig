@@ -6,6 +6,10 @@ const forest = @import("../forest.zig");
 const zm = @import("zmath");
 const raytrace = @import("../raytrace.zig");
 
+pub const Point = @Vector(4, f32);
+pub const Face = []const u32;
+pub const Quad = [4]u32;
+
 pub const GreyboxMesh = struct {
     indices: []const u32,
     position: []const f32,

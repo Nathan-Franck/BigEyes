@@ -6,7 +6,6 @@ const subdiv = @import("../subdiv.zig");
 const Image = @import("../Image.zig");
 const raytrace = @import("../raytrace.zig");
 const mesh_helper = @import("../mesh_helper.zig");
-const MeshSpec = @import("../MeshSpec.zig");
 const zm = @import("zmath");
 const tree = @import("../tree.zig");
 const Bounds = @import("../forest.zig").Bounds;
@@ -79,10 +78,10 @@ pub const interface = struct {
 
 pub const NodeGraph = graph_runtime.NodeGraph(
     game.graph.blueprint,
-    nodes,
+    graph_nodes,
 );
 
-pub const nodes = struct {
+pub const graph_nodes = struct {
     pub fn calculateTerrainDensityInfluenceRange(
         allocator: std.mem.Allocator,
         _: struct {},
@@ -95,6 +94,17 @@ pub const nodes = struct {
     }
 
     pub fn getResources(allocator: std.mem.Allocator, _: struct {}) !game.types.Resources {
+        const bike_blend = blk: {
+            const json_data = @embedFile("../content/ebike.blend.json");
+            const mesh_loader = @import("../mesh_loader.zig");
+            const nodes = try mesh_loader.getNodesFromJSON(allocator, json_data);
+            for (nodes) |mesh| {
+                wasm_entry.dumpDebugLogFmt("a mesh! {s}\n", .{mesh.name});
+            }
+            break :blk nodes;
+        };
+        _ = bike_blend;
+
         const skybox = blk: {
             var images: game.types.ProcessedCubeMap = undefined;
             inline for (@typeInfo(game.types.ProcessedCubeMap).@"struct".fields) |field| {
@@ -217,22 +227,17 @@ pub const nodes = struct {
                 };
             },
             .first_person => {
-
-                // Update rotation based on mouse input
                 props.player.euler_rotation = props.player.euler_rotation +
                     props.input.mouse_delta *
                     zm.splat(Vec4, -props.player_settings.look_speed);
 
-                // Create rotation matrix for movement direction
                 const rotation_matrix = zm.matFromRollPitchYaw(-props.player.euler_rotation[1], -props.player.euler_rotation[0], 0);
 
-                // Process horizontal movement (left/right)
                 const right = Vec4{ 1, 0, 0, 0 };
                 var horizontal_movement = Vec4{ 0, 0, 0, 0 };
                 const movement = props.input.movement;
 
                 if (movement.left != null and movement.right != null) {
-                    // Both keys pressed, use most recent
                     if (movement.left.? > movement.right.?) {
                         horizontal_movement = horizontal_movement - right;
                     } else {
@@ -244,11 +249,9 @@ pub const nodes = struct {
                     horizontal_movement = horizontal_movement + right;
                 }
 
-                // Process vertical movement (forward/backward)
                 const forward = Vec4{ 0, 0, 1, 0 };
                 var vertical_movement = Vec4{ 0, 0, 0, 0 };
                 if (movement.forward != null and movement.backward != null) {
-                    // Both keys pressed, use most recent
                     if (movement.forward.? > movement.backward.?) {
                         vertical_movement = vertical_movement + forward;
                     } else {
@@ -260,7 +263,6 @@ pub const nodes = struct {
                     vertical_movement = vertical_movement - forward;
                 }
 
-                // Combine movements
                 const combined_movement = horizontal_movement + vertical_movement;
 
                 if (zm.length3(combined_movement)[0] > 0.001) {
@@ -276,11 +278,12 @@ pub const nodes = struct {
                     const terrain_height = try props.terrain_sampler
                         .loadCache(&terrain_chunk_cache)
                         .sample(allocator, Vec2{ new_position[0], new_position[2] });
-                    new_position[1] = terrain_height + 0.7; // Add eye height offset
+
+                    new_position[1] = terrain_height + 0.7;
+
                     props.player.position = new_position;
                 }
 
-                // Create view matrix
                 const view_projection = zm.perspectiveFovLh(
                     0.25 * 3.14151,
                     @as(f32, @floatFromInt(props.render_resolution.x)) /
@@ -449,7 +452,9 @@ pub const nodes = struct {
             var positions = try allocator.alloc(Vec4, vertex_iterator.total);
             var index: usize = 0;
             while (vertex_iterator.next()) |vertex_coord| : (index += 1) {
-                var stack_allocator = std.heap.stackFallback(1024, allocator); // TODO: Calculate how big the stack should be, maybe should OOM so that I know when we went to slow-mode (Super cool that one line can save 100ms for a 512*512 terrain)
+                // TODO: Calculate how big the stack should be, maybe should OOM so that I know when we went to slow-mode (Super cool that one line can save 100ms for a 512*512 terrain)
+                var stack_allocator = std.heap.stackFallback(1024, allocator);
+
                 const pos_2d: Vec2 = game.config.demo_terrain_bounds.min +
                     @as(Vec2, @floatFromInt(vertex_coord)) *
                     game.config.demo_terrain_bounds.size /

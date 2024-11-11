@@ -62,9 +62,11 @@ fn callWithJsonErr(name_ptr: [*]const u8, name_len: usize, args_ptr: [*]const u8
     switch (case) {
         inline else => |fn_tag| {
             const func = @field(game.interface, @tagName(fn_tag));
-            var diagnostics = std.json.Diagnostics{};
+
             var scanner = std.json.Scanner.initCompleteInput(allocator, args_string);
             defer scanner.deinit();
+
+            var diagnostics = std.json.Diagnostics{};
             scanner.enableDiagnostics(&diagnostics);
 
             const args = std.json.parseFromTokenSource(Args(func), allocator, &scanner, .{}) catch |err| {
@@ -104,7 +106,8 @@ pub const Panic = struct {
         if (stack_trace) |trace| {
             dumpDebugLogFmt("{any}", .{trace});
         }
-        std.debug.FormattedPanic.call(msg, stack_trace, starting_address);
+        _ = starting_address;
+        unreachable;
     }
 
     pub const messages = std.debug.FormattedPanic.messages;
