@@ -20,6 +20,37 @@ pub const NodeGraphBlueprintEntry = struct {
     name: []const u8,
     function: []const u8,
     input_links: []const InputLink,
+
+    pub fn validateLinkingAllParameters(
+        comptime node: @This(),
+        comptime function_params: []const std.builtin.Type.Fn.Param,
+    ) void {
+        comptime {
+            var unhandled_inputs: []const []const u8 = &.{};
+
+            for (@typeInfo(switch (function_params.len) {
+                else => @compileError("Unsupported number of function parameters for node"),
+                1 => function_params[0].type.?,
+                2 => function_params[1].type.?,
+            }).@"struct".fields) |field| {
+                unhandled_inputs = unhandled_inputs ++ .{field.name};
+            }
+            for (node.input_links) |link| {
+                var next_unhandled_inputs: []const []const u8 = &.{};
+                for (unhandled_inputs) |unhandled_input| {
+                    if (!std.mem.eql(u8, unhandled_input, link.field))
+                        next_unhandled_inputs = next_unhandled_inputs ++ .{unhandled_input};
+                }
+                unhandled_inputs = next_unhandled_inputs;
+            }
+            if (unhandled_inputs.len > 0) {
+                @compileError(std.fmt.comptimePrint(
+                    "Node {s} missing input fields {s}",
+                    .{ node.name, unhandled_inputs },
+                ));
+            }
+        }
+    }
 };
 
 pub const SystemSink = struct {
@@ -425,9 +456,7 @@ pub fn NodeGraph(
             return field_type;
         }
 
-        pub fn update(self: *Self, system_inputs: PartialSystemInputs) !SystemOutputs {
-
-            // Check inputs for changes...
+        pub fn dirtyFromInputs(self: *Self, system_inputs: PartialSystemInputs) SystemInputsDirtyFlags {
             var inputs_dirty: SystemInputsDirtyFlags = undefined;
             inline for (@typeInfo(SystemInputs).@"struct".fields) |field| {
                 const field_name = field.name;
@@ -441,124 +470,105 @@ pub fn NodeGraph(
                     @field(self.system_inputs, field_name) = input;
                 } else dirty.* = false;
             }
+            return inputs_dirty;
+        }
 
-            // Now we can actually set the inputs!
+        const WhatAmI = struct {};
 
-            // Process all nodes...
-            inline for (node_order) |node_index| {
-                const node = graph.nodes[node_index];
-                const node_defn = @field(node_definitions, node.name);
-                const node_params = @typeInfo(@TypeOf(node_defn)).@"fn".params;
-                const NodeInputs = node_params[node_params.len - 1].type.?;
-
-                var node_inputs: NodeInputs = undefined;
-                const is_dirty = &@field(self.nodes_dirty_flags, node.name);
-
-                var mutable_fields: build_type: {
-                    var mutable_fields: []const std.builtin.Type.StructField = &.{};
-                    for (node.input_links) |link|
-                        switch (@typeInfo(@TypeOf(@field(node_inputs, link.field)))) {
+        fn TypeThing(node: NodeGraphBlueprintEntry) type {
+            const node_defn = @field(node_definitions, node.name);
+            const node_params = @typeInfo(@TypeOf(node_defn)).@"fn".params;
+            const NodeInputsInner = node_params[node_params.len - 1].type.?;
+            const mutable_fields = blk: {
+                const node_inputs: NodeInputsInner = undefined;
+                var mutable_fields: []const std.builtin.Type.StructField = &.{};
+                for (node.input_links) |link|
+                    switch (@typeInfo(@TypeOf(@field(node_inputs, link.field)))) {
+                        else => {},
+                        .pointer => |pointer| if (!pointer.is_const) switch (pointer.size) {
                             else => {},
-                            .pointer => |pointer| if (!pointer.is_const) switch (pointer.size) {
-                                else => {},
-                                .One => {
-                                    mutable_fields = mutable_fields ++ .{std.builtin.Type.StructField{
-                                        .name = link.field[0.. :0],
-                                        .type = *const pointer.child,
-                                        .default_value = null,
-                                        .is_comptime = false,
-                                        .alignment = @alignOf(pointer.child),
-                                    }};
-                                },
-                                .Slice => {
-                                    mutable_fields = mutable_fields ++ .{.{
-                                        .name = link.field[0.. :0],
-                                        .type = []const pointer.child,
-                                        .default_value = null,
-                                        .is_comptime = false,
-                                        .alignment = @alignOf(pointer.child),
-                                    }};
-                                },
+                            .One => {
+                                mutable_fields = mutable_fields ++ .{std.builtin.Type.StructField{
+                                    .name = link.field[0.. :0],
+                                    .type = *const pointer.child,
+                                    .default_value = null,
+                                    .is_comptime = false,
+                                    .alignment = @alignOf(pointer.child),
+                                }};
                             },
-                        };
-                    break :build_type @Type(.{ .@"struct" = .{
-                        .layout = .auto,
-                        .fields = mutable_fields,
-                        .decls = &.{},
-                        .is_tuple = false,
-                    } });
-                } = undefined;
+                            .Slice => {
+                                mutable_fields = mutable_fields ++ .{.{
+                                    .name = link.field[0.. :0],
+                                    .type = []const pointer.child,
+                                    .default_value = null,
+                                    .is_comptime = false,
+                                    .alignment = @alignOf(pointer.child),
+                                }};
+                            },
+                        },
+                    };
+                break :blk mutable_fields;
+            };
+            const MutableFieldsInner = @Type(.{ .@"struct" = .{
+                .layout = .auto,
+                .fields = mutable_fields,
+                .decls = &.{},
+                .is_tuple = false,
+            } });
+            return struct {
+                pub const NodeInputs = NodeInputsInner;
+                pub const MutableFields = MutableFieldsInner;
 
-                const function_params = @typeInfo(
-                    @TypeOf(@field(node_definitions, node.function)),
-                ).@"fn".params;
+                graph_runtime: *Self,
+                node_inputs: NodeInputs,
+                mutable_fields: MutableFields,
+                node: NodeGraphBlueprintEntry,
+                inputs_dirty: SystemInputsDirtyFlags,
+                is_dirty: *bool,
 
-                comptime {
-                    var unhandled_inputs: []const []const u8 = &.{};
-
-                    for (@typeInfo(switch (function_params.len) {
-                        else => @compileError("Unsupported number of function parameters for node"),
-                        1 => function_params[0].type.?,
-                        2 => function_params[1].type.?,
-                    }).@"struct".fields) |field| {
-                        unhandled_inputs = unhandled_inputs ++ .{field.name};
-                    }
-                    for (node.input_links) |link| {
-                        var next_unhandled_inputs: []const []const u8 = &.{};
-                        for (unhandled_inputs) |unhandled_input| {
-                            if (!std.mem.eql(u8, unhandled_input, link.field))
-                                next_unhandled_inputs = next_unhandled_inputs ++ .{unhandled_input};
-                        }
-                        unhandled_inputs = next_unhandled_inputs;
-                    }
-                    if (unhandled_inputs.len > 0) {
-                        @compileError(std.fmt.comptimePrint(
-                            "Node {s} missing input fields {s}",
-                            .{ node.name, unhandled_inputs },
-                        ));
-                    }
-                }
-
-                inline for (node.input_links) |link| {
+                fn thinger(
+                    self: *@This(),
+                    comptime link: InputLink,
+                ) void {
                     var is_field_dirty = false;
                     const node_input_field = switch (link.source) {
                         .input_field => |input_field| node_input: {
-                            if (@field(inputs_dirty, input_field)) {
+                            if (@field(self.inputs_dirty, input_field)) {
                                 is_field_dirty = true;
                             }
-                            break :node_input @field(self.system_inputs, input_field);
+                            break :node_input @field(self.graph_runtime.system_inputs, input_field);
                         },
-                        .store_field => |store_field| @field(self.store, store_field),
+                        .store_field => |store_field| @field(self.graph_runtime.store, store_field),
 
                         .node => |node_blueprint| input_field: {
-                            const node_outputs = @field(self.nodes_outputs, node_blueprint.name);
+                            const node_outputs = @field(self.graph_runtime.nodes_outputs, node_blueprint.name);
                             const node_output = @field(node_outputs, node_blueprint.field);
-                            if (@field(self.nodes_dirty_flags, node_blueprint.name)) {
+                            if (@field(self.graph_runtime.nodes_dirty_flags, node_blueprint.name)) {
                                 is_field_dirty = true;
                             }
                             break :input_field node_output;
                         },
                     };
-                    const target_input_field = &@field(node_inputs, link.field);
+                    const target_input_field = &@field(self.node_inputs, link.field);
                     const TargetInputField = @TypeOf(target_input_field.*);
-                    const value = if (!@hasField(@TypeOf(mutable_fields), link.field))
+                    const value = if (!@hasField(MutableFields, link.field))
                         node_input_field
                     else switch (@typeInfo(TargetInputField)) {
                         else => @compileError("Mutable field mismatch"),
                         .pointer => |pointer| switch (pointer.size) {
                             .One => deferred_clone: {
-                                @field(mutable_fields, link.field) = &node_input_field;
+                                @field(self.mutable_fields, link.field) = &node_input_field;
                                 break :deferred_clone undefined;
                             },
                             .Slice => deferred_clone: {
-                                @field(mutable_fields, link.field) = node_input_field;
+                                @field(self.mutable_fields, link.field) = node_input_field;
                                 break :deferred_clone undefined;
                             },
                             else => @compileError("Unsupported pointer type"),
                         },
                     };
                     if (comptime utils.Queryable.isValue(TargetInputField)) {
-                        const queried = &@field(@field(self.nodes_queried_flags, node.name), link.field);
+                        const queried = &@field(@field(self.graph_runtime.nodes_queried_flags, node.name), link.field);
                         if (!queried.*)
                             is_field_dirty = false;
                         queried.* = false;
@@ -568,32 +578,65 @@ pub fn NodeGraph(
                     }
 
                     // Accumulate dirtiness on dirty fields
-                    if (is_field_dirty) is_dirty.* = true;
+                    if (is_field_dirty) self.is_dirty.* = true;
+                }
+            };
+        }
+
+        pub fn update(self: *Self, system_inputs: PartialSystemInputs) !SystemOutputs {
+
+            // Check inputs for changes...
+            const inputs_dirty = self.dirtyFromInputs(system_inputs);
+
+            // Now we can actually set the inputs!
+
+            // Process all nodes...
+            inline for (node_order) |node_index| {
+                const node = graph.nodes[node_index];
+
+                const Chomper = TypeThing(node);
+                var chomper: Chomper = .{
+                    .graph_runtime = self,
+                    .node = node,
+                    .inputs_dirty = inputs_dirty,
+                    .node_inputs = undefined,
+                    .mutable_fields = undefined,
+                    .is_dirty = &@field(self.nodes_dirty_flags, node.name),
+                };
+
+                const function_params = @typeInfo(
+                    @TypeOf(@field(node_definitions, node.function)),
+                ).@"fn".params;
+
+                node.validateLinkingAllParameters(function_params);
+
+                inline for (node.input_links) |link| {
+                    chomper.thinger(link);
                 }
 
                 const target = &@field(self.nodes_outputs, node.name);
-                target.* = if (!is_dirty.*)
+                target.* = if (!chomper.is_dirty.*)
                     target.*
                 else blk: {
                     _ = self.nodes_arenas[node_index].reset(.retain_capacity);
 
                     // Duplicate data from inputs where the node is allowed to manipulate pointers ...
-                    inline for (@typeInfo(@TypeOf(mutable_fields)).@"struct".fields) |field| {
+                    inline for (@typeInfo(@TypeOf(chomper.mutable_fields)).@"struct".fields) |field| {
                         const pointer = @typeInfo(field.type).pointer;
-                        const input_to_clone = &@field(node_inputs, field.name);
+                        const input_to_clone = &@field(chomper.node_inputs, field.name);
                         input_to_clone.* = switch (pointer.size) {
                             .One => cloned: {
                                 var result = try utils.deepClone(
                                     pointer.child,
                                     self.nodes_arenas[node_index].allocator(),
-                                    @field(mutable_fields, field.name).*,
+                                    @field(chomper.mutable_fields, field.name).*,
                                 );
                                 break :cloned &result;
                             },
                             .Slice => try utils.deepClone(
                                 @TypeOf(input_to_clone.*),
                                 self.nodes_arenas[node_index].allocator(),
-                                @field(mutable_fields, field.name),
+                                @field(chomper.mutable_fields, field.name),
                             ),
                             else => @panic("oh no..."),
                         };
@@ -604,21 +647,21 @@ pub fn NodeGraph(
                         @field(node_definitions, node.function),
                         if (function_params.len == 1)
                             .{
-                                node_inputs,
+                                chomper.node_inputs,
                             }
                         else
                             .{
                                 self.nodes_arenas[node_index].allocator(),
-                                node_inputs,
+                                chomper.node_inputs,
                             },
                     );
                     var node_output: @TypeOf(target.*) = undefined;
-                    inline for (@typeInfo(@TypeOf(mutable_fields)).@"struct".fields) |mutable_field| {
+                    inline for (@typeInfo(@TypeOf(chomper.mutable_fields)).@"struct".fields) |mutable_field| {
                         const pointer = @typeInfo(mutable_field.type).pointer;
                         @field(node_output, mutable_field.name) = switch (pointer.size) {
                             else => @panic("qwer"),
-                            .One => @field(node_inputs, mutable_field.name).*,
-                            .Slice => @field(node_inputs, mutable_field.name),
+                            .One => @field(chomper.node_inputs, mutable_field.name).*,
+                            .Slice => @field(chomper.node_inputs, mutable_field.name),
                         };
                     }
                     node_output = utils.copyWith(
