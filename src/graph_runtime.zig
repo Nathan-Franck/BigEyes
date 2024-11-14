@@ -530,16 +530,16 @@ pub fn NodeGraph(
                     }
                 }
 
-                pub fn blah(self: *@This(), TargetInputField: type, comptime link: InputLink, node_input_field: anytype) TargetInputField {
+                pub fn blah(self: *@This(), TargetInputField: type, comptime link: InputLink, node_input_field: TargetInputField) TargetInputField {
                     return switch (@typeInfo(TargetInputField)) {
                         else => @compileError("Mutable field mismatch"),
                         .pointer => |pointer| switch (pointer.size) {
                             .One => deferred_clone: {
-                                @field(self.fields, link.field) = &node_input_field;
+                                @field(self.fields, link.field) = node_input_field;
                                 break :deferred_clone undefined;
                             },
                             .Slice => deferred_clone: {
-                                @field(self.fields, link.field) = node_input_field;
+                                @field(self.fields, link.field) = node_input_field.*;
                                 break :deferred_clone undefined;
                             },
                             else => @compileError("Unsupported pointer type"),
@@ -573,7 +573,7 @@ pub fn NodeGraph(
                 var node_inputs: NodeInputs = undefined;
                 inline for (node.input_links) |link| {
                     var is_field_dirty = false;
-                    const node_input_field = switch (link.source) {
+                    var node_input_field = switch (link.source) {
                         .input_field => |input_field| node_input: {
                             if (@field(inputs_dirty, input_field)) {
                                 is_field_dirty = true;
@@ -595,7 +595,20 @@ pub fn NodeGraph(
                     const value = if (!@hasField(@TypeOf(mutable_fields.fields), link.field))
                         node_input_field
                     else
-                        mutable_fields.blah(TargetInputField, link, node_input_field);
+                        mutable_fields.blah(TargetInputField, link, &node_input_field);
+                    //     else => @compileError("Mutable field mismatch"),
+                    //     .pointer => |pointer| switch (pointer.size) {
+                    //         .One => deferred_clone: {
+                    //             @field(mutable_fields.fields, link.field) = &node_input_field;
+                    //             break :deferred_clone undefined;
+                    //         },
+                    //         .Slice => deferred_clone: {
+                    //             @field(mutable_fields.fields, link.field) = node_input_field;
+                    //             break :deferred_clone undefined;
+                    //         },
+                    //         else => @compileError("Unsupported pointer type"),
+                    //     },
+                    // };
                     if (comptime utils.Queryable.isValue(TargetInputField)) {
                         const queried = &@field(@field(self.nodes_queried_flags, node.name), link.field);
                         if (!queried.*)
