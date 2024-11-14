@@ -473,6 +473,37 @@ pub fn NodeGraph(
             return inputs_dirty;
         }
 
+        pub fn MutableFields(node: NodeGraphBlueprintEntry, NodeInputs: type) type {
+            var mutable_fields: []const std.builtin.Type.StructField = &.{};
+            const node_inputs: NodeInputs = undefined;
+            for (node.input_links) |link|
+                switch (@typeInfo(@TypeOf(@field(node_inputs, link.field)))) {
+                    else => {},
+                    .pointer => |pointer| if (!pointer.is_const) switch (pointer.size) {
+                        else => {},
+                        .One, .Slice => {
+                            mutable_fields = mutable_fields ++ .{std.builtin.Type.StructField{
+                                .name = link.field[0.. :0],
+                                .type = switch (pointer.size) {
+                                    else => unreachable,
+                                    .One => *const pointer.child,
+                                    .Slice => []const pointer.child,
+                                },
+                                .default_value = null,
+                                .is_comptime = false,
+                                .alignment = @alignOf(pointer.child),
+                            }};
+                        },
+                    },
+                };
+            return @Type(.{ .@"struct" = .{
+                .layout = .auto,
+                .fields = mutable_fields,
+                .decls = &.{},
+                .is_tuple = false,
+            } });
+        }
+
         pub fn update(self: *Self, system_inputs: PartialSystemInputs) !SystemOutputs {
 
             // Check inputs for changes...
@@ -487,50 +518,16 @@ pub fn NodeGraph(
                 const node_params = @typeInfo(@TypeOf(node_defn)).@"fn".params;
                 const NodeInputs = node_params[node_params.len - 1].type.?;
 
-                var node_inputs: NodeInputs = undefined;
-                const is_dirty = &@field(self.nodes_dirty_flags, node.name);
-
-                var mutable_fields: build_type: {
-                    var mutable_fields: []const std.builtin.Type.StructField = &.{};
-                    for (node.input_links) |link|
-                        switch (@typeInfo(@TypeOf(@field(node_inputs, link.field)))) {
-                            else => {},
-                            .pointer => |pointer| if (!pointer.is_const) switch (pointer.size) {
-                                else => {},
-                                .One => {
-                                    mutable_fields = mutable_fields ++ .{std.builtin.Type.StructField{
-                                        .name = link.field[0.. :0],
-                                        .type = *const pointer.child,
-                                        .default_value = null,
-                                        .is_comptime = false,
-                                        .alignment = @alignOf(pointer.child),
-                                    }};
-                                },
-                                .Slice => {
-                                    mutable_fields = mutable_fields ++ .{.{
-                                        .name = link.field[0.. :0],
-                                        .type = []const pointer.child,
-                                        .default_value = null,
-                                        .is_comptime = false,
-                                        .alignment = @alignOf(pointer.child),
-                                    }};
-                                },
-                            },
-                        };
-                    break :build_type @Type(.{ .@"struct" = .{
-                        .layout = .auto,
-                        .fields = mutable_fields,
-                        .decls = &.{},
-                        .is_tuple = false,
-                    } });
-                } = undefined;
-
                 const function_params = @typeInfo(
                     @TypeOf(@field(node_definitions, node.function)),
                 ).@"fn".params;
 
                 node.validateLinkingAllParameters(function_params);
 
+                const is_dirty = &@field(self.nodes_dirty_flags, node.name);
+
+                var mutable_fields: MutableFields(node, NodeInputs) = undefined;
+                var node_inputs: NodeInputs = undefined;
                 inline for (node.input_links) |link| {
                     var is_field_dirty = false;
                     const node_input_field = switch (link.source) {
