@@ -473,82 +473,6 @@ pub fn NodeGraph(
             return inputs_dirty;
         }
 
-        pub fn MutableFields(node: NodeGraphBlueprintEntry, NodeInputs: type) type {
-            var mutable_fields: []const std.builtin.Type.StructField = &.{};
-            const temp_node_inputs: NodeInputs = undefined;
-            for (node.input_links) |link|
-                switch (@typeInfo(@TypeOf(@field(temp_node_inputs, link.field)))) {
-                    else => {},
-                    .pointer => |pointer| if (!pointer.is_const) switch (pointer.size) {
-                        else => {},
-                        .One, .Slice => {
-                            mutable_fields = mutable_fields ++ .{std.builtin.Type.StructField{
-                                .name = link.field[0.. :0],
-                                .type = switch (pointer.size) {
-                                    else => unreachable,
-                                    .One => *const pointer.child,
-                                    .Slice => []const pointer.child,
-                                },
-                                .default_value = null,
-                                .is_comptime = false,
-                                .alignment = @alignOf(pointer.child),
-                            }};
-                        },
-                    },
-                };
-            const Fields = @Type(.{ .@"struct" = .{
-                .layout = .auto,
-                .fields = mutable_fields,
-                .decls = &.{},
-                .is_tuple = false,
-            } });
-            return struct {
-                fields: Fields,
-
-                /// Duplicate data from inputs where the node is allowed to manipulate pointers
-                pub fn duplicateMutableInputs(self: @This(), arena: std.mem.Allocator, node_inputs: anytype) !void {
-                    inline for (@typeInfo(@TypeOf(self.fields)).@"struct".fields) |field| {
-                        const pointer = @typeInfo(field.type).pointer;
-                        const input_to_clone = &@field(node_inputs.*, field.name);
-                        input_to_clone.* = switch (pointer.size) {
-                            .One => cloned: {
-                                const clone = try arena.create(pointer.child);
-                                clone.* = try utils.deepClone(
-                                    pointer.child,
-                                    arena,
-                                    @field(self.fields, field.name).*,
-                                );
-                                break :cloned clone;
-                            },
-                            .Slice => try utils.deepClone(
-                                @TypeOf(input_to_clone.*),
-                                arena,
-                                @field(self.fields, field.name),
-                            ),
-                            else => @panic("oh no..."),
-                        };
-                    }
-                }
-
-                pub fn blah(self: *@This(), TargetInputField: type, comptime link: InputLink, node_input_field: TargetInputField) TargetInputField {
-                    return switch (@typeInfo(TargetInputField)) {
-                        else => @compileError("Mutable field mismatch"),
-                        .pointer => |pointer| switch (pointer.size) {
-                            .One => deferred_clone: {
-                                @field(self.fields, link.field) = node_input_field;
-                                break :deferred_clone undefined;
-                            },
-                            .Slice => deferred_clone: {
-                                @field(self.fields, link.field) = node_input_field.*;
-                                break :deferred_clone undefined;
-                            },
-                            else => @compileError("Unsupported pointer type"),
-                        },
-                    };
-                }
-            };
-        }
-
         pub fn update(self: *Self, system_inputs: PartialSystemInputs) !SystemOutputs {
 
             // Check inputs for changes...
@@ -560,6 +484,7 @@ pub fn NodeGraph(
                 const node_defn = @field(node_definitions, node.name);
                 const node_params = @typeInfo(@TypeOf(node_defn)).@"fn".params;
                 const NodeInputs = node_params[node_params.len - 1].type.?;
+                const MutableInputs = utils.MutableInputs(node, NodeInputs);
 
                 const function_params = @typeInfo(
                     @TypeOf(@field(node_definitions, node.function)),
@@ -569,7 +494,7 @@ pub fn NodeGraph(
 
                 const is_dirty = &@field(self.nodes_dirty_flags, node.name);
 
-                var mutable_fields: MutableFields(node, NodeInputs) = undefined;
+                var mutable_inputs: MutableInputs = undefined;
                 var node_inputs: NodeInputs = undefined;
                 inline for (node.input_links) |link| {
                     var is_field_dirty = false;
@@ -592,32 +517,18 @@ pub fn NodeGraph(
                     };
                     const target_input_field = &@field(node_inputs, link.field);
                     const TargetInputField = @TypeOf(target_input_field.*);
-                    const value = if (!@hasField(@TypeOf(mutable_fields.fields), link.field))
-                        node_input_field
+                    const value = if (@hasField(MutableInputs.Fields, link.field))
+                        mutable_inputs.register(TargetInputField, link, &node_input_field)
                     else
-                        mutable_fields.blah(TargetInputField, link, &node_input_field);
-                    //     else => @compileError("Mutable field mismatch"),
-                    //     .pointer => |pointer| switch (pointer.size) {
-                    //         .One => deferred_clone: {
-                    //             @field(mutable_fields.fields, link.field) = &node_input_field;
-                    //             break :deferred_clone undefined;
-                    //         },
-                    //         .Slice => deferred_clone: {
-                    //             @field(mutable_fields.fields, link.field) = node_input_field;
-                    //             break :deferred_clone undefined;
-                    //         },
-                    //         else => @compileError("Unsupported pointer type"),
-                    //     },
-                    // };
-                    if (comptime utils.Queryable.isValue(TargetInputField)) {
-                        const queried = &@field(@field(self.nodes_queried_flags, node.name), link.field);
-                        if (!queried.*)
-                            is_field_dirty = false;
-                        queried.* = false;
-                        target_input_field.* = TargetInputField{ .raw = value, .queried = queried };
-                    } else {
-                        target_input_field.* = value;
-                    }
+                        node_input_field;
+                    target_input_field.* = if (comptime utils.Queryable.isValue(TargetInputField))
+                        TargetInputField.initQueryable(
+                            value,
+                            &is_field_dirty,
+                            &@field(@field(self.nodes_queried_flags, node.name), link.field),
+                        )
+                    else
+                        value;
 
                     // Accumulate dirtiness on dirty fields
                     if (is_field_dirty) is_dirty.* = true;
@@ -627,29 +538,25 @@ pub fn NodeGraph(
                 target.* = if (!is_dirty.*)
                     target.*
                 else process_output: {
-                    _ = self.nodes_arenas[node_index].reset(.retain_capacity);
-                    try mutable_fields.duplicateMutableInputs(
-                        self.nodes_arenas[node_index].allocator(),
-                        &node_inputs,
-                    );
+                    var node_arena = self.nodes_arenas[node_index];
+                    _ = node_arena.reset(.retain_capacity);
+
+                    try mutable_inputs.duplicate(node_arena.allocator(), &node_inputs);
+
                     const function_output = @call(.auto, @field(
                         node_definitions,
                         node.function,
                     ), if (function_params.len == 1) .{
                         node_inputs,
                     } else .{
-                        self.nodes_arenas[node_index].allocator(),
+                        node_arena.allocator(),
                         node_inputs,
                     });
+
                     var node_output: @TypeOf(target.*) = undefined;
-                    inline for (@typeInfo(@TypeOf(mutable_fields.fields)).@"struct".fields) |mutable_field| {
-                        const pointer = @typeInfo(mutable_field.type).pointer;
-                        @field(node_output, mutable_field.name) = switch (pointer.size) {
-                            else => @panic("qwer"),
-                            .One => @field(node_inputs, mutable_field.name).*,
-                            .Slice => @field(node_inputs, mutable_field.name),
-                        };
-                    }
+
+                    mutable_inputs.copyBack(node_inputs, &node_output);
+
                     node_output = utils.copyWith(
                         node_output,
                         switch (@typeInfo(@TypeOf(function_output))) {
@@ -705,40 +612,3 @@ pub fn NodeGraph(
     };
     return Graph;
 }
-
-// test "Build" {
-//     const NodeDefinitions = @import("./legacy/node_graph_blueprint_nodes.zig");
-//     const node_graph_blueprint = @import("./legacy/interactive_node_builder_blueprint.zig");
-//     const allocator = std.heap.page_allocator;
-//     const MyNodeGraph = NodeGraph(
-//         node_graph_blueprint.node_graph_blueprint,
-//         NodeDefinitions,
-//     );
-//     var my_node_graph = try MyNodeGraph.init(.{
-//         .allocator = allocator,
-//         .store = .{
-//             .node_dimensions = &.{},
-//             .blueprint = .{
-//                 .nodes = &.{},
-//                 .output = &.{},
-//                 .store = &.{},
-//             },
-//             .camera = .{},
-//             .context_menu = .{ .open = false, .location = .{ .x = 0, .y = 0 } },
-//             .interaction_state = .{ .node_selection = &.{} },
-//         },
-//     });
-//     _ = try my_node_graph.update(.{
-//         .recieved_blueprint = node_graph_blueprint.node_graph_blueprint,
-//         .keyboard_modifiers = .{
-//             .shift = false,
-//             .alt = false,
-//             .control = false,
-//             .super = false,
-//         },
-//     });
-//     // Yay, at least we can confirm that the Blueprint Loader works!
-//     // Next will be to validate that multiple steps are working in-tandem with each other...
-//     try std.testing.expect(my_node_graph.store.blueprint.nodes.len > 0);
-//     try std.testing.expect(my_node_graph.store.blueprint.store.len > 0);
-// }
