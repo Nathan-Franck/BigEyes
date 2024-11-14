@@ -506,22 +506,23 @@ pub fn NodeGraph(
 
         /// Duplicate data from inputs where the node is allowed to manipulate pointers
         pub fn duplicateMutableInputs(arena: std.mem.Allocator, mutable_fields: anytype, node_inputs: anytype) !void {
-            inline for (@typeInfo(@TypeOf(mutable_fields)).@"struct".fields) |field| {
+            inline for (@typeInfo(@TypeOf(mutable_fields.*)).@"struct".fields) |field| {
                 const pointer = @typeInfo(field.type).pointer;
-                const input_to_clone = &@field(node_inputs, field.name);
+                const input_to_clone = &@field(node_inputs.*, field.name);
                 input_to_clone.* = switch (pointer.size) {
                     .One => cloned: {
-                        var result = try utils.deepClone(
+                        const clone = try arena.create(pointer.child);
+                        clone.* = try utils.deepClone(
                             pointer.child,
                             arena,
-                            @field(mutable_fields, field.name).*,
+                            @field(mutable_fields.*, field.name).*,
                         );
-                        break :cloned &result;
+                        break :cloned clone;
                     },
                     .Slice => try utils.deepClone(
                         @TypeOf(input_to_clone.*),
                         arena,
-                        @field(mutable_fields, field.name),
+                        @field(mutable_fields.*, field.name),
                     ),
                     else => @panic("oh no..."),
                 };
@@ -608,23 +609,20 @@ pub fn NodeGraph(
                     target.*
                 else process_output: {
                     _ = self.nodes_arenas[node_index].reset(.retain_capacity);
-
                     try duplicateMutableInputs(
                         self.nodes_arenas[node_index].allocator(),
-                        mutable_fields,
+                        &mutable_fields,
                         &node_inputs,
                     );
-
-                    const function_output = @call(
-                        .auto,
-                        @field(node_definitions, node.function),
-                        if (function_params.len == 1) .{
-                            node_inputs,
-                        } else .{
-                            self.nodes_arenas[node_index].allocator(),
-                            node_inputs,
-                        },
-                    );
+                    const function_output = @call(.auto, @field(
+                        node_definitions,
+                        node.function,
+                    ), if (function_params.len == 1) .{
+                        node_inputs,
+                    } else .{
+                        self.nodes_arenas[node_index].allocator(),
+                        node_inputs,
+                    });
                     var node_output: @TypeOf(target.*) = undefined;
                     inline for (@typeInfo(@TypeOf(mutable_fields)).@"struct".fields) |mutable_field| {
                         const pointer = @typeInfo(mutable_field.type).pointer;
