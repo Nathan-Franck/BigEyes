@@ -475,9 +475,9 @@ pub fn NodeGraph(
 
         pub fn MutableFields(node: NodeGraphBlueprintEntry, NodeInputs: type) type {
             var mutable_fields: []const std.builtin.Type.StructField = &.{};
-            const node_inputs: NodeInputs = undefined;
+            const temp_node_inputs: NodeInputs = undefined;
             for (node.input_links) |link|
-                switch (@typeInfo(@TypeOf(@field(node_inputs, link.field)))) {
+                switch (@typeInfo(@TypeOf(@field(temp_node_inputs, link.field)))) {
                     else => {},
                     .pointer => |pointer| if (!pointer.is_const) switch (pointer.size) {
                         else => {},
@@ -496,45 +496,63 @@ pub fn NodeGraph(
                         },
                     },
                 };
-            return @Type(.{ .@"struct" = .{
+            const Fields = @Type(.{ .@"struct" = .{
                 .layout = .auto,
                 .fields = mutable_fields,
                 .decls = &.{},
                 .is_tuple = false,
             } });
-        }
+            return struct {
+                fields: Fields,
 
-        /// Duplicate data from inputs where the node is allowed to manipulate pointers
-        pub fn duplicateMutableInputs(arena: std.mem.Allocator, mutable_fields: anytype, node_inputs: anytype) !void {
-            inline for (@typeInfo(@TypeOf(mutable_fields.*)).@"struct".fields) |field| {
-                const pointer = @typeInfo(field.type).pointer;
-                const input_to_clone = &@field(node_inputs.*, field.name);
-                input_to_clone.* = switch (pointer.size) {
-                    .One => cloned: {
-                        const clone = try arena.create(pointer.child);
-                        clone.* = try utils.deepClone(
-                            pointer.child,
-                            arena,
-                            @field(mutable_fields.*, field.name).*,
-                        );
-                        break :cloned clone;
-                    },
-                    .Slice => try utils.deepClone(
-                        @TypeOf(input_to_clone.*),
-                        arena,
-                        @field(mutable_fields.*, field.name),
-                    ),
-                    else => @panic("oh no..."),
-                };
-            }
+                /// Duplicate data from inputs where the node is allowed to manipulate pointers
+                pub fn duplicateMutableInputs(self: @This(), arena: std.mem.Allocator, node_inputs: anytype) !void {
+                    inline for (@typeInfo(@TypeOf(self.fields)).@"struct".fields) |field| {
+                        const pointer = @typeInfo(field.type).pointer;
+                        const input_to_clone = &@field(node_inputs.*, field.name);
+                        input_to_clone.* = switch (pointer.size) {
+                            .One => cloned: {
+                                const clone = try arena.create(pointer.child);
+                                clone.* = try utils.deepClone(
+                                    pointer.child,
+                                    arena,
+                                    @field(self.fields, field.name).*,
+                                );
+                                break :cloned clone;
+                            },
+                            .Slice => try utils.deepClone(
+                                @TypeOf(input_to_clone.*),
+                                arena,
+                                @field(self.fields, field.name),
+                            ),
+                            else => @panic("oh no..."),
+                        };
+                    }
+                }
+
+                pub fn blah(self: *@This(), TargetInputField: type, comptime link: InputLink, node_input_field: anytype) TargetInputField {
+                    return switch (@typeInfo(TargetInputField)) {
+                        else => @compileError("Mutable field mismatch"),
+                        .pointer => |pointer| switch (pointer.size) {
+                            .One => deferred_clone: {
+                                @field(self.fields, link.field) = &node_input_field;
+                                break :deferred_clone undefined;
+                            },
+                            .Slice => deferred_clone: {
+                                @field(self.fields, link.field) = node_input_field;
+                                break :deferred_clone undefined;
+                            },
+                            else => @compileError("Unsupported pointer type"),
+                        },
+                    };
+                }
+            };
         }
 
         pub fn update(self: *Self, system_inputs: PartialSystemInputs) !SystemOutputs {
 
             // Check inputs for changes...
             const inputs_dirty = self.dirtyFromInputs(system_inputs);
-
-            // Now we can actually set the inputs!
 
             // Process all nodes...
             inline for (node_order) |node_index| {
@@ -574,22 +592,10 @@ pub fn NodeGraph(
                     };
                     const target_input_field = &@field(node_inputs, link.field);
                     const TargetInputField = @TypeOf(target_input_field.*);
-                    const value = if (!@hasField(@TypeOf(mutable_fields), link.field))
+                    const value = if (!@hasField(@TypeOf(mutable_fields.fields), link.field))
                         node_input_field
-                    else switch (@typeInfo(TargetInputField)) {
-                        else => @compileError("Mutable field mismatch"),
-                        .pointer => |pointer| switch (pointer.size) {
-                            .One => deferred_clone: {
-                                @field(mutable_fields, link.field) = &node_input_field;
-                                break :deferred_clone undefined;
-                            },
-                            .Slice => deferred_clone: {
-                                @field(mutable_fields, link.field) = node_input_field;
-                                break :deferred_clone undefined;
-                            },
-                            else => @compileError("Unsupported pointer type"),
-                        },
-                    };
+                    else
+                        mutable_fields.blah(TargetInputField, link, node_input_field);
                     if (comptime utils.Queryable.isValue(TargetInputField)) {
                         const queried = &@field(@field(self.nodes_queried_flags, node.name), link.field);
                         if (!queried.*)
@@ -609,9 +615,8 @@ pub fn NodeGraph(
                     target.*
                 else process_output: {
                     _ = self.nodes_arenas[node_index].reset(.retain_capacity);
-                    try duplicateMutableInputs(
+                    try mutable_fields.duplicateMutableInputs(
                         self.nodes_arenas[node_index].allocator(),
-                        &mutable_fields,
                         &node_inputs,
                     );
                     const function_output = @call(.auto, @field(
@@ -624,7 +629,7 @@ pub fn NodeGraph(
                         node_inputs,
                     });
                     var node_output: @TypeOf(target.*) = undefined;
-                    inline for (@typeInfo(@TypeOf(mutable_fields)).@"struct".fields) |mutable_field| {
+                    inline for (@typeInfo(@TypeOf(mutable_fields.fields)).@"struct".fields) |mutable_field| {
                         const pointer = @typeInfo(mutable_field.type).pointer;
                         @field(node_output, mutable_field.name) = switch (pointer.size) {
                             else => @panic("qwer"),
