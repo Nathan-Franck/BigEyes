@@ -83,21 +83,21 @@ pub const NodeGraph = graph_runtime.NodeGraph(
 
 pub const graph_nodes = struct {
     pub fn calculateTerrainDensityInfluenceRange(
-        allocator: std.mem.Allocator,
+        arena: std.mem.Allocator,
         _: struct {},
     ) !struct {
         terrain_sampler: TerrainSampler,
     } {
         return .{
-            .terrain_sampler = try TerrainSampler.init(allocator),
+            .terrain_sampler = try TerrainSampler.init(arena),
         };
     }
 
-    pub fn getResources(allocator: std.mem.Allocator, _: struct {}) !game.types.Resources {
+    pub fn getResources(arena: std.mem.Allocator, _: struct {}) !game.types.Resources {
         const bike_blend = blk: {
             const json_data = @embedFile("../content/ebike.blend.json");
             const mesh_loader = @import("../mesh_loader.zig");
-            const nodes = try mesh_loader.getNodesFromJSON(allocator, json_data);
+            const nodes = try mesh_loader.getNodesFromJSON(arena, json_data);
             for (nodes) |mesh| {
                 wasm_entry.dumpDebugLogFmt("a mesh! {s}\n", .{mesh.name});
             }
@@ -109,33 +109,33 @@ pub const graph_nodes = struct {
             var images: game.types.ProcessedCubeMap = undefined;
             inline for (@typeInfo(game.types.ProcessedCubeMap).@"struct".fields) |field| {
                 const image_png = @embedFile("../content/cloudy skybox/" ++ field.name ++ ".png");
-                const image_data = try Image.loadPngAndProcess(allocator, image_png);
+                const image_data = try Image.loadPngAndProcess(arena, image_png);
                 @field(images, field.name) = image_data;
             }
             break :blk images;
         };
 
         const cutout_leaf = blk: {
-            const diffuse = try Image.loadPng(allocator, @embedFile("../content/manitoba maple/diffuse.png"));
-            const alpha = try Image.loadPng(allocator, @embedFile("../content/manitoba maple/alpha.png"));
+            const diffuse = try Image.loadPng(arena, @embedFile("../content/manitoba maple/diffuse.png"));
+            const alpha = try Image.loadPng(arena, @embedFile("../content/manitoba maple/alpha.png"));
             const cutout_diffuse = Image.Rgba32Image{
                 .width = diffuse.width,
                 .height = diffuse.height,
-                .pixels = try allocator.alloc(@TypeOf(diffuse.pixels[0]), diffuse.pixels.len),
+                .pixels = try arena.alloc(@TypeOf(diffuse.pixels[0]), diffuse.pixels.len),
             };
             for (cutout_diffuse.pixels, 0..) |*pixel, pixel_index| {
                 pixel.* = diffuse.pixels[pixel_index];
                 pixel.*.a = alpha.pixels[pixel_index].r;
             }
-            break :blk try Image.processImageForGPU(allocator, cutout_diffuse);
+            break :blk try Image.processImageForGPU(arena, cutout_diffuse);
         };
 
-        var trees = std.ArrayList(game.types.TreeMesh).init(allocator);
+        var trees = std.ArrayList(game.types.TreeMesh).init(arena);
         inline for (@typeInfo(game.config.ForestSettings).@"struct".decls) |decl| {
             const tree_blueprint = @field(game.config.Trees, decl.name);
-            const tree_skeleton = try tree.generateStructure(allocator, tree_blueprint.structure);
-            const bark_mesh = try tree.generateTaperedWood(allocator, tree_skeleton, tree_blueprint.mesh);
-            const leaf_mesh = try tree.generateLeaves(allocator, tree_skeleton, tree_blueprint.mesh);
+            const tree_skeleton = try tree.generateStructure(arena, tree_blueprint.structure);
+            const bark_mesh = try tree.generateTaperedWood(arena, tree_skeleton, tree_blueprint.mesh);
+            const leaf_mesh = try tree.generateLeaves(arena, tree_skeleton, tree_blueprint.mesh);
             const bounds = raytrace.Bounds.encompassBounds(
                 raytrace.Bounds.encompassPoints(bark_mesh.vertices),
                 raytrace.Bounds.encompassPoints(leaf_mesh.vertices),
@@ -171,7 +171,7 @@ pub const graph_nodes = struct {
     }
 
     pub fn orbit(
-        allocator: std.mem.Allocator,
+        arena: std.mem.Allocator,
         props: struct {
             delta_time: Queryable.Value(f32),
             orbit_speed: f32,
@@ -274,10 +274,10 @@ pub const graph_nodes = struct {
                     var new_position = props.player.position;
                     new_position += final_movement;
 
-                    var terrain_chunk_cache = game.config.TerrainSpawner.ChunkCache.init(allocator);
+                    var terrain_chunk_cache = game.config.TerrainSpawner.ChunkCache.init(arena);
                     const terrain_height = try props.terrain_sampler
                         .loadCache(&terrain_chunk_cache)
-                        .sample(allocator, Vec2{ new_position[0], new_position[2] });
+                        .sample(arena, Vec2{ new_position[0], new_position[2] });
 
                     new_position[1] = terrain_height + 0.7;
 
@@ -309,7 +309,7 @@ pub const graph_nodes = struct {
     }
 
     pub fn getScreenspaceMesh(
-        allocator: std.mem.Allocator,
+        arena: std.mem.Allocator,
         props: struct {
             camera_position: Vec4,
             world_matrix: zm.Mat,
@@ -338,22 +338,22 @@ pub const graph_nodes = struct {
         const PointFlattener = mesh_helper.VecSliceFlattener(4, 3);
         const UvFlattener = mesh_helper.VecSliceFlattener(2, 2);
         return .{ .screen_space_mesh = .{
-            .indices = try allocator.dupe(u32, &.{
+            .indices = try arena.dupe(u32, &.{
                 0, 1, 2,
                 2, 3, 0,
             }),
-            .uvs = UvFlattener.convert(allocator, &.{
+            .uvs = UvFlattener.convert(arena, &.{
                 Vec2{ 0, 0 },
                 Vec2{ 1, 0 },
                 Vec2{ 1, 1 },
                 Vec2{ 0, 1 },
             }),
-            .normals = PointFlattener.convert(allocator, &normals),
+            .normals = PointFlattener.convert(arena, &normals),
         } };
     }
 
     pub fn displayForest(
-        allocator: std.mem.Allocator,
+        arena: std.mem.Allocator,
         props: struct {
             forest_chunk_cache: *game.config.ForestSpawner.ChunkCache,
             terrain_sampler: TerrainSampler,
@@ -361,31 +361,31 @@ pub const graph_nodes = struct {
     ) !struct {
         forest_data: []const game.types.ModelInstances,
     } {
-        var terrain_chunk_cache = game.config.TerrainSpawner.ChunkCache.init(allocator);
+        var terrain_chunk_cache = game.config.TerrainSpawner.ChunkCache.init(arena);
         const terrain_sampler = props.terrain_sampler.loadCache(&terrain_chunk_cache);
 
         const spawns = try game.config.ForestSpawner.gatherSpawnsInBounds(
-            allocator,
+            arena,
             props.forest_chunk_cache,
             game.config.demo_terrain_bounds,
         );
 
-        var instances = try allocator.alloc(std.ArrayList(Vec4), game.config.ForestSpawner.length);
+        var instances = try arena.alloc(std.ArrayList(Vec4), game.config.ForestSpawner.length);
         for (instances) |*instance| {
-            instance.* = std.ArrayList(Vec4).init(allocator);
+            instance.* = std.ArrayList(Vec4).init(arena);
         }
         for (spawns) |spawn| {
             const pos_2d = Vec2{ spawn.position[0], spawn.position[1] };
-            const height = try terrain_sampler.sample(allocator, pos_2d);
+            const height = try terrain_sampler.sample(arena, pos_2d);
             const position = Vec4{ spawn.position[0], height, spawn.position[1], 1 };
             try instances[spawn.id].append(position);
         }
-        const instances_items = try allocator.alloc(game.types.ModelInstances, game.config.ForestSpawner.length);
+        const instances_items = try arena.alloc(game.types.ModelInstances, game.config.ForestSpawner.length);
         const PointFlattener = mesh_helper.VecSliceFlattener(4, 3);
         for (instances_items, @typeInfo(game.config.ForestSettings).@"struct".decls, 0..) |*instance, decl, i| {
             instance.* = .{
                 .label = decl.name,
-                .positions = PointFlattener.convert(allocator, instances[i].items),
+                .positions = PointFlattener.convert(arena, instances[i].items),
             };
         }
 
@@ -395,7 +395,7 @@ pub const graph_nodes = struct {
     }
 
     pub fn displayTrees(
-        allocator: std.mem.Allocator,
+        arena: std.mem.Allocator,
         props: struct {
             cutout_leaf: Image.Processed,
             trees: []const game.types.TreeMesh,
@@ -405,22 +405,22 @@ pub const graph_nodes = struct {
     } {
         const PointFlattener = mesh_helper.VecSliceFlattener(4, 3);
         const UvFlattener = mesh_helper.VecSliceFlattener(2, 2);
-        var models = std.ArrayList(game.types.GameModel).init(allocator);
+        var models = std.ArrayList(game.types.GameModel).init(arena);
         for (props.trees) |tree_mesh| {
             try models.append(.{
                 .label = tree_mesh.label,
-                .meshes = try allocator.dupe(game.types.GameMesh, &.{
+                .meshes = try arena.dupe(game.types.GameMesh, &.{
                     .{ .greybox = .{
                         .indices = tree_mesh.bark_mesh.triangles,
-                        .normal = PointFlattener.convert(allocator, tree_mesh.bark_mesh.normals),
-                        .position = PointFlattener.convert(allocator, tree_mesh.bark_mesh.vertices),
+                        .normal = PointFlattener.convert(arena, tree_mesh.bark_mesh.normals),
+                        .position = PointFlattener.convert(arena, tree_mesh.bark_mesh.vertices),
                     } },
                     .{ .textured = .{
                         .diffuse_alpha = props.cutout_leaf,
                         .indices = tree_mesh.leaf_mesh.triangles,
-                        .normal = PointFlattener.convert(allocator, tree_mesh.leaf_mesh.normals),
-                        .position = PointFlattener.convert(allocator, tree_mesh.leaf_mesh.vertices),
-                        .uv = UvFlattener.convert(allocator, tree_mesh.leaf_mesh.uvs),
+                        .normal = PointFlattener.convert(arena, tree_mesh.leaf_mesh.normals),
+                        .position = PointFlattener.convert(arena, tree_mesh.leaf_mesh.vertices),
+                        .uv = UvFlattener.convert(arena, tree_mesh.leaf_mesh.uvs),
                     } },
                 }),
             });
@@ -431,7 +431,7 @@ pub const graph_nodes = struct {
     }
 
     pub noinline fn displayTerrain(
-        allocator: std.mem.Allocator,
+        arena: std.mem.Allocator,
         props: struct {
             terrain_sampler: TerrainSampler,
         },
@@ -439,7 +439,7 @@ pub const graph_nodes = struct {
         terrain_mesh: game.types.GreyboxMesh,
         terrain_instance: game.types.ModelInstances,
     } {
-        var terrain_chunk_cache = game.config.TerrainSpawner.ChunkCache.init(allocator);
+        var terrain_chunk_cache = game.config.TerrainSpawner.ChunkCache.init(arena);
         try terrain_chunk_cache.ensureTotalCapacity(256);
         const terrain_sampler = props.terrain_sampler.loadCache(&terrain_chunk_cache);
 
@@ -449,17 +449,17 @@ pub const graph_nodes = struct {
 
         var vertex_iterator = CoordIterator.init(@splat(0), @splat(terrain_resolution + 1));
         const positions = blk: {
-            var positions = try allocator.alloc(Vec4, vertex_iterator.total);
+            var positions = try arena.alloc(Vec4, vertex_iterator.total);
             var index: usize = 0;
             while (vertex_iterator.next()) |vertex_coord| : (index += 1) {
                 // TODO: Calculate how big the stack should be, maybe should OOM so that I know when we went to slow-mode (Super cool that one line can save 100ms for a 512*512 terrain)
-                var stack_allocator = std.heap.stackFallback(1024, allocator);
+                var stack_arena = std.heap.stackFallback(1024, arena);
 
                 const pos_2d: Vec2 = game.config.demo_terrain_bounds.min +
                     @as(Vec2, @floatFromInt(vertex_coord)) *
                     game.config.demo_terrain_bounds.size /
                     @as(Vec2, @splat(terrain_resolution));
-                const height = try terrain_sampler.sample(stack_allocator.get(), pos_2d);
+                const height = try terrain_sampler.sample(stack_arena.get(), pos_2d);
                 const vertex: Vec4 = .{ pos_2d[0], height, pos_2d[1], 1 };
                 positions[index] = vertex;
             }
@@ -468,7 +468,7 @@ pub const graph_nodes = struct {
 
         const quads = blk: {
             var quad_iterator = CoordIterator.init(@splat(0), @splat(terrain_resolution));
-            var quads = try allocator.alloc([4]u32, quad_iterator.total);
+            var quads = try arena.alloc([4]u32, quad_iterator.total);
             var index: u32 = 0;
             while (quad_iterator.next()) |quad_coord| : (index += 1) {
                 const quad_corners = &[_]Coord{
@@ -486,19 +486,19 @@ pub const graph_nodes = struct {
             }
             break :blk quads;
         };
-        const indices = mesh_helper.Polygon(.Quad).toTriangleIndices(allocator, quads);
-        const normals = mesh_helper.Polygon(.Quad).calculateNormals(allocator, positions, quads);
+        const indices = mesh_helper.Polygon(.Quad).toTriangleIndices(arena, quads);
+        const normals = mesh_helper.Polygon(.Quad).calculateNormals(arena, positions, quads);
 
         const PointFlattener = mesh_helper.VecSliceFlattener(4, 3);
         return .{
             .terrain_mesh = game.types.GreyboxMesh{
                 .indices = indices,
-                .position = PointFlattener.convert(allocator, positions),
-                .normal = PointFlattener.convert(allocator, normals),
+                .position = PointFlattener.convert(arena, positions),
+                .normal = PointFlattener.convert(arena, normals),
             },
             .terrain_instance = game.types.ModelInstances{
                 .label = "terrain",
-                .positions = PointFlattener.convert(allocator, &.{.{ 0, 0, 0, 0 }}),
+                .positions = PointFlattener.convert(arena, &.{.{ 0, 0, 0, 0 }}),
             },
         };
     }
