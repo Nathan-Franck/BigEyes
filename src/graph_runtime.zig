@@ -504,6 +504,30 @@ pub fn NodeGraph(
             } });
         }
 
+        /// Duplicate data from inputs where the node is allowed to manipulate pointers
+        pub fn duplicateMutableInputs(arena: std.mem.Allocator, mutable_fields: anytype, node_inputs: anytype) !void {
+            inline for (@typeInfo(@TypeOf(mutable_fields)).@"struct".fields) |field| {
+                const pointer = @typeInfo(field.type).pointer;
+                const input_to_clone = &@field(node_inputs, field.name);
+                input_to_clone.* = switch (pointer.size) {
+                    .One => cloned: {
+                        var result = try utils.deepClone(
+                            pointer.child,
+                            arena,
+                            @field(mutable_fields, field.name).*,
+                        );
+                        break :cloned &result;
+                    },
+                    .Slice => try utils.deepClone(
+                        @TypeOf(input_to_clone.*),
+                        arena,
+                        @field(mutable_fields, field.name),
+                    ),
+                    else => @panic("oh no..."),
+                };
+            }
+        }
+
         pub fn update(self: *Self, system_inputs: PartialSystemInputs) !SystemOutputs {
 
             // Check inputs for changes...
@@ -538,7 +562,6 @@ pub fn NodeGraph(
                             break :node_input @field(self.system_inputs, input_field);
                         },
                         .store_field => |store_field| @field(self.store, store_field),
-
                         .node => |node_blueprint| input_field: {
                             const node_outputs = @field(self.nodes_outputs, node_blueprint.name);
                             const node_output = @field(node_outputs, node_blueprint.field);
@@ -583,43 +606,24 @@ pub fn NodeGraph(
                 const target = &@field(self.nodes_outputs, node.name);
                 target.* = if (!is_dirty.*)
                     target.*
-                else blk: {
+                else process_output: {
                     _ = self.nodes_arenas[node_index].reset(.retain_capacity);
 
-                    // Duplicate data from inputs where the node is allowed to manipulate pointers ...
-                    inline for (@typeInfo(@TypeOf(mutable_fields)).@"struct".fields) |field| {
-                        const pointer = @typeInfo(field.type).pointer;
-                        const input_to_clone = &@field(node_inputs, field.name);
-                        input_to_clone.* = switch (pointer.size) {
-                            .One => cloned: {
-                                var result = try utils.deepClone(
-                                    pointer.child,
-                                    self.nodes_arenas[node_index].allocator(),
-                                    @field(mutable_fields, field.name).*,
-                                );
-                                break :cloned &result;
-                            },
-                            .Slice => try utils.deepClone(
-                                @TypeOf(input_to_clone.*),
-                                self.nodes_arenas[node_index].allocator(),
-                                @field(mutable_fields, field.name),
-                            ),
-                            else => @panic("oh no..."),
-                        };
-                    }
+                    try duplicateMutableInputs(
+                        self.nodes_arenas[node_index].allocator(),
+                        mutable_fields,
+                        &node_inputs,
+                    );
 
                     const function_output = @call(
                         .auto,
                         @field(node_definitions, node.function),
-                        if (function_params.len == 1)
-                            .{
-                                node_inputs,
-                            }
-                        else
-                            .{
-                                self.nodes_arenas[node_index].allocator(),
-                                node_inputs,
-                            },
+                        if (function_params.len == 1) .{
+                            node_inputs,
+                        } else .{
+                            self.nodes_arenas[node_index].allocator(),
+                            node_inputs,
+                        },
                     );
                     var node_output: @TypeOf(target.*) = undefined;
                     inline for (@typeInfo(@TypeOf(mutable_fields)).@"struct".fields) |mutable_field| {
@@ -637,7 +641,7 @@ pub fn NodeGraph(
                             .error_union => try function_output,
                         },
                     );
-                    break :blk node_output;
+                    break :process_output node_output;
                 };
             }
 
