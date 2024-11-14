@@ -486,9 +486,8 @@ pub const graph_nodes = struct {
             }
             break :blk quads;
         };
-
-        const normals = mesh_helper.Polygon(.Quad).calculateNormals(allocator, positions, quads);
         const indices = mesh_helper.Polygon(.Quad).toTriangleIndices(allocator, quads);
+        const normals = mesh_helper.Polygon(.Quad).calculateNormals(allocator, positions, quads);
 
         const PointFlattener = mesh_helper.VecSliceFlattener(4, 3);
         return .{

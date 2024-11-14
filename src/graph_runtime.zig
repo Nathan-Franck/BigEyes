@@ -20,6 +20,37 @@ pub const NodeGraphBlueprintEntry = struct {
     name: []const u8,
     function: []const u8,
     input_links: []const InputLink,
+
+    pub fn validateLinkingAllParameters(
+        comptime node: @This(),
+        comptime function_params: []const std.builtin.Type.Fn.Param,
+    ) void {
+        comptime {
+            var unhandled_inputs: []const []const u8 = &.{};
+
+            for (@typeInfo(switch (function_params.len) {
+                else => @compileError("Unsupported number of function parameters for node"),
+                1 => function_params[0].type.?,
+                2 => function_params[1].type.?,
+            }).@"struct".fields) |field| {
+                unhandled_inputs = unhandled_inputs ++ .{field.name};
+            }
+            for (node.input_links) |link| {
+                var next_unhandled_inputs: []const []const u8 = &.{};
+                for (unhandled_inputs) |unhandled_input| {
+                    if (!std.mem.eql(u8, unhandled_input, link.field))
+                        next_unhandled_inputs = next_unhandled_inputs ++ .{unhandled_input};
+                }
+                unhandled_inputs = next_unhandled_inputs;
+            }
+            if (unhandled_inputs.len > 0) {
+                @compileError(std.fmt.comptimePrint(
+                    "Node {s} missing input fields {s}",
+                    .{ node.name, unhandled_inputs },
+                ));
+            }
+        }
+    }
 };
 
 pub const SystemSink = struct {
@@ -425,9 +456,7 @@ pub fn NodeGraph(
             return field_type;
         }
 
-        pub fn update(self: *Self, system_inputs: PartialSystemInputs) !SystemOutputs {
-
-            // Check inputs for changes...
+        pub fn dirtyFromInputs(self: *Self, system_inputs: PartialSystemInputs) SystemInputsDirtyFlags {
             var inputs_dirty: SystemInputsDirtyFlags = undefined;
             inline for (@typeInfo(SystemInputs).@"struct".fields) |field| {
                 const field_name = field.name;
@@ -441,6 +470,13 @@ pub fn NodeGraph(
                     @field(self.system_inputs, field_name) = input;
                 } else dirty.* = false;
             }
+            return inputs_dirty;
+        }
+
+        pub fn update(self: *Self, system_inputs: PartialSystemInputs) !SystemOutputs {
+
+            // Check inputs for changes...
+            const inputs_dirty = self.dirtyFromInputs(system_inputs);
 
             // Now we can actually set the inputs!
 
@@ -493,31 +529,7 @@ pub fn NodeGraph(
                     @TypeOf(@field(node_definitions, node.function)),
                 ).@"fn".params;
 
-                comptime {
-                    var unhandled_inputs: []const []const u8 = &.{};
-
-                    for (@typeInfo(switch (function_params.len) {
-                        else => @compileError("Unsupported number of function parameters for node"),
-                        1 => function_params[0].type.?,
-                        2 => function_params[1].type.?,
-                    }).@"struct".fields) |field| {
-                        unhandled_inputs = unhandled_inputs ++ .{field.name};
-                    }
-                    for (node.input_links) |link| {
-                        var next_unhandled_inputs: []const []const u8 = &.{};
-                        for (unhandled_inputs) |unhandled_input| {
-                            if (!std.mem.eql(u8, unhandled_input, link.field))
-                                next_unhandled_inputs = next_unhandled_inputs ++ .{unhandled_input};
-                        }
-                        unhandled_inputs = next_unhandled_inputs;
-                    }
-                    if (unhandled_inputs.len > 0) {
-                        @compileError(std.fmt.comptimePrint(
-                            "Node {s} missing input fields {s}",
-                            .{ node.name, unhandled_inputs },
-                        ));
-                    }
-                }
+                node.validateLinkingAllParameters(function_params);
 
                 inline for (node.input_links) |link| {
                     var is_field_dirty = false;
