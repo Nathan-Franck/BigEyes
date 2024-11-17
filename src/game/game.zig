@@ -114,7 +114,7 @@ pub const graph_nodes = struct {
                     vertices[i] = zm.loadArr3(vertex.position);
                 }
                 const bike: game.types.GameModel = .{
-                    .label = "ebike",
+                    .label = node.name,
                     .meshes = try arena.dupe(game.types.GameMesh, &.{.{ .greybox = .{
                         .indices = mesh.indices,
                         .normal = PointFlattener.convert(arena, normals),
@@ -456,19 +456,35 @@ pub const graph_nodes = struct {
             terrain_sampler: TerrainSampler,
         },
     ) !struct {
-        model_instance: game.types.ModelInstances,
+        model_instances: []const game.types.ModelInstances,
     } {
         var terrain_chunk_cache = game.config.TerrainSpawner.ChunkCache.init(arena);
         const terrain_sampler = props.terrain_sampler.loadCache(&terrain_chunk_cache);
         _ = terrain_sampler;
 
         const PointFlattener = mesh_helper.VecSliceFlattener(4, 3);
-        return .{
-            .model_instance = .{
-                .label = "ebike",
+        return .{ .model_instances = try arena.dupe(game.types.ModelInstances, &.{
+            .{
+                .label = "front-wheel",
                 .positions = PointFlattener.convert(arena, &.{.{ 0, 0, 0, 0 }}),
             },
-        };
+            .{
+                .label = "back-wheel",
+                .positions = PointFlattener.convert(arena, &.{.{ 0, 0, 0, 0 }}),
+            },
+            .{
+                .label = "body",
+                .positions = PointFlattener.convert(arena, &.{.{ 0, 0, 0, 0 }}),
+            },
+            .{
+                .label = "handlebars",
+                .positions = PointFlattener.convert(arena, &.{.{ 0, 0, 0, 0 }}),
+            },
+            .{
+                .label = "shock",
+                .positions = PointFlattener.convert(arena, &.{.{ 0, 0, 0, 0 }}),
+            },
+        }) };
     }
 
     pub fn displayTrees(
