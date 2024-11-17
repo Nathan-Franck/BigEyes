@@ -56,6 +56,11 @@ pub const blueprint = runtime.Blueprint{
                 .node = .{ .name = "calculateTerrainDensityInfluenceRange", .field = "terrain_sampler" },
             } },
         } },
+        .{ .name = "displayBike", .function = "displayBike", .input_links = &[_]runtime.InputLink{
+            .{ .field = "terrain_sampler", .source = .{
+                .node = .{ .name = "calculateTerrainDensityInfluenceRange", .field = "terrain_sampler" },
+            } },
+        } },
         .{ .name = "displayTerrain", .function = "displayTerrain", .input_links = &[_]runtime.InputLink{
             .{ .field = "terrain_sampler", .source = .{
                 .node = .{ .name = "calculateTerrainDensityInfluenceRange", .field = "terrain_sampler" },
@@ -79,9 +84,11 @@ pub const blueprint = runtime.Blueprint{
     },
     .output = &[_]runtime.SystemSink{
         .{ .output_node = "getResources", .output_field = "skybox", .system_field = "skybox" },
+        .{ .output_node = "getResources", .output_field = "models", .system_field = "models" },
         .{ .output_node = "getScreenspaceMesh", .output_field = "screen_space_mesh", .system_field = "screen_space_mesh" },
         .{ .output_node = "displayTrees", .output_field = "models", .system_field = "models" },
-        .{ .output_node = "displayForest", .output_field = "forest_data", .system_field = "forest_data" },
+        .{ .output_node = "displayForest", .output_field = "model_instances", .system_field = "model_instances" },
+        .{ .output_node = "displayBike", .output_field = "model_instance", .system_field = "model_instance" },
         .{ .output_node = "displayTerrain", .output_field = "terrain_mesh", .system_field = "terrain_mesh" },
         .{ .output_node = "displayTerrain", .output_field = "terrain_instance", .system_field = "terrain_instance" },
         .{ .output_node = "orbit", .output_field = "world_matrix", .system_field = "world_matrix" },

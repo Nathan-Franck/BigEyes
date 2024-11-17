@@ -254,10 +254,16 @@ export function App() {
           normals: ShaderBuilder.createBuffer(gl, sliceToArray.Float32Array(screenspace_data.normals)),
         };
       }
-      const forest_data = graphOutputs.forest_data;
-      if (forest_data) {
+      let model_instances: NonNullable<typeof graphOutputs.model_instances> = [];
+      if (graphOutputs.model_instances) {
+        model_instances = model_instances.concat(graphOutputs.model_instances);
+      }
+      if (graphOutputs.model_instance) {
+        model_instances.push(graphOutputs.model_instance);
+      }
+      if (model_instances.length > 0) {
         renderChange = true;
-        for (let data of forest_data) {
+        for (let data of model_instances) {
           const label = sliceToString(data.label);
           item_positions[label] = ShaderBuilder.createBuffer(gl, sliceToArray.Float32Array(data.positions));
         }
@@ -281,9 +287,10 @@ export function App() {
           },
         ];
       }
-      if (graphOutputs.models != null) {
+      const models_list = graphOutputs.models;
+      if (models_list != null) {
         renderChange = true;
-        for (let model of graphOutputs.models) {
+        for (let model of models_list) {
           const label = sliceToString(model.label);
           const meshes: Model[] = [];
           models[label] = meshes;

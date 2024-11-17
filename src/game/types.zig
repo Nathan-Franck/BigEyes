@@ -77,5 +77,6 @@ pub const ProcessedCubeMap = struct {
 pub const Resources = struct {
     skybox: ProcessedCubeMap,
     cutout_leaf: Image.Processed,
-    trees: []TreeMesh,
+    trees: []const TreeMesh,
+    models: []const GameModel,
 };

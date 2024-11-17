@@ -103,7 +103,26 @@ pub const graph_nodes = struct {
             }
             break :blk nodes;
         };
-        _ = bike_blend;
+        var models = std.ArrayList(game.types.GameModel).init(arena);
+        for (bike_blend) |node|
+            if (node.mesh) |mesh| {
+                const PointFlattener = mesh_helper.VecSliceFlattener(4, 3);
+                const vertices = try arena.alloc(Vec4, mesh.vertices.len);
+                const normals = try arena.alloc(Vec4, mesh.vertices.len);
+                for (mesh.vertices, 0..) |vertex, i| {
+                    normals[i] = zm.loadArr3(vertex.normal);
+                    vertices[i] = zm.loadArr3(vertex.position);
+                }
+                const bike: game.types.GameModel = .{
+                    .label = "ebike",
+                    .meshes = try arena.dupe(game.types.GameMesh, &.{.{ .greybox = .{
+                        .indices = mesh.indices,
+                        .normal = PointFlattener.convert(arena, normals),
+                        .position = PointFlattener.convert(arena, vertices),
+                    } }}),
+                };
+                try models.append(bike);
+            };
 
         const skybox = blk: {
             var images: game.types.ProcessedCubeMap = undefined;
@@ -150,6 +169,7 @@ pub const graph_nodes = struct {
         }
 
         return game.types.Resources{
+            .models = models.items,
             .skybox = skybox,
             .cutout_leaf = cutout_leaf,
             .trees = trees.items,
@@ -359,7 +379,7 @@ pub const graph_nodes = struct {
             terrain_sampler: TerrainSampler,
         },
     ) !struct {
-        forest_data: []const game.types.ModelInstances,
+        model_instances: []const game.types.ModelInstances,
     } {
         var terrain_chunk_cache = game.config.TerrainSpawner.ChunkCache.init(arena);
         const terrain_sampler = props.terrain_sampler.loadCache(&terrain_chunk_cache);
@@ -390,7 +410,64 @@ pub const graph_nodes = struct {
         }
 
         return .{
-            .forest_data = instances_items,
+            .model_instances = instances_items,
+        };
+    }
+
+    fn Pick(@"struct": type, fields: []const std.meta.FieldEnum(@"struct")) type {
+        var tuple_fields: [fields.len]std.builtin.Type.StructField = undefined;
+        const temp_struct: @"struct" = undefined;
+        if (tuple_fields.len > 0)
+            inline for (fields, 0..) |field, i| {
+                var buf: [1000]u8 = undefined;
+                tuple_fields[i] = .{
+                    .name = std.fmt.bufPrintZ(&buf, "{d}", .{i}) catch unreachable,
+                    .type = @TypeOf(@field(temp_struct, @tagName(field))),
+                    .default_value = null,
+                    .is_comptime = false,
+                    .alignment = 0,
+                };
+            };
+
+        return @Type(.{
+            .@"struct" = .{
+                .is_tuple = true,
+                .layout = .auto,
+                .decls = &.{},
+                .fields = &tuple_fields,
+            },
+        });
+    }
+
+    fn pick(
+        data_struct: anytype,
+        comptime fields: []const std.meta.FieldEnum(@TypeOf(data_struct)),
+    ) Pick(@TypeOf(data_struct), fields) {
+        var result: Pick(@TypeOf(data_struct), fields) = undefined;
+        inline for (fields, 0..) |field, i| {
+            result[i] = @field(data_struct, @tagName(field));
+        }
+        return result;
+    }
+
+    pub fn displayBike(
+        arena: std.mem.Allocator,
+        props: struct {
+            terrain_sampler: TerrainSampler,
+        },
+    ) !struct {
+        model_instance: game.types.ModelInstances,
+    } {
+        var terrain_chunk_cache = game.config.TerrainSpawner.ChunkCache.init(arena);
+        const terrain_sampler = props.terrain_sampler.loadCache(&terrain_chunk_cache);
+        _ = terrain_sampler;
+
+        const PointFlattener = mesh_helper.VecSliceFlattener(4, 3);
+        return .{
+            .model_instance = .{
+                .label = "ebike",
+                .positions = PointFlattener.convert(arena, &.{.{ 0, 0, 0, 0 }}),
+            },
         };
     }
 

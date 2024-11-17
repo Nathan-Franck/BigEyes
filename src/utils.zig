@@ -123,7 +123,7 @@ pub const Queryable = struct {
             }
 
             pub fn initQueryable(
-                value: anytype,
+                value: T,
                 is_field_dirty: *bool,
                 queried: *bool,
             ) @This() {

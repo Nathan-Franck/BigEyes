@@ -367,7 +367,7 @@ pub fn NodeGraph(
 
         pub const SystemOutputs = build_type: {
             var fields: []const std.builtin.Type.StructField = &.{};
-            for (graph.output) |output_defn| {
+            outputs: for (graph.output) |output_defn| {
                 const name = output_defn.system_field;
                 const node_id = output_defn.output_node;
                 const node = for (graph.nodes) |node|
@@ -375,6 +375,9 @@ pub fn NodeGraph(
                 else
                     @compileError("Node not found " ++ node_id);
                 const field_type = getOutputFieldTypeFromNode(node, output_defn.output_field);
+                for (fields) |existing_field|
+                    if (std.mem.eql(u8, existing_field.name, name))
+                        continue :outputs;
                 fields = fields ++ .{std.builtin.Type.StructField{
                     .name = name[0.. :0],
                     .type = ?field_type,
@@ -584,19 +587,58 @@ pub fn NodeGraph(
 
             // Output from system from select nodes...
             var system_outputs: SystemOutputs = undefined;
-            inline for (graph.output) |output_defn| {
-                const target = &@field(system_outputs, output_defn.system_field);
-                const is_dirty = @field(self.nodes_dirty_flags, output_defn.output_node);
-                if (!is_dirty) {
-                    target.* = null;
+            inline for (@typeInfo(SystemOutputs).@"struct".fields) |output_field| {
+                comptime var output_defns: []const SystemSink = &.{};
+                inline for (graph.output) |output_defn| {
+                    if (comptime std.mem.eql(u8, output_defn.system_field, output_field.name)) output_defns = output_defns ++ .{output_defn};
+                }
+                if (output_defns.len == 1) {
+                    const output_defn = output_defns[0];
+                    const target = &@field(system_outputs, output_field.name);
+                    const is_dirty = @field(self.nodes_dirty_flags, output_defn.output_node);
+                    if (!is_dirty) {
+                        target.* = null;
+                    } else {
+                        const node_outputs = @field(self.nodes_outputs, output_defn.output_node);
+                        const result = @field(node_outputs, output_defn.output_field);
+                        target.* = try utils.deepClone(
+                            @TypeOf(result),
+                            self.store_arena.allocator(),
+                            result,
+                        );
+                    }
                 } else {
-                    const node_outputs = @field(self.nodes_outputs, output_defn.output_node);
-                    const result = @field(node_outputs, output_defn.output_field);
-                    target.* = try utils.deepClone(
-                        @TypeOf(result),
-                        self.store_arena.allocator(),
-                        result,
-                    );
+                    var any_dirty = false;
+                    const OutputType = @typeInfo(output_field.type).optional.child;
+                    const error_message = std.fmt.comptimePrint("Expected a slice type when combining node outputs - field {s}", .{output_field.name});
+                    switch (@typeInfo(OutputType)) {
+                        else => @compileError(error_message),
+                        .pointer => |pointer| switch (pointer.size) {
+                            else => @compileError(error_message),
+                            .Slice => {},
+                        },
+                    }
+                    var to_concat: [output_defns.len]OutputType = undefined;
+
+                    inline for (output_defns, 0..) |output_defn, i| {
+                        const is_dirty = @field(self.nodes_dirty_flags, output_defn.output_node);
+                        to_concat[i] = blk: {
+                            if (is_dirty) {
+                                any_dirty = true;
+                                const node_outputs = @field(self.nodes_outputs, output_defn.output_node);
+                                break :blk @field(node_outputs, output_defn.output_field);
+                            } else {
+                                break :blk &.{};
+                            }
+                        };
+                    }
+                    if (any_dirty) {
+                        @field(system_outputs, output_field.name) = try std.mem.concat(
+                            self.store_arena.allocator(),
+                            @typeInfo(OutputType).pointer.child,
+                            &to_concat,
+                        );
+                    }
                 }
             }
 
