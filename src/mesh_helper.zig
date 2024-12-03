@@ -41,13 +41,29 @@ pub fn VecSliceFlattener(comptime vec_size: u32, comptime sample_size: u32) type
             for (points, 0..) |point, index| {
                 std.mem.copyForwards(
                     f32,
-                    float_slice[index * sample_size .. index * sample_size + sample_size],
+                    float_slice[index * sample_size .. (index + 1) * sample_size],
                     @as([vec_size]f32, point)[0..sample_size],
                 );
             }
             return float_slice;
         }
     };
+}
+
+pub fn flattenMatrices(allocator: std.mem.Allocator, points: []const zmath.Mat) []const f32 {
+    const sample_size = 16; // 4x4 Matrix
+    var float_slice = allocator.alloc(f32, points.len * sample_size) catch unreachable;
+    for (points, 0..) |point, index| {
+        const location = index * sample_size;
+        for (point, 0..) |row, row_index| {
+            std.mem.copyForwards(
+                f32,
+                float_slice[location + row_index * 4 .. location + (row_index + 1) * 4],
+                @as([4]f32, row)[0..4],
+            );
+        }
+    }
+    return float_slice;
 }
 
 pub fn Polygon(comptime poly_selection: enum { Quad, Face }) type {

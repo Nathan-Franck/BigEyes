@@ -156,6 +156,24 @@ export function App() {
       `,
     });
 
+    const instancingMath = `
+      mat4 computeTransform(vec3 position, vec4 rotation, vec3 scale) {
+          // Convert quaternion to rotation matrix
+          float x = rotation.x, y = rotation.y, z = rotation.z, w = rotation.w;
+          mat3 rotationMatrix = mat3(
+              1.0 - 2.0 * (y * y + z * z), 2.0 * (x * y - w * z), 2.0 * (x * z + w * y),
+              2.0 * (x * y + w * z), 1.0 - 2.0 * (x * x + z * z), 2.0 * (y * z - w * x),
+              2.0 * (x * z - w * y), 2.0 * (y * z + w * x), 1.0 - 2.0 * (x * x + y * y)
+          );
+
+          // Scale and translate
+          mat4 transform = mat4(rotationMatrix * scale, vec3(0.0));
+          transform[3] = vec4(position, 1.0);
+
+          return transform;
+      }
+    `;
+
     const greyboxMaterial = ShaderBuilder.generateMaterial(gl, {
       mode: "TRIANGLES",
       globals: {
@@ -166,11 +184,13 @@ export function App() {
         normal: { type: "varying", unit: "vec3" },
         perspectiveMatrix: { type: "uniform", unit: "mat4", count: 1 },
         item_position: { type: "attribute", unit: "vec3", instanced: true },
+        item_rotation: { type: "attribute", unit: "vec4", instanced: true },
+        item_scale: { type: "attribute", unit: "vec3", instanced: true },
       },
-      vertSource: `
+      vertSource: instancingMath + `
         precision highp float;
         void main(void) {
-          gl_Position = perspectiveMatrix * vec4(item_position + position, 1);
+          gl_Position = perspectiveMatrix * transform * vec4(position, 1);
           normal = normals;
         }
       `,
@@ -195,11 +215,13 @@ export function App() {
         texture: { type: "uniform", unit: "sampler2D", count: 1 },
         perspectiveMatrix: { type: "uniform", unit: "mat4", count: 1 },
         item_position: { type: "attribute", unit: "vec3", instanced: true },
+        item_rotation: { type: "attribute", unit: "vec4", instanced: true },
+        item_scale: { type: "attribute", unit: "vec3", instanced: true },
       },
-      vertSource: `
+      vertSource: instancingMath + `
         precision highp float;
         void main(void) {
-          gl_Position = perspectiveMatrix * vec4(item_position + position, 1);
+          gl_Position = perspectiveMatrix * transform * vec4(position, 1);
           uv = uvs;
           normal = normals;
         }
@@ -218,11 +240,11 @@ export function App() {
 
 
     type Model =
-      | { greybox: Omit<Binds<typeof greyboxMaterial.globals>, "perspectiveMatrix" | "item_position"> }
-      | { textured: Omit<Binds<typeof texturedMeshMaterial.globals>, "perspectiveMatrix" | "item_position"> }
+      | { greybox: Pick<Binds<typeof greyboxMaterial.globals>, "indices" | "normals" | "position"> }
+      | { textured: Pick<Binds<typeof texturedMeshMaterial.globals>, "indices" | "normals" | "position" | "uvs" | "texture"> }
     let models: Record<string, Model[]> = {};
     let perspectiveMatrix: Mat4;
-    let item_positions: Record<string, SizedBuffer> = {};
+    let transforms: Record<string, { item_position: SizedBuffer, item_rotation: SizedBuffer, item_scale: SizedBuffer }> = {};
     let skybox: Binds<typeof skyboxMaterial.globals>;
 
     updateRender = (graphOutputs) => () => {
@@ -258,21 +280,26 @@ export function App() {
       if (graphOutputs.model_instances) {
         model_instances = model_instances.concat(graphOutputs.model_instances);
       }
-      if (graphOutputs.model_instance) {
-        model_instances.push(graphOutputs.model_instance);
-      }
       if (model_instances.length > 0) {
         renderChange = true;
         for (let data of model_instances) {
           const label = sliceToString(data.label);
-          item_positions[label] = ShaderBuilder.createBuffer(gl, sliceToArray.Float32Array(data.positions));
+          transforms[label] = {
+            item_position: ShaderBuilder.createBuffer(gl, sliceToArray.Float32Array(data.positions)),
+            item_rotation: ShaderBuilder.createBuffer(gl, sliceToArray.Float32Array(data.rotations)),
+            item_scale: ShaderBuilder.createBuffer(gl, sliceToArray.Float32Array(data.scales)),
+          };
         }
       }
       const terrain_instance = graphOutputs.terrain_instance;
       if (terrain_instance) {
         renderChange = true;
         const label = sliceToString(terrain_instance.label);
-        item_positions[label] = ShaderBuilder.createBuffer(gl, sliceToArray.Float32Array(terrain_instance.positions));
+        transforms[label] = {
+          item_position: ShaderBuilder.createBuffer(gl, sliceToArray.Float32Array(terrain_instance.positions)),
+          item_rotation: ShaderBuilder.createBuffer(gl, sliceToArray.Float32Array(terrain_instance.rotations)),
+          item_scale: ShaderBuilder.createBuffer(gl, sliceToArray.Float32Array(terrain_instance.scales)),
+        };
       }
       const terrain_mesh = graphOutputs.terrain_mesh;
       if (terrain_mesh) {
@@ -339,13 +366,13 @@ export function App() {
         gl.depthMask(true);
 
         for (const [key, model] of Object.entries(models)) {
-          const item_position = item_positions[key];
+          const transform = transforms[key];
           for (const mesh of model) {
             if ("greybox" in mesh) {
-              ShaderBuilder.renderMaterial(gl, greyboxMaterial, { ...mesh.greybox, item_position, perspectiveMatrix });
+              ShaderBuilder.renderMaterial(gl, greyboxMaterial, { ...mesh.greybox, transform, perspectiveMatrix });
             }
             if ("textured" in mesh) {
-              ShaderBuilder.renderMaterial(gl, texturedMeshMaterial, { ...mesh.textured, item_position, perspectiveMatrix });
+              ShaderBuilder.renderMaterial(gl, texturedMeshMaterial, { ...mesh.textured, transform, perspectiveMatrix });
             }
           }
         }

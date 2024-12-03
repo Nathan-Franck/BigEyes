@@ -44,7 +44,7 @@ pub const interface = struct {
                 .orbit_speed = 0.01,
                 .selected_camera = .orbit,
                 .player_settings = .{
-                    .look_speed = 0.01,
+                    .look_speed = 0.004,
                     .movement_speed = 0.8,
                 },
                 .render_resolution = .{ .x = 0, .y = 0 },
@@ -103,7 +103,9 @@ pub const graph_nodes = struct {
             }
             break :blk nodes;
         };
+
         var models = std.ArrayList(game.types.GameModel).init(arena);
+        var model_transforms = std.StringHashMap(zm.Mat).init(arena);
         for (bike_blend) |node|
             if (node.mesh) |mesh| {
                 const PointFlattener = mesh_helper.VecSliceFlattener(4, 3);
@@ -113,7 +115,7 @@ pub const graph_nodes = struct {
                     normals[i] = zm.loadArr3(vertex.normal);
                     vertices[i] = zm.loadArr3(vertex.position);
                 }
-                const bike: game.types.GameModel = .{
+                const model: game.types.GameModel = .{
                     .label = node.name,
                     .meshes = try arena.dupe(game.types.GameMesh, &.{.{ .greybox = .{
                         .indices = mesh.indices,
@@ -121,7 +123,15 @@ pub const graph_nodes = struct {
                         .position = PointFlattener.convert(arena, vertices),
                     } }}),
                 };
-                try models.append(bike);
+                const transform = zm.mul(
+                    zm.mul(
+                        zm.translationV(zm.loadArr3(node.position)),
+                        zm.matFromRollPitchYawV(zm.loadArr3(node.rotation)),
+                    ),
+                    zm.scalingV(zm.loadArr3(node.scale)),
+                );
+                try models.append(model);
+                try model_transforms.put(node.name, transform);
             };
 
         const skybox = blk: {
@@ -170,6 +180,7 @@ pub const graph_nodes = struct {
 
         return game.types.Resources{
             .models = models.items,
+            .model_transforms = model_transforms,
             .skybox = skybox,
             .cutout_leaf = cutout_leaf,
             .trees = trees.items,
@@ -402,6 +413,7 @@ pub const graph_nodes = struct {
         }
         const instances_items = try arena.alloc(game.types.ModelInstances, game.config.ForestSpawner.length);
         const PointFlattener = mesh_helper.VecSliceFlattener(4, 3);
+        // const QuatFlattener = mesh_helper.VecSliceFlattener(4, 4);
         for (instances_items, @typeInfo(game.config.ForestSettings).@"struct".decls, 0..) |*instance, decl, i| {
             instance.* = .{
                 .label = decl.name,
@@ -453,6 +465,7 @@ pub const graph_nodes = struct {
     pub fn displayBike(
         arena: std.mem.Allocator,
         props: struct {
+            model_transforms: std.StringHashMap(zm.Mat),
             terrain_sampler: TerrainSampler,
         },
     ) !struct {
@@ -462,29 +475,24 @@ pub const graph_nodes = struct {
         const terrain_sampler = props.terrain_sampler.loadCache(&terrain_chunk_cache);
         _ = terrain_sampler;
 
-        const PointFlattener = mesh_helper.VecSliceFlattener(4, 3);
-        return .{ .model_instances = try arena.dupe(game.types.ModelInstances, &.{
-            .{
-                .label = "front-wheel",
-                .positions = PointFlattener.convert(arena, &.{.{ 0, 0, 0, 0 }}),
-            },
-            .{
-                .label = "back-wheel",
-                .positions = PointFlattener.convert(arena, &.{.{ 0, 0, 0, 0 }}),
-            },
-            .{
-                .label = "body",
-                .positions = PointFlattener.convert(arena, &.{.{ 0, 0, 0, 0 }}),
-            },
-            .{
-                .label = "handlebars",
-                .positions = PointFlattener.convert(arena, &.{.{ 0, 0, 0, 0 }}),
-            },
-            .{
-                .label = "shock",
-                .positions = PointFlattener.convert(arena, &.{.{ 0, 0, 0, 0 }}),
-            },
-        }) };
+        var instances = std.ArrayList(game.types.ModelInstances).init(arena);
+        for (&[_][]const u8{
+            "front-wheel",
+            "back-wheel",
+            "body",
+            "handlebars",
+            "shock",
+        }) |label| {
+            try instances.append(.{
+                .label = label,
+                .transforms = mesh_helper.flattenMatrices(
+                    arena,
+                    &.{props.model_transforms.get(label).?},
+                ),
+            });
+        }
+
+        return .{ .model_instances = instances.items };
     }
 
     pub fn displayTrees(
@@ -591,7 +599,7 @@ pub const graph_nodes = struct {
             },
             .terrain_instance = game.types.ModelInstances{
                 .label = "terrain",
-                .positions = PointFlattener.convert(arena, &.{.{ 0, 0, 0, 0 }}),
+                .transforms = mesh_helper.flattenMatrices(arena, &.{zm.identity()}),
             },
         };
     }

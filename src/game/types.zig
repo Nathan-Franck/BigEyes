@@ -1,3 +1,4 @@
+const std = @import("std");
 const Image = @import("../Image.zig");
 const mesh_helper = @import("../mesh_helper.zig");
 const subdiv = @import("../subdiv.zig");
@@ -58,6 +59,8 @@ pub const TreeMesh = struct {
 pub const ModelInstances = struct {
     label: []const u8,
     positions: []const f32,
+    rotations: []const f32,
+    scales: []const f32,
 };
 
 pub const GameModel = struct {
@@ -79,4 +82,5 @@ pub const Resources = struct {
     cutout_leaf: Image.Processed,
     trees: []const TreeMesh,
     models: []const GameModel,
+    model_transforms: std.StringHashMap(zm.Mat),
 };
