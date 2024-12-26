@@ -401,23 +401,29 @@ pub const graph_nodes = struct {
             game.config.demo_terrain_bounds,
         );
 
-        var instances = try arena.alloc(std.ArrayList(Vec4), game.config.ForestSpawner.length);
-        for (instances) |*instance| {
-            instance.* = std.ArrayList(Vec4).init(arena);
+        var positions = try arena.alloc(std.ArrayList(Vec4), game.config.ForestSpawner.length);
+        var rotations = try arena.alloc(std.ArrayList(Vec4), game.config.ForestSpawner.length);
+        var scales = try arena.alloc(std.ArrayList(Vec4), game.config.ForestSpawner.length);
+        for (positions, rotations, scales) |*position, *rotation, *scale| {
+            position.* = std.ArrayList(Vec4).init(arena);
+            rotation.* = std.ArrayList(Vec4).init(arena);
+            scale.* = std.ArrayList(Vec4).init(arena);
         }
         for (spawns) |spawn| {
             const pos_2d = Vec2{ spawn.position[0], spawn.position[1] };
             const height = try terrain_sampler.sample(arena, pos_2d);
-            const position = Vec4{ spawn.position[0], height, spawn.position[1], 1 };
-            try instances[spawn.id].append(position);
+            try positions[spawn.id].append(Vec4{ spawn.position[0], height, spawn.position[1], 1 });
+            try rotations[spawn.id].append(zm.qidentity());
+            try scales[spawn.id].append(.{ 1, 1, 1, 0 });
         }
         const instances_items = try arena.alloc(game.types.ModelInstances, game.config.ForestSpawner.length);
         const PointFlattener = mesh_helper.VecSliceFlattener(4, 3);
-        // const QuatFlattener = mesh_helper.VecSliceFlattener(4, 4);
         for (instances_items, @typeInfo(game.config.ForestSettings).@"struct".decls, 0..) |*instance, decl, i| {
             instance.* = .{
                 .label = decl.name,
-                .positions = PointFlattener.convert(arena, instances[i].items),
+                .positions = PointFlattener.convert(arena, positions[i].items),
+                .rotations = PointFlattener.convert(arena, rotations[i].items),
+                .scales = PointFlattener.convert(arena, scales[i].items),
             };
         }
 
@@ -483,12 +489,14 @@ pub const graph_nodes = struct {
             "handlebars",
             "shock",
         }) |label| {
+            const transform = props.model_transforms.get(label).?;
+            const PointFlattener = mesh_helper.VecSliceFlattener(4, 3);
+            const QuatFlattener = mesh_helper.VecSliceFlattener(4, 4);
             try instances.append(.{
                 .label = label,
-                .transforms = mesh_helper.flattenMatrices(
-                    arena,
-                    &.{props.model_transforms.get(label).?},
-                ),
+                .rotations = QuatFlattener.convert(arena, &.{zm.matToQuat(transform)}),
+                .positions = PointFlattener.convert(arena, &.{transform[3]}),
+                .scales = PointFlattener.convert(arena, &.{.{ transform[0][0], transform[1][1], transform[2][2], transform[3][3] }}),
             });
         }
 
@@ -599,7 +607,9 @@ pub const graph_nodes = struct {
             },
             .terrain_instance = game.types.ModelInstances{
                 .label = "terrain",
-                .transforms = mesh_helper.flattenMatrices(arena, &.{zm.identity()}),
+                .positions = PointFlattener.convert(arena, &.{.{ 0, 0, 0, 0 }}),
+                .rotations = PointFlattener.convert(arena, &.{zm.qidentity()}),
+                .scales = PointFlattener.convert(arena, &.{.{ 1, 1, 1, 0 }}),
             },
         };
     }

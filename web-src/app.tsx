@@ -166,10 +166,20 @@ export function App() {
               2.0 * (x * z - w * y), 2.0 * (y * z + w * x), 1.0 - 2.0 * (x * x + y * y)
           );
 
-          // Scale and translate
-          mat4 transform = mat4(rotationMatrix * scale, vec3(0.0));
-          transform[3] = vec4(position, 1.0);
+          // Scale the rotation matrix
+          mat3 scaledRotation = mat3(
+              rotationMatrix[0] * scale.x,
+              rotationMatrix[1] * scale.y,
+              rotationMatrix[2] * scale.z
+          );
 
+          // Expand scaledRotation into a mat4
+          mat4 transform = mat4(
+              vec4(scaledRotation[0], 0.0),
+              vec4(scaledRotation[1], 0.0),
+              vec4(scaledRotation[2], 0.0),
+              vec4(position, 1.0)
+          );
           return transform;
       }
     `;
@@ -190,7 +200,7 @@ export function App() {
       vertSource: instancingMath + `
         precision highp float;
         void main(void) {
-          gl_Position = perspectiveMatrix * transform * vec4(position, 1);
+          gl_Position = perspectiveMatrix * computeTransform(item_position, item_rotation, item_scale) * vec4(position, 1);
           normal = normals;
         }
       `,
@@ -221,7 +231,7 @@ export function App() {
       vertSource: instancingMath + `
         precision highp float;
         void main(void) {
-          gl_Position = perspectiveMatrix * transform * vec4(position, 1);
+          gl_Position = perspectiveMatrix * computeTransform(item_position, item_rotation, item_scale) * vec4(position, 1);
           uv = uvs;
           normal = normals;
         }
@@ -369,10 +379,10 @@ export function App() {
           const transform = transforms[key];
           for (const mesh of model) {
             if ("greybox" in mesh) {
-              ShaderBuilder.renderMaterial(gl, greyboxMaterial, { ...mesh.greybox, transform, perspectiveMatrix });
+              ShaderBuilder.renderMaterial(gl, greyboxMaterial, { ...mesh.greybox, ...transform, perspectiveMatrix });
             }
             if ("textured" in mesh) {
-              ShaderBuilder.renderMaterial(gl, texturedMeshMaterial, { ...mesh.textured, transform, perspectiveMatrix });
+              ShaderBuilder.renderMaterial(gl, texturedMeshMaterial, { ...mesh.textured, ...transform, perspectiveMatrix });
             }
           }
         }
