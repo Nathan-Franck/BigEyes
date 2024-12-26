@@ -1,5 +1,6 @@
 const std = @import("std");
 const zm = @import("zmath");
+const vm = @import("./vec_math.zig");
 const util = .{
     .tree = @import("./tree.zig"),
 };
@@ -74,7 +75,7 @@ pub fn Forest(comptime chunk_size: i32) type {
                 ) Precalculated {
                     const span = std.math.pow(f32, 2.0, @floatFromInt(source.density));
                     const coord_span: Vec2 = @splat(span);
-                    const chunk_span: Vec2 = coord_span * @as(Vec2, @splat(chunk_size));
+                    const chunk_span: Vec2 = vm.mul(coord_span, @splat(chunk_size));
                     return .{
                         .source = source,
                         .span = span,
@@ -110,7 +111,10 @@ pub fn Forest(comptime chunk_size: i32) type {
                         );
                         while (chunk_coords.next()) |chunk_coord| {
                             const chunk = try self.getChunk(chunk_cache, chunk_coord);
-                            const chunk_offset = @as(Vec2, @floatFromInt(chunk_coord)) * self.chunk_span;
+                            const chunk_offset = vm.mul(
+                                self.chunk_span,
+                                @floatFromInt(chunk_coord),
+                            );
                             const min: Coord = @splat(0);
                             const max: Coord = @splat(chunk_size);
                             var coords = CoordIterator.init(

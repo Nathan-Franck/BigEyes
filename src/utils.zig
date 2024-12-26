@@ -2,6 +2,7 @@ const std = @import("std");
 const utils = @import("./utils.zig");
 const NodeGraphBlueprintEntry = @import("./graph_runtime.zig").NodeGraphBlueprintEntry;
 const InputLink = @import("./graph_runtime.zig").InputLink;
+const vm = @import("./vec_math.zig");
 
 pub fn MutableInputs(node: NodeGraphBlueprintEntry, NodeInputs: type) type {
     var mutable_fields: []const std.builtin.Type.StructField = &.{};
@@ -651,7 +652,7 @@ pub fn findSmallestNumberAndIndex(T: type, numbers: []const T) struct { value: T
     const min_value = @reduce(.Min, min_vec);
     const min_index = @reduce(.Min, @select(
         usize,
-        min_vec == @as(Vec, @splat(min_value)),
+        vm.eq(min_vec, @splat(min_value)),
         min_index_vec,
         @as(IndexVec, @splat(std.math.maxInt(usize))),
     ));

@@ -1,4 +1,6 @@
 const std = @import("std");
+const vm = @import("./vec_math.zig");
+
 const ArrayList = std.ArrayList;
 
 pub const Point = @Vector(4, f32);
@@ -41,7 +43,7 @@ pub fn Polygon(comptime poly_selection: enum {
         }
 
         fn centerPoint(p1: Point, p2: Point) Point {
-            return (p1 + p2) / @as(Point, @splat(@as(f32, @floatCast(2))));
+            return vm.div(p1 + p2, @splat(2));
         }
 
         fn getEdgesFaces(allocator: std.mem.Allocator, input_points: []const Point, input_faces: []const Poly) ![]const EdgesFace {

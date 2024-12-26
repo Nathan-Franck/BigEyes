@@ -14,6 +14,7 @@ const Vec2 = @import("../forest.zig").Vec2;
 const Vec4 = @import("../forest.zig").Vec4;
 const CoordIterator = @import("../CoordIterator.zig");
 const Stamp = @import("../Stamp.zig");
+const vm = @import("../vec_math.zig");
 
 const game = struct {
     pub const graph = @import("./graph.zig");
@@ -499,8 +500,10 @@ pub const graph_nodes = struct {
             const transform = props.model_transforms.get(label).?;
             const PointFlattener = mesh_helper.VecSliceFlattener(4, 3);
             const QuatFlattener = mesh_helper.VecSliceFlattener(4, 4);
-            const offset = Vec4{ 0, 1, 0, 0 } * @as(Vec4, @splat(@sin(props.seconds_since_start)));
-            wasm_entry.dumpDebugLogFmt("offset {any}\n", .{offset});
+            const offset = vm.mul(
+                Vec4{ 0, 1, 0, 0 },
+                @splat(@sin(props.seconds_since_start)),
+            );
             try instances.append(.{
                 .label = label,
                 .positions = PointFlattener.convert(arena, &.{transform[3] + offset}),
@@ -573,10 +576,16 @@ pub const graph_nodes = struct {
                 // TODO: Calculate how big the stack should be, maybe should OOM so that I know when we went to slow-mode (Super cool that one line can save 100ms for a 512*512 terrain)
                 var stack_arena = std.heap.stackFallback(1024, arena);
 
-                const pos_2d: Vec2 = game.config.demo_terrain_bounds.min +
-                    @as(Vec2, @floatFromInt(vertex_coord)) *
-                    game.config.demo_terrain_bounds.size /
-                    @as(Vec2, @splat(terrain_resolution));
+                const pos_2d: Vec2 = vm.add(
+                    game.config.demo_terrain_bounds.min,
+                    vm.mul(
+                        vm.div(
+                            game.config.demo_terrain_bounds.size,
+                            @splat(terrain_resolution),
+                        ),
+                        @floatFromInt(vertex_coord),
+                    ),
+                );
                 const height = try terrain_sampler.sample(stack_arena.get(), pos_2d);
                 const vertex: Vec4 = .{ pos_2d[0], height, pos_2d[1], 1 };
                 positions[index] = vertex;

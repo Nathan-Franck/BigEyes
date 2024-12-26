@@ -1,5 +1,6 @@
 const std = @import("std");
 const zmath = @import("zmath");
+const vm = @import("./vec_math.zig");
 
 pub const Point = @Vector(4, f32);
 pub const Face = []const u32;
@@ -116,8 +117,8 @@ pub fn Polygon(comptime poly_selection: enum { Quad, Face }) type {
                         }
                         average_normal += zmath.normalize3(poly_normal);
                     }
-                    break :average_normal average_normal / @as(
-                        @Vector(4, f32),
+                    break :average_normal vm.div(
+                        average_normal,
                         @splat(@floatFromInt(vertex_to_poly_len[i])),
                     );
                 }) catch unreachable;

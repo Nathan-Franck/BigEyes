@@ -1,4 +1,5 @@
 const std = @import("std");
+const vm = @import("./vec_math.zig");
 const Stamp = @import("./Stamp.zig");
 const Vec2 = @import("./forest.zig").Vec2;
 const Bounds = @import("./forest.zig").Bounds;
@@ -61,9 +62,12 @@ pub fn TerrainSampler(
                 const bounds = blk: {
                     var bounds: [TerrainSpawner.density_tiers.len]Bounds = undefined;
                     for (self.source.tier_index_to_influence_range, 0..) |influence_range, tier_index| {
-                        const size_2d = @as(Vec2, @splat(influence_range));
+                        const size_2d: Vec2 = @splat(influence_range);
                         bounds[tier_index] = Bounds{
-                            .min = pos_2d - size_2d * @as(Vec2, @splat(0.5)),
+                            .min = vm.sub(
+                                pos_2d,
+                                vm.mul(size_2d, @splat(0.5)),
+                            ),
                             .size = size_2d,
                         };
                     }

@@ -1,4 +1,5 @@
 const Coord = @import("./forest.zig").Coord;
+const vm = @import("./vec_math.zig");
 const Vec2 = @import("./forest.zig").Vec2;
 pub const Resolution = struct { x: u32, y: u32 };
 
@@ -17,11 +18,14 @@ pub fn getHeight(
     spawn_pos: Vec2,
     pos_2d: Vec2,
 ) ?f32 {
-    const rel_pos = (pos_2d - spawn_pos) / @as(Vec2, @splat(self.size));
-    const stamp_pos = (rel_pos + @as(Vec2, @splat(0.5))) * Vec2{
-        @floatFromInt(self.resolution.x - 1),
-        @floatFromInt(self.resolution.y - 1),
-    };
+    const rel_pos = vm.div((pos_2d - spawn_pos), @splat(self.size));
+    const stamp_pos = vm.mul(
+        vm.add(rel_pos, @splat(0.5)),
+        .{
+            @floatFromInt(self.resolution.x - 1),
+            @floatFromInt(self.resolution.y - 1),
+        },
+    );
 
     if (@reduce(.Or, stamp_pos < @as(Vec2, @splat(1))) or
         @reduce(.Or, stamp_pos >= @as(Vec2, @splat(@floatFromInt(self.resolution.x - 1)))))
