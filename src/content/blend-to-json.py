@@ -20,8 +20,8 @@ for object in bpy.data.objects:
         "parent": object.parent.name if object.parent != None else None,
         "position": [
             matrix.to_translation().x,
-            matrix.to_translation().y,
             matrix.to_translation().z,
+            matrix.to_translation().y,
         ],
         "rotation": [matrix.to_euler().x, matrix.to_euler().y, matrix.to_euler().z],
         "scale": [matrix.to_scale().x, matrix.to_scale().y, matrix.to_scale().z],
@@ -53,7 +53,7 @@ for object in bpy.data.objects:
 
         vertex_strings = []
         for vertex in mesh.vertices:
-            vertex_array = [vertex.co.x, vertex.co.y, -vertex.co.z]
+            vertex_array = [vertex.co.x, vertex.co.z, vertex.co.y]
             vertex_string = ''.join(''.join(format(byte, '02x') for byte in struct.pack('<f', value)) for value in vertex_array)
             vertex_strings.append(vertex_string)
 

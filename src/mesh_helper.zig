@@ -29,9 +29,13 @@ pub fn decodeVertexDataFromHexidecimal(allocator: std.mem.Allocator, hex_str: []
 pub fn flipYZ(allocator: std.mem.Allocator, points: []const Point) []const Point {
     var flipped = std.ArrayList(Point).init(allocator);
     for (points) |point| {
-        flipped.append(Point{ point[0], -point[2], point[1], point[3] }) catch unreachable;
+        flipped.append(flipYZSingle(point)) catch unreachable;
     }
     return flipped.items;
+}
+
+pub fn flipYZSingle(point: Point) Point {
+    return Point{ point[0], -point[2], point[1], point[3] };
 }
 
 pub fn VecSliceFlattener(comptime vec_size: u32, comptime sample_size: u32) type {

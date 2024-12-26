@@ -375,6 +375,10 @@ fn deepCloneInner(
                     }
                 }
             }
+            break :blk .{
+                .value = undefined,
+                .allocator_used = false,
+            };
         },
         .pointer => |pointer_info| switch (pointer_info.size) {
             .Many, .Slice => blk: {

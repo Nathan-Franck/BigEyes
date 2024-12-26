@@ -60,10 +60,9 @@ pub fn getNodesFromJSON(allocator: std.mem.Allocator, json_data: []const u8) ![]
             .mesh = if (node.mesh) |mesh| .{
                 .vertices = vertices: {
                     const vertices = mesh_helper.decodeVertexDataFromHexidecimal(allocator, mesh.vertices);
-                    const flipped_vertices = mesh_helper.flipYZ(allocator, vertices);
-                    const normals = mesh_helper.Polygon(.Face).calculateNormals(allocator, flipped_vertices, mesh.polygons);
+                    const normals = mesh_helper.Polygon(.Face).calculateNormals(allocator, vertices, mesh.polygons);
                     var result = std.ArrayList(Vertex).init(allocator);
-                    for (flipped_vertices, 0..) |point, i| {
+                    for (vertices, 0..) |point, i| {
                         try result.append(Vertex{
                             .position = @as([4]f32, point)[0..3].*,
                             .color = hexColors[i % hexColors.len],
@@ -83,13 +82,12 @@ pub fn getAnimatedMeshesFromJSON(allocator: std.mem.Allocator, json_data: []cons
     const mesh_input_data = try std.json.parseFromSlice(BlendAnimatedMeshSpec, allocator, json_data, .{});
     var meshes = std.ArrayList(Node).init(allocator);
     for (mesh_input_data.value.meshes) |input_data| {
-        const flipped_vertices = mesh_helper.flipYZ(allocator, input_data.vertices);
         try meshes.append(.{
             .label = input_data.name,
             .vertices = vertices: {
-                const normals = mesh_helper.Polygon(.Face).calculateNormals(allocator, flipped_vertices, input_data.polygons);
+                const normals = mesh_helper.Polygon(.Face).calculateNormals(allocator, input_data.vertices, input_data.polygons);
                 var vertices = std.ArrayList(Vertex).init(allocator);
-                for (flipped_vertices, 0..) |point, i| {
+                for (input_data.vertices, 0..) |point, i| {
                     try vertices.append(Vertex{
                         .position = @as([4]f32, point)[0..3].*,
                         .color = hexColors[i % hexColors.len],
