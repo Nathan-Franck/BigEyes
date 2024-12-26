@@ -187,16 +187,21 @@ pub const graph_nodes = struct {
         };
     }
 
+    var start: u64 = 0;
     pub fn timing(props: struct {
         time: u64,
         last_time: u64,
     }) struct {
         last_time: u64,
         delta_time: f32,
+        seconds_since_start: f32,
     } {
+        if (start == 0) start = props.time;
         const delta_time = @as(f32, @floatFromInt(props.time - props.last_time)) / 1000.0;
+        const seconds_since_start = @as(f32, @floatFromInt(props.time - start)) / 1000.0;
         return .{
             .last_time = props.time,
+            .seconds_since_start = seconds_since_start,
             .delta_time = delta_time,
         };
     }
@@ -472,6 +477,7 @@ pub const graph_nodes = struct {
     pub fn displayBike(
         arena: std.mem.Allocator,
         props: struct {
+            seconds_since_start: f32,
             model_transforms: std.StringHashMap(zm.Mat),
             terrain_sampler: TerrainSampler,
         },
@@ -493,9 +499,11 @@ pub const graph_nodes = struct {
             const transform = props.model_transforms.get(label).?;
             const PointFlattener = mesh_helper.VecSliceFlattener(4, 3);
             const QuatFlattener = mesh_helper.VecSliceFlattener(4, 4);
+            const offset = Vec4{ 0, 1, 0, 0 } * @as(Vec4, @splat(@sin(props.seconds_since_start)));
+            wasm_entry.dumpDebugLogFmt("offset {any}\n", .{offset});
             try instances.append(.{
                 .label = label,
-                .positions = PointFlattener.convert(arena, &.{transform[3]}),
+                .positions = PointFlattener.convert(arena, &.{transform[3] + offset}),
                 .rotations = QuatFlattener.convert(arena, &.{zm.matToQuat(transform)}),
                 .scales = PointFlattener.convert(arena, &.{.{ transform[0][0], transform[1][1], transform[2][2], transform[3][3] }}),
             });

@@ -60,6 +60,9 @@ pub const blueprint = runtime.Blueprint{
             .{ .field = "terrain_sampler", .source = .{
                 .node = .{ .name = "calculateTerrainDensityInfluenceRange", .field = "terrain_sampler" },
             } },
+            .{ .field = "seconds_since_start", .source = .{
+                .node = .{ .name = "timing", .field = "seconds_since_start" },
+            } },
             .{ .field = "model_transforms", .source = .{
                 .node = .{ .name = "getResources", .field = "model_transforms" },
             } },
