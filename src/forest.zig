@@ -118,8 +118,15 @@ pub fn Forest(comptime chunk_size: i32) type {
                             const min: Coord = @splat(0);
                             const max: Coord = @splat(chunk_size);
                             var coords = CoordIterator.init(
-                                std.math.clamp(@as(Coord, @intFromFloat(@floor((bounds.min - chunk_offset) * self.inverse_coord_span))), min, max),
-                                std.math.clamp(@as(Coord, @intFromFloat(@ceil((bounds.min - chunk_offset + bounds.size) * self.inverse_coord_span))), min, max),
+                                std.math.clamp(@as(
+                                    Coord,
+                                    @intFromFloat(@floor((bounds.min - chunk_offset) *
+                                        self.inverse_coord_span)),
+                                ), min, max),
+                                std.math.clamp(@as(Coord, @intFromFloat(
+                                    @ceil((bounds.min - chunk_offset + bounds.size) *
+                                        self.inverse_coord_span),
+                                )), min, max),
                             );
                             while (coords.next()) |coord| if (chunk[@intCast(coord[1])][@intCast(coord[0])]) |*spawn| {
                                 try spawns.append(spawn);
@@ -284,7 +291,11 @@ pub fn Forest(comptime chunk_size: i32) type {
                     return spawns.items;
                 }
 
-                pub fn gatherSpawnsInBounds(allocator: std.mem.Allocator, chunk_cache: *ChunkCache, bounds: Bounds) ![]const *const local.Spawn {
+                pub fn gatherSpawnsInBounds(
+                    allocator: std.mem.Allocator,
+                    chunk_cache: *ChunkCache,
+                    bounds: Bounds,
+                ) ![]const *const local.Spawn {
                     var spawns = try std.ArrayList(*const local.Spawn).initCapacity(allocator, 16);
                     for (density_tiers) |maybe_density_tier| if (maybe_density_tier) |density_tier| {
                         try density_tier.gatherSpawnsInBounds(

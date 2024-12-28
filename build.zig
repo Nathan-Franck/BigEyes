@@ -1,9 +1,11 @@
 const std = @import("std");
+
 const content_dir = "src/content/";
 
 const ExportMeshes = struct {
     allocator: std.mem.Allocator,
     files: []const []const u8,
+
     step: std.Build.Step,
     pub fn create(b: *std.Build, files: []const []const u8) *@This() {
         const self = b.allocator.create(@This()) catch @panic("OOM");
