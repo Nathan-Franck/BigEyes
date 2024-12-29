@@ -124,13 +124,12 @@ pub const graph_nodes = struct {
                         .position = PointFlattener.convert(arena, vertices),
                     } }}),
                 };
-                const transform = zmath.mul(
-                    zmath.mul(
-                        zmath.translationV(zmath.loadArr3(node.position)),
-                        zmath.matFromRollPitchYawV(zmath.loadArr3(node.rotation)),
-                    ),
-                    zmath.scalingV(zmath.loadArr3(node.scale)),
-                );
+                const transform = transform: {
+                    const translation = zmath.translationV(zmath.loadArr3(node.position));
+                    const rotation = zmath.matFromRollPitchYawV(zmath.loadArr3(node.rotation));
+                    const scale = zmath.scalingV(zmath.loadArr3(node.scale));
+                    break :transform zmath.mul(translation, zmath.mul(rotation, scale));
+                };
                 try models.append(model);
                 try model_transforms.put(node.name, transform);
             };
@@ -244,16 +243,15 @@ pub const graph_nodes = struct {
                     0.1,
                     500,
                 );
-                const location = zmath.mul(
-                    zmath.translationV(props.orbit_camera.position),
-                    zmath.mul(
-                        zmath.mul(
-                            zmath.matFromRollPitchYaw(0, props.orbit_camera.rotation[0], 0),
-                            zmath.matFromRollPitchYaw(props.orbit_camera.rotation[1], 0, 0),
-                        ),
-                        zmath.translationV(zmath.loadArr3(.{ 0.0, 0.0, props.orbit_camera.track_distance })),
-                    ),
-                );
+                const location = location: {
+                    const translation = zmath.translationV(props.orbit_camera.position);
+                    const rotation = .{
+                        .y = zmath.matFromRollPitchYaw(0, props.orbit_camera.rotation[0], 0),
+                        .x = zmath.matFromRollPitchYaw(props.orbit_camera.rotation[1], 0, 0),
+                    };
+                    const offset = zmath.translationV(zmath.loadArr3(.{ 0.0, 0.0, props.orbit_camera.track_distance }));
+                    break :location zmath.mul(translation, zmath.mul(zmath.mul(rotation.y, rotation.x), offset));
+                };
 
                 return .{
                     .camera_position = zmath.mul(zmath.inverse(location), Vec4{ 0, 0, 0, 1 }),
