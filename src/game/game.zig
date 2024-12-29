@@ -6,7 +6,7 @@ const subdiv = @import("../subdiv.zig");
 const Image = @import("../Image.zig");
 const raytrace = @import("../raytrace.zig");
 const mesh_helper = @import("../mesh_helper.zig");
-const zm = @import("zmath");
+const zmath = @import("zmath");
 const tree = @import("../tree.zig");
 const Bounds = @import("../forest.zig").Bounds;
 const Coord = @import("../forest.zig").Coord;
@@ -14,7 +14,7 @@ const Vec2 = @import("../forest.zig").Vec2;
 const Vec4 = @import("../forest.zig").Vec4;
 const CoordIterator = @import("../CoordIterator.zig");
 const Stamp = @import("../Stamp.zig");
-const vm = @import("../vec_math.zig");
+const math = @import("../vec_math.zig");
 
 const game = struct {
     pub const graph = @import("./graph.zig");
@@ -106,15 +106,15 @@ pub const graph_nodes = struct {
         };
 
         var models = std.ArrayList(game.types.GameModel).init(arena);
-        var model_transforms = std.StringHashMap(zm.Mat).init(arena);
+        var model_transforms = std.StringHashMap(zmath.Mat).init(arena);
         for (bike_blend) |node|
             if (node.mesh) |mesh| {
                 const PointFlattener = mesh_helper.VecSliceFlattener(4, 3);
                 const vertices = try arena.alloc(Vec4, mesh.vertices.len);
                 const normals = try arena.alloc(Vec4, mesh.vertices.len);
                 for (mesh.vertices, 0..) |vertex, i| {
-                    normals[i] = zm.loadArr3(vertex.normal);
-                    vertices[i] = zm.loadArr3(vertex.position);
+                    normals[i] = zmath.loadArr3(vertex.normal);
+                    vertices[i] = zmath.loadArr3(vertex.position);
                 }
                 const model: game.types.GameModel = .{
                     .label = node.name,
@@ -124,12 +124,12 @@ pub const graph_nodes = struct {
                         .position = PointFlattener.convert(arena, vertices),
                     } }}),
                 };
-                const transform = zm.mul(
-                    zm.mul(
-                        zm.translationV(zm.loadArr3(node.position)),
-                        zm.matFromRollPitchYawV(zm.loadArr3(node.rotation)),
+                const transform = zmath.mul(
+                    zmath.mul(
+                        zmath.translationV(zmath.loadArr3(node.position)),
+                        zmath.matFromRollPitchYawV(zmath.loadArr3(node.rotation)),
                     ),
-                    zm.scalingV(zm.loadArr3(node.scale)),
+                    zmath.scalingV(zmath.loadArr3(node.scale)),
                 );
                 try models.append(model);
                 try model_transforms.put(node.name, transform);
@@ -214,7 +214,7 @@ pub const graph_nodes = struct {
             orbit_speed: f32,
             render_resolution: struct { x: i32, y: i32 },
             input: struct {
-                mouse_delta: zm.Vec,
+                mouse_delta: zmath.Vec,
                 movement: struct {
                     left: ?u64,
                     right: ?u64,
@@ -230,34 +230,34 @@ pub const graph_nodes = struct {
         },
     ) !struct {
         camera_position: Vec4,
-        world_matrix: zm.Mat,
+        world_matrix: zmath.Mat,
     } {
         switch (props.selected_camera) {
             .orbit => {
                 props.orbit_camera.rotation = props.orbit_camera.rotation +
                     props.input.mouse_delta *
-                    zm.splat(Vec4, -props.orbit_speed);
-                const view_projection = zm.perspectiveFovLh(
+                    zmath.splat(Vec4, -props.orbit_speed);
+                const view_projection = zmath.perspectiveFovLh(
                     0.25 * 3.14151,
                     @as(f32, @floatFromInt(props.render_resolution.x)) /
                         @as(f32, @floatFromInt(props.render_resolution.y)),
                     0.1,
                     500,
                 );
-                const location = zm.mul(
-                    zm.translationV(props.orbit_camera.position),
-                    zm.mul(
-                        zm.mul(
-                            zm.matFromRollPitchYaw(0, props.orbit_camera.rotation[0], 0),
-                            zm.matFromRollPitchYaw(props.orbit_camera.rotation[1], 0, 0),
+                const location = zmath.mul(
+                    zmath.translationV(props.orbit_camera.position),
+                    zmath.mul(
+                        zmath.mul(
+                            zmath.matFromRollPitchYaw(0, props.orbit_camera.rotation[0], 0),
+                            zmath.matFromRollPitchYaw(props.orbit_camera.rotation[1], 0, 0),
                         ),
-                        zm.translationV(zm.loadArr3(.{ 0.0, 0.0, props.orbit_camera.track_distance })),
+                        zmath.translationV(zmath.loadArr3(.{ 0.0, 0.0, props.orbit_camera.track_distance })),
                     ),
                 );
 
                 return .{
-                    .camera_position = zm.mul(zm.inverse(location), Vec4{ 0, 0, 0, 1 }),
-                    .world_matrix = zm.mul(
+                    .camera_position = zmath.mul(zmath.inverse(location), Vec4{ 0, 0, 0, 1 }),
+                    .world_matrix = zmath.mul(
                         location,
                         view_projection,
                     ),
@@ -266,9 +266,9 @@ pub const graph_nodes = struct {
             .first_person => {
                 props.player.euler_rotation = props.player.euler_rotation +
                     props.input.mouse_delta *
-                    zm.splat(Vec4, -props.player_settings.look_speed);
+                    zmath.splat(Vec4, -props.player_settings.look_speed);
 
-                const rotation_matrix = zm.matFromRollPitchYaw(-props.player.euler_rotation[1], -props.player.euler_rotation[0], 0);
+                const rotation_matrix = zmath.matFromRollPitchYaw(-props.player.euler_rotation[1], -props.player.euler_rotation[0], 0);
 
                 const right = Vec4{ 1, 0, 0, 0 };
                 var horizontal_movement = Vec4{ 0, 0, 0, 0 };
@@ -302,11 +302,12 @@ pub const graph_nodes = struct {
 
                 const combined_movement = horizontal_movement + vertical_movement;
 
-                if (zm.length3(combined_movement)[0] > 0.001) {
-                    const final_movement = zm.mul(
-                        zm.normalize3(combined_movement),
-                        rotation_matrix,
-                    ) * zm.splat(Vec4, props.player_settings.movement_speed * props.delta_time.get());
+                if (zmath.length3(combined_movement)[0] > 0.001) {
+                    const final_movement = blk: {
+                        const world_direction = zmath.mul(zmath.normalize3(combined_movement), rotation_matrix);
+                        const movement_delta: Vec4 = @splat(props.player_settings.movement_speed * props.delta_time.get());
+                        break :blk world_direction * movement_delta;
+                    };
 
                     var new_position = props.player.position;
                     new_position += final_movement;
@@ -321,7 +322,7 @@ pub const graph_nodes = struct {
                     props.player.position = new_position;
                 }
 
-                const view_projection = zm.perspectiveFovLh(
+                const view_projection = zmath.perspectiveFovLh(
                     0.25 * 3.14151,
                     @as(f32, @floatFromInt(props.render_resolution.x)) /
                         @as(f32, @floatFromInt(props.render_resolution.y)),
@@ -329,14 +330,14 @@ pub const graph_nodes = struct {
                     500,
                 );
 
-                const location = zm.mul(
-                    zm.translationV(-props.player.position),
-                    zm.inverse(rotation_matrix),
+                const location = zmath.mul(
+                    zmath.translationV(-props.player.position),
+                    zmath.inverse(rotation_matrix),
                 );
 
                 return .{
-                    .camera_position = zm.mul(zm.inverse(location), Vec4{ 0, 0, 0, 1 }),
-                    .world_matrix = zm.mul(
+                    .camera_position = zmath.mul(zmath.inverse(location), Vec4{ 0, 0, 0, 1 }),
+                    .world_matrix = zmath.mul(
                         location,
                         view_projection,
                     ),
@@ -349,14 +350,14 @@ pub const graph_nodes = struct {
         arena: std.mem.Allocator,
         props: struct {
             camera_position: Vec4,
-            world_matrix: zm.Mat,
+            world_matrix: zmath.Mat,
         },
     ) !struct { screen_space_mesh: struct {
         indices: []const u32,
         uvs: []const f32,
         normals: []const f32,
     } } {
-        const inverse_view_projection = zm.inverse(props.world_matrix);
+        const inverse_view_projection = zmath.inverse(props.world_matrix);
         var normals: [4]Vec4 = undefined;
         for (
             &normals,
@@ -367,8 +368,8 @@ pub const graph_nodes = struct {
                 Vec4{ -1, 1, 1, 1 },
             },
         ) |*normal, screen_position| {
-            const world_position = zm.mul(screen_position, inverse_view_projection);
-            normal.* = zm.normalize3(
+            const world_position = zmath.mul(screen_position, inverse_view_projection);
+            normal.* = zmath.normalize3(
                 world_position - props.camera_position,
             );
         }
@@ -419,7 +420,7 @@ pub const graph_nodes = struct {
             const pos_2d = Vec2{ spawn.position[0], spawn.position[1] };
             const height = try terrain_sampler.sample(arena, pos_2d);
             try positions[spawn.id].append(Vec4{ spawn.position[0], height, spawn.position[1], 1 });
-            try rotations[spawn.id].append(zm.qidentity());
+            try rotations[spawn.id].append(zmath.qidentity());
             try scales[spawn.id].append(.{ 1, 1, 1, 0 });
         }
         const instances_items = try arena.alloc(game.types.ModelInstances, game.config.ForestSpawner.length);
@@ -479,7 +480,7 @@ pub const graph_nodes = struct {
         arena: std.mem.Allocator,
         props: struct {
             seconds_since_start: f32,
-            model_transforms: std.StringHashMap(zm.Mat),
+            model_transforms: std.StringHashMap(zmath.Mat),
             terrain_sampler: TerrainSampler,
         },
     ) !struct {
@@ -500,14 +501,15 @@ pub const graph_nodes = struct {
             const transform = props.model_transforms.get(label).?;
             const PointFlattener = mesh_helper.VecSliceFlattener(4, 3);
             const QuatFlattener = mesh_helper.VecSliceFlattener(4, 4);
-            const offset = vm.mul(
-                Vec4{ 0, 1, 0, 0 },
-                @splat(@sin(props.seconds_since_start)),
-            );
+            const offset = math: {
+                const up = Vec4{ 0, 1, 0, 0 };
+                const bounce: Vec4 = @splat(@sin(props.seconds_since_start));
+                break :math up * bounce;
+            };
             try instances.append(.{
                 .label = label,
                 .positions = PointFlattener.convert(arena, &.{transform[3] + offset}),
-                .rotations = QuatFlattener.convert(arena, &.{zm.matToQuat(transform)}),
+                .rotations = QuatFlattener.convert(arena, &.{zmath.matToQuat(transform)}),
                 .scales = PointFlattener.convert(arena, &.{.{ transform[0][0], transform[1][1], transform[2][2], transform[3][3] }}),
             });
         }
@@ -569,28 +571,24 @@ pub const graph_nodes = struct {
         // const terrain_resolution = 128;
 
         var vertex_iterator = CoordIterator.init(@splat(0), @splat(terrain_resolution + 1));
-        const positions = blk: {
+        const positions = positions: {
             var positions = try arena.alloc(Vec4, vertex_iterator.total);
             var index: usize = 0;
             while (vertex_iterator.next()) |vertex_coord| : (index += 1) {
                 // TODO: Calculate how big the stack should be, maybe should OOM so that I know when we went to slow-mode (Super cool that one line can save 100ms for a 512*512 terrain)
                 var stack_arena = std.heap.stackFallback(1024, arena);
 
-                const pos_2d: Vec2 = vm.add(
-                    game.config.demo_terrain_bounds.min,
-                    vm.mul(
-                        vm.div(
-                            game.config.demo_terrain_bounds.size,
-                            @splat(terrain_resolution),
-                        ),
-                        @floatFromInt(vertex_coord),
-                    ),
-                );
+                const pos_2d: Vec2 = pos_2d: {
+                    const res: Vec2 = @splat(terrain_resolution);
+                    const span = game.config.demo_terrain_bounds.size / res;
+                    const coord: Vec2 = @floatFromInt(vertex_coord);
+                    break :pos_2d game.config.demo_terrain_bounds.min + (span * coord);
+                };
                 const height = try terrain_sampler.sample(stack_arena.get(), pos_2d);
                 const vertex: Vec4 = .{ pos_2d[0], height, pos_2d[1], 1 };
                 positions[index] = vertex;
             }
-            break :blk positions;
+            break :positions positions;
         };
 
         const quads = blk: {
@@ -607,7 +605,10 @@ pub const graph_nodes = struct {
                 var quad: [4]u32 = undefined;
                 inline for (0..4) |quad_index| {
                     const quad_corner = quad_coord + quad_corners[quad_index];
-                    quad[quad_index] = @intCast(quad_corner[0] + quad_corner[1] * vertex_iterator.width());
+                    quad[quad_index] = @intCast(math.mul(
+                        quad_corner[0] + quad_corner[1],
+                        vertex_iterator.width(),
+                    ));
                 }
                 quads[index] = quad;
             }
@@ -627,7 +628,7 @@ pub const graph_nodes = struct {
             .terrain_instance = game.types.ModelInstances{
                 .label = "terrain",
                 .positions = PointFlattener.convert(arena, &.{.{ 0, 0, 0, 0 }}),
-                .rotations = QuatFlattener.convert(arena, &.{zm.qidentity()}),
+                .rotations = QuatFlattener.convert(arena, &.{zmath.qidentity()}),
                 .scales = PointFlattener.convert(arena, &.{.{ 1, 1, 1, 0 }}),
             },
         };
