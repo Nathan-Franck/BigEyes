@@ -137,8 +137,8 @@ export function App() {
       globals: {
         indices: { type: "element" },
         uv: { type: "attribute", unit: "vec2" },
-        normals: { type: "attribute", unit: "vec3" },
-        normal: { type: "varying", unit: "vec3" },
+        normals: { type: "attribute", unit: "vec4" },
+        normal: { type: "varying", unit: "vec4" },
         skybox: { type: "uniform", unit: "samplerCube", count: 1 },
       },
       vertSource: `
@@ -151,13 +151,13 @@ export function App() {
       fragSource: `
         precision highp float;
         void main(void) {
-          gl_FragColor = textureCube(skybox, normalize(normal));
+          gl_FragColor = textureCube(skybox, normalize(normal.xyz));
         }
       `,
     });
 
     const instancingMath = `
-      mat4 computeTransform(vec3 position, vec4 rotation, vec3 scale) {
+      mat4 computeTransform(vec4 position, vec4 rotation, vec4 scale) {
           // Convert quaternion to rotation matrix
           float x = rotation.x, y = rotation.y, z = rotation.z, w = rotation.w;
           mat3 rotationMatrix = mat3(
@@ -178,7 +178,7 @@ export function App() {
               vec4(scaledRotation[0], 0.0),
               vec4(scaledRotation[1], 0.0),
               vec4(scaledRotation[2], 0.0),
-              vec4(position, 1.0)
+              position
           );
           return transform;
       }
@@ -188,26 +188,26 @@ export function App() {
       mode: "TRIANGLES",
       globals: {
         indices: { type: "element" },
-        position: { type: "attribute", unit: "vec3" },
-        normals: { type: "attribute", unit: "vec3" },
+        position: { type: "attribute", unit: "vec4" },
+        normals: { type: "attribute", unit: "vec4" },
         uv: { type: "varying", unit: "vec2" },
-        normal: { type: "varying", unit: "vec3" },
+        normal: { type: "varying", unit: "vec4" },
         perspectiveMatrix: { type: "uniform", unit: "mat4", count: 1 },
-        item_position: { type: "attribute", unit: "vec3", instanced: true },
+        item_position: { type: "attribute", unit: "vec4", instanced: true },
         item_rotation: { type: "attribute", unit: "vec4", instanced: true },
-        item_scale: { type: "attribute", unit: "vec3", instanced: true },
+        item_scale: { type: "attribute", unit: "vec4", instanced: true },
       },
       vertSource: instancingMath + `
         precision highp float;
         void main(void) {
-          gl_Position = perspectiveMatrix * computeTransform(item_position, item_rotation, item_scale) * vec4(position, 1);
+          gl_Position = perspectiveMatrix * computeTransform(item_position, item_rotation, item_scale) * position;
           normal = normals;
         }
       `,
       fragSource: `
         precision highp float;
         void main(void) {
-          float brightness = clamp(dot(normal, normalize(vec3(1, 1, 1))), 0.0, 1.0);
+          float brightness = clamp(dot(normal.xyz, normalize(vec3(1, 1, 1))), 0.0, 1.0);
           gl_FragColor = vec4(vec3(0.8, 0.8, 0.8) * mix(0.5, 1.0, brightness), 1);
         }
       `,
@@ -217,21 +217,21 @@ export function App() {
       mode: "TRIANGLES",
       globals: {
         indices: { type: "element" },
-        position: { type: "attribute", unit: "vec3" },
-        normals: { type: "attribute", unit: "vec3" },
+        position: { type: "attribute", unit: "vec4" },
+        normals: { type: "attribute", unit: "vec4" },
         uvs: { type: "attribute", unit: "vec2" },
         uv: { type: "varying", unit: "vec2" },
-        normal: { type: "varying", unit: "vec3" },
+        normal: { type: "varying", unit: "vec4" },
         texture: { type: "uniform", unit: "sampler2D", count: 1 },
         perspectiveMatrix: { type: "uniform", unit: "mat4", count: 1 },
-        item_position: { type: "attribute", unit: "vec3", instanced: true },
+        item_position: { type: "attribute", unit: "vec4", instanced: true },
         item_rotation: { type: "attribute", unit: "vec4", instanced: true },
-        item_scale: { type: "attribute", unit: "vec3", instanced: true },
+        item_scale: { type: "attribute", unit: "vec4", instanced: true },
       },
       vertSource: instancingMath + `
         precision highp float;
         void main(void) {
-          gl_Position = perspectiveMatrix * computeTransform(item_position, item_rotation, item_scale) * vec4(position, 1);
+          gl_Position = perspectiveMatrix * computeTransform(item_position, item_rotation, item_scale) * position;
           uv = uvs;
           normal = normals;
         }
@@ -242,7 +242,7 @@ export function App() {
           if (texture2D(texture, uv).a > 0.65) {
             discard;
           }
-          float brightness = abs(dot(normal, normalize(vec3(1, 1, 1))));
+          float brightness = abs(dot(normal.xyz, normalize(vec3(1, 1, 1))));
           gl_FragColor = vec4(texture2D(texture, uv).rgb * brightness, 1);
         }
       `,
@@ -254,7 +254,7 @@ export function App() {
       | { textured: Pick<Binds<typeof texturedMeshMaterial.globals>, "indices" | "normals" | "position" | "uvs" | "texture"> }
     let models: Record<string, Model[]> = {};
     let perspectiveMatrix: Mat4;
-    let transforms: Record<string, { item_position: SizedBuffer<3>, item_rotation: SizedBuffer<4>, item_scale: SizedBuffer<3> }> = {};
+    let transforms: Record<string, { item_position: SizedBuffer<4>, item_rotation: SizedBuffer<4>, item_scale: SizedBuffer<4> }> = {};
     let skybox: Binds<typeof skyboxMaterial.globals>;
 
     updateRender = (graphOutputs) => () => {

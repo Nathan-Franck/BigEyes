@@ -39,7 +39,23 @@ pub fn flipYZSingle(point: Point) Point {
     return Point{ point[0], -point[2], point[1], point[3] };
 }
 
-pub fn VecSliceFlattener(comptime options: struct {
+pub fn VecSliceFlattener(comptime vec_size: u32, comptime sample_size: u32) type {
+    return struct {
+        pub fn convert(allocator: std.mem.Allocator, points: []const @Vector(vec_size, f32)) []const f32 {
+            var float_slice = allocator.alloc(f32, points.len * sample_size) catch unreachable;
+            for (points, 0..) |point, index| {
+                std.mem.copyForwards(
+                    f32,
+                    float_slice[index * sample_size .. (index + 1) * sample_size],
+                    @as([vec_size]f32, point)[0..sample_size],
+                );
+            }
+            return float_slice;
+        }
+    };
+}
+
+pub fn VecSliceFieldFlattener(comptime options: struct {
     vec_size: u32,
     sample_size: u32,
     element_type: ?type = null,
@@ -47,10 +63,10 @@ pub fn VecSliceFlattener(comptime options: struct {
     const ElementType = if (options.element_type) |element_type| element_type else @Vector(options.vec_size, f32);
     const SubField = if (options.element_type) |element_type| std.meta.FieldEnum(element_type) else void;
     return struct {
-        pub fn convert(allocator: std.mem.Allocator, points: []const ElementType, sub_field: SubField) []const f32 {
+        pub fn convert(allocator: std.mem.Allocator, points: []const ElementType, comptime sub_field: SubField) []const f32 {
             var float_slice = allocator.alloc(f32, points.len * options.sample_size) catch unreachable;
             for (points, 0..) |point, index| {
-                const point_data = @field(point, sub_field);
+                const point_data = @field(point, @tagName(sub_field));
                 std.mem.copyForwards(
                     f32,
                     float_slice[index * options.sample_size .. (index + 1) * options.sample_size],

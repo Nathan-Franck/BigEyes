@@ -4,7 +4,6 @@ const zm = @import("zmath");
 
 const forest = @import("../forest.zig");
 const Vec2 = forest.Vec2;
-const Vec3 = forest.Vec3;
 const Vec4 = forest.Vec4;
 const Image = @import("../Image.zig");
 const mesh_helper = @import("../mesh_helper.zig");
@@ -18,16 +17,16 @@ pub const Quad = [4]u32;
 
 pub const GreyboxMesh = struct {
     indices: []const u32,
-    position: []const Vec3,
-    normal: []const Vec3,
+    position: []const Vec4,
+    normal: []const Vec4,
 };
 
 pub const TextureMesh = struct {
     diffuse_alpha: Image.Processed,
     indices: []const u32,
-    position: []const Vec3,
+    position: []const Vec4,
     uv: []const Vec2,
-    normal: []const Vec3,
+    normal: []const Vec4,
 };
 
 pub const GameMesh = union(enum) {
@@ -63,9 +62,9 @@ pub const TreeMesh = struct {
 
 pub const ModelInstances = struct {
     label: []const u8,
-    positions: []const Vec3,
+    positions: []const Vec4,
     rotations: []const Vec4,
-    scales: []const Vec3,
+    scales: []const Vec4,
 };
 
 pub const GameModel = struct {

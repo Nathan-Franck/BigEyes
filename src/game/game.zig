@@ -109,11 +109,11 @@ pub const graph_nodes = struct {
         var model_transforms = std.StringHashMap(zmath.Mat).init(arena);
         for (bike_blend) |node|
             if (node.mesh) |mesh| {
-                const vertices = try arena.alloc(Vec3, mesh.vertices.len);
-                const normals = try arena.alloc(Vec3, mesh.vertices.len);
+                const vertices = try arena.alloc(Vec4, mesh.vertices.len);
+                const normals = try arena.alloc(Vec4, mesh.vertices.len);
                 for (mesh.vertices, 0..) |vertex, i| {
-                    normals[i] = vertex.normal;
-                    vertices[i] = vertex.position;
+                    normals[i] = zmath.loadArr3(vertex.normal);
+                    vertices[i] = zmath.loadArr3(vertex.position);
                 }
                 const model: game.types.GameModel = .{
                     .label = node.name,
@@ -356,7 +356,7 @@ pub const graph_nodes = struct {
     ) !struct { screen_space_mesh: struct {
         indices: []const u32,
         uvs: []const Vec2,
-        normals: []const Vec3,
+        normals: []const Vec4,
     } } {
         const inverse_view_projection = zmath.inverse(props.world_matrix);
         var normals: [4]Vec4 = undefined;
@@ -385,7 +385,7 @@ pub const graph_nodes = struct {
                 Vec2{ 1, 1 },
                 Vec2{ 0, 1 },
             }),
-            .normals = try arena.dupe(Vec3, &normals),
+            .normals = try arena.dupe(Vec4, &normals),
         } };
     }
 
@@ -407,7 +407,7 @@ pub const graph_nodes = struct {
             game.config.demo_terrain_bounds,
         );
 
-        const InstanceEntry = struct { position: Vec3, rotation: Vec4, scale: Vec3 };
+        const InstanceEntry = struct { position: Vec4, rotation: Vec4, scale: Vec4 };
         var instances = try arena.alloc(std.ArrayList(InstanceEntry), game.config.ForestSpawner.length);
         for (instances) |*position| {
             position.* = std.ArrayList(InstanceEntry).init(arena);
@@ -416,9 +416,9 @@ pub const graph_nodes = struct {
             const pos_2d = Vec2{ spawn.position[0], spawn.position[1] };
             const height = try terrain_sampler.sample(arena, pos_2d);
             try instances[spawn.id].append(.{
-                .position = .{ spawn.position[0], height, spawn.position[1] },
+                .position = .{ spawn.position[0], height, spawn.position[1], 1 },
                 .rotation = zmath.qidentity(),
-                .scale = .{ 1, 1, 1 },
+                .scale = .{ 1, 1, 1, 0 },
             });
         }
         const instances_items = try arena.alloc(game.types.ModelInstances, game.config.ForestSpawner.length);
@@ -426,7 +426,7 @@ pub const graph_nodes = struct {
             instance.* = .{
                 .label = decl.name,
                 .positions = positions: {
-                    const res = try arena.alloc(Vec3, instances[i].items.len);
+                    const res = try arena.alloc(Vec4, instances[i].items.len);
                     for (instances[i].items, 0..) |entry, j| {
                         res[j] = entry.position;
                     } else break :positions res;
@@ -438,7 +438,7 @@ pub const graph_nodes = struct {
                     } else break :rotations res;
                 },
                 .scales = scales: {
-                    const res = try arena.alloc(Vec3, instances[i].items.len);
+                    const res = try arena.alloc(Vec4, instances[i].items.len);
                     for (instances[i].items, 0..) |entry, j| {
                         res[j] = entry.scale;
                     } else break :scales res;
@@ -517,9 +517,9 @@ pub const graph_nodes = struct {
             };
             try instances.append(.{
                 .label = label,
-                .positions = try arena.dupe(Vec3, &.{zmath.vecToArr3(transform[3]) + offset}),
+                .positions = try arena.dupe(Vec4, &.{transform[3] + offset}),
                 .rotations = try arena.dupe(Vec4, &.{zmath.matToQuat(transform)}),
-                .scales = try arena.dupe(Vec3, &.{.{ transform[0][0], transform[1][1], transform[2][2] }}),
+                .scales = try arena.dupe(Vec4, &.{.{ transform[0][0], transform[1][1], transform[2][2], transform[3][3] }}),
             });
         }
 
@@ -592,7 +592,7 @@ pub const graph_nodes = struct {
                     break :pos_2d game.config.demo_terrain_bounds.min + (span * coord);
                 };
                 const height = try terrain_sampler.sample(stack_arena.get(), pos_2d);
-                positions[index] = .{ pos_2d[0], height, pos_2d[1] };
+                positions[index] = .{ pos_2d[0], height, pos_2d[1], 1 };
             }
             break :positions positions;
         };
@@ -624,13 +624,13 @@ pub const graph_nodes = struct {
             .terrain_mesh = game.types.GreyboxMesh{
                 .indices = indices,
                 .position = positions,
-                .normal = PointFlattener.convert(arena, normals),
+                .normal = normals,
             },
             .terrain_instance = game.types.ModelInstances{
                 .label = "terrain",
-                .positions = try arena.dupe(Vec3, &.{.{ 0, 0, 0 }}),
+                .positions = try arena.dupe(Vec4, &.{.{ 0, 0, 0, 0 }}),
                 .rotations = try arena.dupe(Vec4, &.{zmath.qidentity()}),
-                .scales = try arena.dupe(Vec3, &.{.{ 1, 1, 1 }}),
+                .scales = try arena.dupe(Vec4, &.{.{ 1, 1, 1, 0 }}),
             },
         };
     }
