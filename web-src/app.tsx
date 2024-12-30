@@ -254,7 +254,7 @@ export function App() {
       | { textured: Pick<Binds<typeof texturedMeshMaterial.globals>, "indices" | "normals" | "position" | "uvs" | "texture"> }
     let models: Record<string, Model[]> = {};
     let perspectiveMatrix: Mat4;
-    let transforms: Record<string, { item_position: SizedBuffer, item_rotation: SizedBuffer, item_scale: SizedBuffer }> = {};
+    let transforms: Record<string, { item_position: SizedBuffer<3>, item_rotation: SizedBuffer<4>, item_scale: SizedBuffer<3> }> = {};
     let skybox: Binds<typeof skyboxMaterial.globals>;
 
     updateRender = (graphOutputs) => () => {
@@ -279,11 +279,15 @@ export function App() {
       const screenspace_data = graphOutputs.screen_space_mesh;
       if (screenspace_data) {
         renderChange = true;
+        const indices =  sliceToArray.Uint32Array(screenspace_data.indices);
+        const what = sliceToArray.Float32Array(screenspace_data.normals);
+        const uv = sliceToArray.Float32Array(screenspace_data.uvs);
+        console.table(uv);
         skybox = {
           ...skybox,
-          indices: ShaderBuilder.createElementBuffer(gl, sliceToArray.Uint32Array(screenspace_data.indices)),
-          uv: ShaderBuilder.createBuffer(gl, sliceToArray.Float32Array(screenspace_data.uvs)),
-          normals: ShaderBuilder.createBuffer(gl, sliceToArray.Float32Array(screenspace_data.normals)),
+          indices: ShaderBuilder.createElementBuffer(gl, indices),
+          uv: ShaderBuilder.createBuffer(gl, uv),
+          normals: ShaderBuilder.createBuffer(gl, what),
         };
       }
       let model_instances: NonNullable<typeof graphOutputs.model_instances> = [];

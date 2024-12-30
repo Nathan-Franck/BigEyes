@@ -1,11 +1,16 @@
 const std = @import("std");
+
+const zm = @import("zmath");
+
+const forest = @import("../forest.zig");
+const Vec2 = forest.Vec2;
+const Vec3 = forest.Vec3;
+const Vec4 = forest.Vec4;
 const Image = @import("../Image.zig");
 const mesh_helper = @import("../mesh_helper.zig");
+const raytrace = @import("../raytrace.zig");
 const subdiv = @import("../subdiv.zig");
 const tree = @import("../tree.zig");
-const forest = @import("../forest.zig");
-const zm = @import("zmath");
-const raytrace = @import("../raytrace.zig");
 
 pub const Point = @Vector(4, f32);
 pub const Face = []const u32;
@@ -13,16 +18,16 @@ pub const Quad = [4]u32;
 
 pub const GreyboxMesh = struct {
     indices: []const u32,
-    position: []const f32,
-    normal: []const f32,
+    position: []const Vec3,
+    normal: []const Vec3,
 };
 
 pub const TextureMesh = struct {
     diffuse_alpha: Image.Processed,
     indices: []const u32,
-    position: []const f32,
-    uv: []const f32,
-    normal: []const f32,
+    position: []const Vec3,
+    uv: []const Vec2,
+    normal: []const Vec3,
 };
 
 pub const GameMesh = union(enum) {
@@ -58,9 +63,9 @@ pub const TreeMesh = struct {
 
 pub const ModelInstances = struct {
     label: []const u8,
-    positions: []const f32,
-    rotations: []const f32,
-    scales: []const f32,
+    positions: []const Vec3,
+    rotations: []const Vec4,
+    scales: []const Vec3,
 };
 
 pub const GameModel = struct {

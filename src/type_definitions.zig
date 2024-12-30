@@ -1,11 +1,11 @@
 const std = @import("std");
 const utils = @import("./utils.zig");
 
-pub inline fn typescriptTypeOf(comptime from_type: anytype, comptime options: struct { first: bool = false }) []const u8 {
+pub inline fn typescriptTypeOf(from_type: type, comptime options: struct { first: bool = false, decl: ?from_type = null }) []const u8 {
     return comptime switch (@typeInfo(from_type)) {
         .bool => "boolean",
         .void => "void",
-        .int => "number",
+        .int => if (options.decl) |decl| std.fmt.comptimePrint("{}", .{decl}) else "number",
         .float => "number",
         .optional => |optional_info| typescriptTypeOf(optional_info.child, .{}) ++ " | null",
         .array => |array_info| typescriptTypeOf(array_info.child, .{}) ++ "[]",
@@ -49,11 +49,13 @@ pub inline fn typescriptTypeOf(comptime from_type: anytype, comptime options: st
         .@"struct" => |struct_info| {
             var decls: []const u8 = &.{};
             for (struct_info.decls, 0..) |decl, i| {
+                const field = @field(from_type, decl.name);
+
                 decls = decls ++ std.fmt.comptimePrint("{s}{s}{s}: {s}", .{
                     if (i == 0) "" else ", ",
                     if (options.first) "\n\t" else "",
                     decl.name,
-                    typescriptTypeOf(@TypeOf(@field(from_type, decl.name)), .{}),
+                    typescriptTypeOf(@TypeOf(field), .{ .decl = field }),
                 });
             }
             var fields: []const u8 = &.{};
@@ -143,38 +145,70 @@ pub fn deepTypedArrayReferences(t: type, allocator: std.mem.Allocator, data: t) 
                 break :blk elements.items;
             },
             .Many, .Slice => switch (p.child) {
-                else => blk: {
-                    var elements = std.ArrayList(DeepTypedArrayReferences(p.child).type).init(allocator);
-                    for (data) |elem| {
-                        try elements.append(try deepTypedArrayReferences(p.child, allocator, elem));
-                    }
-                    break :blk elements.items;
+                else => switch (@typeInfo(p.child)) {
+                    .vector => |vec| .{
+                        .ptr = @intFromPtr(@as(*const p.child, @ptrCast(data))),
+                        .len = data.len * vec.len,
+                        .type = typeToTypedArrayEnumElement(vec.child),
+                    },
+                    .array => |arr| .{
+                        .ptr = @intFromPtr(@as(*const p.child, @ptrCast(data))),
+                        .len = data.len * arr.len,
+                        .type = typeToTypedArrayEnumElement(arr.child),
+                    },
+                    else => blk: {
+                        var elements = std.ArrayList(DeepTypedArrayReferences(p.child).type).init(allocator);
+                        for (data) |elem| {
+                            try elements.append(try deepTypedArrayReferences(p.child, allocator, elem));
+                        }
+                        break :blk elements.items;
+                    },
                 },
                 f32, f64, i8, i16, i32, u8, u16, u32 => .{
                     .ptr = @intFromPtr(@as(*const p.child, @ptrCast(data))),
                     .len = data.len,
-                    .type = switch (p.child) {
-                        f32 => .Float32Array,
-                        f64 => .Float64Array,
-                        i8 => .Int8Array,
-                        i16 => .Int16Array,
-                        i32 => .Int32Array,
-                        u8 => .Uint8Array,
-                        u16 => .Uint16Array,
-                        u32 => .Uint32Array,
-                        else => unreachable,
-                    },
+                    .type = typeToTypedArrayEnumElement(p.child),
                 },
             },
         },
     };
 }
 
-pub fn TypedArrayReference(type_enum: type) type {
+pub fn TypedArrayReference(type_enum: type, _vec_len: u8) type {
     return struct {
+        pub const vec_len: u8 = _vec_len;
+
         type: type_enum,
         ptr: usize,
         len: usize,
+    };
+}
+
+fn TypeToTypedArrayEnum(t: type) type {
+    return switch (t) {
+        f32 => enum { Float32Array },
+        f64 => enum { Float64Array },
+        i8 => enum { Int8Array },
+        i16 => enum { Int16Array },
+        i32 => enum { Int32Array },
+        u8 => enum { Uint8Array },
+        u16 => enum { Uint16Array },
+        u32 => enum { Uint32Array },
+        else => @compileError(std.fmt.comptimePrint("Unsupported typed array {}", .{t})),
+    };
+}
+
+fn typeToTypedArrayEnumElement(t: type) TypeToTypedArrayEnum(t) {
+    return switch (t) {
+        f32 => .Float32Array,
+        f64 => .Float64Array,
+        i8 => .Int8Array,
+        i16 => .Int16Array,
+        i32 => .Int32Array,
+        u8 => .Uint8Array,
+        u16 => .Uint16Array,
+        u32 => .Uint32Array,
+        else => @compileError(std.fmt.comptimePrint("Unsupported typed array {}", .{t})),
     };
 }
 
@@ -234,24 +268,18 @@ pub fn DeepTypedArrayReferences(t: type) struct { type: type, changed: bool = fa
             .Many, .Slice => switch (p.child) {
                 f32, f64, i8, i16, i32, u8, u16, u32 => .{
                     .changed = true,
-                    .type = switch (p.child) {
-                        else => unreachable,
-                        f32 => TypedArrayReference(enum { Float32Array }),
-                        f64 => TypedArrayReference(enum { Float64Array }),
-                        i8 => TypedArrayReference(enum { Int8Array }),
-                        i16 => TypedArrayReference(enum { Int16Array }),
-                        i32 => TypedArrayReference(enum { Int32Array }),
-                        u8 => TypedArrayReference(enum { Uint8Array }),
-                        u16 => TypedArrayReference(enum { Uint16Array }),
-                        u32 => TypedArrayReference(enum { Uint32Array }),
-                    },
+                    .type = TypedArrayReference(TypeToTypedArrayEnum(p.child), 1),
                 },
-                else => blk: {
-                    const child = DeepTypedArrayReferences(p.child);
-                    break :blk if (!child.changed)
-                        .{ .type = t }
-                    else
-                        .{ .changed = true, .type = @Type(.{ .pointer = utils.copyWith(p, .{ .child = child.type }) }) };
+                else => switch (@typeInfo(p.child)) {
+                    .vector => |vec| .{ .changed = true, .type = TypedArrayReference(TypeToTypedArrayEnum(vec.child), vec.len) },
+                    .array => |arr| .{ .changed = true, .type = TypedArrayReference(TypeToTypedArrayEnum(arr.child), arr.len) },
+                    else => blk: {
+                        const child = DeepTypedArrayReferences(p.child);
+                        break :blk if (!child.changed)
+                            .{ .type = t }
+                        else
+                            .{ .changed = true, .type = @Type(.{ .pointer = utils.copyWith(p, .{ .child = child.type }) }) };
+                    },
                 },
             },
             else => blk: {

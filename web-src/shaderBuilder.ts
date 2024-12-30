@@ -65,10 +65,11 @@ export type CubemapTexture = {
 export type UniformSizes =
 	2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 |
 	17 | 18 | 19 | 20 | 21 | 22 | 23 | 24 | 25 | 26 | 27 | 28 | 29 | 30 | 31 | 32;
-export type SizedBuffer = {
+export type SizedBuffer<VecLen extends number> = {
 	type: "attribute",
 	buffer: WebGLBuffer,
 	length: number,
+	_vec_len: VecLen,
 };
 export type ElementBuffer = {
 	type: "element",
@@ -91,7 +92,10 @@ export type Binds<T> =
 	& { [key in AllowedKeys<T, { type: "uniform", unit: "mat4", count: UniformSizes }>]: readonly Mat4[] }
 	& { [key in AllowedKeys<T, { type: "uniform", unit: "sampler2D", count: UniformSizes }>]: readonly Texture[] }
 	& { [key in AllowedKeys<T, { type: "uniform", unit: "samplerCube", count: UniformSizes }>]: readonly CubemapTexture[] }
-	& { [key in AllowedKeys<T, Attribute>]: SizedBuffer }
+	& { [key in AllowedKeys<T, { type: "attribute", unit: "float" }>]: SizedBuffer<1> }
+	& { [key in AllowedKeys<T, { type: "attribute", unit: "vec2" }>]: SizedBuffer<2> }
+	& { [key in AllowedKeys<T, { type: "attribute", unit: "vec3" }>]: SizedBuffer<3> }
+	& { [key in AllowedKeys<T, { type: "attribute", unit: "vec4" }>]: SizedBuffer<4> }
 	& { [key in AllowedKeys<T, Element>]: ElementBuffer }
 
 export type ShaderGlobals = {
@@ -319,14 +323,14 @@ export namespace ShaderBuilder {
 		};
 	}
 
-	export function createBuffer(gl: WebGL2RenderingContext, data: Float32Array): SizedBuffer {
+	export function createBuffer<VecLen extends number>(gl: WebGL2RenderingContext, data: { _vec_len: VecLen } & Float32Array): SizedBuffer<VecLen> {
 		const buffer = gl.createBuffer();
 		if (buffer == null) {
 			throw new Error("Buffer is null, this is not expected!");
 		}
 		gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
 		gl.bufferData(gl.ARRAY_BUFFER, data, gl.STATIC_DRAW);
-		return { type: "attribute", buffer, length: data.length };
+		return { type: "attribute", buffer, length: data.length, _vec_len: data._vec_len };
 	}
 
 	export function renderMaterial<T extends ShaderGlobals>(
@@ -396,7 +400,7 @@ export namespace ShaderBuilder {
 					entry[1].type == "attribute")
 				.forEach(entry => {
 					const [key, global] = entry;
-					const data = (binds as any)[key] as SizedBuffer;
+					const data = (binds as any)[key] as SizedBuffer<number>;
 					gl.bindBuffer(gl.ARRAY_BUFFER, data.buffer);
 					const attributeLocation = gl.getAttribLocation(material.program, key as string);
 					if (attributeLocation == -1) {
@@ -417,7 +421,7 @@ export namespace ShaderBuilder {
 					entry[1].type == "attribute")
 				.reduce((bufferCounts, entry) => {
 					const [key, global] = entry;
-					const data = (binds as any)[key] as SizedBuffer;
+					const data = (binds as any)[key] as SizedBuffer<number>;
 					const unitSize = unitToSize[global.unit];
 					return global.instanced ?
 						{
@@ -443,7 +447,7 @@ export namespace ShaderBuilder {
 		}
 	}
 
-	export function cleanupResources<T extends Record<string, Texture | SizedBuffer | ElementBuffer>>(gl: WebGL2RenderingContext, binds: T) {
+	export function cleanupResources<T extends Record<string, Texture | SizedBuffer<number> | ElementBuffer>>(gl: WebGL2RenderingContext, binds: T) {
 		Object.values(binds).forEach((bind) => {
 			if ("type" in bind && (bind.type == "attribute" || bind.type == "element")) {
 				gl.deleteBuffer(bind.buffer);

@@ -84,8 +84,11 @@ export function sliceToString(slice: { type: "Uint8Array", ptr: number, len: num
   return result;
 }
 
-function sliceToArrayFunc<N extends string, T extends { new (length: number): any, new(buffer: ArrayBuffer, byteOffset: number, length: number): any }>(_: N, constructor: T) {
-  return (slice: { type: N, ptr: number, len: number }): InstanceType<T> => {
+type TypedArray = { new (length: number): any, new(buffer: ArrayBuffer, byteOffset: number, length: number): any };
+type VectorArray<N extends number, T extends TypedArray> = { _vec_len: N } & InstanceType<T>;
+
+function sliceToArrayFunc<N extends string, T extends TypedArray>(_: N, constructor: T) {
+  return <VecLen extends number>(slice: { type: N, ptr: number, len: number, vec_len: VecLen }): VectorArray<VecLen, T> => {
     if (slice.len == 0) {
       return new constructor(0);
     }

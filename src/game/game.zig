@@ -109,19 +109,18 @@ pub const graph_nodes = struct {
         var model_transforms = std.StringHashMap(zmath.Mat).init(arena);
         for (bike_blend) |node|
             if (node.mesh) |mesh| {
-                const PointFlattener = mesh_helper.VecSliceFlattener(4, 3);
-                const vertices = try arena.alloc(Vec4, mesh.vertices.len);
-                const normals = try arena.alloc(Vec4, mesh.vertices.len);
+                const vertices = try arena.alloc(Vec3, mesh.vertices.len);
+                const normals = try arena.alloc(Vec3, mesh.vertices.len);
                 for (mesh.vertices, 0..) |vertex, i| {
-                    normals[i] = zmath.loadArr3(vertex.normal);
-                    vertices[i] = zmath.loadArr3(vertex.position);
+                    normals[i] = vertex.normal;
+                    vertices[i] = vertex.position;
                 }
                 const model: game.types.GameModel = .{
                     .label = node.name,
                     .meshes = try arena.dupe(game.types.GameMesh, &.{.{ .greybox = .{
                         .indices = mesh.indices,
-                        .normal = PointFlattener.convert(arena, normals),
-                        .position = PointFlattener.convert(arena, vertices),
+                        .normal = normals,
+                        .position = vertices,
                     } }}),
                 };
                 const transform = transform: {
@@ -344,6 +343,10 @@ pub const graph_nodes = struct {
         }
     }
 
+    const PointFlattener = mesh_helper.VecSliceFlattener(4, 3);
+    const UvFlattener = mesh_helper.VecSliceFlattener(2, 2);
+    const QuatFlattener = mesh_helper.VecSliceFlattener(4, 4);
+
     pub fn getScreenspaceMesh(
         arena: std.mem.Allocator,
         props: struct {
@@ -352,8 +355,8 @@ pub const graph_nodes = struct {
         },
     ) !struct { screen_space_mesh: struct {
         indices: []const u32,
-        uvs: []const f32,
-        normals: []const f32,
+        uvs: []const Vec2,
+        normals: []const Vec3,
     } } {
         const inverse_view_projection = zmath.inverse(props.world_matrix);
         var normals: [4]Vec4 = undefined;
@@ -371,20 +374,18 @@ pub const graph_nodes = struct {
                 world_position - props.camera_position,
             );
         }
-        const PointFlattener = mesh_helper.VecSliceFlattener(4, 3);
-        const UvFlattener = mesh_helper.VecSliceFlattener(2, 2);
         return .{ .screen_space_mesh = .{
             .indices = try arena.dupe(u32, &.{
                 0, 1, 2,
                 2, 3, 0,
             }),
-            .uvs = UvFlattener.convert(arena, &.{
+            .uvs = try arena.dupe(Vec2, &.{
                 Vec2{ 0, 0 },
                 Vec2{ 1, 0 },
                 Vec2{ 1, 1 },
                 Vec2{ 0, 1 },
             }),
-            .normals = PointFlattener.convert(arena, &normals),
+            .normals = try arena.dupe(Vec3, &normals),
         } };
     }
 
@@ -406,30 +407,42 @@ pub const graph_nodes = struct {
             game.config.demo_terrain_bounds,
         );
 
-        var positions = try arena.alloc(std.ArrayList(Vec4), game.config.ForestSpawner.length);
-        var rotations = try arena.alloc(std.ArrayList(Vec4), game.config.ForestSpawner.length);
-        var scales = try arena.alloc(std.ArrayList(Vec4), game.config.ForestSpawner.length);
-        for (positions, rotations, scales) |*position, *rotation, *scale| {
-            position.* = std.ArrayList(Vec4).init(arena);
-            rotation.* = std.ArrayList(Vec4).init(arena);
-            scale.* = std.ArrayList(Vec4).init(arena);
+        const InstanceEntry = struct { position: Vec3, rotation: Vec4, scale: Vec3 };
+        var instances = try arena.alloc(std.ArrayList(InstanceEntry), game.config.ForestSpawner.length);
+        for (instances) |*position| {
+            position.* = std.ArrayList(InstanceEntry).init(arena);
         }
         for (spawns) |spawn| {
             const pos_2d = Vec2{ spawn.position[0], spawn.position[1] };
             const height = try terrain_sampler.sample(arena, pos_2d);
-            try positions[spawn.id].append(Vec4{ spawn.position[0], height, spawn.position[1], 1 });
-            try rotations[spawn.id].append(zmath.qidentity());
-            try scales[spawn.id].append(.{ 1, 1, 1, 0 });
+            try instances[spawn.id].append(.{
+                .position = .{ spawn.position[0], height, spawn.position[1] },
+                .rotation = zmath.qidentity(),
+                .scale = .{ 1, 1, 1 },
+            });
         }
         const instances_items = try arena.alloc(game.types.ModelInstances, game.config.ForestSpawner.length);
-        const PointFlattener = mesh_helper.VecSliceFlattener(4, 3);
-        const QuatFlattener = mesh_helper.VecSliceFlattener(4, 4);
         for (instances_items, @typeInfo(game.config.ForestSettings).@"struct".decls, 0..) |*instance, decl, i| {
             instance.* = .{
                 .label = decl.name,
-                .positions = PointFlattener.convert(arena, positions[i].items),
-                .rotations = QuatFlattener.convert(arena, rotations[i].items),
-                .scales = PointFlattener.convert(arena, scales[i].items),
+                .positions = positions: {
+                    const res = try arena.alloc(Vec3, instances[i].items.len);
+                    for (instances[i].items, 0..) |entry, j| {
+                        res[j] = entry.position;
+                    } else break :positions res;
+                },
+                .rotations = rotations: {
+                    const res = try arena.alloc(Vec4, instances[i].items.len);
+                    for (instances[i].items, 0..) |entry, j| {
+                        res[j] = entry.rotation;
+                    } else break :rotations res;
+                },
+                .scales = scales: {
+                    const res = try arena.alloc(Vec3, instances[i].items.len);
+                    for (instances[i].items, 0..) |entry, j| {
+                        res[j] = entry.scale;
+                    } else break :scales res;
+                },
             };
         }
 
@@ -497,8 +510,6 @@ pub const graph_nodes = struct {
             "shock",
         }) |label| {
             const transform = props.model_transforms.get(label).?;
-            const PointFlattener = mesh_helper.VecSliceFlattener(4, 3);
-            const QuatFlattener = mesh_helper.VecSliceFlattener(4, 4);
             const offset = math: {
                 const up = Vec4{ 0, 1, 0, 0 };
                 const bounce: Vec4 = @splat(@sin(props.seconds_since_start));
@@ -506,9 +517,9 @@ pub const graph_nodes = struct {
             };
             try instances.append(.{
                 .label = label,
-                .positions = PointFlattener.convert(arena, &.{transform[3] + offset}),
-                .rotations = QuatFlattener.convert(arena, &.{zmath.matToQuat(transform)}),
-                .scales = PointFlattener.convert(arena, &.{.{ transform[0][0], transform[1][1], transform[2][2], transform[3][3] }}),
+                .positions = try arena.dupe(Vec3, &.{zmath.vecToArr3(transform[3]) + offset}),
+                .rotations = try arena.dupe(Vec4, &.{zmath.matToQuat(transform)}),
+                .scales = try arena.dupe(Vec3, &.{.{ transform[0][0], transform[1][1], transform[2][2] }}),
             });
         }
 
@@ -524,8 +535,6 @@ pub const graph_nodes = struct {
     ) !struct {
         models: []const game.types.GameModel,
     } {
-        const PointFlattener = mesh_helper.VecSliceFlattener(4, 3);
-        const UvFlattener = mesh_helper.VecSliceFlattener(2, 2);
         var models = std.ArrayList(game.types.GameModel).init(arena);
         for (props.trees) |tree_mesh| {
             try models.append(.{
@@ -533,15 +542,15 @@ pub const graph_nodes = struct {
                 .meshes = try arena.dupe(game.types.GameMesh, &.{
                     .{ .greybox = .{
                         .indices = tree_mesh.bark_mesh.triangles,
-                        .normal = PointFlattener.convert(arena, tree_mesh.bark_mesh.normals),
-                        .position = PointFlattener.convert(arena, tree_mesh.bark_mesh.vertices),
+                        .normal = tree_mesh.bark_mesh.normals,
+                        .position = tree_mesh.bark_mesh.vertices,
                     } },
                     .{ .textured = .{
                         .diffuse_alpha = props.cutout_leaf,
                         .indices = tree_mesh.leaf_mesh.triangles,
-                        .normal = PointFlattener.convert(arena, tree_mesh.leaf_mesh.normals),
-                        .position = PointFlattener.convert(arena, tree_mesh.leaf_mesh.vertices),
-                        .uv = UvFlattener.convert(arena, tree_mesh.leaf_mesh.uvs),
+                        .normal = tree_mesh.leaf_mesh.normals,
+                        .position = tree_mesh.leaf_mesh.vertices,
+                        .uv = tree_mesh.leaf_mesh.uvs,
                     } },
                 }),
             });
@@ -583,8 +592,7 @@ pub const graph_nodes = struct {
                     break :pos_2d game.config.demo_terrain_bounds.min + (span * coord);
                 };
                 const height = try terrain_sampler.sample(stack_arena.get(), pos_2d);
-                const vertex: Vec4 = .{ pos_2d[0], height, pos_2d[1], 1 };
-                positions[index] = vertex;
+                positions[index] = .{ pos_2d[0], height, pos_2d[1] };
             }
             break :positions positions;
         };
@@ -603,10 +611,7 @@ pub const graph_nodes = struct {
                 var quad: [4]u32 = undefined;
                 inline for (0..4) |quad_index| {
                     const quad_corner = quad_coord + quad_corners[quad_index];
-                    quad[quad_index] = @intCast(math.mul(
-                        quad_corner[0] + quad_corner[1],
-                        vertex_iterator.width(),
-                    ));
+                    quad[quad_index] = @intCast(quad_corner[0] + quad_corner[1] * vertex_iterator.width());
                 }
                 quads[index] = quad;
             }
@@ -615,19 +620,17 @@ pub const graph_nodes = struct {
         const indices = mesh_helper.Polygon(.Quad).toTriangleIndices(arena, quads);
         const normals = mesh_helper.Polygon(.Quad).calculateNormals(arena, positions, quads);
 
-        const PointFlattener = mesh_helper.VecSliceFlattener(4, 3);
-        const QuatFlattener = mesh_helper.VecSliceFlattener(4, 4);
         return .{
             .terrain_mesh = game.types.GreyboxMesh{
                 .indices = indices,
-                .position = PointFlattener.convert(arena, positions),
+                .position = positions,
                 .normal = PointFlattener.convert(arena, normals),
             },
             .terrain_instance = game.types.ModelInstances{
                 .label = "terrain",
-                .positions = PointFlattener.convert(arena, &.{.{ 0, 0, 0, 0 }}),
-                .rotations = QuatFlattener.convert(arena, &.{zmath.qidentity()}),
-                .scales = PointFlattener.convert(arena, &.{.{ 1, 1, 1, 0 }}),
+                .positions = try arena.dupe(Vec3, &.{.{ 0, 0, 0 }}),
+                .rotations = try arena.dupe(Vec4, &.{zmath.qidentity()}),
+                .scales = try arena.dupe(Vec3, &.{.{ 1, 1, 1 }}),
             },
         };
     }
