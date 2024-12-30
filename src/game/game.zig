@@ -1,5 +1,4 @@
 const std = @import("std");
-const wasm_entry = @import("../wasm_entry.zig");
 const graph_runtime = @import("../graph_runtime.zig");
 const Queryable = @import("../utils.zig").Queryable;
 const subdiv = @import("../subdiv.zig");
@@ -99,9 +98,6 @@ pub const graph_nodes = struct {
             const json_data = @embedFile("../content/ebike.blend.json");
             const mesh_loader = @import("../mesh_loader.zig");
             const nodes = try mesh_loader.getNodesFromJSON(arena, json_data);
-            for (nodes) |mesh| {
-                wasm_entry.dumpDebugLogFmt("a mesh! {s}\n", .{mesh.name});
-            }
             break :blk nodes;
         };
 
@@ -112,8 +108,8 @@ pub const graph_nodes = struct {
                 const vertices = try arena.alloc(Vec4, mesh.vertices.len);
                 const normals = try arena.alloc(Vec4, mesh.vertices.len);
                 for (mesh.vertices, 0..) |vertex, i| {
-                    normals[i] = zmath.loadArr3(vertex.normal);
-                    vertices[i] = zmath.loadArr3(vertex.position);
+                    normals[i] = zmath.loadArr3w(vertex.normal, 0);
+                    vertices[i] = zmath.loadArr3w(vertex.position, 1);
                 }
                 const model: game.types.GameModel = .{
                     .label = node.name,
@@ -343,10 +339,6 @@ pub const graph_nodes = struct {
         }
     }
 
-    const PointFlattener = mesh_helper.VecSliceFlattener(4, 3);
-    const UvFlattener = mesh_helper.VecSliceFlattener(2, 2);
-    const QuatFlattener = mesh_helper.VecSliceFlattener(4, 4);
-
     pub fn getScreenspaceMesh(
         arena: std.mem.Allocator,
         props: struct {
@@ -517,9 +509,9 @@ pub const graph_nodes = struct {
             };
             try instances.append(.{
                 .label = label,
-                .positions = try arena.dupe(Vec4, &.{transform[3] + offset}),
+                .positions = try arena.dupe(Vec4, &.{std.simd.join(zmath.vecToArr3(transform[3] + offset), @Vector(1, f32){1})}),
                 .rotations = try arena.dupe(Vec4, &.{zmath.matToQuat(transform)}),
-                .scales = try arena.dupe(Vec4, &.{.{ transform[0][0], transform[1][1], transform[2][2], transform[3][3] }}),
+                .scales = try arena.dupe(Vec4, &.{.{ transform[0][0], transform[1][1], transform[2][2], 0 }}),
             });
         }
 
@@ -628,7 +620,7 @@ pub const graph_nodes = struct {
             },
             .terrain_instance = game.types.ModelInstances{
                 .label = "terrain",
-                .positions = try arena.dupe(Vec4, &.{.{ 0, 0, 0, 0 }}),
+                .positions = try arena.dupe(Vec4, &.{.{ 0, 0, 0, 1 }}),
                 .rotations = try arena.dupe(Vec4, &.{zmath.qidentity()}),
                 .scales = try arena.dupe(Vec4, &.{.{ 1, 1, 1, 0 }}),
             },

@@ -40,11 +40,11 @@ pub fn getNodesFromJSON(allocator: std.mem.Allocator, json_data: []const u8) ![]
     scanner.enableDiagnostics(&diagnostics);
 
     const mesh_input_data = std.json.parseFromTokenSource(BlendMeshSpec, allocator, &scanner, .{}) catch |err| {
-        const wasm_entry = @import("./wasm_entry.zig");
-        wasm_entry.dumpDebugLogFmt("Something in here isn't parsing right: {s}\nError: {any}\n", .{
-            json_data[0..@intCast(diagnostics.getByteOffset())],
-            err,
-        });
+        // const wasm_entry = @import("./wasm_entry.zig");
+        // wasm_entry.dumpDebugLogFmt("Something in here isn't parsing right: {s}\nError: {any}\n", .{
+        //     json_data[0..@intCast(diagnostics.getByteOffset())],
+        //     err,
+        // });
         return err;
     };
 

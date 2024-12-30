@@ -1,6 +1,5 @@
 const std = @import("std");
 const utils = @import("./utils.zig");
-const wasm_entry = @import("./wasm_entry.zig");
 
 pub const NodeLink = struct {
     name: []const u8,
