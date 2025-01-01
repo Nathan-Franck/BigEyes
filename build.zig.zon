@@ -4,5 +4,6 @@
     .paths = .{""},
     .dependencies = .{
         .zmath = .{ .path = "libs/zmath" },
+        .@"zig-webui" = .{ .path = "libs/zig-webui" },
     },
 }

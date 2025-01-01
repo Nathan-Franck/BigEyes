@@ -236,8 +236,35 @@ pub fn build(
         const run_step = b.step("test_perf", "run the perf");
         run_step.dependOn(&run_cmd.step);
     }
-}
 
-inline fn thisDir() []const u8 {
-    return comptime std.fs.path.dirname(@src().file) orelse ".";
+    // Web-ui node graph
+    {
+        const exe = b.addExecutable(.{
+            .name = "webui-nodegraph",
+            .root_source_file = .{ .cwd_relative = "src/webui_nodegraph.zig" },
+            .target = target,
+            .optimize = optimize,
+        });
+
+        const zig_webui = b.dependency("zig-webui", .{
+            .target = target,
+            .optimize = optimize,
+            .enable_tls = false, // whether enable tls support
+            .is_static = true, // whether static link
+        });
+
+        // add module
+        exe.root_module.addImport("webui", zig_webui.module("webui"));
+
+        const install_artifact = b.addInstallArtifact(exe, .{});
+        const run_cmd = b.addRunArtifact(exe);
+        run_cmd.step.dependOn(&install_artifact.step);
+        if (b.args) |args| {
+            run_cmd.addArgs(args);
+        }
+        run_cmd.step.dependOn(&install_artifact.step);
+
+        const run_step = b.step("webui-nodegraph", "run the webui nodegraph");
+        run_step.dependOn(&run_cmd.step);
+    }
 }

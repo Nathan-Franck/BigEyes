@@ -1,3 +1,9 @@
 [submodule "libs/zig-gamedev"]
 	path = libs/zig-gamedev
 	url = https://github.com/zig-gamedev/zig-gamedev.git
+[submodule "libs/zig-webui"]
+	path = libs/zig-webui
+	url = https://github.com/webui-dev/zig-webui.git
+[submodule "libs/zmath"]
+	path = libs/zmath
+	url = https://github.com/zig-gamedev/zmath.git
