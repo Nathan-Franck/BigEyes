@@ -97,7 +97,7 @@ pub fn MutableInputs(node: NodeGraphBlueprintEntry, NodeInputs: type) type {
 /// For the NodeGraph, this Queryable can be used to retrieve values within a branch of the node's logic,
 /// so that if the node has chosen a different branch, the value doesn't have to be considered when marking
 /// the node as dirty.
-pub const Queryable = struct {
+pub const queryable = struct {
     pub fn isValue(candidate: type) bool {
         return switch (@typeInfo(candidate)) {
             .@"struct" => @hasDecl(candidate, "QueryableSource"),
@@ -229,13 +229,13 @@ test "copyWith" {
 ///
 /// This is useful for communicating at comptime partial data changes from a function.
 pub fn PickField(comptime t: type, comptime field_tag: anytype) type {
-    const input_struct = @typeInfo(t).Struct;
+    const input_struct = @typeInfo(t).@"struct";
     const found_field = found_field: for (input_struct.fields) |field| {
         if (std.mem.eql(u8, field.name, @tagName(field_tag))) {
             break :found_field field;
         }
     };
-    return @Type(.{ .Struct = copyWith(input_struct, .{
+    return @Type(.{ .@"struct" = copyWith(input_struct, .{
         .fields = &.{found_field},
     }) });
 }
@@ -258,7 +258,7 @@ test "PickField" {
 ///
 /// This is useful for communicating at comptime partial data changes from a function.
 pub fn Pick(comptime t: type, comptime field_tags: anytype) type {
-    const input_struct = @typeInfo(t).Struct;
+    const input_struct = @typeInfo(t).@"struct";
     var output_fields: []const std.builtin.Type.StructField = &.{};
     inline for (input_struct.fields) |field| {
         if (match: for (@typeInfo(@TypeOf(field_tags)).@"struct".fields) |tag| {
@@ -269,7 +269,7 @@ pub fn Pick(comptime t: type, comptime field_tags: anytype) type {
             output_fields = output_fields ++ &[_]std.builtin.Type.StructField{field};
         }
     }
-    return @Type(.{ .Struct = copyWith(input_struct, .{
+    return @Type(.{ .@"struct" = copyWith(input_struct, .{
         .fields = output_fields,
     }) });
 }
@@ -496,7 +496,7 @@ pub fn deepHashableStruct(t: type, quantization: u32, allocator: std.mem.Allocat
     }
     return switch (@typeInfo(t)) {
         else => data,
-        .Float => @intFromFloat(data * @as(t, @floatFromInt(quantization))),
+        .float => @intFromFloat(data * @as(t, @floatFromInt(quantization))),
         .ErrorUnion => try deepHashableStruct(try data),
         .Optional => |op| if (data) |non_null_data| try deepHashableStruct(op.child, quantization, allocator, non_null_data) else null,
         .Union => |u| blk: {
@@ -552,13 +552,13 @@ pub fn TypedArrayReference(type_enum: type) type {
 pub fn DeepHashableStruct(t: type) struct { type: type, changed: bool = false } {
     return switch (@typeInfo(t)) {
         else => .{ .type = t },
-        .Float => .{ .type = u64, .changed = true },
-        .ErrorUnion => |eu| DeepHashableStruct(eu.payload),
-        .Optional => |op| blk: {
+        .float => .{ .type = u64, .changed = true },
+        .error_union => |eu| DeepHashableStruct(eu.payload),
+        .optional => |op| blk: {
             const result = DeepHashableStruct(op.child);
             break :blk if (!result.changed) .{ .type = t } else .{ .changed = true, .type = ?result.type };
         },
-        .Union => |u| blk: {
+        .@"union" => |u| blk: {
             var fields: []const std.builtin.Type.UnionField = &.{};
             var changed = false;
             for (u.fields) |field| {
@@ -573,7 +573,7 @@ pub fn DeepHashableStruct(t: type) struct { type: type, changed: bool = false } 
             else
                 .{ .changed = true, .type = @Type(.{ .Union = copyWith(u, .{ .fields = fields }) }) };
         },
-        .Struct => |s| blk: {
+        .@"struct" => |s| blk: {
             var fields: []const std.builtin.Type.StructField = &.{};
             var changed = false;
             for (s.fields) |field| {
@@ -595,21 +595,21 @@ pub fn DeepHashableStruct(t: type) struct { type: type, changed: bool = false } 
             else
                 .{ .changed = true, .type = @Type(.{ .Struct = copyWith(s, .{ .decls = &[_]std.builtin.Type.Declaration{}, .fields = fields }) }) };
         },
-        .Vector => |a| blk: {
+        .vector => |a| blk: {
             const child = DeepHashableStruct(a.child);
             break :blk if (!child.changed)
                 .{ .type = t }
             else
                 .{ .changed = true, .type = @Type(.{ .Vector = .{ .len = a.len, .child = child.type } }) };
         },
-        .Array => |a| blk: {
+        .array => |a| blk: {
             const child = DeepHashableStruct(a.child);
             break :blk if (!child.changed)
                 .{ .type = t }
             else
                 .{ .changed = true, .type = @Type(.{ .Array = .{ .len = a.len, .sentinel = a.sentinel, .child = child.type } }) };
         },
-        .Pointer => |p| blk: {
+        .pointer => |p| blk: {
             const child = DeepHashableStruct(p.child);
             break :blk if (!child.changed)
                 .{ .type = t }
@@ -627,8 +627,8 @@ pub fn findSmallestNumberAndIndex(T: type, numbers: []const T) struct { value: T
     const IndexVec = @Vector(vec_len, usize);
 
     const max_value = switch (@typeInfo(T)) {
-        .Float => std.math.floatMax(T),
-        .Int => std.math.maxInt(T),
+        .float => std.math.floatMax(T),
+        .int => std.math.maxInt(T),
         else => @compileError("Invalid type"),
     };
 
@@ -652,7 +652,7 @@ pub fn findSmallestNumberAndIndex(T: type, numbers: []const T) struct { value: T
     const min_value = @reduce(.Min, min_vec);
     const min_index = @reduce(.Min, @select(
         usize,
-        vm.eq(min_vec, @splat(min_value)),
+        min_vec == @as(Vec, @splat(min_value)),
         min_index_vec,
         @as(IndexVec, @splat(std.math.maxInt(usize))),
     ));

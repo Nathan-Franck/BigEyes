@@ -168,7 +168,7 @@ pub fn NodeGraph(
             const node_input_fields = @typeInfo(node_params[node_params.len - 1].type.?).@"struct".fields;
             var fields: []const std.builtin.Type.StructField = &.{};
             inline for (node_input_fields) |field| {
-                if (utils.Queryable.getSourceOrNull(field.type) != null) {
+                if (utils.queryable.getSourceOrNull(field.type) != null) {
                     fields = fields ++ .{std.builtin.Type.StructField{
                         .name = field.name,
                         .type = bool,
@@ -284,7 +284,7 @@ pub fn NodeGraph(
                             const output_node_type = node_params[node_params.len - 1].type.?;
                             break :blk for (@typeInfo(output_node_type).@"struct".fields) |field|
                                 if (std.mem.eql(u8, field.name, input_field))
-                                    break utils.Queryable.getSourceOrNull(field.type) orelse field.type
+                                    break utils.queryable.getSourceOrNull(field.type) orelse field.type
                                 else
                                     continue
                             else
@@ -523,7 +523,7 @@ pub fn NodeGraph(
                         mutable_inputs.register(TargetInputField, link, &node_input_field)
                     else
                         node_input_field;
-                    target_input_field.* = if (comptime utils.Queryable.isValue(TargetInputField))
+                    target_input_field.* = if (comptime utils.queryable.isValue(TargetInputField))
                         TargetInputField.initQueryable(
                             value,
                             &is_field_dirty,

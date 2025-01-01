@@ -1,7 +1,7 @@
 const game = @import("./game/game.zig");
 const std = @import("std");
 
-pub fn main() !void {
+test "performance" {
     const allocator = std.heap.page_allocator;
     const defins = game.graph_nodes;
     const influence_ranges = try defins.calculateTerrainDensityInfluenceRange(allocator, .{});
@@ -11,14 +11,17 @@ pub fn main() !void {
             .terrain_sampler = influence_ranges.terrain_sampler,
         });
         const time = timer.read() / 1_000_000;
-        std.debug.print("Hi! {any} in time {d}\n", .{ result.terrain_mesh.position.len, time });
+        _ = time;
+        _ = result;
+        // std.debug.print("Hi! {any} in time {d}\n", .{ result.terrain_mesh.position.len, time });
     }
 
     {
         var timer = try std.time.Timer.start();
         defer {
             const time = timer.read() / 1_000_000;
-            std.debug.print("Part #2! time {d}\n", .{time});
+            _ = time;
+            // std.debug.print("Part #2! time {d}\n", .{time});
         }
         game.interface.init();
         _ = try game.interface.updateNodeGraph(.{});

@@ -66,6 +66,7 @@ pub const blueprint = runtime.Blueprint{
             .{ .field = "model_transforms", .source = .{
                 .node = .{ .name = "getResources", .field = "model_transforms" },
             } },
+            .{ .field = "bounce", .source = .{ .input_field = "bounce" } },
         } },
         .{ .name = "displayTerrain", .function = "displayTerrain", .input_links = &[_]runtime.InputLink{
             .{ .field = "terrain_sampler", .source = .{

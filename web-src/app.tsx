@@ -7,12 +7,13 @@ import { Mat4, ShaderBuilder, Binds, SizedBuffer } from "./shaderBuilder";
 const { classes, encodedStyle } = declareStyle({
   stats: {
     position: "absolute",
-    top: "0px",
-    left: "0px",
+    top: "10px",
+    left: "10px",
     color: "#fff",
-    backgroundColor: "#000",
+    backgroundColor: "#0007",
     padding: "5px",
     borderRadius: "5px",
+    textAlign: "left",
   },
   nodeGraph: {},
   nodeGraphBackground: {
@@ -128,6 +129,8 @@ export function App() {
     const gl = canvas.getContext("webgl2");
     if (!gl) return;
 
+    gl.cullFace(gl.BACK);
+    gl.enable(gl.CULL_FACE);
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
     gl.enable(gl.DEPTH_TEST);
@@ -279,7 +282,7 @@ export function App() {
       const screenspace_data = graphOutputs.screen_space_mesh;
       if (screenspace_data) {
         renderChange = true;
-        const indices =  sliceToArray.Uint32Array(screenspace_data.indices);
+        const indices = sliceToArray.Uint32Array(screenspace_data.indices);
         const what = sliceToArray.Float32Array(screenspace_data.normals);
         const uv = sliceToArray.Float32Array(screenspace_data.uvs);
         console.table(uv);
@@ -475,7 +478,9 @@ export function App() {
         }}
       >
         <div class={classes.stats}>
-          <div>frame_rate - {"" + Math.round(stats.framerate)}</div>
+          <div>Framerate - {"" + Math.round(stats.framerate)}</div>
+          <div><input type="checkbox"/>Hello</div>
+          <div><input type="range"/>My range</div>
         </div>
       </div>
       <canvas

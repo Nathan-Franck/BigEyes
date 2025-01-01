@@ -1,6 +1,6 @@
 const std = @import("std");
 const graph_runtime = @import("../graph_runtime.zig");
-const Queryable = @import("../utils.zig").Queryable;
+const queryable = @import("../utils.zig").queryable;
 const subdiv = @import("../subdiv.zig");
 const Image = @import("../Image.zig");
 const raytrace = @import("../raytrace.zig");
@@ -48,6 +48,7 @@ pub const interface = struct {
                     .movement_speed = 0.8,
                 },
                 .render_resolution = .{ .x = 0, .y = 0 },
+                .bounce = false,
             },
             .store = .{
                 .last_time = 0,
@@ -98,6 +99,7 @@ pub const graph_nodes = struct {
             const json_data = @embedFile("../content/ebike.blend.json");
             const mesh_loader = @import("../mesh_loader.zig");
             const nodes = try mesh_loader.getNodesFromJSON(arena, json_data);
+
             break :blk nodes;
         };
 
@@ -204,7 +206,7 @@ pub const graph_nodes = struct {
     pub fn orbit(
         arena: std.mem.Allocator,
         props: struct {
-            delta_time: Queryable.Value(f32),
+            delta_time: queryable.Value(f32),
             orbit_speed: f32,
             render_resolution: struct { x: i32, y: i32 },
             input: struct {
@@ -482,9 +484,10 @@ pub const graph_nodes = struct {
     pub fn displayBike(
         arena: std.mem.Allocator,
         props: struct {
-            seconds_since_start: f32,
+            seconds_since_start: queryable.Value(f32),
             model_transforms: std.StringHashMap(zmath.Mat),
             terrain_sampler: TerrainSampler,
+            bounce: bool,
         },
     ) !struct {
         model_instances: []const game.types.ModelInstances,
@@ -502,14 +505,14 @@ pub const graph_nodes = struct {
             "shock",
         }) |label| {
             const transform = props.model_transforms.get(label).?;
-            const offset = math: {
+            const offset = if (props.bounce) math: {
                 const up = Vec4{ 0, 1, 0, 0 };
-                const bounce: Vec4 = @splat(@sin(props.seconds_since_start));
+                const bounce: Vec4 = @splat(@sin(props.seconds_since_start.get()));
                 break :math up * bounce;
-            };
+            } else Vec4{ 0, 0, 0, 0 };
             try instances.append(.{
                 .label = label,
-                .positions = try arena.dupe(Vec4, &.{std.simd.join(zmath.vecToArr3(transform[3] + offset), @Vector(1, f32){1})}),
+                .positions = try arena.dupe(Vec4, &.{zmath.loadArr3w(zmath.vecToArr3(transform[3] + offset), 1)}),
                 .rotations = try arena.dupe(Vec4, &.{zmath.matToQuat(transform)}),
                 .scales = try arena.dupe(Vec4, &.{.{ transform[0][0], transform[1][1], transform[2][2], 0 }}),
             });
