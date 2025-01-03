@@ -199,8 +199,8 @@ pub fn NodeGraph(
         } });
     };
 
-    const node_order = precalculate: {
-        var max_node_priority: u16 = 0;
+    var max_node_priority: u16 = 0;
+    const node_priorities = precalculate: {
         var node_priorities = [_]u16{0} ** graph.nodes.len;
         const Node = struct { name: []const u8, priority: u16 };
         var next_nodes: []const Node = &.{};
@@ -248,6 +248,10 @@ pub fn NodeGraph(
                 }
             }
         }
+        break :precalculate node_priorities;
+    };
+
+    const node_order = precalculate: {
         comptime var node_order: []const u16 = &.{};
         @setEvalBranchQuota(9000);
         inline for (0..max_node_priority) |current_priority|
@@ -262,6 +266,7 @@ pub fn NodeGraph(
         const Self = @This();
         pub const Definitions = node_definitions;
 
+        allocator: std.mem.Allocator,
         store: SystemStore,
         store_arena: std.heap.ArenaAllocator,
         system_inputs: SystemInputs,
@@ -425,6 +430,7 @@ pub fn NodeGraph(
             store: SystemStore,
         }) !Self {
             var self = Self{
+                .allocator = props.allocator,
                 .store = props.store,
                 .store_arena = std.heap.ArenaAllocator.init(props.allocator),
                 .system_inputs = props.inputs,
@@ -648,6 +654,10 @@ pub fn NodeGraph(
             }
 
             return system_outputs;
+        }
+
+        pub fn getDisplayDefinition() struct { blueprint: Blueprint, node_priorities: []const u16 } {
+            return .{ .blueprint = graph, .node_priorities = &node_priorities };
         }
 
         pub fn deinit(self: Self) void {

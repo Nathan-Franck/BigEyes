@@ -188,6 +188,7 @@ pub fn EnumStruct(field_key: type, field_value: type) type {
 /// eg. `copyWith(.{ .a = 0, .b = 2} .{ .a = 1 })` will return a type that is equivalent
 /// to `.{ .a = 1, .b = 2 }`.
 pub fn copyWith(source_data: anytype, field_changes: anytype) @TypeOf(source_data) {
+    @setEvalBranchQuota(10_000);
     switch (@typeInfo(@TypeOf(source_data))) {
         else => @compileError("Can't merge non-struct types"),
         .@"struct" => |struct_info| {

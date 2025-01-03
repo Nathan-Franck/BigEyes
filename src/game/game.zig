@@ -62,6 +62,8 @@ pub const InterfaceEnum = std.meta.DeclEnum(interface);
 pub const interface = struct {
     var node_graph: NodeGraph = undefined;
 
+    pub const getGraphJson = NodeGraph.getDisplayDefinition;
+
     pub fn init() void {
         node_graph = try NodeGraph.init(.{
             .allocator = std.heap.page_allocator,
