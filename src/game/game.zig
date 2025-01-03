@@ -54,7 +54,7 @@ pub const graph_store: NodeGraph.SystemStore = .{
     .orbit_camera = .{
         .position = .{ 0, -0.75, 0, 1 },
         .rotation = .{ 0, 0, 0, 1 },
-        .track_distance = 2,
+        .track_distance = 10,
     },
 };
 
@@ -575,8 +575,8 @@ pub const graph_nodes = struct {
         const terrain_sampler = props.terrain_sampler.loadCache(&terrain_chunk_cache);
 
         // const terrain_resolution = 512;
-        // const terrain_resolution = 256;
-        const terrain_resolution = 128;
+        const terrain_resolution = 256;
+        // const terrain_resolution = 128;
 
         var vertex_iterator = CoordIterator.init(@splat(0), @splat(terrain_resolution + 1));
         const positions = positions: {

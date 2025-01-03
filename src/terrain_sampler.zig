@@ -97,7 +97,7 @@ pub fn TerrainSampler(
                         height = @max(height, stamp_height);
                 }
 
-                return height;
+                return height * self.source.size_multiplier;
             }
         };
     };

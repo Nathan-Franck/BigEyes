@@ -538,11 +538,11 @@ pub fn NodeGraph(
                 target.* = if (!is_dirty.*)
                     target.*
                 else process_output: {
-                    const node_arena = self.nodes_arenas[node_index].allocator();
+                    const node_arena = &self.nodes_arenas[node_index];
 
-                    _ = self.nodes_arenas[node_index].reset(.retain_capacity);
+                    _ = node_arena.reset(.retain_capacity);
 
-                    try mutable_inputs.duplicate(node_arena, &node_inputs);
+                    try mutable_inputs.duplicate(node_arena.allocator(), &node_inputs);
 
                     const function_output = @call(.auto, @field(
                         node_definitions,
@@ -550,7 +550,7 @@ pub fn NodeGraph(
                     ), if (function_params.len == 1) .{
                         node_inputs,
                     } else .{
-                        node_arena,
+                        node_arena.allocator(),
                         node_inputs,
                     });
 
