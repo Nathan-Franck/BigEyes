@@ -28,7 +28,8 @@ pub fn dumpDebugLog(source: []const u8) void {
     debugLogFromWasm(source.ptr, source.len);
 }
 pub fn dumpDebugLogFmt(comptime fmt: []const u8, args: anytype) void {
-    dumpDebugLog(std.fmt.allocPrint(std.heap.page_allocator, fmt, args) catch unreachable);
+    dumpDebugLog(std.fmt.allocPrint(message_arena.allocator(), fmt, args) catch unreachable);
+    _ = message_arena.reset(.retain_capacity);
 }
 
 pub fn Args(comptime func: anytype) type {
@@ -53,6 +54,9 @@ pub fn Args(comptime func: anytype) type {
 
 fn callWithJsonErr(name_ptr: [*]const u8, name_len: usize, args_ptr: [*]const u8, args_len: usize) !void {
     const allocator = message_arena.allocator();
+    defer {
+        _ = message_arena.reset(.retain_capacity);
+    }
     const name: []const u8 = name_ptr[0..name_len];
     const args_string: []const u8 = args_ptr[0..args_len];
     const case = std.meta.stringToEnum(game.InterfaceEnum, name) orelse {
@@ -84,18 +88,17 @@ fn callWithJsonErr(name_ptr: [*]const u8, name_len: usize, args_ptr: [*]const u8
             };
 
             if (@TypeOf(result) != void) {
-                const converted_result = try type_definitions.deepTypedArrayReferences(@TypeOf(result), allocator, result);
+                const converted_result = try type_definitions.deepTypedArrayReferences(@TypeOf(result), message_arena.allocator(), result);
                 dumpMessage(try std.json.stringifyAlloc(allocator, converted_result, .{}));
             }
-            _ = message_arena.reset(.retain_capacity);
         },
     }
 }
 
 export fn callWithJson(name_ptr: [*]const u8, name_len: usize, args_ptr: [*]const u8, args_len: usize) void {
     callWithJsonErr(name_ptr, name_len, args_ptr, args_len) catch |err| {
-        const allocator = std.heap.page_allocator;
-        dumpError(std.fmt.allocPrint(allocator, "error: {?}\n", .{err}) catch unreachable);
+        dumpError(std.fmt.allocPrint(message_arena.allocator(), "error: {?}\n", .{err}) catch unreachable);
+        _ = message_arena.reset(.retain_capacity);
         return;
     };
 }

@@ -262,7 +262,6 @@ pub fn NodeGraph(
         const Self = @This();
         pub const Definitions = node_definitions;
 
-        allocator: std.mem.Allocator,
         store: SystemStore,
         store_arena: std.heap.ArenaAllocator,
         system_inputs: SystemInputs,
@@ -426,7 +425,6 @@ pub fn NodeGraph(
             store: SystemStore,
         }) !Self {
             var self = Self{
-                .allocator = props.allocator,
                 .store = props.store,
                 .store_arena = std.heap.ArenaAllocator.init(props.allocator),
                 .system_inputs = props.inputs,
@@ -540,10 +538,11 @@ pub fn NodeGraph(
                 target.* = if (!is_dirty.*)
                     target.*
                 else process_output: {
-                    var node_arena = self.nodes_arenas[node_index];
-                    _ = node_arena.reset(.retain_capacity);
+                    const node_arena = self.nodes_arenas[node_index].allocator();
 
-                    try mutable_inputs.duplicate(node_arena.allocator(), &node_inputs);
+                    _ = self.nodes_arenas[node_index].reset(.retain_capacity);
+
+                    try mutable_inputs.duplicate(node_arena, &node_inputs);
 
                     const function_output = @call(.auto, @field(
                         node_definitions,
@@ -551,7 +550,7 @@ pub fn NodeGraph(
                     ), if (function_params.len == 1) .{
                         node_inputs,
                     } else .{
-                        node_arena.allocator(),
+                        node_arena,
                         node_inputs,
                     });
 
@@ -649,6 +648,13 @@ pub fn NodeGraph(
             }
 
             return system_outputs;
+        }
+
+        pub fn deinit(self: Self) void {
+            for (self.nodes_arenas) |arena| {
+                arena.deinit();
+            }
+            self.store_arena.deinit();
         }
     };
     return Graph;

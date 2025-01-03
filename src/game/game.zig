@@ -12,7 +12,6 @@ const Coord = @import("../forest.zig").Coord;
 const Vec2 = @import("../forest.zig").Vec2;
 const Vec4 = @import("../forest.zig").Vec4;
 const CoordIterator = @import("../CoordIterator.zig");
-const Stamp = @import("../Stamp.zig");
 const math = @import("../vec_math.zig");
 
 const game = struct {
@@ -23,6 +22,42 @@ const game = struct {
 const Forest = game.config.Forest;
 const TerrainSampler = game.config.TerrainSampler;
 
+pub const graph_inputs: NodeGraph.SystemInputs = .{
+    .time = 0,
+    .input = .{
+        .mouse_delta = .{ 0, 0, 0, 0 },
+        .movement = .{
+            .left = null,
+            .right = null,
+            .forward = null,
+            .backward = null,
+        },
+    },
+    .orbit_speed = 0.01,
+    .selected_camera = .orbit,
+    .player_settings = .{
+        .look_speed = 0.004,
+        .movement_speed = 0.8,
+    },
+    .render_resolution = .{ .x = 0, .y = 0 },
+    .size_multiplier = 1,
+    .bounce = false,
+};
+
+pub const graph_store: NodeGraph.SystemStore = .{
+    .last_time = 0,
+    .forest_chunk_cache = game.config.ForestSpawner.ChunkCache.init(std.heap.page_allocator),
+    .player = .{
+        .position = .{ 0, -0.75, 0, 1 },
+        .euler_rotation = .{ 0, 0, 0, 1 },
+    },
+    .orbit_camera = .{
+        .position = .{ 0, -0.75, 0, 1 },
+        .rotation = .{ 0, 0, 0, 1 },
+        .track_distance = 2,
+    },
+};
+
 pub const InterfaceEnum = std.meta.DeclEnum(interface);
 pub const interface = struct {
     var node_graph: NodeGraph = undefined;
@@ -30,39 +65,8 @@ pub const interface = struct {
     pub fn init() void {
         node_graph = try NodeGraph.init(.{
             .allocator = std.heap.page_allocator,
-            .inputs = .{
-                .time = 0,
-                .input = .{
-                    .mouse_delta = .{ 0, 0, 0, 0 },
-                    .movement = .{
-                        .left = null,
-                        .right = null,
-                        .forward = null,
-                        .backward = null,
-                    },
-                },
-                .orbit_speed = 0.01,
-                .selected_camera = .orbit,
-                .player_settings = .{
-                    .look_speed = 0.004,
-                    .movement_speed = 0.8,
-                },
-                .render_resolution = .{ .x = 0, .y = 0 },
-                .bounce = false,
-            },
-            .store = .{
-                .last_time = 0,
-                .forest_chunk_cache = game.config.ForestSpawner.ChunkCache.init(std.heap.page_allocator),
-                .player = .{
-                    .position = .{ 0, -0.75, 0, 1 },
-                    .euler_rotation = .{ 0, 0, 0, 1 },
-                },
-                .orbit_camera = .{
-                    .position = .{ 0, -0.75, 0, 1 },
-                    .rotation = .{ 0, 0, 0, 1 },
-                    .track_distance = 2,
-                },
-            },
+            .inputs = graph_inputs,
+            .store = graph_store,
         });
     }
 
@@ -85,12 +89,14 @@ pub const NodeGraph = graph_runtime.NodeGraph(
 pub const graph_nodes = struct {
     pub fn calculateTerrainDensityInfluenceRange(
         arena: std.mem.Allocator,
-        _: struct {},
+        props: struct { size_multiplier: f32 },
     ) !struct {
         terrain_sampler: TerrainSampler,
     } {
         return .{
-            .terrain_sampler = try TerrainSampler.init(arena),
+            .terrain_sampler = try TerrainSampler.init(arena, .{
+                .size_multiplier = props.size_multiplier,
+            }),
         };
     }
 
@@ -568,9 +574,9 @@ pub const graph_nodes = struct {
         try terrain_chunk_cache.ensureTotalCapacity(256);
         const terrain_sampler = props.terrain_sampler.loadCache(&terrain_chunk_cache);
 
-        const terrain_resolution = 512;
+        // const terrain_resolution = 512;
         // const terrain_resolution = 256;
-        // const terrain_resolution = 128;
+        const terrain_resolution = 128;
 
         var vertex_iterator = CoordIterator.init(@splat(0), @splat(terrain_resolution + 1));
         const positions = positions: {

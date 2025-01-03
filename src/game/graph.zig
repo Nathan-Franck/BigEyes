@@ -73,7 +73,9 @@ pub const blueprint = runtime.Blueprint{
                 .node = .{ .name = "calculateTerrainDensityInfluenceRange", .field = "terrain_sampler" },
             } },
         } },
-        .{ .name = "calculateTerrainDensityInfluenceRange", .function = "calculateTerrainDensityInfluenceRange", .input_links = &[_]runtime.InputLink{} },
+        .{ .name = "calculateTerrainDensityInfluenceRange", .function = "calculateTerrainDensityInfluenceRange", .input_links = &[_]runtime.InputLink{
+            .{ .field = "size_multiplier", .source = .{ .input_field = "size_multiplier" } },
+        } },
         .{ .name = "getScreenspaceMesh", .function = "getScreenspaceMesh", .input_links = &[_]runtime.InputLink{
             .{ .field = "camera_position", .source = .{
                 .node = .{ .name = "orbit", .field = "camera_position" },

@@ -285,7 +285,6 @@ export function App() {
         const indices = sliceToArray.Uint32Array(screenspace_data.indices);
         const what = sliceToArray.Float32Array(screenspace_data.normals);
         const uv = sliceToArray.Float32Array(screenspace_data.uvs);
-        console.table(uv);
         skybox = {
           ...skybox,
           indices: ShaderBuilder.createElementBuffer(gl, indices),
@@ -477,10 +476,16 @@ export function App() {
           lastMousePosition = currentMouse;
         }}
       >
-        <div class={classes.stats}>
+        <div class={classes.stats}
+          onMouseDown={(event) => {
+            event.stopPropagation();
+          }}
+          onMouseMove={(event) => {
+            event.stopPropagation();
+          }}>
           <div>Framerate - {"" + Math.round(stats.framerate)}</div>
-          <div><input type="checkbox"/>Hello</div>
-          <div><input type="range"/>My range</div>
+          <div><input type="checkbox" onChange={change => updateGraph({ bounce: (change.target as HTMLInputElement).checked })} />Animate Bike</div>
+          <div><input type="range" min="0.5" max="2.0" step="0.1" onInput={event => updateGraph({ size_multiplier: parseFloat((event.target as HTMLInputElement).value) })} />Terrain stamp size multiplier: </div>
         </div>
       </div>
       <canvas

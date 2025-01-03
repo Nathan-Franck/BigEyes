@@ -2,12 +2,17 @@ const game = @import("./game/game.zig");
 const std = @import("std");
 
 test "performance" {
-    const allocator = std.heap.page_allocator;
+    const allocator = std.testing.allocator;
     const defins = game.graph_nodes;
-    const influence_ranges = try defins.calculateTerrainDensityInfluenceRange(allocator, .{});
+    var arena = std.heap.ArenaAllocator.init(allocator);
+    defer {
+        _ = arena.reset(.retain_capacity);
+        arena.deinit();
+    }
+    const influence_ranges = try defins.calculateTerrainDensityInfluenceRange(arena.allocator(), .{ .size_multiplier = 1 });
     {
         var timer = try std.time.Timer.start();
-        const result = try defins.displayTerrain(allocator, .{
+        const result = try defins.displayTerrain(arena.allocator(), .{
             .terrain_sampler = influence_ranges.terrain_sampler,
         });
         const time = timer.read() / 1_000_000;
@@ -23,7 +28,13 @@ test "performance" {
             _ = time;
             // std.debug.print("Part #2! time {d}\n", .{time});
         }
-        game.interface.init();
-        _ = try game.interface.updateNodeGraph(.{});
+        const NodeGraph = game.NodeGraph;
+        var node_graph = try NodeGraph.init(.{
+            .allocator = allocator,
+            .inputs = game.graph_inputs,
+            .store = game.graph_store,
+        });
+        _ = try node_graph.update(.{});
+        node_graph.deinit();
     }
 }

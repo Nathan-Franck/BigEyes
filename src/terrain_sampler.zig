@@ -11,8 +11,9 @@ pub fn TerrainSampler(
     return struct {
         const length = TerrainSpawner.density_tiers.len;
         tier_index_to_influence_range: [length]f32,
+        size_multiplier: f32,
 
-        pub fn init(arena: std.mem.Allocator) !@This() {
+        pub fn init(arena: std.mem.Allocator, settings: struct { size_multiplier: f32 }) !@This() {
             var tier_index_to_influence_range: [length]f32 = undefined;
             for (TerrainSpawner.density_tiers, 0..) |maybe_tier, tier_index|
                 tier_index_to_influence_range[tier_index] = if (maybe_tier) |tier| blk: {
@@ -28,12 +29,14 @@ pub fn TerrainSampler(
                     }
                     var max_size: f32 = 0;
                     for (trees.keys()) |tree_index| {
-                        const size = index_to_stamp_data[@intFromEnum(tree_index)].size;
+                        const size = settings.size_multiplier *
+                            index_to_stamp_data[@intFromEnum(tree_index)].size;
                         max_size = @max(max_size, size);
                     }
                     break :blk max_size;
                 } else 0;
             return .{
+                .size_multiplier = settings.size_multiplier,
                 .tier_index_to_influence_range = tier_index_to_influence_range,
             };
         }
@@ -88,7 +91,8 @@ pub fn TerrainSampler(
 
                 var height: f32 = 0;
                 for (spawns) |spawn| {
-                    const stamp = index_to_stamp_data[spawn.id];
+                    var stamp = index_to_stamp_data[spawn.id];
+                    stamp.size *= self.source.size_multiplier;
                     if (stamp.getHeight(spawn.position, pos_2d)) |stamp_height|
                         height = @max(height, stamp_height);
                 }
