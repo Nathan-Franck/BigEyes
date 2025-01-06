@@ -249,13 +249,13 @@ pub const graph_nodes = struct {
                     500,
                 );
                 const location = location: {
-                    const translation = zmath.translationV(props.orbit_camera.position);
-                    const rotation = .{
+                    const t = zmath.translationV(props.orbit_camera.position);
+                    const r = .{
                         .y = zmath.matFromRollPitchYaw(0, props.orbit_camera.rotation[0], 0),
                         .x = zmath.matFromRollPitchYaw(props.orbit_camera.rotation[1], 0, 0),
                     };
                     const offset = zmath.translationV(zmath.loadArr3(.{ 0.0, 0.0, props.orbit_camera.track_distance }));
-                    break :location zmath.mul(translation, zmath.mul(zmath.mul(rotation.y, rotation.x), offset));
+                    break :location zmath.mul(t, zmath.mul(zmath.mul(r.y, r.x), offset));
                 };
 
                 return .{
@@ -513,10 +513,10 @@ pub const graph_nodes = struct {
             "shock",
         }) |label| {
             const transform = props.model_transforms.get(label).?;
-            const offset = if (props.bounce) math: {
+            const offset = if (props.bounce) offset: {
                 const up = Vec4{ 0, 1, 0, 0 };
                 const bounce: Vec4 = @splat(@sin(props.seconds_since_start.get()));
-                break :math up * bounce;
+                break :offset up * bounce;
             } else Vec4{ 0, 0, 0, 0 };
             try instances.append(.{
                 .label = label,

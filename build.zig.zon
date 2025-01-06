@@ -5,5 +5,13 @@
     .dependencies = .{
         .zmath = .{ .path = "libs/zmath" },
         .@"zig-webui" = .{ .path = "libs/zig-webui" },
+        .zopengl = .{ .path = "libs/zopengl" },
+        .zglfw = .{ .path = "libs/zglfw" },
+        .zsdl = .{ .path = "libs/zsdl" },
+        .@"sdl2-prebuilt-x86_64-linux-gnu" = .{
+            .url = "https://github.com/zig-gamedev/sdl2-prebuilt-x86_64-linux-gnu/archive/2eccc574ad909b0d00b694b10c217a95145c47af.tar.gz",
+            .hash = "12200ecb91c0596d0356ff39d573af83abcd44fecb27943589f11c2cd172763fea39",
+            .lazy = true,
+        },
     },
 }

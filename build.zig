@@ -68,50 +68,11 @@ const ExportMeshes = struct {
     }
 };
 
-// fn GenerateTypescripTypes(interface: anytype) type {
-//     return struct {
-//         allocator: std.mem.Allocator,
-//         folder_path: []const u8,
-//         file_name: []const u8,
-//         step: std.Build.Step,
-//         pub fn create(b: *std.Build, folder_path: []const u8, file_name: []const u8) *@This() {
-//             const self = b.allocator.create(@This()) catch @panic("OOM");
-//             self.* = .{
-//                 .allocator = b.allocator,
-//                 .folder_path = folder_path,
-//                 .file_name = file_name,
-//                 .step = std.Build.Step.init(.{
-//                     .id = .custom,
-//                     .name = "export_meshes",
-//                     .owner = b,
-//                     .makeFn = doStep,
-//                 }),
-//             };
-//             return self;
-//         }
-//         pub fn doStep(step: *std.Build.Step, prog_node: *std.Progress.Node) anyerror!void {
-//             _ = prog_node;
-
-//             const self = @fieldParentPtr(@This(), "step", step);
-
-//             const typescriptTypeOf = @import("src/typeDefinitions.zig").typescriptTypeOf;
-
-//             const typeInfo = comptime typescriptTypeOf(interface, .{ .first = true });
-//             const contents = "export type WasmInterface = " ++ typeInfo;
-//             const file_path = try std.fmt.allocPrint(self.allocator, "{s}/{s}", .{ self.folder_path, self.file_name });
-//             std.fs.cwd().makeDir(self.folder_path) catch {};
-//             std.fs.cwd().deleteFile(file_path) catch {};
-//             const file = try std.fs.cwd().createFile(file_path, .{});
-//             try file.writeAll(contents);
-//         }
-//     };
-// }
-
 pub fn build(
     b: *std.Build,
 ) !void {
-    const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
+    const target = b.standardTargetOptions(.{});
 
     const export_meshes = ExportMeshes.create(b, &.{"ebike"});
 
@@ -154,10 +115,11 @@ pub fn build(
     // Check
     {
         const exe_check = b.addExecutable(.{
-            .target = b.resolveTargetQuery(.{ .cpu_arch = .wasm32, .os_tag = .freestanding }),
+            .target = target,
             .optimize = optimize,
             .name = "check_exe",
-            .root_source_file = b.path("src/wasm_entry.zig"),
+            .root_source_file = b.path("src/glfw_entry.zig"),
+            // .root_source_file = b.path("src/wasm_entry.zig"),
             // .root_source_file = b.path("src/test_perf.zig"),
         });
         const zmath = b.dependency("zmath", .{});
@@ -165,6 +127,44 @@ pub fn build(
 
         const check = b.step("check", "Check if wasm compiles");
         check.dependOn(&exe_check.step);
+    }
+
+    // Glfw
+    {
+        var exe = b.addExecutable(.{
+            .target = target,
+            .optimize = optimize,
+            .name = "game",
+            .root_source_file = b.path("src/glfw_entry.zig"),
+        });
+
+        const zmath = b.dependency("zmath", .{});
+        exe.root_module.addImport("zmath", zmath.module("root"));
+
+        const zglfw = b.dependency("zglfw", .{
+            .target = target,
+            // .x11 = false,
+        });
+        exe.root_module.addImport("zglfw", zglfw.module("root"));
+        exe.linkLibrary(zglfw.artifact("glfw"));
+
+        const zopengl = b.dependency("zopengl", .{});
+        exe.root_module.addImport("zopengl", zopengl.module("root"));
+
+        exe.step.dependOn(&export_meshes.step);
+
+        const install_artifact = b.addInstallArtifact(exe, .{ .dest_dir = .{ .override = .{ .custom = "../bin" } } });
+        const install_step = b.step("glfw", "build glfw entrypoint");
+        install_step.dependOn(&install_artifact.step);
+
+        const run_cmd = b.addRunArtifact(exe);
+        run_cmd.step.dependOn(&install_artifact.step);
+        if (b.args) |args| {
+            run_cmd.addArgs(args);
+        }
+        run_cmd.step.dependOn(&install_artifact.step);
+        const run_step = b.step("glfw-run", "run the glfw entrypoint");
+        run_step.dependOn(&run_cmd.step);
     }
 
     // Wasm
@@ -179,27 +179,14 @@ pub fn build(
         const zmath = b.dependency("zmath", .{});
         exe.root_module.addImport("zmath", zmath.module("root"));
 
-        // Latest wasm hack - https://github.com/ringtailsoftware/zig-wasm-audio-framebuffer/blob/master/build.zig
         exe.entry = .disabled;
         exe.rdynamic = true;
-
-        // // <https://github.com/ziglang/zig/issues/8633>
-        // exe.global_base = 6560;
-        // exe.import_memory = true;
         exe.stack_size = std.wasm.page_size * 128;
-        // exe.use_llvm = false;
-
-        // // Number of pages reserved for heap memory.
-        // // This must match the number of pages used in script.js.
-        // const number_of_pages = 4;
-        // exe.initial_memory = std.wasm.page_size * number_of_pages;
-        // exe.max_memory = std.wasm.page_size * number_of_pages;
 
         exe.step.dependOn(&export_meshes.step);
-        // exe.step.dependOn(&generate_typescript_types.step);
 
         const install_artifact = b.addInstallArtifact(exe, .{ .dest_dir = .{ .override = .{ .custom = "../bin" } } });
-        const install_step = b.step("wasm", "build a wasm");
+        const install_step = b.step("wasm", "build wasm entrypoint");
         install_step.dependOn(&install_artifact.step);
     }
 
@@ -216,11 +203,6 @@ pub fn build(
         exe.root_module.addImport("zmath", zmath.module("root"));
 
         exe.step.dependOn(&export_meshes.step);
-        // Windows hax
-        exe.want_lto = false;
-        // exe.use_llvm = false;
-        // if (exe.optimize == .ReleaseFast)
-        //     exe.strip = true;
 
         const install_artifact = b.addInstallArtifact(exe, .{});
         const run_cmd = b.addRunArtifact(exe);
@@ -234,37 +216,6 @@ pub fn build(
         // install_step.dependOn(&install_artifact.step);
 
         const run_step = b.step("test_perf", "run the perf");
-        run_step.dependOn(&run_cmd.step);
-    }
-
-    // Web-ui node graph
-    {
-        const exe = b.addExecutable(.{
-            .name = "webui-nodegraph",
-            .root_source_file = .{ .cwd_relative = "src/webui_nodegraph.zig" },
-            .target = target,
-            .optimize = optimize,
-        });
-
-        const zig_webui = b.dependency("zig-webui", .{
-            .target = target,
-            .optimize = optimize,
-            .enable_tls = false, // whether enable tls support
-            .is_static = true, // whether static link
-        });
-
-        // add module
-        exe.root_module.addImport("webui", zig_webui.module("webui"));
-
-        const install_artifact = b.addInstallArtifact(exe, .{});
-        const run_cmd = b.addRunArtifact(exe);
-        run_cmd.step.dependOn(&install_artifact.step);
-        if (b.args) |args| {
-            run_cmd.addArgs(args);
-        }
-        run_cmd.step.dependOn(&install_artifact.step);
-
-        const run_step = b.step("webui-nodegraph", "run the webui nodegraph");
         run_step.dependOn(&run_cmd.step);
     }
 }

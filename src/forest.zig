@@ -13,8 +13,6 @@ pub const Bounds = struct {
     size: Vec2,
 };
 
-// const wasm_entry = @import("./wasm_entry.zig");
-
 pub const CoordIterator = @import("./CoordIterator.zig");
 pub const Coord = CoordIterator.Coord;
 
