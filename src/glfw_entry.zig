@@ -1,6 +1,7 @@
 const std = @import("std");
 const glfw = @import("zglfw");
 const zopengl = @import("zopengl");
+const game = @import("./game/game.zig");
 
 pub fn main() !void {
     try glfw.init();
@@ -26,10 +27,26 @@ pub fn main() !void {
 
     glfw.swapInterval(1);
 
+    {
+        const allocator = std.heap.page_allocator;
+        const NodeGraph = game.NodeGraph;
+        var node_graph = try NodeGraph.init(.{
+            .allocator = allocator,
+            .inputs = game.graph_inputs,
+            .store = game.graph_store,
+        });
+        const result = try node_graph.update(.{});
+        if (result.skybox) |skybox| {
+            std.debug.print("Found skybox!\n", .{});
+            _ = skybox;
+        }
+        node_graph.deinit();
+    }
+
     while (!window.shouldClose()) {
         glfw.pollEvents();
 
-        gl.clearBufferfv(gl.COLOR, 0, &[_]f32{ 0.2, 0.6, 0.4, 1.0 });
+        gl.clearBufferfv(gl.COLOR, 0, &[_]f32{ 0.2, 0.4, 0.4, 1.0 });
 
         window.swapBuffers();
     }

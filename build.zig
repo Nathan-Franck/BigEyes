@@ -143,7 +143,6 @@ pub fn build(
 
         const zglfw = b.dependency("zglfw", .{
             .target = target,
-            // .x11 = false,
         });
         exe.root_module.addImport("zglfw", zglfw.module("root"));
         exe.linkLibrary(zglfw.artifact("glfw"));
