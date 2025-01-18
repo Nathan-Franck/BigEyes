@@ -94,7 +94,7 @@ pub fn generateStructure(allocator: Allocator, settings: Settings) !Skeleton {
     var nodes = std.ArrayList(Node).init(allocator);
     var node_to_primary_child_index = std.ArrayList(?usize).init(allocator);
 
-    try generation_queue.append(GenQueueItem{ .node = start_node, .parent_index = null });
+    try generation_queue.append(.{ .node = start_node, .parent_index = null });
 
     while (generation_queue.popOrNull()) |gen_item| {
         const node_index = nodes.items.len;
@@ -121,8 +121,8 @@ pub fn generateStructure(allocator: Allocator, settings: Settings) !Skeleton {
                         gen_item.node.rotation,
                         zm.loadArr3(.{ 0, 0, gen_item.node.size * gen_item.node.growth }),
                     );
-                    try generation_queue.append(GenQueueItem{
-                        .node = Node{
+                    try generation_queue.append(.{
+                        .node = .{
                             .position = gen_item.node.position + forward,
                             .rotation = zm.qmul(
                                 zm.quatFromNormAxisAngle(
@@ -142,13 +142,11 @@ pub fn generateStructure(allocator: Allocator, settings: Settings) !Skeleton {
 
                 // Tangential branches
                 var split_index: usize = 0;
-                while (split_index < split_amount) {
-                    defer split_index += 1;
-
+                while (split_index < split_amount) : (split_index += 1) {
                     const split_height = @as(f32, @floatFromInt(split_index)) / @as(f32, @floatFromInt(split_amount));
                     const growth = math.clamp(depth_definition.height_to_growth.sample(split_height * gen_item.node.growth), 0, 1);
-                    try generation_queue.append(GenQueueItem{
-                        .node = Node{
+                    try generation_queue.append(.{
+                        .node = .{
                             .position = gen_item.node.position + zm.rotate(gen_item.node.rotation, zm.loadArr3(.{ 0, 0, gen_item.node.size * gen_item.node.growth * (1 - split_height * depth_definition.height_spread) })),
                             .rotation = zm.qmul(
                                 zm.qmul(
@@ -207,10 +205,12 @@ const leaf_normals = [_]zm.Vec{
 };
 
 pub const Mesh = struct {
-    vertices: []Vec4,
-    uvs: []Vec2,
-    normals: []Vec4,
-    split_height: []f32,
+    vertices: std.MultiArrayList(struct {
+        position: Vec4,
+        uv: Vec2,
+        normal: Vec4,
+        split_height: f32,
+    }),
     triangles: []u32,
 };
 
@@ -219,12 +219,10 @@ pub fn generateTaperedWood(allocator: Allocator, skeleton: Skeleton, settings: M
     const triangle_count = skeleton.nodes.len * 6 * 6;
 
     var mesh = Mesh{
-        .vertices = try allocator.alloc(Vec4, vertex_count),
-        .uvs = try allocator.alloc(Vec2, vertex_count),
-        .normals = try allocator.alloc(Vec4, vertex_count),
-        .split_height = try allocator.alloc(f32, vertex_count),
+        .vertices = .{},
         .triangles = try allocator.alloc(u32, triangle_count),
     };
+    try mesh.vertices.resize(allocator, vertex_count);
 
     var node_index: usize = 0;
     for (skeleton.nodes) |parent| {
@@ -250,16 +248,17 @@ pub fn generateTaperedWood(allocator: Allocator, skeleton: Skeleton, settings: M
             };
 
             const vertex_offset = node_index * 8;
-            for (vertices, 0..) |vertex, i| {
-                mesh.vertices[vertex_offset + i] = zm.mul(
+            const slice = mesh.vertices.slice();
+            for (vertices, bark_normals, vertex_offset..) |vertex, bark_normal, i| {
+                slice.items(.position)[i] = zm.mul(
                     vertex,
                     zm.mul(
                         zm.matFromQuat(parent.rotation),
                         zm.translationV(parent.position),
                     ),
                 );
-                mesh.normals[vertex_offset + i] = zm.normalize3(zm.rotate(parent.rotation, bark_normals[i]));
-                mesh.split_height[vertex_offset + i] = parent.split_height;
+                slice.items(.normal)[i] = zm.normalize3(zm.rotate(parent.rotation, bark_normal));
+                slice.items(.split_height)[i] = parent.split_height;
             }
 
             const triangle_offset = node_index * bark_triangles.len;
@@ -278,12 +277,10 @@ pub fn generateLeaves(allocator: Allocator, skeleton: Skeleton, settings: MeshSe
     const triangle_count = skeleton.nodes.len * 6;
 
     var mesh = Mesh{
-        .vertices = try allocator.alloc(Vec4, vertex_count),
-        .uvs = try allocator.alloc(Vec2, vertex_count),
-        .normals = try allocator.alloc(Vec4, vertex_count),
-        .split_height = try allocator.alloc(f32, vertex_count),
+        .vertices = .{},
         .triangles = try allocator.alloc(u32, triangle_count),
     };
+    try mesh.vertices.resize(allocator, vertex_count);
 
     var node_index: usize = 0;
     for (skeleton.nodes) |node| {
@@ -291,7 +288,7 @@ pub fn generateLeaves(allocator: Allocator, skeleton: Skeleton, settings: MeshSe
             const length = node.size * settings.leaves.length;
             const breadth = node.size * settings.leaves.breadth;
 
-            const uvs = [_]Vec2{ Vec2{ 0, 0 }, Vec2{ 1, 0 }, Vec2{ 1, 1 }, Vec2{ 0, 1 } };
+            const uvs = [_]Vec2{ .{ 0, 0 }, .{ 1, 0 }, .{ 1, 1 }, .{ 0, 1 } };
             const vertices = blk: {
                 var result: [4]Vec4 = undefined;
                 inline for (uvs, 0..) |uv, index| {
@@ -301,17 +298,18 @@ pub fn generateLeaves(allocator: Allocator, skeleton: Skeleton, settings: MeshSe
             };
 
             const vertex_offset = node_index * 4;
-            for (vertices, 0..) |vertex, i| {
-                mesh.vertices[vertex_offset + i] = zm.mul(
+            const slice = mesh.vertices.slice();
+            for (vertices, uvs, leaf_normals, vertex_offset..) |vertex, input_uv, leaf_normal, i| {
+                slice.items(.position)[i] = zm.mul(
                     vertex,
                     zm.mul(
                         zm.matFromQuat(node.rotation),
                         zm.translationV(node.position),
                     ),
                 );
-                mesh.uvs[vertex_offset + i] = uvs[i];
-                mesh.normals[vertex_offset + i] = zm.normalize3(zm.rotate(node.rotation, leaf_normals[i]));
-                mesh.split_height[vertex_offset + i] = node.split_height;
+                slice.items(.uv)[i] = input_uv;
+                slice.items(.normal)[i] = zm.normalize3(zm.rotate(node.rotation, leaf_normal));
+                slice.items(.split_height)[i] = node.split_height;
             }
 
             const triangle_offset = node_index * leaf_triangles.len;

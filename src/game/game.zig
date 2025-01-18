@@ -171,8 +171,8 @@ pub const graph_nodes = struct {
             const bark_mesh = try tree.generateTaperedWood(arena, tree_skeleton, tree_blueprint.mesh);
             const leaf_mesh = try tree.generateLeaves(arena, tree_skeleton, tree_blueprint.mesh);
             const bounds = raytrace.Bounds.encompassBounds(
-                raytrace.Bounds.encompassPoints(bark_mesh.vertices),
-                raytrace.Bounds.encompassPoints(leaf_mesh.vertices),
+                raytrace.Bounds.encompassPoints(bark_mesh.vertices.slice().items(.position)),
+                raytrace.Bounds.encompassPoints(leaf_mesh.vertices.slice().items(.position)),
             );
             try trees.append(game.types.TreeMesh{
                 .label = decl.name,
@@ -545,15 +545,15 @@ pub const graph_nodes = struct {
                 .meshes = try arena.dupe(game.types.GameMesh, &.{
                     .{ .greybox = .{
                         .indices = tree_mesh.bark_mesh.triangles,
-                        .normal = tree_mesh.bark_mesh.normals,
-                        .position = tree_mesh.bark_mesh.vertices,
+                        .normal = tree_mesh.bark_mesh.vertices.slice().items(.normal),
+                        .position = tree_mesh.bark_mesh.vertices.slice().items(.position),
                     } },
                     .{ .textured = .{
                         .diffuse_alpha = props.cutout_leaf,
                         .indices = tree_mesh.leaf_mesh.triangles,
-                        .normal = tree_mesh.leaf_mesh.normals,
-                        .position = tree_mesh.leaf_mesh.vertices,
-                        .uv = tree_mesh.leaf_mesh.uvs,
+                        .normal = tree_mesh.leaf_mesh.vertices.slice().items(.normal),
+                        .position = tree_mesh.leaf_mesh.vertices.slice().items(.position),
+                        .uv = tree_mesh.leaf_mesh.vertices.slice().items(.uv),
                     } },
                 }),
             });

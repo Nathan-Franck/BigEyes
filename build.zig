@@ -118,8 +118,8 @@ pub fn build(
             .target = target,
             .optimize = optimize,
             .name = "check_exe",
-            .root_source_file = b.path("src/glfw_entry.zig"),
-            // .root_source_file = b.path("src/wasm_entry.zig"),
+            // .root_source_file = b.path("src/glfw_entry.zig"),
+            .root_source_file = b.path("src/wasm_entry.zig"),
             // .root_source_file = b.path("src/test_perf.zig"),
         });
         const zmath = b.dependency("zmath", .{});
