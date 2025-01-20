@@ -248,8 +248,8 @@ pub fn generateTaperedWood(allocator: Allocator, skeleton: Skeleton, settings: M
             };
 
             const vertex_offset = node_index * 8;
-            const slice = mesh.vertices.slice();
             for (vertices, bark_normals, vertex_offset..) |vertex, bark_normal, i| {
+                const slice = mesh.vertices.slice();
                 slice.items(.position)[i] = zm.mul(
                     vertex,
                     zm.mul(
@@ -298,8 +298,8 @@ pub fn generateLeaves(allocator: Allocator, skeleton: Skeleton, settings: MeshSe
             };
 
             const vertex_offset = node_index * 4;
-            const slice = mesh.vertices.slice();
             for (vertices, uvs, leaf_normals, vertex_offset..) |vertex, input_uv, leaf_normal, i| {
+                const slice = mesh.vertices.slice();
                 slice.items(.position)[i] = zm.mul(
                     vertex,
                     zm.mul(

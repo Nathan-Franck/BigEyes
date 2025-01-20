@@ -1,20 +1,23 @@
 const std = @import("std");
-const graph_runtime = @import("../graph_runtime.zig");
-const queryable = @import("../utils.zig").queryable;
-const subdiv = @import("../subdiv.zig");
-const Image = @import("../Image.zig");
-const raytrace = @import("../raytrace.zig");
-const mesh_helper = @import("../mesh_helper.zig");
+
 const zmath = @import("zmath");
-const tree = @import("../tree.zig");
+
+const CoordIterator = @import("../CoordIterator.zig");
 const Bounds = @import("../forest.zig").Bounds;
 const Coord = @import("../forest.zig").Coord;
 const Vec2 = @import("../forest.zig").Vec2;
 const Vec4 = @import("../forest.zig").Vec4;
-const CoordIterator = @import("../CoordIterator.zig");
+const graph_runtime = @import("../graph_runtime.zig");
+const Image = @import("../Image.zig");
+const mesh_helper = @import("../mesh_helper.zig");
+const mesh_loader = @import("../mesh_loader.zig");
+const raytrace = @import("../raytrace.zig");
+const subdiv = @import("../subdiv.zig");
+const tree = @import("../tree.zig");
+const queryable = @import("../utils.zig").queryable;
 const math = @import("../vec_math.zig");
 
-const game = struct {
+pub const game = struct {
     pub const graph = @import("./graph.zig");
     pub const types = @import("./types.zig");
     pub const config = @import("./config.zig");
@@ -103,41 +106,10 @@ pub const graph_nodes = struct {
     }
 
     pub fn getResources(arena: std.mem.Allocator, _: struct {}) !game.types.Resources {
-        const bike_blend = blk: {
-            const json_data = @embedFile("../content/ebike.blend.json");
-            const mesh_loader = @import("../mesh_loader.zig");
-            const nodes = try mesh_loader.getNodesFromJSON(arena, json_data);
-
-            break :blk nodes;
-        };
-
-        var models = std.ArrayList(game.types.GameModel).init(arena);
-        var model_transforms = std.StringHashMap(zmath.Mat).init(arena);
-        for (bike_blend) |node|
-            if (node.mesh) |mesh| {
-                const vertices = try arena.alloc(Vec4, mesh.vertices.len);
-                const normals = try arena.alloc(Vec4, mesh.vertices.len);
-                for (mesh.vertices, 0..) |vertex, i| {
-                    normals[i] = zmath.loadArr3w(vertex.normal, 0);
-                    vertices[i] = zmath.loadArr3w(vertex.position, 1);
-                }
-                const model: game.types.GameModel = .{
-                    .label = node.name,
-                    .meshes = try arena.dupe(game.types.GameMesh, &.{.{ .greybox = .{
-                        .indices = mesh.indices,
-                        .normal = normals,
-                        .position = vertices,
-                    } }}),
-                };
-                const transform = transform: {
-                    const translation = zmath.translationV(zmath.loadArr3(node.position));
-                    const rotation = zmath.matFromRollPitchYawV(zmath.loadArr3(node.rotation));
-                    const scale = zmath.scalingV(zmath.loadArr3(node.scale));
-                    break :transform zmath.mul(translation, zmath.mul(rotation, scale));
-                };
-                try models.append(model);
-                try model_transforms.put(node.name, transform);
-            };
+        const result = try mesh_loader.loadModelsFromBlends(arena, &.{
+            .{ .model_name = "ebike" },
+            .{ .model_name = "Sonic (rough)", .subdiv_level = 1 },
+        });
 
         const skybox = blk: {
             var images: game.types.ProcessedCubeMap = undefined;
@@ -184,8 +156,8 @@ pub const graph_nodes = struct {
         }
 
         return game.types.Resources{
-            .models = models.items,
-            .model_transforms = model_transforms,
+            .models = result.models.items,
+            .model_transforms = result.model_transforms,
             .skybox = skybox,
             .cutout_leaf = cutout_leaf,
             .trees = trees.items,
@@ -506,11 +478,12 @@ pub const graph_nodes = struct {
 
         var instances = std.ArrayList(game.types.ModelInstances).init(arena);
         for (&[_][]const u8{
-            "front-wheel",
-            "back-wheel",
-            "body",
-            "handlebars",
-            "shock",
+            "Sonic (rough)_Cube",
+            "ebike_front-wheel",
+            "ebike_back-wheel",
+            "ebike_body",
+            "ebike_handlebars",
+            "ebike_shock",
         }) |label| {
             const transform = props.model_transforms.get(label).?;
             const offset = if (props.bounce) offset: {

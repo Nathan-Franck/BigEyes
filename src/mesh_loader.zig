@@ -1,8 +1,13 @@
 const std = @import("std");
-const subdiv = @import("./subdiv.zig");
-const mesh_helper = @import("./mesh_helper.zig");
-const BlendMeshSpec = @import("./BlendMeshSpec.zig");
+
+const zmath = @import("zmath");
+
 const BlendAnimatedMeshSpec = @import("./BlendAnimatedMeshSpec.zig");
+const BlendMeshSpec = @import("./BlendMeshSpec.zig");
+const mesh_helper = @import("./mesh_helper.zig");
+const subdiv = @import("./subdiv.zig");
+const game = @import("game/game.zig").game;
+const Vec4 = @import("forest.zig").Vec4;
 
 pub const Vertex = struct {
     position: [3]f32,
@@ -32,7 +37,66 @@ const hexColors = [_][3]f32{
     .{ 0.0, 1.0, 1.0 },
 };
 
-pub fn getNodesFromJSON(allocator: std.mem.Allocator, json_data: []const u8) ![]const Node {
+pub fn loadModelsFromBlends(arena: std.mem.Allocator, comptime blend_inputs: []const struct { model_name: []const u8, subdiv_level: u8 = 0 }) !struct {
+    models: std.ArrayList(game.types.GameModel),
+    model_transforms: std.StringHashMap(zmath.Mat),
+} {
+    var models = std.ArrayList(game.types.GameModel).init(arena);
+    var model_transforms = std.StringHashMap(zmath.Mat).init(arena);
+    inline for (blend_inputs) |blend_input| {
+        const json_data = @embedFile(std.fmt.comptimePrint("content/{s}.blend.json", .{blend_input.model_name}));
+        const blend = try loadBlendFromJson(arena, json_data);
+        for (blend.nodes) |node|
+            if (node.mesh) |mesh| {
+                const positions = mesh_helper.decodeVertexDataFromHexidecimal(arena, mesh.vertices);
+                const label = try std.mem.concat(arena, u8, &.{ blend_input.model_name, "_", node.name });
+                if (blend_input.subdiv_level > 0) {
+                    const faces = mesh.polygons;
+                    var subdiv_result = try subdiv.Polygon(.Face).cmcSubdiv(arena, positions, faces);
+                    var quads_per_subdiv = std.ArrayList([]const game.types.Quad).init(arena);
+                    try quads_per_subdiv.append(subdiv_result.quads);
+                    for (0..blend_input.subdiv_level) |_| {
+                        subdiv_result = try subdiv.Polygon(.Quad).cmcSubdiv(arena, subdiv_result.points, subdiv_result.quads);
+                        try quads_per_subdiv.append(subdiv_result.quads);
+                    }
+                    const model: game.types.GameModel = .{
+                        .label = label,
+                        .meshes = try arena.dupe(game.types.GameMesh, &.{game.types.GameMesh{ .subdiv = .{
+                            .top_indices = mesh_helper.Polygon(.Quad).toTriangleIndices(arena, subdiv_result.quads),
+                            .base_position = positions,
+                            .base_faces = mesh.polygons,
+                            .quads_per_subdiv = quads_per_subdiv.items,
+                        } }}),
+                    };
+                    try models.append(model);
+                } else {
+                    const model: game.types.GameModel = .{
+                        .label = label,
+                        .meshes = try arena.dupe(game.types.GameMesh, &.{.{ .greybox = .{
+                            .indices = mesh_helper.Polygon(.Face).toTriangleIndices(arena, mesh.polygons),
+
+                            .normal = mesh_helper.Polygon(.Face).calculateNormals(arena, positions, mesh.polygons),
+                            .position = positions,
+                        } }}),
+                    };
+                    try models.append(model);
+                }
+                const transform = transform: {
+                    const translation = zmath.translationV(zmath.loadArr3(node.position));
+                    const rotation = zmath.matFromRollPitchYawV(zmath.loadArr3(node.rotation));
+                    const scale = zmath.scalingV(zmath.loadArr3(node.scale));
+                    break :transform zmath.mul(translation, zmath.mul(rotation, scale));
+                };
+                try model_transforms.put(label, transform);
+            };
+    }
+    return .{
+        .models = models,
+        .model_transforms = model_transforms,
+    };
+}
+
+pub fn loadBlendFromJson(allocator: std.mem.Allocator, json_data: []const u8) !BlendMeshSpec {
     var scanner = std.json.Scanner.initCompleteInput(allocator, json_data);
     defer scanner.deinit();
 
@@ -47,34 +111,7 @@ pub fn getNodesFromJSON(allocator: std.mem.Allocator, json_data: []const u8) ![]
         return err;
     };
 
-    var meshes = std.ArrayList(Node).init(allocator);
-    for (mesh_input_data.value.nodes) |node| {
-        try meshes.append(.{
-            .name = node.name,
-            .type = node.type,
-            .parent = node.parent,
-            .position = node.position,
-            .rotation = node.rotation,
-            .scale = node.scale,
-            .mesh = if (node.mesh) |mesh| .{
-                .vertices = vertices: {
-                    const vertices = mesh_helper.decodeVertexDataFromHexidecimal(allocator, mesh.vertices);
-                    const normals = mesh_helper.Polygon(.Face).calculateNormals(allocator, vertices, mesh.polygons);
-                    var result = std.ArrayList(Vertex).init(allocator);
-                    for (vertices, 0..) |point, i| {
-                        try result.append(Vertex{
-                            .position = @as([4]f32, point)[0..3].*,
-                            .color = hexColors[i % hexColors.len],
-                            .normal = @as([4]f32, normals[i])[0..3].*,
-                        });
-                    }
-                    break :vertices result.items;
-                },
-                .indices = mesh_helper.Polygon(.Face).toTriangleIndices(allocator, mesh.polygons),
-            } else null,
-        });
-    }
-    return meshes.items;
+    return mesh_input_data.value;
 }
 
 pub fn getAnimatedMeshesFromJSON(allocator: std.mem.Allocator, json_data: []const u8) !std.ArrayList(Node) {
@@ -82,7 +119,7 @@ pub fn getAnimatedMeshesFromJSON(allocator: std.mem.Allocator, json_data: []cons
     var meshes = std.ArrayList(Node).init(allocator);
     for (mesh_input_data.value.meshes) |input_data| {
         try meshes.append(.{
-            .label = input_data.name,
+            .name = input_data.name,
             .vertices = vertices: {
                 const normals = mesh_helper.Polygon(.Face).calculateNormals(allocator, input_data.vertices, input_data.polygons);
                 var vertices = std.ArrayList(Vertex).init(allocator);

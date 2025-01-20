@@ -2,14 +2,18 @@ const std = @import("std");
 const content_dir = "src/content/";
 
 const ExportMeshes = struct {
+    const BlendExport = struct {
+        script_path: []const u8,
+        blend_paths: []const []const u8,
+    };
     allocator: std.mem.Allocator,
-    files: []const []const u8,
+    blend_exports: []const BlendExport,
     step: std.Build.Step,
-    pub fn create(b: *std.Build, files: []const []const u8) *@This() {
+    pub fn create(b: *std.Build, blend_exports: []const BlendExport) *@This() {
         const self = b.allocator.create(@This()) catch @panic("OOM");
         self.* = .{
             .allocator = b.allocator,
-            .files = files,
+            .blend_exports = blend_exports,
             .step = std.Build.Step.init(.{
                 .id = .custom,
                 .name = "export_meshes",
@@ -27,41 +31,42 @@ const ExportMeshes = struct {
 
         var export_count: u32 = 0;
 
-        for (self.files) |file| {
-            const full_path = try std.fmt.allocPrint(self.allocator, content_dir ++ "/{s}.blend", .{file});
+        for (self.blend_exports) |blend_export|
+            for (blend_export.blend_paths) |blend_path| {
+                const full_path = try std.fmt.allocPrint(self.allocator, content_dir ++ "/{s}.blend", .{blend_path});
 
-            var man = b.graph.cache.obtain();
-            defer man.deinit();
-            _ = try man.addFile(full_path, null);
-            if (try step.cacheHit(&man)) {
+                var man = b.graph.cache.obtain();
+                defer man.deinit();
+                _ = try man.addFile(full_path, null);
+                if (try step.cacheHit(&man)) {
+                    _ = man.final();
+                    continue;
+                }
                 _ = man.final();
-                continue;
-            }
-            _ = man.final();
-            try man.writeManifest();
+                try man.writeManifest();
 
-            std.debug.print("Working on {s}", .{file});
-            var timer = try std.time.Timer.start();
-            const res = try std.process.Child.run(.{
-                .allocator = self.allocator,
-                .cwd = try std.process.getCwdAlloc(self.allocator),
-                .argv = &[_][]const u8{
-                    "blender",
-                    full_path,
-                    "--background",
-                    "--python",
-                    content_dir ++ "/blend-to-json.py",
-                },
-            });
-            std.debug.print("stdout: {s}\n", .{res.stdout});
-            if (res.stderr.len > 0) {
-                std.debug.print("stderr: {s}\n", .{res.stderr});
-                return error.ExportFailed;
-            }
-            const ns = timer.read();
-            std.debug.print("Process took {d} ms\n", .{@as(f64, @floatFromInt(ns)) / 1_000_000});
-            export_count += 1;
-        }
+                std.debug.print("Working on {s}", .{blend_path});
+                var timer = try std.time.Timer.start();
+                const res = try std.process.Child.run(.{
+                    .allocator = self.allocator,
+                    .cwd = try std.process.getCwdAlloc(self.allocator),
+                    .argv = &[_][]const u8{
+                        "blender",
+                        full_path,
+                        "--background",
+                        "--python",
+                        std.fmt.allocPrint(self.allocator, "{s}/{s}.py", .{ content_dir, blend_export.script_path }) catch @panic("OOM"),
+                    },
+                });
+                std.debug.print("stdout: {s}\n", .{res.stdout});
+                if (res.stderr.len > 0) {
+                    std.debug.print("stderr: {s}\n", .{res.stderr});
+                    return error.ExportFailed;
+                }
+                const ns = timer.read();
+                std.debug.print("Process took {d} ms\n", .{@as(f64, @floatFromInt(ns)) / 1_000_000});
+                export_count += 1;
+            };
         if (export_count > 0) {
             std.debug.print("Exported {d} meshes\n", .{export_count});
         }
@@ -74,7 +79,14 @@ pub fn build(
     const optimize = b.standardOptimizeOption(.{});
     const target = b.standardTargetOptions(.{});
 
-    const export_meshes = ExportMeshes.create(b, &.{"ebike"});
+    const export_meshes = ExportMeshes.create(b, &.{
+        .{ .script_path = "blend-to-json", .blend_paths = &.{
+            "ebike",
+            "Sonic (rough)",
+        } },
+        // .{ .script_path = "custom-gltf", .blend_paths = &.{
+        // } },
+    });
 
     // Tests (default)
     {

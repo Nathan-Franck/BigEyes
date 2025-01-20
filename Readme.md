@@ -4,7 +4,7 @@ Can 3D toon graphics be easy?
 
 [Check out the current working build!](https://nathan-franck.github.io/BigEyes/)
 
-![image](Cat2024-07-28.png)
+![image](docs/Cat2024-07-28.png)
 
 ### Objective
 

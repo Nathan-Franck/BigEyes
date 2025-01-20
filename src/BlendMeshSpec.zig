@@ -11,5 +11,5 @@ nodes: []const struct {
     mesh: ?struct {
         polygons: []const mesh_helper.Face,
         vertices: []const u8, // hexidecimal-encoding of Point type
-    },
+    } = null,
 },

@@ -21,6 +21,13 @@ pub const GreyboxMesh = struct {
     normal: []const Vec4,
 };
 
+pub const SubdivMesh = struct {
+    top_indices: []const u32,
+    base_position: []const Vec4,
+    base_faces: []const Face,
+    quads_per_subdiv: []const []const Quad,
+};
+
 pub const TextureMesh = struct {
     diffuse_alpha: Image.Processed,
     indices: []const u32,
@@ -31,6 +38,7 @@ pub const TextureMesh = struct {
 
 pub const GameMesh = union(enum) {
     greybox: GreyboxMesh,
+    subdiv: SubdivMesh,
     textured: TextureMesh,
 };
 
