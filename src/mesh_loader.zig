@@ -7,6 +7,7 @@ const BlendMeshSpec = @import("./BlendMeshSpec.zig");
 const mesh_helper = @import("./mesh_helper.zig");
 const subdiv = @import("./subdiv.zig");
 const game = @import("game/game.zig").game;
+const debugPrint = @import("game/game.zig").debugPrint;
 const Vec4 = @import("forest.zig").Vec4;
 
 pub const Vertex = struct {
@@ -104,10 +105,10 @@ pub fn loadBlendFromJson(allocator: std.mem.Allocator, json_data: []const u8) !B
     scanner.enableDiagnostics(&diagnostics);
 
     const mesh_input_data = std.json.parseFromTokenSource(BlendMeshSpec, allocator, &scanner, .{}) catch |err| {
-        // std.debug.print("Something in here isn't parsing right: {s}\nError: {any}\n", .{
-        //     json_data[0..@intCast(diagnostics.getByteOffset())],
-        //     err,
-        // });
+        debugPrint("Something in here isn't parsing right: {s}\nError: {any}\n", .{
+            json_data[0..@intCast(diagnostics.getByteOffset())],
+            err,
+        });
         return err;
     };
 

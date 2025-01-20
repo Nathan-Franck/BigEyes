@@ -17,6 +17,11 @@ const tree = @import("../tree.zig");
 const queryable = @import("../utils.zig").queryable;
 const math = @import("../vec_math.zig");
 
+pub const debugPrint = if (@import("builtin").target.cpu.arch.isWasm())
+    @import("../wasm_entry.zig").dumpDebugLogFmt
+else
+    std.debug.print;
+
 pub const game = struct {
     pub const graph = @import("./graph.zig");
     pub const types = @import("./types.zig");
