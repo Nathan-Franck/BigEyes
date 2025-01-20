@@ -23,7 +23,8 @@ pub const GreyboxMesh = struct {
 
 pub const SubdivMesh = struct {
     top_indices: []const u32,
-    base_position: []const Vec4,
+    base_positions: []const Vec4,
+    base_bone_indices: []const i8,
     base_faces: []const Face,
     quads_per_subdiv: []const []const Quad,
 };

@@ -189,6 +189,22 @@ pub fn build(
             .root_source_file = b.path("src/wasm_entry.zig"),
         });
 
+        const gen = b.addWriteFile("generated.zig",
+            \\pub const GeneratedData = struct {
+            \\    pub const version = "1.0.0";
+            \\    pub const buildTime = @as(i64, @intCast(@typeInfo(u64).Int.bits));
+            \\    pub const constants = [_][]const u8{
+            \\        "value1",
+            \\        "value2",
+            \\        "value3",
+            \\    };
+            \\};
+        );
+        const gen_module = b.addModule("generated", .{
+            .root_source_file = .{ .generated = .{ .file = &gen.generated_directory, .up = 0, .sub_path = gen.files.items[0].sub_path } },
+        });
+        exe.root_module.addImport("generated", gen_module);
+
         const zmath = b.dependency("zmath", .{});
         exe.root_module.addImport("zmath", zmath.module("root"));
 

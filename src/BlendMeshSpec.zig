@@ -11,6 +11,7 @@ nodes: []const struct {
     mesh: ?struct {
         polygons: []const mesh_helper.Face,
         vertices: []const u8, // hexidecimal-encoding of Point type
+        bone_indices: []const i8,
     } = null,
     armature: ?struct {
         bones: []const struct {

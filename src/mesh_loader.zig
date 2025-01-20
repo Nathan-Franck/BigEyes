@@ -38,7 +38,10 @@ const hexColors = [_][3]f32{
     .{ 0.0, 1.0, 1.0 },
 };
 
-pub fn loadModelsFromBlends(arena: std.mem.Allocator, comptime blend_inputs: []const struct { model_name: []const u8, subdiv_level: u8 = 0 }) !struct {
+pub fn loadModelsFromBlends(
+    arena: std.mem.Allocator,
+    comptime blend_inputs: []const struct { model_name: []const u8, subdiv_level: u8 = 0 },
+) !struct {
     models: std.ArrayList(game.types.GameModel),
     model_transforms: std.StringHashMap(zmath.Mat),
 } {
@@ -47,7 +50,10 @@ pub fn loadModelsFromBlends(arena: std.mem.Allocator, comptime blend_inputs: []c
     inline for (blend_inputs) |blend_input| {
         const json_data = @embedFile(std.fmt.comptimePrint("content/{s}.blend.json", .{blend_input.model_name}));
         const blend = try loadBlendFromJson(arena, json_data);
-        for (blend.nodes) |node|
+        for (blend.nodes) |node| {
+            if (node.armature) |armature| {
+                _ = armature;
+            }
             if (node.mesh) |mesh| {
                 const positions = mesh_helper.decodeVertexDataFromHexidecimal(arena, mesh.vertices);
                 const label = try std.mem.concat(arena, u8, &.{ blend_input.model_name, "_", node.name });
@@ -64,7 +70,8 @@ pub fn loadModelsFromBlends(arena: std.mem.Allocator, comptime blend_inputs: []c
                         .label = label,
                         .meshes = try arena.dupe(game.types.GameMesh, &.{game.types.GameMesh{ .subdiv = .{
                             .top_indices = mesh_helper.Polygon(.Quad).toTriangleIndices(arena, subdiv_result.quads),
-                            .base_position = positions,
+                            .base_positions = positions,
+                            .base_bone_indices = mesh.bone_indices,
                             .base_faces = mesh.polygons,
                             .quads_per_subdiv = quads_per_subdiv.items,
                         } }}),
@@ -89,7 +96,8 @@ pub fn loadModelsFromBlends(arena: std.mem.Allocator, comptime blend_inputs: []c
                     break :transform zmath.mul(translation, zmath.mul(rotation, scale));
                 };
                 try model_transforms.put(label, transform);
-            };
+            }
+        }
     }
     return .{
         .models = models,

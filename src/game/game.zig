@@ -2,6 +2,10 @@ const std = @import("std");
 
 const zmath = @import("zmath");
 
+// Hey! You can totally create code before the build starts!
+const gen = @import("generated");
+const _ = gen.GeneratedData;
+
 const CoordIterator = @import("../CoordIterator.zig");
 const Bounds = @import("../forest.zig").Bounds;
 const Coord = @import("../forest.zig").Coord;
