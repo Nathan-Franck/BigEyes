@@ -47,13 +47,13 @@ pub fn loadModelsFromBlends(
 } {
     var models = std.ArrayList(game.types.GameModel).init(arena);
     var model_transforms = std.StringHashMap(zmath.Mat).init(arena);
-    var armatures = std.StringHashMap(struct {}).init(arena);
+    var armatures = std.StringHashMap(BlendMeshSpec.Armature).init(arena);
     inline for (blend_inputs) |blend_input| {
         const json_data = @embedFile(std.fmt.comptimePrint("content/{s}.blend.json", .{blend_input.model_name}));
         const blend = try loadBlendFromJson(arena, json_data);
         for (blend.nodes) |node| {
             if (node.armature) |armature| {
-                _ = armature;
+                try armatures.put(node.name, armature);
             }
             if (node.mesh) |mesh| {
                 const positions = mesh_helper.decodeVertexDataFromHexidecimal(arena, mesh.vertices);
@@ -92,9 +92,9 @@ pub fn loadModelsFromBlends(
                     try models.append(model);
                 }
                 const transform = transform: {
-                    const translation = zmath.translationV(zmath.loadArr3(node.position));
-                    const rotation = zmath.matFromRollPitchYawV(zmath.loadArr3(node.rotation));
-                    const scale = zmath.scalingV(zmath.loadArr3(node.scale));
+                    const translation = zmath.translationV(node.position);
+                    const rotation = zmath.matFromRollPitchYawV(node.rotation);
+                    const scale = zmath.scalingV(node.scale);
                     break :transform zmath.mul(translation, zmath.mul(rotation, scale));
                 };
                 try model_transforms.put(label, transform);

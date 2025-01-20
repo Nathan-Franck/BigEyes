@@ -13,18 +13,30 @@ nodes = []
 armatures = []
 for object in bpy.data.objects:
     print("Exporting " + object.name + " " + object.type)
-    matrix = object.matrix_local
+    translation, rotation, scale =  object.matrix_local.decompose() # Transform a point in bone space to "Armature" space
     object_data = {
         "name": object.name,
         "type": object.type,
         "parent": object.parent.name if object.parent != None else None,
         "position": [
-            matrix.to_translation().x,
-            matrix.to_translation().z,
-            matrix.to_translation().y,
+            translation.x,
+            translation.y,
+            translation.z,
+            0,
         ],
-        "rotation": [matrix.to_euler().x, matrix.to_euler().y, matrix.to_euler().z],
-        "scale": [matrix.to_scale().x, matrix.to_scale().y, matrix.to_scale().z],
+        "rotation": [
+            rotation.x,
+            rotation.y,
+            rotation.z,
+            rotation.w,
+        ],
+        "scale": [
+            scale.x,
+            scale.y,
+            scale.z,
+            0,
+        ],
+
     };
     if object.type == "ARMATURE":
         armature = object.data
@@ -51,8 +63,6 @@ for object in bpy.data.objects:
                 if pose_bone:
                     translation, rotation, scale = pose_bone.matrix.decompose() # Transform a point in bone space to "Armature" space
                     frame_data["bones"].append({
-                        "name": bone.name,
-                        "parent": bone.parent.name if bone.parent != None else None,
                         "position": [
                             translation.x,
                             translation.y,
