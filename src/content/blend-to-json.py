@@ -126,7 +126,7 @@ for object in bpy.data.objects:
                 if weight > max_weight:
                     max_weight = weight
                     max_bone_index = group.group
-            bone_indices.append(bone_index)
+            bone_indices.append(max_bone_index)
 
         object_data["mesh"] = {
             "polygons": polygons,
