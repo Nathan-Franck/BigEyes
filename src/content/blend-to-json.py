@@ -30,27 +30,11 @@ for object in bpy.data.objects:
         armature = object.data
         bones = []
         for bone in armature.bones:
-            matrix = bone.matrix_local
             bones.append(
                 {
                     "name": bone.name,
                     "parent": bone.parent.name if bone.parent != None else None,
-                    "rest_position": [
-                        matrix.to_translation().x,
-                        matrix.to_translation().y
-                        + (bone.parent.length if bone.parent != None else 0),
-                        matrix.to_translation().z,
-                    ],
-                    "rest_rotation": [
-                        matrix.to_euler().x,
-                        matrix.to_euler().y,
-                        matrix.to_euler().z,
-                    ],
-                    "rest_scale": [
-                        matrix.to_scale().x,
-                        matrix.to_scale().y,
-                        matrix.to_scale().z,
-                    ],
+                    "rest_matrix": [list(row) for row in bone.matrix_local.inverted()], # Transform a point relative to the "Armature" node to the bone-space
                 }
             )
 
@@ -65,22 +49,27 @@ for object in bpy.data.objects:
             for bone in armature.bones:
                 pose_bone = object.pose.bones.get(bone.name)
                 if pose_bone:
-                    matrix = pose_bone.matrix
+                    translation, rotation, scale = pose_bone.matrix.decompose() # Transform a point in bone space to "Armature" space
                     frame_data["bones"].append({
+                        "name": bone.name,
+                        "parent": bone.parent.name if bone.parent != None else None,
                         "position": [
-                            matrix.to_translation().x,
-                            matrix.to_translation().y,
-                            matrix.to_translation().z,
+                            translation.x,
+                            translation.y,
+                            translation.z,
+                            0,
                         ],
                         "rotation": [
-                            matrix.to_euler().x,
-                            matrix.to_euler().y,
-                            matrix.to_euler().z,
+                            rotation.x,
+                            rotation.y,
+                            rotation.z,
+                            rotation.w,
                         ],
                         "scale": [
-                            matrix.to_scale().x,
-                            matrix.to_scale().y,
-                            matrix.to_scale().z,
+                            scale.x,
+                            scale.y,
+                            scale.z,
+                            0,
                         ],
                     })
             animation.append(frame_data)

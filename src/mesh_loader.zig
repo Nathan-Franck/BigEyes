@@ -47,6 +47,7 @@ pub fn loadModelsFromBlends(
 } {
     var models = std.ArrayList(game.types.GameModel).init(arena);
     var model_transforms = std.StringHashMap(zmath.Mat).init(arena);
+    var armatures = std.StringHashMap(struct {}).init(arena);
     inline for (blend_inputs) |blend_input| {
         const json_data = @embedFile(std.fmt.comptimePrint("content/{s}.blend.json", .{blend_input.model_name}));
         const blend = try loadBlendFromJson(arena, json_data);
@@ -69,6 +70,7 @@ pub fn loadModelsFromBlends(
                     const model: game.types.GameModel = .{
                         .label = label,
                         .meshes = try arena.dupe(game.types.GameMesh, &.{game.types.GameMesh{ .subdiv = .{
+                            .armature_node = node.parent.?,
                             .top_indices = mesh_helper.Polygon(.Quad).toTriangleIndices(arena, subdiv_result.quads),
                             .base_positions = positions,
                             .base_bone_indices = mesh.bone_indices,
