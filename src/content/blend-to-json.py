@@ -112,14 +112,26 @@ for object in bpy.data.objects:
         mesh = bpy.data.meshes.new_from_object(object_eval)
 
         vertex_strings = []
+        bone_indices = []
         for vertex in mesh.vertices:
             vertex_array = [vertex.co.x, vertex.co.z, vertex.co.y]
             vertex_string = ''.join(''.join(format(byte, '02x') for byte in struct.pack('<f', value)) for value in vertex_array)
             vertex_strings.append(vertex_string)
 
+            # Find most heavily weighted bone
+            max_weight = 0
+            max_bone_index = -1
+            for group in vertex.groups:
+                weight = group.weight
+                if weight > max_weight:
+                    max_weight = weight
+                    max_bone_index = group.group
+            bone_indices.append(bone_index)
+
         object_data["mesh"] = {
             "polygons": polygons,
             "vertices": ''.join(vertex_strings),
+            "bone_indices": bone_indices,
         }
     nodes.append(object_data)
 
