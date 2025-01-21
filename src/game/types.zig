@@ -10,6 +10,7 @@ const mesh_helper = @import("../mesh_helper.zig");
 const raytrace = @import("../raytrace.zig");
 const subdiv = @import("../subdiv.zig");
 const tree = @import("../tree.zig");
+const Armature = @import("../BlendMeshSpec.zig").Armature;
 
 pub const Point = @Vector(4, f32);
 pub const Face = []const u32;
@@ -27,7 +28,7 @@ pub const SubdivBoneMesh = struct {
     base_bone_indices: []const i8,
     base_faces: []const Face,
     quads_per_subdiv: []const []const Quad,
-    armature_node: []const u8,
+    armature: Armature,
 };
 
 pub const TextureMesh = struct {

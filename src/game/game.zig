@@ -511,6 +511,43 @@ pub const graph_nodes = struct {
         return .{ .model_instances = instances.items };
     }
 
+    /// Take all models, pull out the animatable ones, write them out after animating and subdividing them
+    pub fn animateMeshes(arena: std.mem.Allocator, props: struct {
+        models: []const game.types.GameModel,
+    }) !struct {
+        models: []const game.types.GameModel,
+    } {
+        var models = std.ArrayList(game.types.GameModel).init(arena);
+        for (props.models) |model| {
+            const mesh = model.meshes[0];
+            switch (mesh) {
+                .subdiv => |subdiv_mesh| {
+                    debugPrint("Hey it's a mesh! {s}\n", .{model.label});
+                    const faces = subdiv_mesh.base_faces;
+                    const positions = subdiv_mesh.base_positions;
+                    var subdiv_result = try subdiv.Polygon(.Face).cmcSubdivOnlyPoints(arena, positions, faces);
+                    const subdiv_levels = subdiv_mesh.quads_per_subdiv.len;
+                    for (subdiv_mesh.quads_per_subdiv[0 .. subdiv_levels - 1]) |quads| {
+                        subdiv_result = try subdiv.Polygon(.Quad).cmcSubdivOnlyPoints(arena, subdiv_result, quads);
+                    }
+                    var highest_index: u32 = 0;
+                    for (subdiv_mesh.top_indices) |index| {
+                        if (index > highest_index) highest_index = index;
+                    }
+                    const bounds = @import("../raytrace.zig").Bounds.encompassPoints(subdiv_result);
+                    debugPrint("highest {d} 2 {d} bounds {}\n", .{ highest_index, subdiv_result.len, bounds });
+                    try models.append(.{ .label = model.label, .meshes = &[_]game.types.GameMesh{.{ .greybox = game.types.GreyboxMesh{
+                        .indices = subdiv_mesh.top_indices,
+                        .position = subdiv_result,
+                        .normal = mesh_helper.Polygon(.Quad).calculateNormals(arena, subdiv_result, subdiv_mesh.quads_per_subdiv[subdiv_levels - 1]),
+                    } }} });
+                },
+                else => {},
+            }
+        }
+        return .{ .models = models.items };
+    }
+
     pub fn displayTrees(
         arena: std.mem.Allocator,
         props: struct {

@@ -63,14 +63,14 @@ pub fn loadModelsFromBlends(
                     var subdiv_result = try subdiv.Polygon(.Face).cmcSubdiv(arena, positions, faces);
                     var quads_per_subdiv = std.ArrayList([]const game.types.Quad).init(arena);
                     try quads_per_subdiv.append(subdiv_result.quads);
-                    for (0..blend_input.subdiv_level) |_| {
+                    for (0..blend_input.subdiv_level - 1) |_| {
                         subdiv_result = try subdiv.Polygon(.Quad).cmcSubdiv(arena, subdiv_result.points, subdiv_result.quads);
                         try quads_per_subdiv.append(subdiv_result.quads);
                     }
                     const model: game.types.GameModel = .{
                         .label = label,
                         .meshes = try arena.dupe(game.types.GameMesh, &.{game.types.GameMesh{ .subdiv = .{
-                            .armature_node = node.parent.?,
+                            .armature = armatures.get(node.parent.?).?,
                             .top_indices = mesh_helper.Polygon(.Quad).toTriangleIndices(arena, subdiv_result.quads),
                             .base_positions = positions,
                             .base_bone_indices = mesh.bone_indices,

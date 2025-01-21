@@ -48,6 +48,11 @@ pub const blueprint = runtime.Blueprint{
                 .node = .{ .name = "getResources", .field = "trees" },
             } },
         } },
+        .{ .name = "animateMeshes", .function = "animateMeshes", .input_links = &[_]runtime.InputLink{
+            .{ .field = "models", .source = .{
+                .node = .{ .name = "getResources", .field = "models" },
+            } },
+        } },
         .{ .name = "displayForest", .function = "displayForest", .input_links = &[_]runtime.InputLink{
             .{ .field = "forest_chunk_cache", .source = .{
                 .store_field = "forest_chunk_cache",
@@ -94,6 +99,7 @@ pub const blueprint = runtime.Blueprint{
     .output = &[_]runtime.SystemSink{
         .{ .output_node = "getResources", .output_field = "skybox", .system_field = "skybox" },
         .{ .output_node = "getResources", .output_field = "models", .system_field = "models" },
+        .{ .output_node = "animateMeshes", .output_field = "models", .system_field = "models" },
         .{ .output_node = "getScreenspaceMesh", .output_field = "screen_space_mesh", .system_field = "screen_space_mesh" },
         .{ .output_node = "displayTrees", .output_field = "models", .system_field = "models" },
         .{ .output_node = "displayForest", .output_field = "model_instances", .system_field = "model_instances" },
