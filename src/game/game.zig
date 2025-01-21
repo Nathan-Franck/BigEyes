@@ -522,7 +522,6 @@ pub const graph_nodes = struct {
             const mesh = model.meshes[0];
             switch (mesh) {
                 .subdiv => |subdiv_mesh| {
-                    debugPrint("Hey it's a mesh! {s}\n", .{model.label});
                     const faces = subdiv_mesh.base_faces;
                     const positions = subdiv_mesh.base_positions;
                     var subdiv_result = try subdiv.Polygon(.Face).cmcSubdivOnlyPoints(arena, positions, faces);
@@ -536,11 +535,16 @@ pub const graph_nodes = struct {
                     }
                     const bounds = @import("../raytrace.zig").Bounds.encompassPoints(subdiv_result);
                     debugPrint("highest {d} 2 {d} bounds {}\n", .{ highest_index, subdiv_result.len, bounds });
-                    try models.append(.{ .label = model.label, .meshes = &[_]game.types.GameMesh{.{ .greybox = game.types.GreyboxMesh{
-                        .indices = subdiv_mesh.top_indices,
-                        .position = subdiv_result,
-                        .normal = mesh_helper.Polygon(.Quad).calculateNormals(arena, subdiv_result, subdiv_mesh.quads_per_subdiv[subdiv_levels - 1]),
-                    } }} });
+                    try models.append(.{
+                        .label = model.label,
+                        .meshes = try arena.dupe(game.types.GameMesh, &[_]game.types.GameMesh{.{
+                            .greybox = game.types.GreyboxMesh{
+                                .indices = subdiv_mesh.top_indices,
+                                .position = subdiv_result,
+                                .normal = mesh_helper.Polygon(.Quad).calculateNormals(arena, subdiv_result, subdiv_mesh.quads_per_subdiv[subdiv_levels - 1]),
+                            },
+                        }}),
+                    });
                 },
                 else => {},
             }
