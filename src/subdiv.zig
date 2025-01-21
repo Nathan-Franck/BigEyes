@@ -32,7 +32,7 @@ pub fn Polygon(comptime poly_selection: enum {
         fn getFacePoints(allocator: std.mem.Allocator, input_points: []const Point, input_faces: []const Poly) ![]Point {
             var face_points = try ArrayList(Point).initCapacity(allocator, input_faces.len);
             for (input_faces) |face| {
-                var face_point = Point{ 0, 0, 0, 1 };
+                var face_point = Point{ 0, 0, 0, 0 };
                 for (face) |point_num| {
                     face_point += input_points[point_num];
                 }
@@ -124,7 +124,7 @@ pub fn Polygon(comptime poly_selection: enum {
         fn getAvgFacePoints(allocator: std.mem.Allocator, input_points: []const Point, input_faces: []const Poly, face_points: []const Point) ![]Point {
             var temp_points = try ArrayList(Point_Ex).initCapacity(allocator, input_points.len);
             for (input_points) |_| {
-                try temp_points.append(Point_Ex{ .p = Point{ 0, 0, 0, 1 }, .n = 0 });
+                try temp_points.append(Point_Ex{ .p = Point{ 0, 0, 0, 0 }, .n = 0 });
             }
             for (input_faces, 0..) |face, face_num| {
                 const fp = face_points[face_num];
@@ -144,7 +144,7 @@ pub fn Polygon(comptime poly_selection: enum {
         fn getAvgMidEdges(allocator: std.mem.Allocator, input_points: []const Point, edges_faces: []const EdgesFace) ![]Point {
             var temp_points = try ArrayList(Point_Ex).initCapacity(allocator, input_points.len);
             for (input_points) |_| {
-                try temp_points.append(Point_Ex{ .p = Point{ 0, 0, 0, 1 }, .n = 0 });
+                try temp_points.append(Point_Ex{ .p = Point{ 0, 0, 0, 0 }, .n = 0 });
             }
             for (edges_faces) |edge| {
                 for ([_]u32{ edge.points[0], edge.points[1] }) |point_num| {
@@ -174,9 +174,12 @@ pub fn Polygon(comptime poly_selection: enum {
         }
 
         fn getNewPoints(allocator: std.mem.Allocator, input_points: []const Point, input_faces: []const Poly, face_points: []const Point, edges_faces: []const EdgesFace) ![]Point {
-            const avg_face_points = try getAvgFacePoints(allocator, input_points, input_faces, face_points);
-            const avg_mid_edges = try getAvgMidEdges(allocator, input_points, edges_faces);
-            const points_faces = try getPointsFaces(allocator, input_points, input_faces);
+            var arena = std.heap.ArenaAllocator.init(allocator);
+            defer arena.deinit();
+
+            const avg_face_points = try getAvgFacePoints(arena.allocator(), input_points, input_faces, face_points);
+            const avg_mid_edges = try getAvgMidEdges(arena.allocator(), input_points, edges_faces);
+            const points_faces = try getPointsFaces(arena.allocator(), input_points, input_faces);
             var new_points = try ArrayList(Point).initCapacity(allocator, input_points.len);
             for (input_points, 0..) |point, point_num| {
                 const n = @as(f32, @floatFromInt(points_faces[point_num]));
@@ -203,7 +206,7 @@ pub fn Polygon(comptime poly_selection: enum {
 
         pub noinline fn cmcSubdiv(allocator: std.mem.Allocator, input_points: []const Point, input_faces: []const Poly) !Mesh {
             var arena = std.heap.ArenaAllocator.init(allocator);
-            defer arena.deinit();
+            // defer arena.deinit();
 
             const face_points = try getFacePoints(arena.allocator(), input_points, input_faces);
             const edges_faces = try getEdgesFaces(arena.allocator(), input_points, input_faces);

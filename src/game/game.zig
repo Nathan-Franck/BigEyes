@@ -252,9 +252,15 @@ pub const graph_nodes = struct {
                     props.input.mouse_delta *
                     zmath.splat(Vec4, -props.player_settings.look_speed);
 
-                const rotation_matrix = zmath.matFromRollPitchYaw(-props.player.euler_rotation[1], -props.player.euler_rotation[0], 0);
+                const rotation_matrix = zmath.matFromRollPitchYaw(
+                    -props.player.euler_rotation[1],
+                    -props.player.euler_rotation[0],
+                    0,
+                );
 
                 const right = Vec4{ 1, 0, 0, 0 };
+                const forward = Vec4{ 0, 0, 1, 0 };
+
                 var horizontal_movement = Vec4{ 0, 0, 0, 0 };
                 const movement = props.input.movement;
 
@@ -270,7 +276,6 @@ pub const graph_nodes = struct {
                     horizontal_movement = horizontal_movement + right;
                 }
 
-                const forward = Vec4{ 0, 0, 1, 0 };
                 var vertical_movement = Vec4{ 0, 0, 0, 0 };
                 if (movement.forward != null and movement.backward != null) {
                     if (movement.forward.? > movement.backward.?) {
@@ -346,10 +351,10 @@ pub const graph_nodes = struct {
         for (
             &normals,
             [_]Vec4{
-                Vec4{ -1, -1, 1, 1 },
-                Vec4{ 1, -1, 1, 1 },
-                Vec4{ 1, 1, 1, 1 },
-                Vec4{ -1, 1, 1, 1 },
+                .{ -1, -1, 1, 1 },
+                .{ 1, -1, 1, 1 },
+                .{ 1, 1, 1, 1 },
+                .{ -1, 1, 1, 1 },
             },
         ) |*normal, screen_position| {
             const world_position = zmath.mul(screen_position, inverse_view_projection);
@@ -363,10 +368,10 @@ pub const graph_nodes = struct {
                 2, 3, 0,
             }),
             .uvs = try arena.dupe(Vec2, &.{
-                Vec2{ 0, 0 },
-                Vec2{ 1, 0 },
-                Vec2{ 1, 1 },
-                Vec2{ 0, 1 },
+                .{ 0, 0 },
+                .{ 1, 0 },
+                .{ 1, 1 },
+                .{ 0, 1 },
             }),
             .normals = try arena.dupe(Vec4, &normals),
         } };
@@ -512,9 +517,12 @@ pub const graph_nodes = struct {
     }
 
     /// Take all models, pull out the animatable ones, write them out after animating and subdividing them
-    pub fn animateMeshes(arena: std.mem.Allocator, props: struct {
-        models: []const game.types.GameModel,
-    }) !struct {
+    pub fn animateMeshes(
+        arena: std.mem.Allocator,
+        props: struct {
+            models: []const game.types.GameModel,
+        },
+    ) !struct {
         models: []const game.types.GameModel,
     } {
         var models = std.ArrayList(game.types.GameModel).init(arena);
@@ -529,12 +537,14 @@ pub const graph_nodes = struct {
                     for (subdiv_mesh.quads_per_subdiv[0 .. subdiv_levels - 1]) |quads| {
                         subdiv_result = try subdiv.Polygon(.Quad).cmcSubdivOnlyPoints(arena, subdiv_result, quads);
                     }
-                    var highest_index: u32 = 0;
-                    for (subdiv_mesh.top_indices) |index| {
-                        if (index > highest_index) highest_index = index;
+                    {
+                        var highest_index: u32 = 0;
+                        for (subdiv_mesh.top_indices) |index| {
+                            if (index > highest_index) highest_index = index;
+                        }
+                        const bounds = @import("../raytrace.zig").Bounds.encompassPoints(subdiv_result);
+                        debugPrint("highest {d} 2 {d} bounds {}\n", .{ highest_index, subdiv_result.len, bounds });
                     }
-                    const bounds = @import("../raytrace.zig").Bounds.encompassPoints(subdiv_result);
-                    debugPrint("highest {d} 2 {d} bounds {}\n", .{ highest_index, subdiv_result.len, bounds });
                     try models.append(.{
                         .label = model.label,
                         .meshes = try arena.dupe(game.types.GameMesh, &[_]game.types.GameMesh{.{
