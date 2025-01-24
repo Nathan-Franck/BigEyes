@@ -1,4 +1,5 @@
 import bpy
+import bpy_extras
 import mathutils
 import struct
 import os
@@ -11,9 +12,11 @@ bpy.ops.object.mode_set(mode="OBJECT")
 meshes = []
 nodes = []
 armatures = []
+to_ogl_matrix = bpy_extras.io_utils.axis_conversion(to_forward="Z", to_up="Y").to_4x4()
 for object in bpy.data.objects:
     print("Exporting " + object.name + " " + object.type)
-    translation, rotation, scale =  object.matrix_local.decompose() # Transform a point in bone space to "Armature" space
+    mat = to_ogl_matrix @ object.matrix_local @ to_ogl_matrix.inverted();
+    translation, rotation, scale =  mat.decompose() # Transform a point in bone space to "Armature" space
     object_data = {
         "name": object.name,
         "type": object.type,
@@ -22,7 +25,7 @@ for object in bpy.data.objects:
             translation.x,
             translation.y,
             translation.z,
-            0,
+            1,
         ],
         "rotation": [
             rotation.x,
@@ -42,11 +45,32 @@ for object in bpy.data.objects:
         armature = object.data
         bones = []
         for bone in armature.bones:
+            mat = to_ogl_matrix @ bone.matrix_local @ to_ogl_matrix.inverted();
+            translation, rotation, scale =  mat.decompose() # Transform a point in bone space to "Armature" space
             bones.append(
                 {
                     "name": bone.name,
                     "parent": bone.parent.name if bone.parent != None else None,
-                    "rest_matrix": [list(row) for row in bone.matrix_local.inverted()], # Transform a point relative to the "Armature" node to the bone-space
+                    "rest":{
+                        "position": [
+                            translation.x,
+                            translation.y,
+                            translation.z,
+                            1,
+                        ],
+                        "rotation": [
+                            rotation.x,
+                            rotation.y,
+                            rotation.z,
+                            rotation.w,
+                        ],
+                        "scale": [
+                            scale.x,
+                            scale.y,
+                            scale.z,
+                            0,
+                        ],
+                    }
                 }
             )
 
@@ -61,13 +85,14 @@ for object in bpy.data.objects:
             for bone in armature.bones:
                 pose_bone = object.pose.bones.get(bone.name)
                 if pose_bone:
-                    translation, rotation, scale = pose_bone.matrix.decompose() # Transform a point in bone space to "Armature" space
+                    mat = to_ogl_matrix @ pose_bone.matrix @ to_ogl_matrix;
+                    translation, rotation, scale = mat.decompose() # Transform a point in bone space to "Armature" space
                     frame_data["bones"].append({
                         "position": [
                             translation.x,
                             translation.y,
                             translation.z,
-                            0,
+                            1,
                         ],
                         "rotation": [
                             rotation.x,
@@ -146,7 +171,7 @@ with open(
             "nodes": nodes,
         },
         file,
-        # indent=4,
+        indent=4,
     )
 print(
     "Export of "

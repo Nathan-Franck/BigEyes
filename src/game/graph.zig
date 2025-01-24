@@ -52,6 +52,9 @@ pub const blueprint = runtime.Blueprint{
             .{ .field = "models", .source = .{
                 .node = .{ .name = "getResources", .field = "models" },
             } },
+            .{ .field = "seconds_since_start", .source = .{
+                .node = .{ .name = "timing", .field = "seconds_since_start" },
+            } },
         } },
         .{ .name = "displayForest", .function = "displayForest", .input_links = &[_]runtime.InputLink{
             .{ .field = "forest_chunk_cache", .source = .{

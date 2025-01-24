@@ -7,7 +7,11 @@ pub const Armature = struct {
     bones: []const struct {
         name: []const u8,
         parent: ?[]const u8,
-        rest_matrix: Mat,
+        rest: struct {
+            position: Vec4,
+            rotation: Vec4,
+            scale: Vec4,
+        },
     },
     animation: []const struct {
         frame: u32,

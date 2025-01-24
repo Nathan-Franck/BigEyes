@@ -210,7 +210,7 @@ export function App() {
       fragSource: `
         precision highp float;
         void main(void) {
-          float brightness = clamp(dot(normal.xyz, normalize(vec3(1, 1, 1))), 0.0, 1.0);
+          float brightness = clamp(-dot(normal.xyz, normalize(vec3(-1, -1, -1))), 0.0, 1.0);
           gl_FragColor = vec4(vec3(0.8, 0.8, 0.8) * mix(0.5, 1.0, brightness), 1);
         }
       `,

@@ -520,6 +520,7 @@ pub const graph_nodes = struct {
     pub fn animateMeshes(
         arena: std.mem.Allocator,
         props: struct {
+            seconds_since_start: f32,
             models: []const game.types.GameModel,
         },
     ) !struct {
@@ -531,12 +532,36 @@ pub const graph_nodes = struct {
             switch (mesh) {
                 .subdiv => |subdiv_mesh| {
                     const faces = subdiv_mesh.base_faces;
-                    const positions = subdiv_mesh.base_positions;
+                    const positions = try arena.dupe(Vec4, subdiv_mesh.base_positions);
+                    for (subdiv_mesh.base_bone_indices, positions) |i, *position| {
+                        const bone_index: usize = @intCast(i);
+                        const bone = subdiv_mesh.armature.bones[bone_index];
+                        const animated_bone = subdiv_mesh.armature.animation[0].bones[bone_index];
+                        debugPrint("length of quat {d}\n", .{zmath.length4(bone.rest.rotation)});
+                        position.* = zmath.mul(
+                            zmath.mul(
+                                position.*,
+                                mesh_loader.translationRotationScaleToMatrix(
+                                    bone.rest.position,
+                                    bone.rest.rotation,
+                                    bone.rest.scale,
+                                ),
+                            ),
+                            mesh_loader.translationRotationScaleToMatrix(
+                                animated_bone.position,
+                                animated_bone.rotation,
+                                animated_bone.scale,
+                            ),
+                        );
+                    }
+
                     var subdiv_result = try subdiv.Polygon(.Face).cmcSubdivOnlyPoints(arena, positions, faces);
                     const subdiv_levels = subdiv_mesh.quads_per_subdiv.len;
                     for (subdiv_mesh.quads_per_subdiv[0 .. subdiv_levels - 1]) |quads| {
                         subdiv_result = try subdiv.Polygon(.Quad).cmcSubdivOnlyPoints(arena, subdiv_result, quads);
                     }
+
+                    // Debug stuff :)
                     {
                         var highest_index: u32 = 0;
                         for (subdiv_mesh.top_indices) |index| {
@@ -545,6 +570,7 @@ pub const graph_nodes = struct {
                         const bounds = @import("../raytrace.zig").Bounds.encompassPoints(subdiv_result);
                         debugPrint("highest {d} 2 {d} bounds {}\n", .{ highest_index, subdiv_result.len, bounds });
                     }
+
                     try models.append(.{
                         .label = model.label,
                         .meshes = try arena.dupe(game.types.GameMesh, &[_]game.types.GameMesh{.{

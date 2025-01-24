@@ -91,13 +91,14 @@ pub fn loadModelsFromBlends(
                     };
                     try models.append(model);
                 }
-                const transform = transform: {
-                    const translation = zmath.translationV(node.position);
-                    const rotation = zmath.matFromRollPitchYawV(node.rotation);
-                    const scale = zmath.scalingV(node.scale);
-                    break :transform zmath.mul(translation, zmath.mul(rotation, scale));
-                };
-                try model_transforms.put(label, transform);
+                try model_transforms.put(
+                    label,
+                    translationRotationScaleToMatrix(
+                        node.position,
+                        node.rotation,
+                        node.scale,
+                    ),
+                );
             }
         }
     }
@@ -105,6 +106,18 @@ pub fn loadModelsFromBlends(
         .models = models,
         .model_transforms = model_transforms,
     };
+}
+
+pub fn translationRotationScaleToMatrix(translation: Vec4, rotation: Vec4, scale: Vec4) zmath.Mat {
+    const t = zmath.translationV(translation);
+    // const r = zmath.matFromQuat(rotation);
+    const rpy = zmath.loadArr3(.{ 1.5, 1.5, 1.5 });
+    const r = zmath.matFromRollPitchYawV(rpy);
+    const s = zmath.scalingV(scale);
+    _ = .{ t, rotation, s };
+    debugPrint("r {any:2}", .{r});
+
+    return r;
 }
 
 pub fn loadBlendFromJson(allocator: std.mem.Allocator, json_data: []const u8) !BlendMeshSpec {
