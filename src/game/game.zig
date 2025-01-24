@@ -509,7 +509,7 @@ pub const graph_nodes = struct {
                 .label = label,
                 .positions = try arena.dupe(Vec4, &.{zmath.loadArr3w(zmath.vecToArr3(transform[3] + offset), 1)}),
                 .rotations = try arena.dupe(Vec4, &.{zmath.matToQuat(transform)}),
-                .scales = try arena.dupe(Vec4, &.{.{ transform[0][0], transform[1][1], transform[2][2], 0 }}),
+                .scales = try arena.dupe(Vec4, &.{.{ zmath.length3(transform[0])[0], zmath.length3(transform[1])[0], zmath.length3(transform[2])[0], 0 }}),
             });
         }
 

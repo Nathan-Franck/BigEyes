@@ -110,14 +110,9 @@ pub fn loadModelsFromBlends(
 
 pub fn translationRotationScaleToMatrix(translation: Vec4, rotation: Vec4, scale: Vec4) zmath.Mat {
     const t = zmath.translationV(translation);
-    // const r = zmath.matFromQuat(rotation);
-    const rpy = zmath.loadArr3(.{ 1.5, 1.5, 1.5 });
-    const r = zmath.matFromRollPitchYawV(rpy);
+    const r = zmath.matFromQuat(rotation);
     const s = zmath.scalingV(scale);
-    _ = .{ t, rotation, s };
-    debugPrint("r {any:2}", .{r});
-
-    return r;
+    return zmath.mul(t, zmath.mul(r, s));
 }
 
 pub fn loadBlendFromJson(allocator: std.mem.Allocator, json_data: []const u8) !BlendMeshSpec {
