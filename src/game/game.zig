@@ -486,7 +486,7 @@ pub const graph_nodes = struct {
     pub fn animateMeshes(
         arena: std.mem.Allocator,
         props: struct {
-            seconds_since_start: queryable.Value(f32),
+            seconds_since_start: f32,
             models: []const game.types.GameModel,
         },
     ) !struct {
@@ -502,8 +502,8 @@ pub const graph_nodes = struct {
                     for (subdiv_mesh.base_bone_indices, positions) |i, *position| {
                         const bone_index: usize = @intCast(i);
                         const bone = subdiv_mesh.armature.bones[bone_index];
-                        const thinger = subdiv_mesh.armature.animation;
-                        const animated_bone = thinger[@as(usize, @intFromFloat(props.seconds_since_start.get())) % thinger.len].bones[bone_index];
+                        const animation = subdiv_mesh.armature.animation;
+                        const animated_bone = animation[@as(usize, @intFromFloat(props.seconds_since_start)) % animation.len].bones[bone_index];
                         position.* = zmath.mul(
                             zmath.mul(
                                 position.*,
