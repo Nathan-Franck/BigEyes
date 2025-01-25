@@ -503,7 +503,12 @@ pub const graph_nodes = struct {
                         const bone_index: usize = @intCast(i);
                         const bone = subdiv_mesh.armature.bones[bone_index];
                         const animation = subdiv_mesh.armature.animation;
-                        const animated_bone = animation[@as(usize, @intFromFloat(props.seconds_since_start)) % animation.len].bones[bone_index];
+                        const time: usize = @intFromFloat(props.seconds_since_start);
+                        const animated_bone = .{
+                            animation[time % animation.len].bones[bone_index],
+                            animation[(time + 1) % animation.len].bones[bone_index],
+                        };
+                        const lerp: Vec4 = @splat(props.seconds_since_start - @as(f32, @floatFromInt(time)));
                         position.* = zmath.mul(
                             zmath.mul(
                                 position.*,
@@ -516,9 +521,9 @@ pub const graph_nodes = struct {
                                 ),
                             ),
                             mesh_loader.translationRotationScaleToMatrix(
-                                animated_bone.position,
-                                animated_bone.rotation,
-                                animated_bone.scale,
+                                zmath.lerpV(animated_bone[0].position, animated_bone[1].position, lerp),
+                                zmath.lerpV(animated_bone[0].rotation, animated_bone[1].rotation, lerp),
+                                zmath.lerpV(animated_bone[0].scale, animated_bone[1].scale, lerp),
                             ),
                         );
                     }
