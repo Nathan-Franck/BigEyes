@@ -217,7 +217,8 @@ export function App() {
         void main(void) {
           // float brightness = clamp(-dot(normal.xyz, normalize(vec3(-1, -1, -1))), 0.0, 1.0);
           // gl_FragColor = vec4(vec3(0.8, 0.8, 0.8) * mix(0.5, 1.0, brightness), 1);
-          gl_FragColor = vec4(normal.xyz * 0.5 + 0.5, 1);
+          vec4 final_normal = vec4(normalize(normal.xyz), 0);
+          gl_FragColor = vec4(final_normal.xyz * 0.5 + 0.5, 1);
         }
       `,
     });
