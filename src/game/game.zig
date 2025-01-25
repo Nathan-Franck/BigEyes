@@ -117,7 +117,7 @@ pub const graph_nodes = struct {
     pub fn getResources(arena: std.mem.Allocator, _: struct {}) !game.types.Resources {
         const result = try mesh_loader.loadModelsFromBlends(arena, &.{
             .{ .model_name = "ebike" },
-            .{ .model_name = "Sonic (rough)", .subdiv_level = 3 },
+            .{ .model_name = "Sonic (rough)", .subdiv_level = 2 },
         });
 
         const skybox = blk: {
