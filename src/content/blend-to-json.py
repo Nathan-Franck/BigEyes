@@ -12,31 +12,30 @@ bpy.ops.object.mode_set(mode="OBJECT")
 meshes = []
 nodes = []
 armatures = []
-to_ogl_matrix = bpy_extras.io_utils.axis_conversion(to_forward="Z", to_up="Y").to_4x4()
 for object in bpy.data.objects:
     print("Exporting " + object.name + " " + object.type)
-    mat = to_ogl_matrix @ object.matrix_local @ to_ogl_matrix.inverted();
+    mat = object.matrix_local;
     translation, rotation, scale =  mat.decompose() # Transform a point in bone space to "Armature" space
     object_data = {
         "name": object.name,
         "type": object.type,
         "parent": object.parent.name if object.parent != None else None,
         "position": [
-            translation.x,
-            translation.y,
+            -translation.x,
             translation.z,
+            -translation.y,
             1,
         ],
         "rotation": [
-            rotation.x,
-            rotation.y,
+            -rotation.x,
             rotation.z,
+            -rotation.y,
             rotation.w,
         ],
         "scale": [
             scale.x,
-            scale.y,
             scale.z,
+            scale.y,
             0,
         ],
 
@@ -45,29 +44,27 @@ for object in bpy.data.objects:
         armature = object.data
         bones = []
         for bone in armature.bones:
-            mat = to_ogl_matrix @ bone.matrix_local @ to_ogl_matrix.inverted();
-            translation, rotation, scale =  mat.decompose() # Transform a point in bone space to "Armature" space
             bones.append(
                 {
                     "name": bone.name,
                     "parent": bone.parent.name if bone.parent != None else None,
                     "rest":{
                         "position": [
-                            translation.x,
-                            translation.y,
+                            -translation.x,
                             translation.z,
+                            -translation.y,
                             1,
                         ],
                         "rotation": [
-                            rotation.x,
-                            rotation.y,
+                            -rotation.x,
                             rotation.z,
+                            -rotation.y,
                             rotation.w,
                         ],
                         "scale": [
                             scale.x,
-                            scale.y,
                             scale.z,
+                            scale.y,
                             0,
                         ],
                     }
@@ -85,25 +82,25 @@ for object in bpy.data.objects:
             for bone in armature.bones:
                 pose_bone = object.pose.bones.get(bone.name)
                 if pose_bone:
-                    mat = to_ogl_matrix @ pose_bone.matrix @ to_ogl_matrix;
+                    mat = pose_bone.matrix;
                     translation, rotation, scale = mat.decompose() # Transform a point in bone space to "Armature" space
                     frame_data["bones"].append({
                         "position": [
-                            translation.x,
-                            translation.y,
+                            -translation.x,
                             translation.z,
+                            -translation.y,
                             1,
                         ],
                         "rotation": [
-                            rotation.x,
-                            rotation.y,
+                            -rotation.x,
                             rotation.z,
+                            -rotation.y,
                             rotation.w,
                         ],
                         "scale": [
                             scale.x,
-                            scale.y,
                             scale.z,
+                            scale.y,
                             0,
                         ],
                     })
@@ -138,7 +135,7 @@ for object in bpy.data.objects:
         vertex_strings = []
         bone_indices = []
         for vertex in mesh.vertices:
-            vertex_array = [vertex.co.x, vertex.co.z, vertex.co.y]
+            vertex_array = [-vertex.co.x, vertex.co.z, -vertex.co.y]
             vertex_string = ''.join(''.join(format(byte, '02x') for byte in struct.pack('<f', value)) for value in vertex_array)
             vertex_strings.append(vertex_string)
 

@@ -112,7 +112,7 @@ pub fn translationRotationScaleToMatrix(translation: Vec4, rotation: Vec4, scale
     const t = zmath.translationV(translation);
     const r = zmath.matFromQuat(rotation);
     const s = zmath.scalingV(scale);
-    return zmath.mul(t, zmath.mul(r, s));
+    return zmath.mul(zmath.mul(r, s), t);
 }
 
 pub fn loadBlendFromJson(allocator: std.mem.Allocator, json_data: []const u8) !BlendMeshSpec {

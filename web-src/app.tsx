@@ -64,16 +64,16 @@ function toEntries<T extends Object>(object: T) {
 // https://stackoverflow.com/questions/6604192/showing-console-errors-and-alerts-in-a-div-inside-the-page
 
 type UpdateNodeGraph = typeof callWasm<"updateNodeGraph">;
-type GraphOutputs = Exclude<ReturnType<UpdateNodeGraph>, { error: any }>["outputs"];
+type GraphOutputs = Exclude<
+  ReturnType<UpdateNodeGraph>,
+  { error: any }
+>["outputs"];
 const graphInputs: Parameters<UpdateNodeGraph>[1] = {
   render_resolution: { x: window.innerWidth, y: window.innerHeight },
 };
 
 callWasm("init");
-let updateRender:
-  | ((graphOutputs: GraphOutputs) => () => void)
-  | null = null;
-
+let updateRender: ((graphOutputs: GraphOutputs) => () => void) | null = null;
 
 function updateGraph(newInputs: typeof graphInputs) {
   var graphInputs = newInputs;
@@ -83,7 +83,10 @@ function updateGraph(newInputs: typeof graphInputs) {
 }
 
 let lastMousePosition: { x: number; y: number } | null = null;
-let controllerInputs: NonNullable<typeof graphInputs.input> = { mouse_delta: [0, 0, 0, 0], movement: { left: null, right: null, forward: null, backward: null } };
+let controllerInputs: NonNullable<typeof graphInputs.input> = {
+  mouse_delta: [0, 0, 0, 0],
+  movement: { left: null, right: null, forward: null, backward: null },
+};
 
 export function App() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -200,7 +203,9 @@ export function App() {
         item_rotation: { type: "attribute", unit: "vec4", instanced: true },
         item_scale: { type: "attribute", unit: "vec4", instanced: true },
       },
-      vertSource: instancingMath + `
+      vertSource:
+        instancingMath +
+        `
         precision highp float;
         void main(void) {
           gl_Position = perspectiveMatrix * computeTransform(item_position, item_rotation, item_scale) * position;
@@ -231,7 +236,9 @@ export function App() {
         item_rotation: { type: "attribute", unit: "vec4", instanced: true },
         item_scale: { type: "attribute", unit: "vec4", instanced: true },
       },
-      vertSource: instancingMath + `
+      vertSource:
+        instancingMath +
+        `
         precision highp float;
         void main(void) {
           gl_Position = perspectiveMatrix * computeTransform(item_position, item_rotation, item_scale) * position;
@@ -251,13 +258,29 @@ export function App() {
       `,
     });
 
-
     type Model =
-      | { greybox: Pick<Binds<typeof greyboxMaterial.globals>, "indices" | "normals" | "position"> }
-      | { textured: Pick<Binds<typeof texturedMeshMaterial.globals>, "indices" | "normals" | "position" | "uvs" | "texture"> }
+      | {
+          greybox: Pick<
+            Binds<typeof greyboxMaterial.globals>,
+            "indices" | "normals" | "position"
+          >;
+        }
+      | {
+          textured: Pick<
+            Binds<typeof texturedMeshMaterial.globals>,
+            "indices" | "normals" | "position" | "uvs" | "texture"
+          >;
+        };
     let models: Record<string, Model[]> = {};
     let perspectiveMatrix: Mat4;
-    let transforms: Record<string, { item_position: SizedBuffer<4>, item_rotation: SizedBuffer<4>, item_scale: SizedBuffer<4> }> = {};
+    let transforms: Record<
+      string,
+      {
+        item_position: SizedBuffer<4>;
+        item_rotation: SizedBuffer<4>;
+        item_scale: SizedBuffer<4>;
+      }
+    > = {};
     let skybox: Binds<typeof skyboxMaterial.globals>;
 
     updateRender = (graphOutputs) => () => {
@@ -270,13 +293,20 @@ export function App() {
       const skybox_data = graphOutputs.skybox;
       if (skybox_data) {
         renderChange = true;
-        var texture_data = fromEntries(toEntries(skybox_data).map(([key, value]) => [
-          key,
-          sliceToArray.Uint8Array(value.data),
-        ] as const))
+        var texture_data = fromEntries(
+          toEntries(skybox_data).map(
+            ([key, value]) =>
+              [key, sliceToArray.Uint8Array(value.data)] as const,
+          ),
+        );
         skybox = {
           ...skybox,
-          skybox: ShaderBuilder.loadCubemapData(gl, texture_data, skybox_data.nx.width, skybox_data.nx.height),
+          skybox: ShaderBuilder.loadCubemapData(
+            gl,
+            texture_data,
+            skybox_data.nx.width,
+            skybox_data.nx.height,
+          ),
         };
       }
       const screenspace_data = graphOutputs.screen_space_mesh;
@@ -292,7 +322,8 @@ export function App() {
           normals: ShaderBuilder.createBuffer(gl, what),
         };
       }
-      let model_instances: NonNullable<typeof graphOutputs.model_instances> = [];
+      let model_instances: NonNullable<typeof graphOutputs.model_instances> =
+        [];
       if (graphOutputs.model_instances) {
         model_instances = model_instances.concat(graphOutputs.model_instances);
       }
@@ -300,10 +331,21 @@ export function App() {
         renderChange = true;
         for (let data of model_instances) {
           const label = sliceToString(data.label);
+          console.log(label);
+          console.log(sliceToArray.Float32Array(data.rotations));
           transforms[label] = {
-            item_position: ShaderBuilder.createBuffer(gl, sliceToArray.Float32Array(data.positions)),
-            item_rotation: ShaderBuilder.createBuffer(gl, sliceToArray.Float32Array(data.rotations)),
-            item_scale: ShaderBuilder.createBuffer(gl, sliceToArray.Float32Array(data.scales)),
+            item_position: ShaderBuilder.createBuffer(
+              gl,
+              sliceToArray.Float32Array(data.positions),
+            ),
+            item_rotation: ShaderBuilder.createBuffer(
+              gl,
+              sliceToArray.Float32Array(data.rotations),
+            ),
+            item_scale: ShaderBuilder.createBuffer(
+              gl,
+              sliceToArray.Float32Array(data.scales),
+            ),
           };
         }
       }
@@ -312,9 +354,18 @@ export function App() {
         renderChange = true;
         const label = sliceToString(terrain_instance.label);
         transforms[label] = {
-          item_position: ShaderBuilder.createBuffer(gl, sliceToArray.Float32Array(terrain_instance.positions)),
-          item_rotation: ShaderBuilder.createBuffer(gl, sliceToArray.Float32Array(terrain_instance.rotations)),
-          item_scale: ShaderBuilder.createBuffer(gl, sliceToArray.Float32Array(terrain_instance.scales)),
+          item_position: ShaderBuilder.createBuffer(
+            gl,
+            sliceToArray.Float32Array(terrain_instance.positions),
+          ),
+          item_rotation: ShaderBuilder.createBuffer(
+            gl,
+            sliceToArray.Float32Array(terrain_instance.rotations),
+          ),
+          item_scale: ShaderBuilder.createBuffer(
+            gl,
+            sliceToArray.Float32Array(terrain_instance.scales),
+          ),
         };
       }
       const terrain_mesh = graphOutputs.terrain_mesh;
@@ -323,9 +374,18 @@ export function App() {
         models["terrain"] = [
           {
             greybox: {
-              indices: ShaderBuilder.createElementBuffer(gl, sliceToArray.Uint32Array(terrain_mesh.indices)),
-              normals: ShaderBuilder.createBuffer(gl, sliceToArray.Float32Array(terrain_mesh.normal)),
-              position: ShaderBuilder.createBuffer(gl, sliceToArray.Float32Array(terrain_mesh.position)),
+              indices: ShaderBuilder.createElementBuffer(
+                gl,
+                sliceToArray.Uint32Array(terrain_mesh.indices),
+              ),
+              normals: ShaderBuilder.createBuffer(
+                gl,
+                sliceToArray.Float32Array(terrain_mesh.normal),
+              ),
+              position: ShaderBuilder.createBuffer(
+                gl,
+                sliceToArray.Float32Array(terrain_mesh.position),
+              ),
             },
           },
         ];
@@ -343,22 +403,40 @@ export function App() {
               const mesh = meshVariation.greybox;
               meshes.push({
                 greybox: {
-                  indices: ShaderBuilder.createElementBuffer(gl, sliceToArray.Uint32Array(mesh.indices)),
-                  position: ShaderBuilder.createBuffer(gl, sliceToArray.Float32Array(mesh.position)),
-                  normals: ShaderBuilder.createBuffer(gl, sliceToArray.Float32Array(mesh.normal)),
+                  indices: ShaderBuilder.createElementBuffer(
+                    gl,
+                    sliceToArray.Uint32Array(mesh.indices),
+                  ),
+                  position: ShaderBuilder.createBuffer(
+                    gl,
+                    sliceToArray.Float32Array(mesh.position),
+                  ),
+                  normals: ShaderBuilder.createBuffer(
+                    gl,
+                    sliceToArray.Float32Array(mesh.normal),
+                  ),
                 },
               });
-            }
-            else if ("textured" in meshVariation) {
+            } else if ("textured" in meshVariation) {
               const mesh = meshVariation.textured;
               const uvs = sliceToArray.Float32Array(mesh.uv);
               meshes.push({
                 textured: {
-                  indices: ShaderBuilder.createElementBuffer(gl, sliceToArray.Uint32Array(mesh.indices)),
-                  position: ShaderBuilder.createBuffer(gl, sliceToArray.Float32Array(mesh.position)),
-                  normals: ShaderBuilder.createBuffer(gl, sliceToArray.Float32Array(mesh.normal)),
+                  indices: ShaderBuilder.createElementBuffer(
+                    gl,
+                    sliceToArray.Uint32Array(mesh.indices),
+                  ),
+                  position: ShaderBuilder.createBuffer(
+                    gl,
+                    sliceToArray.Float32Array(mesh.position),
+                  ),
+                  normals: ShaderBuilder.createBuffer(
+                    gl,
+                    sliceToArray.Float32Array(mesh.normal),
+                  ),
                   uvs: ShaderBuilder.createBuffer(gl, uvs),
-                  texture: ShaderBuilder.loadImageData(gl,
+                  texture: ShaderBuilder.loadImageData(
+                    gl,
                     sliceToArray.Uint8Array(mesh.diffuse_alpha.data),
                     mesh.diffuse_alpha.width,
                     mesh.diffuse_alpha.height,
@@ -385,10 +463,18 @@ export function App() {
           const transform = transforms[key];
           for (const mesh of model) {
             if ("greybox" in mesh) {
-              ShaderBuilder.renderMaterial(gl, greyboxMaterial, { ...mesh.greybox, ...transform, perspectiveMatrix });
+              ShaderBuilder.renderMaterial(gl, greyboxMaterial, {
+                ...mesh.greybox,
+                ...transform,
+                perspectiveMatrix,
+              });
             }
             if ("textured" in mesh) {
-              ShaderBuilder.renderMaterial(gl, texturedMeshMaterial, { ...mesh.textured, ...transform, perspectiveMatrix });
+              ShaderBuilder.renderMaterial(gl, texturedMeshMaterial, {
+                ...mesh.textured,
+                ...transform,
+                perspectiveMatrix,
+              });
             }
           }
         }
@@ -402,31 +488,37 @@ export function App() {
       if (document.hasFocus()) {
         updateGraph({
           input: controllerInputs,
-          time: Date.now()
+          time: Date.now(),
         });
         controllerInputs.mouse_delta = [0, 0, 0, 0];
       }
       if (animationRunning) requestAnimationFrame(update);
-    }
+    };
     requestAnimationFrame(update);
 
     return () => (animationRunning = false);
   }, []);
 
   const keyToDirection = {
-    "w": "forward",
-    "s": "backward",
-    "a": "left",
-    "d": "right",
+    w: "forward",
+    s: "backward",
+    a: "left",
+    d: "right",
   } as const;
 
   const graphDisplay = callWasm("getGraphJson");
   let nodes;
   if (!("error" in graphDisplay)) {
-    nodes = graphDisplay.blueprint.nodes.map((node, i) => <div style={{
-      position: "absolute",
-      top: `${i * 20}px`
-    }}>{sliceToString(node.name)}</div>)
+    nodes = graphDisplay.blueprint.nodes.map((node, i) => (
+      <div
+        style={{
+          position: "absolute",
+          top: `${i * 20}px`,
+        }}
+      >
+        {sliceToString(node.name)}
+      </div>
+    ));
   }
 
   return (
@@ -441,7 +533,7 @@ export function App() {
           position: "absolute",
           left: 0,
           top: 0,
-          outline: 'none',
+          outline: "none",
         }}
         onMouseDown={(event) => {
           if (event.button == 1) {
@@ -457,14 +549,16 @@ export function App() {
           }
         }}
         onKeyDown={(event) => {
-          const direction = keyToDirection[event.key as keyof typeof keyToDirection];
+          const direction =
+            keyToDirection[event.key as keyof typeof keyToDirection];
           if (direction != null) {
             controllerInputs.mouse_delta = [0, 0, 0, 0];
             controllerInputs.movement[direction] = Date.now();
           }
         }}
         onKeyUp={(event) => {
-          const direction = keyToDirection[event.key as keyof typeof keyToDirection];
+          const direction =
+            keyToDirection[event.key as keyof typeof keyToDirection];
           if (direction != null) {
             controllerInputs.mouse_delta = [0, 0, 0, 0];
             controllerInputs.movement[direction] = null;
@@ -477,24 +571,51 @@ export function App() {
               lastMousePosition == null
                 ? currentMouse
                 : {
-                  x: currentMouse.x - lastMousePosition.x,
-                  y: currentMouse.y - lastMousePosition.y,
-                };
+                    x: currentMouse.x - lastMousePosition.x,
+                    y: currentMouse.y - lastMousePosition.y,
+                  };
             controllerInputs.mouse_delta = [mouseDelta.x, mouseDelta.y, 0, 0];
           }
           lastMousePosition = currentMouse;
         }}
       >
-        <div class={classes.stats}
+        <div
+          class={classes.stats}
           onMouseDown={(event) => {
             event.stopPropagation();
           }}
           onMouseMove={(event) => {
             event.stopPropagation();
-          }}>
+          }}
+        >
           <div>Framerate - {"" + Math.round(stats.framerate)}</div>
-          <div><input type="checkbox" onChange={change => updateGraph({ bounce: (change.target as HTMLInputElement).checked })} />Animate Bike</div>
-          <div><input type="range" min="0.5" max="2.0" step="0.1" onInput={event => updateGraph({ size_multiplier: parseFloat((event.target as HTMLInputElement).value) })} />Terrain stamp size multiplier: </div>
+          <div>
+            <input
+              type="checkbox"
+              onChange={(change) =>
+                updateGraph({
+                  bounce: (change.target as HTMLInputElement).checked,
+                })
+              }
+            />
+            Animate Bike
+          </div>
+          <div>
+            <input
+              type="range"
+              min="0.5"
+              max="2.0"
+              step="0.1"
+              onInput={(event) =>
+                updateGraph({
+                  size_multiplier: parseFloat(
+                    (event.target as HTMLInputElement).value,
+                  ),
+                })
+              }
+            />
+            Terrain stamp size multiplier:{" "}
+          </div>
         </div>
         {nodes}
       </div>

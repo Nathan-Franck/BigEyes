@@ -252,6 +252,47 @@ test "PickField" {
     );
 }
 
+fn PickFields(@"struct": type, fields: []const std.meta.FieldEnum(@"struct")) type {
+    var tuple_fields: [fields.len]std.builtin.Type.StructField = undefined;
+    const temp_struct: @"struct" = undefined;
+    if (tuple_fields.len > 0)
+        inline for (fields, 0..) |field, i| {
+            var buf: [1000]u8 = undefined;
+            tuple_fields[i] = .{
+                .name = std.fmt.bufPrintZ(&buf, "{d}", .{i}) catch unreachable,
+                .type = @TypeOf(@field(temp_struct, @tagName(field))),
+                .default_value = null,
+                .is_comptime = false,
+                .alignment = 0,
+            };
+        };
+
+    return @Type(.{
+        .@"struct" = .{
+            .is_tuple = true,
+            .layout = .auto,
+            .decls = &.{},
+            .fields = &tuple_fields,
+        },
+    });
+}
+
+/// The idea with this is to be able to select some fields from a
+/// struct and use tuple destructuring to get them out to local scope.
+///
+/// eg. `const a, const b = pickFields(.{ .a = 1, .b = "hi", .c = 1.2 }, .{ .a, .b });`
+/// The result is that a will be 1 and b will be "hi".
+fn pickFields(
+    data_struct: anytype,
+    comptime fields: []const std.meta.FieldEnum(@TypeOf(data_struct)),
+) Pick(@TypeOf(data_struct), fields) {
+    var result: Pick(@TypeOf(data_struct), fields) = undefined;
+    inline for (fields, 0..) |field, i| {
+        result[i] = @field(data_struct, @tagName(field));
+    }
+    return result;
+}
+
 /// Filter out all but a set of fields from a struct.
 ///
 /// eg. `Pick(struct { a: u32, b: f32, c: bool }, .{ .a, .c })` will return a type that is equivalent to
