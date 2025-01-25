@@ -4,9 +4,12 @@ import mathutils
 import struct
 import os
 import json
+import math
 
 # get out of edit mode
 bpy.ops.object.mode_set(mode="OBJECT")
+
+correction_rotation = mathutils.Euler((math.radians(-90), 0, 0), 'XYZ').to_quaternion()
 
 # For each mesh, gather all polygons, these we'll export seperately to a json format - mesh -> polygons (indices)
 meshes = []
@@ -44,8 +47,10 @@ for object in bpy.data.objects:
         armature = object.data
         bones = []
         for bone in armature.bones:
-            mat = bone.matrix_local;
+            mat = object.matrix_world @ bone.matrix_local;
             translation, rotation, scale =  mat.decompose() # Transform a point in bone space to "Armature" space
+            # rotation = correction_rotation @ rotation
+            rotation = rotation @ correction_rotation
             bones.append(
                 {
                     "name": bone.name,
@@ -58,9 +63,9 @@ for object in bpy.data.objects:
                             1,
                         ],
                         "rotation": [
-                            -rotation.x,
-                            rotation.z,
-                            -rotation.y,
+                            rotation.x,
+                            -rotation.z,
+                            rotation.y,
                             rotation.w,
                         ],
                         "scale": [
@@ -86,6 +91,7 @@ for object in bpy.data.objects:
                 if pose_bone:
                     mat = pose_bone.matrix;
                     translation, rotation, scale = mat.decompose() # Transform a point in bone space to "Armature" space
+                    rotation = rotation @ correction_rotation
                     frame_data["bones"].append({
                         "position": [
                             -translation.x,
@@ -94,9 +100,9 @@ for object in bpy.data.objects:
                             1,
                         ],
                         "rotation": [
-                            -rotation.x,
-                            rotation.z,
-                            -rotation.y,
+                            rotation.x,
+                            -rotation.z,
+                            rotation.y,
                             rotation.w,
                         ],
                         "scale": [
