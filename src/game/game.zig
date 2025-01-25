@@ -503,12 +503,14 @@ pub const graph_nodes = struct {
                         const bone_index: usize = @intCast(i);
                         const bone = subdiv_mesh.armature.bones[bone_index];
                         const animation = subdiv_mesh.armature.animation;
-                        const time: usize = @intFromFloat(props.seconds_since_start);
+                        const fps = 12;
+                        const inter_frame = props.seconds_since_start * fps;
+                        const frame: usize = @intFromFloat(inter_frame);
                         const animated_bone = .{
-                            animation[time % animation.len].bones[bone_index],
-                            animation[(time + 1) % animation.len].bones[bone_index],
+                            animation[frame % animation.len].bones[bone_index],
+                            animation[(frame + 1) % animation.len].bones[bone_index],
                         };
-                        const lerp: Vec4 = @splat(props.seconds_since_start - @as(f32, @floatFromInt(time)));
+                        const lerp: Vec4 = @splat(inter_frame - @as(f32, @floatFromInt(frame)));
                         position.* = zmath.mul(
                             zmath.mul(
                                 position.*,
