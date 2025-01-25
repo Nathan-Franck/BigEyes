@@ -44,6 +44,8 @@ for object in bpy.data.objects:
         armature = object.data
         bones = []
         for bone in armature.bones:
+            mat = bone.matrix_local;
+            translation, rotation, scale =  mat.decompose() # Transform a point in bone space to "Armature" space
             bones.append(
                 {
                     "name": bone.name,

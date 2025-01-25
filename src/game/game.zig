@@ -117,7 +117,7 @@ pub const graph_nodes = struct {
     pub fn getResources(arena: std.mem.Allocator, _: struct {}) !game.types.Resources {
         const result = try mesh_loader.loadModelsFromBlends(arena, &.{
             .{ .model_name = "ebike" },
-            .{ .model_name = "Sonic (rough)", .subdiv_level = 1 },
+            .{ .model_name = "Sonic (rough)", .subdiv_level = 3 },
         });
 
         const skybox = blk: {
@@ -439,42 +439,6 @@ pub const graph_nodes = struct {
         };
     }
 
-    fn Pick(@"struct": type, fields: []const std.meta.FieldEnum(@"struct")) type {
-        var tuple_fields: [fields.len]std.builtin.Type.StructField = undefined;
-        const temp_struct: @"struct" = undefined;
-        if (tuple_fields.len > 0)
-            inline for (fields, 0..) |field, i| {
-                var buf: [1000]u8 = undefined;
-                tuple_fields[i] = .{
-                    .name = std.fmt.bufPrintZ(&buf, "{d}", .{i}) catch unreachable,
-                    .type = @TypeOf(@field(temp_struct, @tagName(field))),
-                    .default_value = null,
-                    .is_comptime = false,
-                    .alignment = 0,
-                };
-            };
-
-        return @Type(.{
-            .@"struct" = .{
-                .is_tuple = true,
-                .layout = .auto,
-                .decls = &.{},
-                .fields = &tuple_fields,
-            },
-        });
-    }
-
-    fn pick(
-        data_struct: anytype,
-        comptime fields: []const std.meta.FieldEnum(@TypeOf(data_struct)),
-    ) Pick(@TypeOf(data_struct), fields) {
-        var result: Pick(@TypeOf(data_struct), fields) = undefined;
-        inline for (fields, 0..) |field, i| {
-            result[i] = @field(data_struct, @tagName(field));
-        }
-        return result;
-    }
-
     pub fn displayBike(
         arena: std.mem.Allocator,
         props: struct {
@@ -491,23 +455,25 @@ pub const graph_nodes = struct {
         _ = terrain_sampler;
 
         var instances = std.ArrayList(game.types.ModelInstances).init(arena);
-        for (&[_][]const u8{
-            "Sonic (rough)_Cube",
-            "ebike_front-wheel",
-            "ebike_back-wheel",
-            "ebike_body",
-            "ebike_handlebars",
-            "ebike_shock",
-        }) |label| {
+        const Entry = struct { name: []const u8, offset: Vec4 };
+        for (&[_]Entry{
+            .{ .name = "Sonic (rough)_Cube", .offset = .{ 4, 0, 0, 0 } },
+            .{ .name = "ebike_front-wheel", .offset = .{ 0, 0, 0, 0 } },
+            .{ .name = "ebike_back-wheel", .offset = .{ 0, 0, 0, 0 } },
+            .{ .name = "ebike_body", .offset = .{ 0, 0, 0, 0 } },
+            .{ .name = "ebike_handlebars", .offset = .{ 0, 0, 0, 0 } },
+            .{ .name = "ebike_shock", .offset = .{ 0, 0, 0, 0 } },
+        }) |entry| {
+            const label = entry.name;
             const transform = props.model_transforms.get(label).?;
-            const offset = if (props.bounce) offset: {
-                const up = Vec4{ 0, 1, 0, 0 };
-                const bounce: Vec4 = @splat(@sin(props.seconds_since_start.get()));
-                break :offset up * bounce;
-            } else Vec4{ 0, 0, 0, 0 };
+            // const offset = if (props.bounce) offset: {
+            //     const up = Vec4{ 0, 1, 0, 0 };
+            //     const bounce: Vec4 = @splat(@sin(props.seconds_since_start.get()));
+            //     break :offset up * bounce;
+            // } else Vec4{ 0, 0, 0, 0 };
             try instances.append(.{
                 .label = label,
-                .positions = try arena.dupe(Vec4, &.{zmath.loadArr3w(zmath.vecToArr3(transform[3] + offset), 1)}),
+                .positions = try arena.dupe(Vec4, &.{zmath.loadArr3w(zmath.vecToArr3(transform[3] + entry.offset), 1)}),
                 .rotations = try arena.dupe(Vec4, &.{zmath.matToQuat(transform)}),
                 .scales = try arena.dupe(Vec4, &.{.{ zmath.length3(transform[0])[0], zmath.length3(transform[1])[0], zmath.length3(transform[2])[0], 0 }}),
             });
@@ -520,7 +486,7 @@ pub const graph_nodes = struct {
     pub fn animateMeshes(
         arena: std.mem.Allocator,
         props: struct {
-            seconds_since_start: f32,
+            seconds_since_start: queryable.Value(f32),
             models: []const game.types.GameModel,
         },
     ) !struct {
@@ -536,15 +502,17 @@ pub const graph_nodes = struct {
                     for (subdiv_mesh.base_bone_indices, positions) |i, *position| {
                         const bone_index: usize = @intCast(i);
                         const bone = subdiv_mesh.armature.bones[bone_index];
-                        const animated_bone = subdiv_mesh.armature.animation[0].bones[bone_index];
-                        debugPrint("length of quat {d}\n", .{zmath.length4(bone.rest.rotation)});
+                        const thinger = subdiv_mesh.armature.animation;
+                        const animated_bone = thinger[@as(usize, @intFromFloat(props.seconds_since_start.get())) % thinger.len].bones[bone_index];
                         position.* = zmath.mul(
                             zmath.mul(
                                 position.*,
-                                mesh_loader.translationRotationScaleToMatrix(
-                                    bone.rest.position,
-                                    bone.rest.rotation,
-                                    bone.rest.scale,
+                                zmath.inverse(
+                                    mesh_loader.translationRotationScaleToMatrix(
+                                        bone.rest.position,
+                                        bone.rest.rotation,
+                                        bone.rest.scale,
+                                    ),
                                 ),
                             ),
                             mesh_loader.translationRotationScaleToMatrix(
@@ -559,16 +527,6 @@ pub const graph_nodes = struct {
                     const subdiv_levels = subdiv_mesh.quads_per_subdiv.len;
                     for (subdiv_mesh.quads_per_subdiv[0 .. subdiv_levels - 1]) |quads| {
                         subdiv_result = try subdiv.Polygon(.Quad).cmcSubdivOnlyPoints(arena, subdiv_result, quads);
-                    }
-
-                    // Debug stuff :)
-                    {
-                        var highest_index: u32 = 0;
-                        for (subdiv_mesh.top_indices) |index| {
-                            if (index > highest_index) highest_index = index;
-                        }
-                        const bounds = @import("../raytrace.zig").Bounds.encompassPoints(subdiv_result);
-                        debugPrint("highest {d} 2 {d} bounds {}\n", .{ highest_index, subdiv_result.len, bounds });
                     }
 
                     try models.append(.{
