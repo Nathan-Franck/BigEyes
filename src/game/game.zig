@@ -97,10 +97,10 @@ pub const interface = struct {
 
 pub const NodeGraph = graph_runtime.NodeGraph(
     game.graph.blueprint,
-    graph_nodes,
+    graph_functions,
 );
 
-pub const graph_nodes = struct {
+pub const graph_functions = struct {
     pub fn calculateTerrainDensityInfluenceRange(
         arena: std.mem.Allocator,
         props: struct { size_multiplier: f32 },
@@ -210,7 +210,7 @@ pub const graph_nodes = struct {
             orbit_camera: *game.types.OrbitCamera,
             selected_camera: enum { orbit, first_person },
             player_settings: struct { movement_speed: f32, look_speed: f32 },
-            player: *struct { position: Vec4, euler_rotation: Vec4 },
+            player: *game.types.Player,
             terrain_sampler: TerrainSampler,
         },
     ) !struct {
@@ -537,7 +537,6 @@ pub const graph_nodes = struct {
                         const bone_index: usize = @intCast(i);
                         const bone = subdiv_mesh.armature.bones[bone_index];
                         const animated_bone = subdiv_mesh.armature.animation[0].bones[bone_index];
-                        debugPrint("length of quat {d}\n", .{zmath.length4(bone.rest.rotation)});
                         position.* = zmath.mul(
                             zmath.mul(
                                 position.*,
@@ -560,17 +559,6 @@ pub const graph_nodes = struct {
                     for (subdiv_mesh.quads_per_subdiv[0 .. subdiv_levels - 1]) |quads| {
                         subdiv_result = try subdiv.Polygon(.Quad).cmcSubdivOnlyPoints(arena, subdiv_result, quads);
                     }
-
-                    // Debug stuff :)
-                    {
-                        var highest_index: u32 = 0;
-                        for (subdiv_mesh.top_indices) |index| {
-                            if (index > highest_index) highest_index = index;
-                        }
-                        const bounds = @import("../raytrace.zig").Bounds.encompassPoints(subdiv_result);
-                        debugPrint("highest {d} 2 {d} bounds {}\n", .{ highest_index, subdiv_result.len, bounds });
-                    }
-
                     try models.append(.{
                         .label = model.label,
                         .meshes = try arena.dupe(game.types.GameMesh, &[_]game.types.GameMesh{.{

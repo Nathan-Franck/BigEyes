@@ -63,6 +63,11 @@ pub const OrbitCamera = struct {
     track_distance: f32,
 };
 
+pub const Player = struct {
+    position: Vec4,
+    euler_rotation: Vec4,
+};
+
 pub const TreeMesh = struct {
     label: []const u8,
     bounds: raytrace.Bounds,
