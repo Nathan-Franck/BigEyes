@@ -86,11 +86,8 @@ pub fn build(
             "ebike",
             "Sonic (rough)",
         } },
-        // .{ .script_path = "custom-gltf", .blend_paths = &.{
-        // } },
     });
 
-    // Add zbullet as a dependency
     const zbullet = b.dependency("zbullet", .{});
     const zmath = b.dependency("zmath", .{});
 
@@ -145,23 +142,53 @@ pub fn build(
         check.dependOn(&exe_check.step);
     }
 
-    // Glfw
+    // Exe glfw
     {
+        const resources_lib = resources_lib: {
+            const resources_lib = b.addSharedLibrary(.{
+                .name = "resources",
+                .root_source_file = b.path("src/resources_entry.zig"),
+                .target = target,
+                .optimize = optimize,
+            });
+            resources_lib.root_module.addImport("zmath", zmath.module("root"));
+            resources_lib.root_module.addImport("zbullet", zbullet.module("root"));
+
+            const install_lib = b.addInstallArtifact(resources_lib, .{ .dest_dir = .{ .override = .{ .custom = "../bin" } } });
+            break :resources_lib install_lib;
+        };
+        const game_lib = game_lib: {
+            const game_lib = b.addSharedLibrary(.{
+                .name = "game",
+                .root_source_file = b.path("src/game_entry.zig"),
+                .target = target,
+                .optimize = optimize,
+            });
+            game_lib.root_module.addImport("zmath", zmath.module("root"));
+            game_lib.root_module.addImport("zbullet", zbullet.module("root"));
+            game_lib.linkSystemLibrary("resources");
+            game_lib.addLibraryPath(b.path("bin"));
+
+            const install_lib = b.addInstallArtifact(game_lib, .{ .dest_dir = .{ .override = .{ .custom = "../bin" } } });
+            install_lib.step.dependOn(&resources_lib.step);
+            break :game_lib install_lib;
+        };
+
         var exe = b.addExecutable(.{
+            .name = "game_exe",
+            .root_source_file = b.path("src/glfw_entry.zig"),
             .target = target,
             .optimize = optimize,
-            .name = "game",
-            .root_source_file = b.path("src/glfw_entry.zig"),
         });
-        // exe.use_llvm = false; // Needs way more work - theoretically would compile faster!
-
         exe.root_module.addImport("zmath", zmath.module("root"));
         exe.root_module.addImport("zbullet", zbullet.module("root"));
         exe.linkLibrary(zbullet.artifact("cbullet"));
 
-        const zglfw = b.dependency("zglfw", .{
-            .target = target,
-        });
+        // Link against the DLL
+        exe.linkSystemLibrary("game");
+        exe.addLibraryPath(b.path("bin"));
+
+        const zglfw = b.dependency("zglfw", .{ .target = target });
         exe.root_module.addImport("zglfw", zglfw.module("root"));
         exe.linkLibrary(zglfw.artifact("glfw"));
 
@@ -171,6 +198,7 @@ pub fn build(
         exe.step.dependOn(&export_meshes.step);
 
         const install_artifact = b.addInstallArtifact(exe, .{ .dest_dir = .{ .override = .{ .custom = "../bin" } } });
+        install_artifact.step.dependOn(&game_lib.step);
         const install_step = b.step("glfw", "build glfw entrypoint");
         install_step.dependOn(&install_artifact.step);
 

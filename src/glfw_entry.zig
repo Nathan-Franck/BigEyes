@@ -1,7 +1,12 @@
 const std = @import("std");
 const glfw = @import("zglfw");
 const zopengl = @import("zopengl");
-const game = @import("./game/game.zig");
+const NodeGraph = @import("./game/game.zig").NodeGraph;
+
+const game = struct {
+    extern "c" fn gameInit() void;
+    extern "c" fn gameUpdate(inputs: *const NodeGraph.PartialSystemInputs, outputs: *NodeGraph.SystemOutputs) void;
+};
 
 pub fn main() !void {
     try glfw.init();
@@ -26,27 +31,18 @@ pub fn main() !void {
     const gl = zopengl.bindings;
 
     glfw.swapInterval(1);
-
-    {
-        const allocator = std.heap.page_allocator;
-        const NodeGraph = game.NodeGraph;
-        var node_graph = try NodeGraph.init(.{
-            .allocator = allocator,
-            .inputs = game.graph_inputs,
-            .store = game.graph_store,
-        });
-        const result = try node_graph.update(.{});
-        if (result.skybox) |skybox| {
-            std.debug.print("Found skybox!\n", .{});
-            _ = skybox;
-        }
-        node_graph.deinit();
-    }
+    game.gameInit();
 
     while (!window.shouldClose()) {
         glfw.pollEvents();
 
         gl.clearBufferfv(gl.COLOR, 0, &[_]f32{ 0.2, 0.4, 0.4, 1.0 });
+
+        const inputs = NodeGraph.PartialSystemInputs{
+            // populate input data
+        };
+        var outputs: NodeGraph.SystemOutputs = undefined;
+        game.gameUpdate(&inputs, &outputs);
 
         window.swapBuffers();
     }

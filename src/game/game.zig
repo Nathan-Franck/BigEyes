@@ -21,6 +21,9 @@ const subdiv = @import("../subdiv.zig");
 const tree = @import("../tree.zig");
 const queryable = @import("../utils.zig").queryable;
 const math = @import("../vec_math.zig");
+const resources = struct {
+    extern "C" fn getResources(resources: *game.types.Resources) void;
+};
 
 pub const debugPrint = if (@import("builtin").target.cpu.arch.isWasm())
     @import("../wasm_entry.zig").dumpDebugLogFmt
@@ -117,62 +120,10 @@ pub const graph_nodes = struct {
     }
 
     pub fn getResources(arena: std.mem.Allocator, _: struct {}) !game.types.Resources {
-        const result = try mesh_loader.loadModelsFromBlends(arena, &.{
-            .{ .model_name = "ebike" },
-            .{ .model_name = "Sonic (rough)", .subdiv_level = 2 },
-        });
-
-        const skybox = blk: {
-            var images: game.types.ProcessedCubeMap = undefined;
-            inline for (@typeInfo(game.types.ProcessedCubeMap).@"struct".fields) |field| {
-                const image_png = @embedFile("../content/cloudy skybox/" ++ field.name ++ ".png");
-                const image_data = try Image.loadPngAndProcess(arena, image_png);
-                @field(images, field.name) = image_data;
-            }
-            break :blk images;
-        };
-
-        const cutout_leaf = blk: {
-            const diffuse = try Image.loadPng(arena, @embedFile("../content/manitoba maple/diffuse.png"));
-            const alpha = try Image.loadPng(arena, @embedFile("../content/manitoba maple/alpha.png"));
-            const cutout_diffuse = Image.Rgba32Image{
-                .width = diffuse.width,
-                .height = diffuse.height,
-                .pixels = try arena.alloc(@TypeOf(diffuse.pixels[0]), diffuse.pixels.len),
-            };
-            for (cutout_diffuse.pixels, 0..) |*pixel, pixel_index| {
-                pixel.* = diffuse.pixels[pixel_index];
-                pixel.*.a = alpha.pixels[pixel_index].r;
-            }
-            break :blk try Image.processImageForGPU(arena, cutout_diffuse);
-        };
-
-        var trees = std.ArrayList(game.types.TreeMesh).init(arena);
-        inline for (@typeInfo(game.config.ForestSettings).@"struct".decls) |decl| {
-            const tree_blueprint = @field(game.config.Trees, decl.name);
-            const tree_skeleton = try tree.generateStructure(arena, tree_blueprint.structure);
-            const bark_mesh = try tree.generateTaperedWood(arena, tree_skeleton, tree_blueprint.mesh);
-            const leaf_mesh = try tree.generateLeaves(arena, tree_skeleton, tree_blueprint.mesh);
-            const bounds = raytrace.Bounds.encompassBounds(
-                raytrace.Bounds.encompassPoints(bark_mesh.vertices.slice().items(.position)),
-                raytrace.Bounds.encompassPoints(leaf_mesh.vertices.slice().items(.position)),
-            );
-            try trees.append(game.types.TreeMesh{
-                .label = decl.name,
-                .skeleton = tree_skeleton,
-                .bark_mesh = bark_mesh,
-                .leaf_mesh = leaf_mesh,
-                .bounds = bounds,
-            });
-        }
-
-        return game.types.Resources{
-            .models = result.models.items,
-            .model_transforms = result.model_transforms,
-            .skybox = skybox,
-            .cutout_leaf = cutout_leaf,
-            .trees = trees.items,
-        };
+        _ = arena;
+        var res: game.types.Resources = undefined;
+        resources.getResources(&res);
+        return res;
     }
 
     var start: u64 = 0;
