@@ -90,10 +90,13 @@ pub fn build(
         // } },
     });
 
+    // Add zbullet as a dependency
+    const zbullet = b.dependency("zbullet", .{});
+    const zmath = b.dependency("zmath", .{});
+
     // Tests (default)
     {
         const main_tests = b.addTest(.{ .root_source_file = .{ .cwd_relative = "src/tests.zig" } });
-        const zmath = b.dependency("zmath", .{});
         main_tests.root_module.addImport("zmath", zmath.module("root"));
         const run_unit_tests = b.addRunArtifact(main_tests);
         const test_step = b.step("test", "run tests");
@@ -111,7 +114,6 @@ pub fn build(
         });
         exe.step.dependOn(&export_meshes.step);
 
-        const zmath = b.dependency("zmath", .{});
         exe.root_module.addImport("zmath", zmath.module("root"));
 
         const install_artifact = b.addInstallArtifact(exe, .{});
@@ -136,8 +138,8 @@ pub fn build(
             .root_source_file = b.path("src/wasm_entry.zig"),
             // .root_source_file = b.path("src/test_perf.zig"),
         });
-        const zmath = b.dependency("zmath", .{});
         exe_check.root_module.addImport("zmath", zmath.module("root"));
+        exe_check.root_module.addImport("zbullet", zbullet.module("root"));
 
         const check = b.step("check", "Check if wasm compiles");
         check.dependOn(&exe_check.step);
@@ -151,9 +153,11 @@ pub fn build(
             .name = "game",
             .root_source_file = b.path("src/glfw_entry.zig"),
         });
+        // exe.use_llvm = false; // Needs way more work - theoretically would compile faster!
 
-        const zmath = b.dependency("zmath", .{});
         exe.root_module.addImport("zmath", zmath.module("root"));
+        exe.root_module.addImport("zbullet", zbullet.module("root"));
+        exe.linkLibrary(zbullet.artifact("cbullet"));
 
         const zglfw = b.dependency("zglfw", .{
             .target = target,
@@ -205,7 +209,7 @@ pub fn build(
         });
         exe.root_module.addImport("generated", gen_module);
 
-        const zmath = b.dependency("zmath", .{});
+        exe.root_module.addImport("zbullet", zbullet.module("root"));
         exe.root_module.addImport("zmath", zmath.module("root"));
 
         exe.entry = .disabled;
@@ -228,7 +232,6 @@ pub fn build(
             .optimize = optimize,
         });
 
-        const zmath = b.dependency("zmath", .{});
         exe.root_module.addImport("zmath", zmath.module("root"));
 
         exe.step.dependOn(&export_meshes.step);

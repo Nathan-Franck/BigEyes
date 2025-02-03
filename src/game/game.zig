@@ -74,6 +74,7 @@ pub const graph_store: NodeGraph.SystemStore = .{
 pub const InterfaceEnum = std.meta.DeclEnum(interface);
 pub const interface = struct {
     var node_graph: NodeGraph = undefined;
+    var world: zbullet.World = undefined;
 
     pub const getGraphJson = NodeGraph.getDisplayDefinition;
 
@@ -451,7 +452,29 @@ pub const graph_nodes = struct {
     ) !struct {
         model_instances: []const game.types.ModelInstances,
     } {
+        zbullet.init(std.heap.page_allocator);
+        var world = zbullet.initWorld();
+        world.setGravity(&.{ 0, 9.81, 0 });
+        world.addBody(zbullet.initBody(
+            1,
+            &zmath.matToArr43(zmath.translation(0, 0, 0)),
+            zbullet.initBoxShape(&.{ 1, 1, 1 }).asShape(),
+        ));
+        for (0..100) |_| {
+            _ = world.stepSimulation(1, .{});
+        }
+        for (0..@intCast(world.getNumBodies())) |body_index| {
+            const body = world.getBody(@intCast(body_index));
+            const transform = object_to_world: {
+                var transform: [12]f32 = undefined;
+                body.getGraphicsWorldTransform(&transform);
+                break :object_to_world zmath.loadMat43(transform[0..]);
+            };
+            debugPrint("wow it's a body at location! {any}", .{transform});
+        }
+
         var terrain_chunk_cache = game.config.TerrainSpawner.ChunkCache.init(arena);
+
         const terrain_sampler = props.terrain_sampler.loadCache(&terrain_chunk_cache);
         _ = terrain_sampler;
 
@@ -467,6 +490,7 @@ pub const graph_nodes = struct {
         }) |entry| {
             const label = entry.name;
             const transform = props.model_transforms.get(label).?;
+
             // const offset = if (props.bounce) offset: {
             //     const up = Vec4{ 0, 1, 0, 0 };
             //     const bounce: Vec4 = @splat(@sin(props.seconds_since_start.get()));
@@ -496,59 +520,59 @@ pub const graph_nodes = struct {
         var models = std.ArrayList(game.types.GameModel).init(arena);
         for (props.models) |model| {
             for (model.meshes) |mesh|
-            switch (mesh) {
-                .subdiv => |subdiv_mesh| {
-                    const faces = subdiv_mesh.base_faces;
-                    const positions = try arena.dupe(Vec4, subdiv_mesh.base_positions);
-                    for (subdiv_mesh.base_bone_indices, positions) |i, *position| {
-                        const bone_index: usize = @intCast(i);
-                        const bone = subdiv_mesh.armature.bones[bone_index];
-                        const animation = subdiv_mesh.armature.animation;
-                        const fps = 12;
-                        const inter_frame = props.seconds_since_start * fps;
-                        const frame: usize = @intFromFloat(inter_frame);
-                        const animated_bone = .{
-                            animation[frame % animation.len].bones[bone_index],
-                            animation[(frame + 1) % animation.len].bones[bone_index],
-                        };
-                        const lerp: Vec4 = @splat(inter_frame - @as(f32, @floatFromInt(frame)));
-                        position.* = zmath.mul(
-                            zmath.mul(
-                                position.*,
-                                zmath.inverse(
-                                    mesh_loader.translationRotationScaleToMatrix(
-                                        bone.rest.position,
-                                        bone.rest.rotation,
-                                        bone.rest.scale,
+                switch (mesh) {
+                    .subdiv => |subdiv_mesh| {
+                        const faces = subdiv_mesh.base_faces;
+                        const positions = try arena.dupe(Vec4, subdiv_mesh.base_positions);
+                        for (subdiv_mesh.base_bone_indices, positions) |i, *position| {
+                            const bone_index: usize = @intCast(i);
+                            const bone = subdiv_mesh.armature.bones[bone_index];
+                            const animation = subdiv_mesh.armature.animation;
+                            const fps = 12;
+                            const inter_frame = props.seconds_since_start * fps;
+                            const frame: usize = @intFromFloat(inter_frame);
+                            const animated_bone = .{
+                                animation[frame % animation.len].bones[bone_index],
+                                animation[(frame + 1) % animation.len].bones[bone_index],
+                            };
+                            const lerp: Vec4 = @splat(inter_frame - @as(f32, @floatFromInt(frame)));
+                            position.* = zmath.mul(
+                                zmath.mul(
+                                    position.*,
+                                    zmath.inverse(
+                                        mesh_loader.translationRotationScaleToMatrix(
+                                            bone.rest.position,
+                                            bone.rest.rotation,
+                                            bone.rest.scale,
+                                        ),
                                     ),
                                 ),
-                            ),
-                            mesh_loader.translationRotationScaleToMatrix(
-                                zmath.lerpV(animated_bone[0].position, animated_bone[1].position, lerp),
-                                zmath.lerpV(animated_bone[0].rotation, animated_bone[1].rotation, lerp),
-                                zmath.lerpV(animated_bone[0].scale, animated_bone[1].scale, lerp),
-                            ),
-                        );
-                    }
+                                mesh_loader.translationRotationScaleToMatrix(
+                                    zmath.lerpV(animated_bone[0].position, animated_bone[1].position, lerp),
+                                    zmath.lerpV(animated_bone[0].rotation, animated_bone[1].rotation, lerp),
+                                    zmath.lerpV(animated_bone[0].scale, animated_bone[1].scale, lerp),
+                                ),
+                            );
+                        }
 
-                    var subdiv_result = try subdiv.Polygon(.Face).cmcSubdivOnlyPoints(arena, positions, faces);
-                    const subdiv_levels = subdiv_mesh.quads_per_subdiv.len;
-                    for (subdiv_mesh.quads_per_subdiv[0 .. subdiv_levels - 1]) |quads| {
-                        subdiv_result = try subdiv.Polygon(.Quad).cmcSubdivOnlyPoints(arena, subdiv_result, quads);
-                    }
+                        var subdiv_result = try subdiv.Polygon(.Face).cmcSubdivOnlyPoints(arena, positions, faces);
+                        const subdiv_levels = subdiv_mesh.quads_per_subdiv.len;
+                        for (subdiv_mesh.quads_per_subdiv[0 .. subdiv_levels - 1]) |quads| {
+                            subdiv_result = try subdiv.Polygon(.Quad).cmcSubdivOnlyPoints(arena, subdiv_result, quads);
+                        }
 
-                    try models.append(.{
-                        .label = model.label,
-                        .meshes = try arena.dupe(game.types.GameMesh, &[_]game.types.GameMesh{.{
-                            .greybox = game.types.GreyboxMesh{
-                                .indices = subdiv_mesh.top_indices,
-                                .position = subdiv_result,
-                                .normal = mesh_helper.Polygon(.Quad).calculateNormals(arena, subdiv_result, subdiv_mesh.quads_per_subdiv[subdiv_levels - 1]),
-                            },
-                        }}),
-                    });
-                },
-                else => {},
+                        try models.append(.{
+                            .label = model.label,
+                            .meshes = try arena.dupe(game.types.GameMesh, &[_]game.types.GameMesh{.{
+                                .greybox = game.types.GreyboxMesh{
+                                    .indices = subdiv_mesh.top_indices,
+                                    .position = subdiv_result,
+                                    .normal = mesh_helper.Polygon(.Quad).calculateNormals(arena, subdiv_result, subdiv_mesh.quads_per_subdiv[subdiv_levels - 1]),
+                                },
+                            }}),
+                        });
+                    },
+                    else => {},
                 };
         }
         return .{ .models = models.items };
