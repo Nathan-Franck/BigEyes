@@ -4,9 +4,10 @@ const Image = @import("./Image.zig");
 const mesh_loader = @import("./mesh_loader.zig");
 const raytrace = @import("./raytrace.zig");
 const tree = @import("./tree.zig");
-const game = @import("./game/game.zig").game;
+const types = @import("./game/types.zig");
+const config = @import("./game/config.zig");
 
-pub export fn getResources(resources: *game.types.Resources) void {
+pub export fn getResources(resources: *types.Resources) void {
     const arena = std.heap.page_allocator;
     const result = mesh_loader.loadModelsFromBlends(arena, &.{
         .{ .model_name = "ebike" },
@@ -14,8 +15,8 @@ pub export fn getResources(resources: *game.types.Resources) void {
     }) catch unreachable;
 
     const skybox = blk: {
-        var images: game.types.ProcessedCubeMap = undefined;
-        inline for (@typeInfo(game.types.ProcessedCubeMap).@"struct".fields) |field| {
+        var images: types.ProcessedCubeMap = undefined;
+        inline for (@typeInfo(types.ProcessedCubeMap).@"struct".fields) |field| {
             const image_png = @embedFile("./content/cloudy skybox/" ++ field.name ++ ".png");
             const image_data = Image.loadPngAndProcess(arena, image_png) catch unreachable;
             @field(images, field.name) = image_data;
@@ -38,9 +39,9 @@ pub export fn getResources(resources: *game.types.Resources) void {
         break :blk Image.processImageForGPU(arena, cutout_diffuse) catch unreachable;
     };
 
-    var trees = std.ArrayList(game.types.TreeMesh).init(arena);
-    inline for (@typeInfo(game.config.ForestSettings).@"struct".decls) |decl| {
-        const tree_blueprint = @field(game.config.Trees, decl.name);
+    var trees = std.ArrayList(types.TreeMesh).init(arena);
+    inline for (@typeInfo(config.ForestSettings).@"struct".decls) |decl| {
+        const tree_blueprint = @field(config.Trees, decl.name);
         const tree_skeleton = tree.generateStructure(arena, tree_blueprint.structure) catch unreachable;
         const bark_mesh = tree.generateTaperedWood(arena, tree_skeleton, tree_blueprint.mesh) catch unreachable;
         const leaf_mesh = tree.generateLeaves(arena, tree_skeleton, tree_blueprint.mesh) catch unreachable;
@@ -48,7 +49,7 @@ pub export fn getResources(resources: *game.types.Resources) void {
             raytrace.Bounds.encompassPoints(bark_mesh.vertices.slice().items(.position)),
             raytrace.Bounds.encompassPoints(leaf_mesh.vertices.slice().items(.position)),
         );
-        trees.append(game.types.TreeMesh{
+        trees.append(types.TreeMesh{
             .label = decl.name,
             .skeleton = tree_skeleton,
             .bark_mesh = bark_mesh,
@@ -57,7 +58,7 @@ pub export fn getResources(resources: *game.types.Resources) void {
         }) catch unreachable;
     }
 
-    resources.* = game.types.Resources{
+    resources.* = types.Resources{
         .models = result.models.items,
         .model_transforms = result.model_transforms,
         .skybox = skybox,

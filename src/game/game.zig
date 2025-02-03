@@ -22,21 +22,14 @@ const tree = @import("../tree.zig");
 const queryable = @import("../utils.zig").queryable;
 const math = @import("../vec_math.zig");
 const resources = struct {
-    extern "C" fn getResources(resources: *game.types.Resources) void;
+    extern "C" fn getResources(resources: *types.Resources) void;
 };
 
-pub const debugPrint = if (@import("builtin").target.cpu.arch.isWasm())
-    @import("../wasm_entry.zig").dumpDebugLogFmt
-else
-    std.debug.print;
-
-pub const game = struct {
-    pub const graph = @import("./graph.zig");
-    pub const types = @import("./types.zig");
-    pub const config = @import("./config.zig");
-};
-const Forest = game.config.Forest;
-const TerrainSampler = game.config.TerrainSampler;
+const graph = @import("./graph.zig");
+const types = @import("./types.zig");
+const config = @import("./config.zig");
+const Forest = config.Forest;
+const TerrainSampler = config.TerrainSampler;
 
 pub const graph_inputs: NodeGraph.SystemInputs = .{
     .time = 0,
@@ -53,7 +46,7 @@ pub const graph_inputs: NodeGraph.SystemInputs = .{
     .selected_camera = .orbit,
     .player_settings = .{
         .look_speed = 0.004,
-        .movement_speed = 0.8,
+        .movement_speed = 0.5,
     },
     .render_resolution = .{ .x = 0, .y = 0 },
     .size_multiplier = 1,
@@ -62,7 +55,7 @@ pub const graph_inputs: NodeGraph.SystemInputs = .{
 
 pub const graph_store: NodeGraph.SystemStore = .{
     .last_time = 0,
-    .forest_chunk_cache = game.config.ForestSpawner.ChunkCache.init(std.heap.page_allocator),
+    .forest_chunk_cache = config.ForestSpawner.ChunkCache.init(std.heap.page_allocator),
     .player = .{
         .position = .{ 0, -0.75, 0, 1 },
         .euler_rotation = .{ 0, 0, 0, 1 },
@@ -101,7 +94,7 @@ pub const interface = struct {
 };
 
 pub const NodeGraph = graph_runtime.NodeGraph(
-    game.graph.blueprint,
+    graph.blueprint,
     graph_nodes,
 );
 
@@ -119,9 +112,9 @@ pub const graph_nodes = struct {
         };
     }
 
-    pub fn getResources(arena: std.mem.Allocator, _: struct {}) !game.types.Resources {
+    pub fn getResources(arena: std.mem.Allocator, _: struct {}) !types.Resources {
         _ = arena;
-        var res: game.types.Resources = undefined;
+        var res: types.Resources = undefined;
         resources.getResources(&res);
         return res;
     }
@@ -160,7 +153,7 @@ pub const graph_nodes = struct {
                     backward: ?u64,
                 },
             },
-            orbit_camera: *game.types.OrbitCamera,
+            orbit_camera: *types.OrbitCamera,
             selected_camera: enum { orbit, first_person },
             player_settings: struct { movement_speed: f32, look_speed: f32 },
             player: *struct { position: Vec4, euler_rotation: Vec4 },
@@ -254,7 +247,7 @@ pub const graph_nodes = struct {
                     var new_position = props.player.position;
                     new_position += final_movement;
 
-                    var terrain_chunk_cache = game.config.TerrainSpawner.ChunkCache.init(arena);
+                    var terrain_chunk_cache = config.TerrainSpawner.ChunkCache.init(arena);
                     const terrain_height = try props.terrain_sampler
                         .loadCache(&terrain_chunk_cache)
                         .sample(arena, Vec2{ new_position[0], new_position[2] });
@@ -333,23 +326,23 @@ pub const graph_nodes = struct {
     pub fn displayForest(
         arena: std.mem.Allocator,
         props: struct {
-            forest_chunk_cache: *game.config.ForestSpawner.ChunkCache,
+            forest_chunk_cache: *config.ForestSpawner.ChunkCache,
             terrain_sampler: TerrainSampler,
         },
     ) !struct {
-        model_instances: []const game.types.ModelInstances,
+        model_instances: []const types.ModelInstances,
     } {
-        var terrain_chunk_cache = game.config.TerrainSpawner.ChunkCache.init(arena);
+        var terrain_chunk_cache = config.TerrainSpawner.ChunkCache.init(arena);
         const terrain_sampler = props.terrain_sampler.loadCache(&terrain_chunk_cache);
 
-        const spawns = try game.config.ForestSpawner.gatherSpawnsInBounds(
+        const spawns = try config.ForestSpawner.gatherSpawnsInBounds(
             arena,
             props.forest_chunk_cache,
-            game.config.demo_terrain_bounds,
+            config.demo_terrain_bounds,
         );
 
         const InstanceEntry = struct { position: Vec4, rotation: Vec4, scale: Vec4 };
-        var instances = try arena.alloc(std.ArrayList(InstanceEntry), game.config.ForestSpawner.length);
+        var instances = try arena.alloc(std.ArrayList(InstanceEntry), config.ForestSpawner.length);
         for (instances) |*position| {
             position.* = std.ArrayList(InstanceEntry).init(arena);
         }
@@ -362,8 +355,8 @@ pub const graph_nodes = struct {
                 .scale = .{ 1, 1, 1, 0 },
             });
         }
-        const instances_items = try arena.alloc(game.types.ModelInstances, game.config.ForestSpawner.length);
-        for (instances_items, @typeInfo(game.config.ForestSettings).@"struct".decls, 0..) |*instance, decl, i| {
+        const instances_items = try arena.alloc(types.ModelInstances, config.ForestSpawner.length);
+        for (instances_items, @typeInfo(config.ForestSettings).@"struct".decls, 0..) |*instance, decl, i| {
             instance.* = .{
                 .label = decl.name,
                 .positions = positions: {
@@ -401,7 +394,7 @@ pub const graph_nodes = struct {
             bounce: bool,
         },
     ) !struct {
-        model_instances: []const game.types.ModelInstances,
+        model_instances: []const types.ModelInstances,
     } {
         zbullet.init(std.heap.page_allocator);
         var world = zbullet.initWorld();
@@ -421,15 +414,15 @@ pub const graph_nodes = struct {
                 body.getGraphicsWorldTransform(&transform);
                 break :object_to_world zmath.loadMat43(transform[0..]);
             };
-            debugPrint("wow it's a body at location! {any}", .{transform});
+            std.debug.print("wow it's a body at location! {any}", .{transform});
         }
 
-        var terrain_chunk_cache = game.config.TerrainSpawner.ChunkCache.init(arena);
+        var terrain_chunk_cache = config.TerrainSpawner.ChunkCache.init(arena);
 
         const terrain_sampler = props.terrain_sampler.loadCache(&terrain_chunk_cache);
         _ = terrain_sampler;
 
-        var instances = std.ArrayList(game.types.ModelInstances).init(arena);
+        var instances = std.ArrayList(types.ModelInstances).init(arena);
         const Entry = struct { name: []const u8, offset: Vec4 };
         for (&[_]Entry{
             .{ .name = "Sonic (rough)_Cube", .offset = .{ 4, 0, 0, 0 } },
@@ -463,12 +456,12 @@ pub const graph_nodes = struct {
         arena: std.mem.Allocator,
         props: struct {
             seconds_since_start: f32,
-            models: []const game.types.GameModel,
+            models: []const types.GameModel,
         },
     ) !struct {
-        models: []const game.types.GameModel,
+        models: []const types.GameModel,
     } {
-        var models = std.ArrayList(game.types.GameModel).init(arena);
+        var models = std.ArrayList(types.GameModel).init(arena);
         for (props.models) |model| {
             for (model.meshes) |mesh|
                 switch (mesh) {
@@ -514,8 +507,8 @@ pub const graph_nodes = struct {
 
                         try models.append(.{
                             .label = model.label,
-                            .meshes = try arena.dupe(game.types.GameMesh, &[_]game.types.GameMesh{.{
-                                .greybox = game.types.GreyboxMesh{
+                            .meshes = try arena.dupe(types.GameMesh, &[_]types.GameMesh{.{
+                                .greybox = types.GreyboxMesh{
                                     .indices = subdiv_mesh.top_indices,
                                     .position = subdiv_result,
                                     .normal = mesh_helper.Polygon(.Quad).calculateNormals(arena, subdiv_result, subdiv_mesh.quads_per_subdiv[subdiv_levels - 1]),
@@ -533,16 +526,16 @@ pub const graph_nodes = struct {
         arena: std.mem.Allocator,
         props: struct {
             cutout_leaf: Image.Processed,
-            trees: []const game.types.TreeMesh,
+            trees: []const types.TreeMesh,
         },
     ) !struct {
-        models: []const game.types.GameModel,
+        models: []const types.GameModel,
     } {
-        var models = std.ArrayList(game.types.GameModel).init(arena);
+        var models = std.ArrayList(types.GameModel).init(arena);
         for (props.trees) |tree_mesh| {
             try models.append(.{
                 .label = tree_mesh.label,
-                .meshes = try arena.dupe(game.types.GameMesh, &.{
+                .meshes = try arena.dupe(types.GameMesh, &.{
                     .{ .greybox = .{
                         .indices = tree_mesh.bark_mesh.triangles,
                         .normal = tree_mesh.bark_mesh.vertices.slice().items(.normal),
@@ -569,10 +562,10 @@ pub const graph_nodes = struct {
             terrain_sampler: TerrainSampler,
         },
     ) !struct {
-        terrain_mesh: game.types.GreyboxMesh,
-        terrain_instance: game.types.ModelInstances,
+        terrain_mesh: types.GreyboxMesh,
+        terrain_instance: types.ModelInstances,
     } {
-        var terrain_chunk_cache = game.config.TerrainSpawner.ChunkCache.init(arena);
+        var terrain_chunk_cache = config.TerrainSpawner.ChunkCache.init(arena);
         try terrain_chunk_cache.ensureTotalCapacity(256);
         const terrain_sampler = props.terrain_sampler.loadCache(&terrain_chunk_cache);
 
@@ -590,9 +583,9 @@ pub const graph_nodes = struct {
 
                 const pos_2d: Vec2 = pos_2d: {
                     const res: Vec2 = @splat(terrain_resolution);
-                    const span = game.config.demo_terrain_bounds.size / res;
+                    const span = config.demo_terrain_bounds.size / res;
                     const coord: Vec2 = @floatFromInt(vertex_coord);
-                    break :pos_2d game.config.demo_terrain_bounds.min + (span * coord);
+                    break :pos_2d config.demo_terrain_bounds.min + (span * coord);
                 };
                 const height = try terrain_sampler.sample(stack_arena.get(), pos_2d);
                 positions[index] = .{ pos_2d[0], height, pos_2d[1], 1 };
@@ -624,12 +617,12 @@ pub const graph_nodes = struct {
         const normals = mesh_helper.Polygon(.Quad).calculateNormals(arena, positions, quads);
 
         return .{
-            .terrain_mesh = game.types.GreyboxMesh{
+            .terrain_mesh = types.GreyboxMesh{
                 .indices = indices,
                 .position = positions,
                 .normal = normals,
             },
-            .terrain_instance = game.types.ModelInstances{
+            .terrain_instance = types.ModelInstances{
                 .label = "terrain",
                 .positions = try arena.dupe(Vec4, &.{.{ 0, 0, 0, 1 }}),
                 .rotations = try arena.dupe(Vec4, &.{zmath.qidentity()}),

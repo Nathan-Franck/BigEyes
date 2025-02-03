@@ -6,9 +6,8 @@ const BlendAnimatedMeshSpec = @import("./BlendAnimatedMeshSpec.zig");
 const BlendMeshSpec = @import("./BlendMeshSpec.zig");
 const mesh_helper = @import("./mesh_helper.zig");
 const subdiv = @import("./subdiv.zig");
-const game = @import("game/game.zig").game;
-const debugPrint = @import("game/game.zig").debugPrint;
 const Vec4 = @import("forest.zig").Vec4;
+const types = @import("./game/types.zig");
 
 pub const Vertex = struct {
     position: [3]f32,
@@ -42,10 +41,10 @@ pub fn loadModelsFromBlends(
     arena: std.mem.Allocator,
     comptime blend_inputs: []const struct { model_name: []const u8, subdiv_level: u8 = 0 },
 ) !struct {
-    models: std.ArrayList(game.types.GameModel),
+    models: std.ArrayList(types.GameModel),
     model_transforms: std.StringHashMap(zmath.Mat),
 } {
-    var models = std.ArrayList(game.types.GameModel).init(arena);
+    var models = std.ArrayList(types.GameModel).init(arena);
     var model_transforms = std.StringHashMap(zmath.Mat).init(arena);
     var armatures = std.StringHashMap(BlendMeshSpec.Armature).init(arena);
     inline for (blend_inputs) |blend_input| {
@@ -61,15 +60,15 @@ pub fn loadModelsFromBlends(
                 if (blend_input.subdiv_level > 0) {
                     const faces = mesh.polygons;
                     var subdiv_result = try subdiv.Polygon(.Face).cmcSubdiv(arena, positions, faces);
-                    var quads_per_subdiv = std.ArrayList([]const game.types.Quad).init(arena);
+                    var quads_per_subdiv = std.ArrayList([]const types.Quad).init(arena);
                     try quads_per_subdiv.append(subdiv_result.quads);
                     for (0..blend_input.subdiv_level - 1) |_| {
                         subdiv_result = try subdiv.Polygon(.Quad).cmcSubdiv(arena, subdiv_result.points, subdiv_result.quads);
                         try quads_per_subdiv.append(subdiv_result.quads);
                     }
-                    const model: game.types.GameModel = .{
+                    const model: types.GameModel = .{
                         .label = label,
-                        .meshes = try arena.dupe(game.types.GameMesh, &.{game.types.GameMesh{ .subdiv = .{
+                        .meshes = try arena.dupe(types.GameMesh, &.{types.GameMesh{ .subdiv = .{
                             .armature = armatures.get(node.parent.?).?,
                             .top_indices = mesh_helper.Polygon(.Quad).toTriangleIndices(arena, subdiv_result.quads),
                             .base_positions = positions,
@@ -80,9 +79,9 @@ pub fn loadModelsFromBlends(
                     };
                     try models.append(model);
                 } else {
-                    const model: game.types.GameModel = .{
+                    const model: types.GameModel = .{
                         .label = label,
-                        .meshes = try arena.dupe(game.types.GameMesh, &.{.{ .greybox = .{
+                        .meshes = try arena.dupe(types.GameMesh, &.{.{ .greybox = .{
                             .indices = mesh_helper.Polygon(.Face).toTriangleIndices(arena, mesh.polygons),
 
                             .normal = mesh_helper.Polygon(.Face).calculateNormals(arena, positions, mesh.polygons),
@@ -123,7 +122,7 @@ pub fn loadBlendFromJson(allocator: std.mem.Allocator, json_data: []const u8) !B
     scanner.enableDiagnostics(&diagnostics);
 
     const mesh_input_data = std.json.parseFromTokenSource(BlendMeshSpec, allocator, &scanner, .{}) catch |err| {
-        debugPrint("Something in here isn't parsing right: {s}\nError: {any}\n", .{
+        std.debug.print("Something in here isn't parsing right: {s}\nError: {any}\n", .{
             json_data[0..@intCast(diagnostics.getByteOffset())],
             err,
         });
