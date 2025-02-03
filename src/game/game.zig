@@ -1,6 +1,7 @@
 const std = @import("std");
 
 const zmath = @import("zmath");
+const zbullet = @import("zbullet");
 
 // Hey! You can totally create code before the build starts!
 const gen = @import("generated");
@@ -494,7 +495,7 @@ pub const graph_nodes = struct {
     } {
         var models = std.ArrayList(game.types.GameModel).init(arena);
         for (props.models) |model| {
-            const mesh = model.meshes[0];
+            for (model.meshes) |mesh|
             switch (mesh) {
                 .subdiv => |subdiv_mesh| {
                     const faces = subdiv_mesh.base_faces;
@@ -548,7 +549,7 @@ pub const graph_nodes = struct {
                     });
                 },
                 else => {},
-            }
+                };
         }
         return .{ .models = models.items };
     }

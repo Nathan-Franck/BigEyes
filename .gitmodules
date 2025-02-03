@@ -7,3 +7,6 @@
 [submodule "libs/zopengl"]
 	path = libs/zopengl
 	url = https://github.com/zig-gamedev/zopengl.git
+[submodule "libs/zbullet"]
+	path = libs/zbullet
+	url = https://github.com/zig-gamedev/zbullet.git
