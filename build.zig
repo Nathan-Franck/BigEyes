@@ -145,14 +145,13 @@ pub fn build(
     // Exe glfw
     {
         const resources_lib = resources_lib: {
-            const resources_lib = b.addSharedLibrary(.{
+            const resources_lib = b.addStaticLibrary(.{
                 .name = "resources",
                 .root_source_file = b.path("src/resources_entry.zig"),
                 .target = target,
                 .optimize = optimize,
             });
             resources_lib.root_module.addImport("zmath", zmath.module("root"));
-            resources_lib.root_module.addImport("zbullet", zbullet.module("root"));
 
             const install_lib = b.addInstallArtifact(resources_lib, .{ .dest_dir = .{ .override = .{ .custom = "../bin" } } });
             break :resources_lib install_lib;
@@ -166,7 +165,7 @@ pub fn build(
             });
             game_lib.root_module.addImport("zmath", zmath.module("root"));
             game_lib.root_module.addImport("zbullet", zbullet.module("root"));
-            game_lib.linkSystemLibrary("resources");
+            game_lib.root_module.addImport("resources", resources_lib.artifact.root_module);
             game_lib.addLibraryPath(b.path("bin"));
 
             const install_lib = b.addInstallArtifact(game_lib, .{ .dest_dir = .{ .override = .{ .custom = "../bin" } } });

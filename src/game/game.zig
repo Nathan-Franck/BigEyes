@@ -21,9 +21,7 @@ const subdiv = @import("../subdiv.zig");
 const tree = @import("../tree.zig");
 const queryable = @import("../utils.zig").queryable;
 const math = @import("../vec_math.zig");
-const resources = struct {
-    extern "C" fn getResources(resources: *types.Resources) void;
-};
+const resources = @import("resources");
 
 const graph = @import("./graph.zig");
 const types = @import("./types.zig");
