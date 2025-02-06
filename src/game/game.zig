@@ -50,7 +50,7 @@ pub const graph_inputs: NodeGraph.SystemInputs = .{
     .selected_camera = .orbit,
     .player_settings = .{
         .look_speed = 0.004,
-        .movement_speed = 0.5,
+        .movement_speed = 0.10,
     },
     .render_resolution = .{ .x = 0, .y = 0 },
     .size_multiplier = 1,

@@ -1,5 +1,5 @@
 const std = @import("std");
-const content_dir = "src/content/";
+const content_dir = "src/resources/content/";
 
 const ExportMeshes = struct {
     const BlendExport = struct {
@@ -165,20 +165,14 @@ pub fn build(
                 .{ .name = "utils", .module = utils },
             },
         });
-        // const typescript = b.createModule(.{
-        //     .root_source_file = b.path("src/typescript/typescript.zig"),
-        //     .imports = &.{
-        //         // .{ .name = "game_options", .module = options_module },
-        //     },
-        // });
         const game = b.createModule(.{
             .root_source_file = b.path("src/game/game.zig"),
             .imports = &.{
+                .{ .name = "zmath", .module = zmath.module("root") },
+                .{ .name = "zbullet", .module = zbullet.module("root") },
                 .{ .name = "node_graph", .module = node_graph },
                 .{ .name = "resources", .module = resources },
                 .{ .name = "utils", .module = utils },
-                .{ .name = "zmath", .module = zmath.module("root") },
-                .{ .name = "zbullet", .module = zbullet.module("root") },
             },
         });
 
@@ -193,8 +187,8 @@ pub fn build(
         exe.root_module.addImport("zglfw", zglfw.module("root"));
         exe.root_module.addImport("zopengl", zopengl.module("root"));
 
-        exe.linkLibrary(zbullet.artifact("cbullet"));
         exe.linkLibrary(zglfw.artifact("glfw"));
+        exe.linkLibrary(zbullet.artifact("cbullet"));
 
         exe.step.dependOn(&export_meshes.step);
 
