@@ -7,27 +7,33 @@ const zbullet = @import("zbullet");
 const gen = @import("generated");
 const _ = gen.GeneratedData;
 
-const CoordIterator = @import("../CoordIterator.zig");
-const Bounds = @import("utils").forest.Bounds;
-const Coord = @import("utils").forest.Coord;
-const Vec2 = @import("utils").forest.Vec2;
-const Vec4 = @import("utils").forest.Vec4;
-const graph_runtime = @import("../graph_runtime.zig");
+const graph_runtime = @import("node_graph").graph_runtime;
+const CoordIterator = @import("utils").CoordIterator;
+const Bounds = @import("utils").Bounds;
+const Coord = @import("utils").Coord;
+const Vec2 = @import("utils").Vec2;
+const Vec4 = @import("utils").Vec4;
 const Image = @import("utils").Image;
 const mesh_helper = @import("utils").mesh_helper;
-const mesh_loader = @import("utils").mesh_loader;
 const raytrace = @import("utils").raytrace;
 const subdiv = @import("utils").subdiv;
 const tree = @import("utils").tree;
-const queryable = @import("utils").queryable;
-const math = @import("../vec_math.zig");
+const queryable = @import("node_graph").utils_node.queryable;
+const math = @import("utils").vec_math;
+const types = @import("utils").types;
 const resources = @import("resources");
 
 const graph = @import("./graph.zig");
-const types = @import("./types.zig");
-const config = @import("./config.zig");
+
+const mesh_loader = resources.mesh_loader;
+const config = resources.config;
 const Forest = config.Forest;
 const TerrainSampler = config.TerrainSampler;
+
+pub const NodeGraph = graph_runtime.NodeGraph(
+    graph.blueprint,
+    graph_nodes,
+);
 
 pub const graph_inputs: NodeGraph.SystemInputs = .{
     .time = 0,
@@ -90,11 +96,6 @@ pub const interface = struct {
         };
     }
 };
-
-pub const NodeGraph = graph_runtime.NodeGraph(
-    graph.blueprint,
-    graph_nodes,
-);
 
 pub const graph_nodes = struct {
     pub fn calculateTerrainDensityInfluenceRange(

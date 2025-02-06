@@ -1,11 +1,12 @@
+pub const types = @import("utils").types;
+pub const config = @import("config.zig");
+pub const mesh_loader = @import("mesh_loader.zig");
+
 const std = @import("std");
 
 const Image = @import("utils").Image;
-const mesh_loader = @import("utils").mesh_loader;
 const raytrace = @import("utils").raytrace;
 const tree = @import("utils").tree;
-const types = @import("game").types;
-const config = @import("game").config;
 
 pub export fn getResources(resources: *types.Resources) void {
     const arena = std.heap.page_allocator;

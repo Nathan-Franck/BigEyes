@@ -4,16 +4,12 @@ const vm = @import("./vec_math.zig");
 const util = .{
     .tree = @import("./tree.zig"),
 };
-pub const Vec4 = @Vector(4, f32);
-pub const Vec2 = @Vector(2, f32);
-
-pub const Bounds = struct {
-    min: Vec2,
-    size: Vec2,
-};
+const Vec2 = @import("./utils.zig").Vec2;
+const Vec4 = @import("./utils.zig").Vec4;
+const Coord = @import("./utils.zig").Coord;
+const Bounds = @import("./utils.zig").Bounds;
 
 pub const CoordIterator = @import("./CoordIterator.zig");
-pub const Coord = CoordIterator.Coord;
 
 pub fn Forest(comptime chunk_size: i32) type {
     return struct {

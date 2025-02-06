@@ -2,12 +2,12 @@ const std = @import("std");
 
 const zmath = @import("zmath");
 
-const BlendAnimatedMeshSpec = @import("./BlendAnimatedMeshSpec.zig");
-const BlendMeshSpec = @import("./BlendMeshSpec.zig");
-const mesh_helper = @import("./mesh_helper.zig");
-const subdiv = @import("./subdiv.zig");
-const Vec4 = @import("forest.zig").Vec4;
-const types = @import("./game/types.zig");
+const BlendAnimatedMeshSpec = @import("utils").BlendAnimatedMeshSpec;
+const BlendMeshSpec = @import("utils").BlendMeshSpec;
+const mesh_helper = @import("utils").mesh_helper;
+const subdiv = @import("utils").subdiv;
+const Vec4 = @import("utils").Vec4;
+const types = @import("utils").types;
 
 pub const Vertex = struct {
     position: [3]f32,

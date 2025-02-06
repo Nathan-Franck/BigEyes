@@ -1,8 +1,8 @@
 const std = @import("std");
 const zm = @import("zmath");
-const Stamp = @import("../Stamp.zig");
-const Vec4 = @import("utils").forest.Vec4;
-const Bounds = @import("utils").forest.Bounds;
+const Stamp = @import("utils").Stamp;
+const Vec4 = @import("utils").Vec4;
+const Bounds = @import("utils").Bounds;
 const tree = @import("utils").tree;
 
 pub const demo_terrain_bounds = Bounds{
@@ -14,7 +14,7 @@ pub const Forest = @import("utils").forest.Forest(32);
 
 pub const ForestSpawner = Forest.spawner(ForestSettings);
 
-pub const TerrainSampler = @import("../terrain_sampler.zig").TerrainSampler(
+pub const TerrainSampler = @import("utils").terrain_sampler.TerrainSampler(
     TerrainSpawner,
     TerrainStamps,
 );

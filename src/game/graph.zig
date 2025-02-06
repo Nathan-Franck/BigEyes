@@ -1,4 +1,4 @@
-const runtime = @import("../graph_runtime.zig");
+const runtime = @import("node_graph").graph_runtime;
 
 pub const blueprint = runtime.Blueprint{
     .nodes = &[_]runtime.NodeGraphBlueprintEntry{

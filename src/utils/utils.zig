@@ -1,14 +1,27 @@
 const std = @import("std");
-const utils = @import("./utils.zig");
 
+pub const types = @import("types.zig");
 pub const Image = @import("Image.zig");
 pub const vec_math = @import("vec_math.zig");
-pub const mesh_loader = @import("mesh_loader.zig");
 pub const mesh_helper = @import("mesh_helper.zig");
 pub const forest = @import("forest.zig");
 pub const tree = @import("tree.zig");
 pub const raytrace = @import("raytrace.zig");
 pub const subdiv = @import("subdiv.zig");
+pub const CoordIterator = @import("CoordIterator.zig");
+pub const BlendMeshSpec = @import("BlendMeshSpec.zig");
+pub const BlendAnimatedMeshSpec = @import("BlendAnimatedMeshSpec.zig");
+pub const terrain_sampler = @import("terrain_sampler.zig");
+pub const Stamp = @import("Stamp.zig");
+
+pub const Coord = CoordIterator.Coord;
+pub const Vec4 = @Vector(4, f32);
+pub const Vec2 = @Vector(2, f32);
+
+pub const Bounds = struct {
+    min: Vec2,
+    size: Vec2,
+};
 
 /// Apply the changes in `field_changes` to `source_data`.
 ///

@@ -1,6 +1,7 @@
 const std = @import("std");
-const math = std.math;
 const zm = @import("zmath");
+
+const math = std.math;
 const Allocator = std.mem.Allocator;
 
 pub const Vec4 = @Vector(4, f32);

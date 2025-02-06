@@ -1,5 +1,5 @@
 const std = @import("std");
-const utils = @import("./utils.zig");
+const utils = @import("utils");
 
 pub inline fn typescriptTypeOf(from_type: type, comptime options: struct { first: bool = false, decl: ?from_type = null }) []const u8 {
     return comptime switch (@typeInfo(from_type)) {

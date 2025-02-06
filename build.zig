@@ -88,8 +88,10 @@ pub fn build(
         } },
     });
 
+    const zglfw = b.dependency("zglfw", .{ .target = target, .x11 = false });
     const zbullet = b.dependency("zbullet", .{});
     const zmath = b.dependency("zmath", .{});
+    const zopengl = b.dependency("zopengl", .{});
 
     // Tests (default)
     {
@@ -144,71 +146,59 @@ pub fn build(
 
     // Exe glfw
     {
-        const utils_lib = utils_lib: {
-            const utils_lib = b.addSharedLibrary(.{
-                .name = "utils",
-                .root_source_file = b.path("src/utils/entry.zig"),
-                .target = target,
-                .optimize = optimize,
-            });
-            utils_lib.root_module.addImport("zmath", zmath.module("root"));
-            utils_lib.addLibraryPath(b.path("bin"));
-            break :utils_lib utils_lib;
-        };
-        const resources_lib = resources_lib: {
-            const resources_lib = b.addStaticLibrary(.{
-                .name = "resources",
-                .root_source_file = b.path("src/resources_entry.zig"),
-                .target = target,
-                .optimize = optimize,
-            });
-            resources_lib.root_module.addImport("zmath", zmath.module("root"));
-            resources_lib.root_module.addImport("utils", utils_lib.root_module);
-
-            const install_lib = b.addInstallArtifact(resources_lib, .{ .dest_dir = .{ .override = .{ .custom = "../bin" } } });
-            break :resources_lib install_lib;
-        };
-        const game_lib = game_lib: {
-            const game_lib = b.addSharedLibrary(.{
-                .name = "game",
-                .root_source_file = b.path("src/game_entry.zig"),
-                .target = target,
-                .optimize = optimize,
-            });
-            game_lib.root_module.addImport("utils", utils_lib.root_module);
-            game_lib.root_module.addImport("zmath", zmath.module("root"));
-            game_lib.root_module.addImport("zbullet", zbullet.module("root"));
-            game_lib.root_module.addImport("resources", resources_lib.artifact.root_module);
-            game_lib.addLibraryPath(b.path("bin"));
-            break :game_lib game_lib;
-        };
+        const utils = b.createModule(.{
+            .root_source_file = b.path("src/utils/utils.zig"),
+            .imports = &.{
+                .{ .name = "zmath", .module = zmath.module("root") },
+            },
+        });
+        const node_graph = b.createModule(.{
+            .root_source_file = b.path("src/node_graph/node_graph.zig"),
+            .imports = &.{
+                .{ .name = "utils", .module = utils },
+            },
+        });
+        const resources = b.createModule(.{
+            .root_source_file = b.path("src/resources/resources.zig"),
+            .imports = &.{
+                .{ .name = "zmath", .module = zmath.module("root") },
+                .{ .name = "utils", .module = utils },
+            },
+        });
+        // const typescript = b.createModule(.{
+        //     .root_source_file = b.path("src/typescript/typescript.zig"),
+        //     .imports = &.{
+        //         // .{ .name = "game_options", .module = options_module },
+        //     },
+        // });
+        const game = b.createModule(.{
+            .root_source_file = b.path("src/game/game.zig"),
+            .imports = &.{
+                .{ .name = "node_graph", .module = node_graph },
+                .{ .name = "resources", .module = resources },
+                .{ .name = "utils", .module = utils },
+                .{ .name = "zmath", .module = zmath.module("root") },
+                .{ .name = "zbullet", .module = zbullet.module("root") },
+            },
+        });
 
         var exe = b.addExecutable(.{
             .name = "game_exe",
-            .root_source_file = b.path("src/glfw_entry.zig"),
+            .root_source_file = b.path("src/glfw/glfw.zig"),
             .target = target,
             .optimize = optimize,
         });
-        exe.root_module.addImport("game", game_lib.root_module);
-        exe.root_module.addImport("zmath", zmath.module("root"));
-        exe.root_module.addImport("zbullet", zbullet.module("root"));
-        exe.linkLibrary(zbullet.artifact("cbullet"));
 
-        // Link against the DLL
-        exe.linkLibrary(game_lib);
-        exe.addLibraryPath(b.path("bin"));
-
-        const zglfw = b.dependency("zglfw", .{ .target = target });
+        exe.root_module.addImport("game", game);
         exe.root_module.addImport("zglfw", zglfw.module("root"));
-        exe.linkLibrary(zglfw.artifact("glfw"));
-
-        const zopengl = b.dependency("zopengl", .{});
         exe.root_module.addImport("zopengl", zopengl.module("root"));
+
+        exe.linkLibrary(zbullet.artifact("cbullet"));
+        exe.linkLibrary(zglfw.artifact("glfw"));
 
         exe.step.dependOn(&export_meshes.step);
 
         const install_artifact = b.addInstallArtifact(exe, .{ .dest_dir = .{ .override = .{ .custom = "../bin" } } });
-        install_artifact.step.dependOn(&game_lib.step);
         const install_step = b.step("glfw", "build glfw entrypoint");
         install_step.dependOn(&install_artifact.step);
 
@@ -288,19 +278,4 @@ pub fn build(
         const run_step = b.step("test_perf", "run the perf");
         run_step.dependOn(&run_cmd.step);
     }
-}
-
-fn module() *std.Build.Step.Compile {
-    const lib = b.addSharedLibrary(.{
-        .name = "game",
-        .root_source_file = b.path("src/game_entry.zig"),
-        .target = target,
-        .optimize = optimize,
-    });
-    lib.root_module.addImport("utils", utils_lib.root_module);
-    lib.root_module.addImport("zmath", zmath.module("root"));
-    lib.root_module.addImport("zbullet", zbullet.module("root"));
-    lib.root_module.addImport("resources", resources_lib.artifact.root_module);
-    lib.addLibraryPath(b.path("bin"));
-    return lib;
 }

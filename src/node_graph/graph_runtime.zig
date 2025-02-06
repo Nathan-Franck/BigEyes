@@ -1,5 +1,8 @@
 const std = @import("std");
-const utils = @import("./utils.zig");
+const utils = @import("utils");
+
+const utils_node = @import("./utils_node.zig");
+const queryable = utils_node.queryable;
 
 pub const NodeLink = struct {
     name: []const u8,
@@ -168,7 +171,7 @@ pub fn NodeGraph(
             const node_input_fields = @typeInfo(node_params[node_params.len - 1].type.?).@"struct".fields;
             var fields: []const std.builtin.Type.StructField = &.{};
             inline for (node_input_fields) |field| {
-                if (utils.queryable.getSourceOrNull(field.type) != null) {
+                if (queryable.getSourceOrNull(field.type) != null) {
                     fields = fields ++ .{std.builtin.Type.StructField{
                         .name = field.name,
                         .type = bool,
@@ -288,7 +291,7 @@ pub fn NodeGraph(
                             const output_node_type = node_params[node_params.len - 1].type.?;
                             break :blk for (@typeInfo(output_node_type).@"struct".fields) |field|
                                 if (std.mem.eql(u8, field.name, input_field))
-                                    break utils.queryable.getSourceOrNull(field.type) orelse field.type
+                                    break queryable.getSourceOrNull(field.type) orelse field.type
                                 else
                                     continue
                             else
@@ -490,7 +493,7 @@ pub fn NodeGraph(
                 const node_defn = @field(node_definitions, node.name);
                 const node_params = @typeInfo(@TypeOf(node_defn)).@"fn".params;
                 const NodeInputs = node_params[node_params.len - 1].type.?;
-                const MutableInputs = utils.MutableInputs(node, NodeInputs);
+                const MutableInputs = utils_node.MutableInputs(node, NodeInputs);
 
                 const function_params = @typeInfo(
                     @TypeOf(@field(node_definitions, node.function)),
@@ -527,7 +530,7 @@ pub fn NodeGraph(
                         mutable_inputs.register(TargetInputField, link, &node_input_field)
                     else
                         node_input_field;
-                    target_input_field.* = if (comptime utils.queryable.isValue(TargetInputField))
+                    target_input_field.* = if (comptime queryable.isValue(TargetInputField))
                         TargetInputField.initQueryable(
                             value,
                             &is_field_dirty,

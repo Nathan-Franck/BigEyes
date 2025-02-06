@@ -1,12 +1,8 @@
 const std = @import("std");
 const glfw = @import("zglfw");
 const zopengl = @import("zopengl");
-const NodeGraph = @import("./game/game.zig").NodeGraph;
-
-const game = struct {
-    extern "c" fn gameInit() void;
-    extern "c" fn gameUpdate(inputs: *const NodeGraph.PartialSystemInputs, outputs: *NodeGraph.SystemOutputs) void;
-};
+const NodeGraph = @import("game").NodeGraph;
+const game = @import("game");
 
 pub fn main() !void {
     try glfw.init();
@@ -31,7 +27,7 @@ pub fn main() !void {
     const gl = zopengl.bindings;
 
     glfw.swapInterval(1);
-    game.gameInit();
+    game.interface.init();
 
     while (!window.shouldClose()) {
         glfw.pollEvents();
@@ -41,8 +37,8 @@ pub fn main() !void {
         const inputs = NodeGraph.PartialSystemInputs{
             // populate input data
         };
-        var outputs: NodeGraph.SystemOutputs = undefined;
-        game.gameUpdate(&inputs, &outputs);
+        const outputs = try game.interface.updateNodeGraph(inputs);
+        _ = outputs;
 
         window.swapBuffers();
     }

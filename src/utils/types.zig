@@ -2,15 +2,15 @@ const std = @import("std");
 
 const zm = @import("zmath");
 
-const forest = @import("utils").forest;
-const Vec2 = forest.Vec2;
-const Vec4 = forest.Vec4;
-const Image = @import("utils").Image;
-const mesh_helper = @import("utils").mesh_helper;
-const raytrace = @import("utils").raytrace;
-const subdiv = @import("utils").subdiv;
-const tree = @import("utils").tree;
-const Armature = @import("../BlendMeshSpec.zig").Armature;
+const forest = @import("utils.zig").forest;
+const Vec2 = @import("utils.zig").Vec2;
+const Vec4 = @import("utils.zig").Vec4;
+const Image = @import("utils.zig").Image;
+const mesh_helper = @import("utils.zig").mesh_helper;
+const raytrace = @import("utils.zig").raytrace;
+const subdiv = @import("utils.zig").subdiv;
+const tree = @import("utils.zig").tree;
+const Armature = @import("utils.zig").BlendMeshSpec.Armature;
 
 pub const Point = @Vector(4, f32);
 pub const Face = []const u32;
