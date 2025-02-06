@@ -1,6 +1,6 @@
-const Coord = @import("./forest.zig").Coord;
-const vm = @import("./vec_math.zig");
-const Vec2 = @import("./forest.zig").Vec2;
+const Coord = @import("utils").forest.Coord;
+const vm = @import("utils").vec_math;
+const Vec2 = @import("utils").forest.Vec2;
 pub const Resolution = struct { x: u32, y: u32 };
 
 size: f32,

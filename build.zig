@@ -144,6 +144,17 @@ pub fn build(
 
     // Exe glfw
     {
+        const utils_lib = utils_lib: {
+            const utils_lib = b.addSharedLibrary(.{
+                .name = "utils",
+                .root_source_file = b.path("src/utils/entry.zig"),
+                .target = target,
+                .optimize = optimize,
+            });
+            utils_lib.root_module.addImport("zmath", zmath.module("root"));
+            utils_lib.addLibraryPath(b.path("bin"));
+            break :utils_lib utils_lib;
+        };
         const resources_lib = resources_lib: {
             const resources_lib = b.addStaticLibrary(.{
                 .name = "resources",
@@ -152,6 +163,7 @@ pub fn build(
                 .optimize = optimize,
             });
             resources_lib.root_module.addImport("zmath", zmath.module("root"));
+            resources_lib.root_module.addImport("utils", utils_lib.root_module);
 
             const install_lib = b.addInstallArtifact(resources_lib, .{ .dest_dir = .{ .override = .{ .custom = "../bin" } } });
             break :resources_lib install_lib;
@@ -163,14 +175,12 @@ pub fn build(
                 .target = target,
                 .optimize = optimize,
             });
+            game_lib.root_module.addImport("utils", utils_lib.root_module);
             game_lib.root_module.addImport("zmath", zmath.module("root"));
             game_lib.root_module.addImport("zbullet", zbullet.module("root"));
             game_lib.root_module.addImport("resources", resources_lib.artifact.root_module);
             game_lib.addLibraryPath(b.path("bin"));
-
-            const install_lib = b.addInstallArtifact(game_lib, .{ .dest_dir = .{ .override = .{ .custom = "../bin" } } });
-            install_lib.step.dependOn(&resources_lib.step);
-            break :game_lib install_lib;
+            break :game_lib game_lib;
         };
 
         var exe = b.addExecutable(.{
@@ -179,12 +189,13 @@ pub fn build(
             .target = target,
             .optimize = optimize,
         });
+        exe.root_module.addImport("game", game_lib.root_module);
         exe.root_module.addImport("zmath", zmath.module("root"));
         exe.root_module.addImport("zbullet", zbullet.module("root"));
         exe.linkLibrary(zbullet.artifact("cbullet"));
 
         // Link against the DLL
-        exe.linkSystemLibrary("game");
+        exe.linkLibrary(game_lib);
         exe.addLibraryPath(b.path("bin"));
 
         const zglfw = b.dependency("zglfw", .{ .target = target });
@@ -277,4 +288,19 @@ pub fn build(
         const run_step = b.step("test_perf", "run the perf");
         run_step.dependOn(&run_cmd.step);
     }
+}
+
+fn module() *std.Build.Step.Compile {
+    const lib = b.addSharedLibrary(.{
+        .name = "game",
+        .root_source_file = b.path("src/game_entry.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    lib.root_module.addImport("utils", utils_lib.root_module);
+    lib.root_module.addImport("zmath", zmath.module("root"));
+    lib.root_module.addImport("zbullet", zbullet.module("root"));
+    lib.root_module.addImport("resources", resources_lib.artifact.root_module);
+    lib.addLibraryPath(b.path("bin"));
+    return lib;
 }

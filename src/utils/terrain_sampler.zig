@@ -1,8 +1,8 @@
 const std = @import("std");
-const vm = @import("./vec_math.zig");
-const Stamp = @import("./Stamp.zig");
-const Vec2 = @import("./forest.zig").Vec2;
-const Bounds = @import("./forest.zig").Bounds;
+const vm = @import("utils").vec_math;
+const Stamp = @import("utils").Stamp;
+const Vec2 = @import("utils").forest.Vec2;
+const Bounds = @import("utils").forest.Bounds;
 
 pub fn TerrainSampler(
     TerrainSpawner: type,

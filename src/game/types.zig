@@ -2,14 +2,14 @@ const std = @import("std");
 
 const zm = @import("zmath");
 
-const forest = @import("../forest.zig");
+const forest = @import("utils").forest;
 const Vec2 = forest.Vec2;
 const Vec4 = forest.Vec4;
-const Image = @import("../Image.zig");
-const mesh_helper = @import("../mesh_helper.zig");
-const raytrace = @import("../raytrace.zig");
-const subdiv = @import("../subdiv.zig");
-const tree = @import("../tree.zig");
+const Image = @import("utils").Image;
+const mesh_helper = @import("utils").mesh_helper;
+const raytrace = @import("utils").raytrace;
+const subdiv = @import("utils").subdiv;
+const tree = @import("utils").tree;
 const Armature = @import("../BlendMeshSpec.zig").Armature;
 
 pub const Point = @Vector(4, f32);
