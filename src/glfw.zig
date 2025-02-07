@@ -1,7 +1,7 @@
 const std = @import("std");
 const glfw = @import("zglfw");
 const zopengl = @import("zopengl");
-const NodeGraph = @import("game").NodeGraph;
+const GameGraph = @import("game").GameGraph;
 const game = @import("game");
 
 pub fn main() !void {
@@ -34,7 +34,7 @@ pub fn main() !void {
 
         gl.clearBufferfv(gl.COLOR, 0, &[_]f32{ 0.2, 0.4, 0.4, 1.0 });
 
-        const inputs = NodeGraph.PartialSystemInputs{
+        const inputs = GameGraph.PartialSystemInputs{
             // populate input data
         };
         const outputs = try game.interface.updateNodeGraph(inputs);

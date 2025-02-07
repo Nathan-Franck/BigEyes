@@ -1,6 +1,6 @@
 const std = @import("std");
-const game = @import("./game/game.zig");
-const type_definitions = @import("./type_definitions.zig");
+const game = @import("game");
+const type_definitions = @import("typecript").type_definitions;
 
 var message_arena: std.heap.ArenaAllocator = std.heap.ArenaAllocator.init(std.heap.page_allocator);
 

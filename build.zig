@@ -147,26 +147,26 @@ pub fn build(
     // Exe glfw
     {
         const utils = b.createModule(.{
-            .root_source_file = b.path("src/utils/utils.zig"),
+            .root_source_file = b.path("src/utils.zig"),
             .imports = &.{
                 .{ .name = "zmath", .module = zmath.module("root") },
             },
         });
         const node_graph = b.createModule(.{
-            .root_source_file = b.path("src/node_graph/node_graph.zig"),
+            .root_source_file = b.path("src/node_graph.zig"),
             .imports = &.{
                 .{ .name = "utils", .module = utils },
             },
         });
         const resources = b.createModule(.{
-            .root_source_file = b.path("src/resources/resources.zig"),
+            .root_source_file = b.path("src/resources.zig"),
             .imports = &.{
                 .{ .name = "zmath", .module = zmath.module("root") },
                 .{ .name = "utils", .module = utils },
             },
         });
         const game = b.createModule(.{
-            .root_source_file = b.path("src/game/game.zig"),
+            .root_source_file = b.path("src/game.zig"),
             .imports = &.{
                 .{ .name = "zmath", .module = zmath.module("root") },
                 .{ .name = "zbullet", .module = zbullet.module("root") },
@@ -178,7 +178,7 @@ pub fn build(
 
         var exe = b.addExecutable(.{
             .name = "game_exe",
-            .root_source_file = b.path("src/glfw/glfw.zig"),
+            .root_source_file = b.path("src/glfw.zig"),
             .target = target,
             .optimize = optimize,
         });

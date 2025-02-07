@@ -1,6 +1,6 @@
 pub const types = @import("utils").types;
-pub const config = @import("config.zig");
-pub const mesh_loader = @import("mesh_loader.zig");
+pub const config = @import("resources/config.zig");
+pub const mesh_loader = @import("resources/mesh_loader.zig");
 
 const std = @import("std");
 
@@ -18,7 +18,7 @@ pub export fn getResources(resources: *types.Resources) void {
     const skybox = blk: {
         var images: types.ProcessedCubeMap = undefined;
         inline for (@typeInfo(types.ProcessedCubeMap).@"struct".fields) |field| {
-            const image_png = @embedFile("./content/cloudy skybox/" ++ field.name ++ ".png");
+            const image_png = @embedFile("./resources/content/cloudy skybox/" ++ field.name ++ ".png");
             const image_data = Image.loadPngAndProcess(arena, image_png) catch unreachable;
             @field(images, field.name) = image_data;
         }
@@ -26,8 +26,8 @@ pub export fn getResources(resources: *types.Resources) void {
     };
 
     const cutout_leaf = blk: {
-        const diffuse = Image.loadPng(arena, @embedFile("./content/manitoba maple/diffuse.png")) catch unreachable;
-        const alpha = Image.loadPng(arena, @embedFile("./content/manitoba maple/alpha.png")) catch unreachable;
+        const diffuse = Image.loadPng(arena, @embedFile("./resources/content/manitoba maple/diffuse.png")) catch unreachable;
+        const alpha = Image.loadPng(arena, @embedFile("./resources/content/manitoba maple/alpha.png")) catch unreachable;
         const cutout_diffuse = Image.Rgba32Image{
             .width = diffuse.width,
             .height = diffuse.height,

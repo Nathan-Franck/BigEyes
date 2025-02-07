@@ -1,7 +1,8 @@
+pub const utils_node = @import("./node_graph/utils_node.zig");
+
 const std = @import("std");
 const utils = @import("utils");
 
-const utils_node = @import("./utils_node.zig");
 const queryable = utils_node.queryable;
 
 pub const NodeLink = struct {

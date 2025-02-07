@@ -4,10 +4,10 @@ const vm = @import("./vec_math.zig");
 const util = .{
     .tree = @import("./tree.zig"),
 };
-const Vec2 = @import("./utils.zig").Vec2;
-const Vec4 = @import("./utils.zig").Vec4;
-const Coord = @import("./utils.zig").Coord;
-const Bounds = @import("./utils.zig").Bounds;
+const Vec2 = @import("../utils.zig").Vec2;
+const Vec4 = @import("../utils.zig").Vec4;
+const Coord = @import("../utils.zig").Coord;
+const Bounds = @import("../utils.zig").Bounds;
 
 pub const CoordIterator = @import("./CoordIterator.zig");
 

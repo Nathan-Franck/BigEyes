@@ -1,9 +1,14 @@
-const runtime = @import("node_graph").graph_runtime;
+const node_graph = @import("node_graph");
 
-pub const blueprint = runtime.Blueprint{
-    .nodes = &[_]runtime.NodeGraphBlueprintEntry{
-        .{ .name = "getResources", .function = "getResources", .input_links = &[_]runtime.InputLink{} },
-        .{ .name = "timing", .function = "timing", .input_links = &[_]runtime.InputLink{
+const Blueprint = node_graph.Blueprint;
+const NodeGraphBlueprintEntry = node_graph.NodeGraphBlueprintEntry;
+const InputLink = node_graph.InputLink;
+const SystemSink = node_graph.SystemSink;
+
+pub const blueprint = Blueprint{
+    .nodes = &[_]NodeGraphBlueprintEntry{
+        .{ .name = "getResources", .function = "getResources", .input_links = &[_]InputLink{} },
+        .{ .name = "timing", .function = "timing", .input_links = &[_]InputLink{
             .{ .field = "time", .source = .{
                 .input_field = "time",
             } },
@@ -11,7 +16,7 @@ pub const blueprint = runtime.Blueprint{
                 .store_field = "last_time",
             } },
         } },
-        .{ .name = "orbit", .function = "orbit", .input_links = &[_]runtime.InputLink{
+        .{ .name = "orbit", .function = "orbit", .input_links = &[_]InputLink{
             .{ .field = "delta_time", .source = .{
                 .node = .{ .name = "timing", .field = "delta_time" },
             } },
@@ -40,7 +45,7 @@ pub const blueprint = runtime.Blueprint{
                 .node = .{ .name = "calculateTerrainDensityInfluenceRange", .field = "terrain_sampler" },
             } },
         } },
-        .{ .name = "displayTrees", .function = "displayTrees", .input_links = &[_]runtime.InputLink{
+        .{ .name = "displayTrees", .function = "displayTrees", .input_links = &[_]InputLink{
             .{ .field = "cutout_leaf", .source = .{
                 .node = .{ .name = "getResources", .field = "cutout_leaf" },
             } },
@@ -48,7 +53,7 @@ pub const blueprint = runtime.Blueprint{
                 .node = .{ .name = "getResources", .field = "trees" },
             } },
         } },
-        .{ .name = "animateMeshes", .function = "animateMeshes", .input_links = &[_]runtime.InputLink{
+        .{ .name = "animateMeshes", .function = "animateMeshes", .input_links = &[_]InputLink{
             .{ .field = "models", .source = .{
                 .node = .{ .name = "getResources", .field = "models" },
             } },
@@ -56,7 +61,7 @@ pub const blueprint = runtime.Blueprint{
                 .node = .{ .name = "timing", .field = "seconds_since_start" },
             } },
         } },
-        .{ .name = "displayForest", .function = "displayForest", .input_links = &[_]runtime.InputLink{
+        .{ .name = "displayForest", .function = "displayForest", .input_links = &[_]InputLink{
             .{ .field = "forest_chunk_cache", .source = .{
                 .store_field = "forest_chunk_cache",
             } },
@@ -64,7 +69,7 @@ pub const blueprint = runtime.Blueprint{
                 .node = .{ .name = "calculateTerrainDensityInfluenceRange", .field = "terrain_sampler" },
             } },
         } },
-        .{ .name = "displayBike", .function = "displayBike", .input_links = &[_]runtime.InputLink{
+        .{ .name = "displayBike", .function = "displayBike", .input_links = &[_]InputLink{
             .{ .field = "terrain_sampler", .source = .{
                 .node = .{ .name = "calculateTerrainDensityInfluenceRange", .field = "terrain_sampler" },
             } },
@@ -76,15 +81,15 @@ pub const blueprint = runtime.Blueprint{
             } },
             .{ .field = "bounce", .source = .{ .input_field = "bounce" } },
         } },
-        .{ .name = "displayTerrain", .function = "displayTerrain", .input_links = &[_]runtime.InputLink{
+        .{ .name = "displayTerrain", .function = "displayTerrain", .input_links = &[_]InputLink{
             .{ .field = "terrain_sampler", .source = .{
                 .node = .{ .name = "calculateTerrainDensityInfluenceRange", .field = "terrain_sampler" },
             } },
         } },
-        .{ .name = "calculateTerrainDensityInfluenceRange", .function = "calculateTerrainDensityInfluenceRange", .input_links = &[_]runtime.InputLink{
+        .{ .name = "calculateTerrainDensityInfluenceRange", .function = "calculateTerrainDensityInfluenceRange", .input_links = &[_]InputLink{
             .{ .field = "size_multiplier", .source = .{ .input_field = "size_multiplier" } },
         } },
-        .{ .name = "getScreenspaceMesh", .function = "getScreenspaceMesh", .input_links = &[_]runtime.InputLink{
+        .{ .name = "getScreenspaceMesh", .function = "getScreenspaceMesh", .input_links = &[_]InputLink{
             .{ .field = "camera_position", .source = .{
                 .node = .{ .name = "orbit", .field = "camera_position" },
             } },
@@ -93,13 +98,13 @@ pub const blueprint = runtime.Blueprint{
             } },
         } },
     },
-    .store = &[_]runtime.SystemSink{
+    .store = &[_]SystemSink{
         .{ .output_node = "orbit", .output_field = "orbit_camera", .system_field = "orbit_camera" },
         .{ .output_node = "timing", .output_field = "last_time", .system_field = "last_time" },
         .{ .output_node = "orbit", .output_field = "player", .system_field = "player" },
         .{ .output_node = "displayForest", .output_field = "forest_chunk_cache", .system_field = "forest_chunk_cache" },
     },
-    .output = &[_]runtime.SystemSink{
+    .output = &[_]SystemSink{
         .{ .output_node = "getResources", .output_field = "skybox", .system_field = "skybox" },
         .{ .output_node = "getResources", .output_field = "models", .system_field = "models" },
         .{ .output_node = "animateMeshes", .output_field = "models", .system_field = "models" },

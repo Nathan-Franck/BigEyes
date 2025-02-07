@@ -1,6 +1,6 @@
-const Coord = @import("utils.zig").Coord;
-const vm = @import("utils.zig").vec_math;
-const Vec2 = @import("utils.zig").Vec2;
+const Coord = @import("../utils.zig").Coord;
+const vm = @import("../utils.zig").vec_math;
+const Vec2 = @import("../utils.zig").Vec2;
 pub const Resolution = struct { x: u32, y: u32 };
 
 size: f32,

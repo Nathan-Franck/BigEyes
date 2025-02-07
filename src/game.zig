@@ -7,7 +7,7 @@ const zbullet = @import("zbullet");
 const gen = @import("generated");
 const _ = gen.GeneratedData;
 
-const graph_runtime = @import("node_graph").graph_runtime;
+const node_graph = @import("node_graph");
 const CoordIterator = @import("utils").CoordIterator;
 const Bounds = @import("utils").Bounds;
 const Coord = @import("utils").Coord;
@@ -18,24 +18,24 @@ const mesh_helper = @import("utils").mesh_helper;
 const raytrace = @import("utils").raytrace;
 const subdiv = @import("utils").subdiv;
 const tree = @import("utils").tree;
-const queryable = @import("node_graph").utils_node.queryable;
 const math = @import("utils").vec_math;
 const types = @import("utils").types;
 const resources = @import("resources");
 
-const graph = @import("./graph.zig");
+const graph = @import("./game/graph.zig");
 
+const queryable = node_graph.utils_node.queryable;
 const mesh_loader = resources.mesh_loader;
 const config = resources.config;
 const Forest = config.Forest;
 const TerrainSampler = config.TerrainSampler;
 
-pub const NodeGraph = graph_runtime.NodeGraph(
+pub const GameGraph = node_graph.NodeGraph(
     graph.blueprint,
     graph_nodes,
 );
 
-pub const graph_inputs: NodeGraph.SystemInputs = .{
+pub const graph_inputs: GameGraph.SystemInputs = .{
     .time = 0,
     .input = .{
         .mouse_delta = .{ 0, 0, 0, 0 },
@@ -50,14 +50,14 @@ pub const graph_inputs: NodeGraph.SystemInputs = .{
     .selected_camera = .orbit,
     .player_settings = .{
         .look_speed = 0.004,
-        .movement_speed = 0.10,
+        .movement_speed = 0.8,
     },
     .render_resolution = .{ .x = 0, .y = 0 },
     .size_multiplier = 1,
     .bounce = false,
 };
 
-pub const graph_store: NodeGraph.SystemStore = .{
+pub const graph_store: GameGraph.SystemStore = .{
     .last_time = 0,
     .forest_chunk_cache = config.ForestSpawner.ChunkCache.init(std.heap.page_allocator),
     .player = .{
@@ -73,13 +73,13 @@ pub const graph_store: NodeGraph.SystemStore = .{
 
 pub const InterfaceEnum = std.meta.DeclEnum(interface);
 pub const interface = struct {
-    var node_graph: NodeGraph = undefined;
+    var game_graph: GameGraph = undefined;
     var world: zbullet.World = undefined;
 
-    pub const getGraphJson = NodeGraph.getDisplayDefinition;
+    pub const getGraphJson = GameGraph.getDisplayDefinition;
 
     pub fn init() void {
-        node_graph = try NodeGraph.init(.{
+        game_graph = try GameGraph.init(.{
             .allocator = std.heap.page_allocator,
             .inputs = graph_inputs,
             .store = graph_store,
@@ -87,12 +87,12 @@ pub const interface = struct {
     }
 
     pub fn updateNodeGraph(
-        inputs: NodeGraph.PartialSystemInputs,
+        inputs: GameGraph.PartialSystemInputs,
     ) !struct {
-        outputs: NodeGraph.SystemOutputs,
+        outputs: GameGraph.SystemOutputs,
     } {
         return .{
-            .outputs = try node_graph.update(inputs),
+            .outputs = try game_graph.update(inputs),
         };
     }
 };

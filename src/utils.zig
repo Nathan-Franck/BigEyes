@@ -1,18 +1,18 @@
 const std = @import("std");
 
-pub const types = @import("types.zig");
-pub const Image = @import("Image.zig");
-pub const vec_math = @import("vec_math.zig");
-pub const mesh_helper = @import("mesh_helper.zig");
-pub const forest = @import("forest.zig");
-pub const tree = @import("tree.zig");
-pub const raytrace = @import("raytrace.zig");
-pub const subdiv = @import("subdiv.zig");
-pub const CoordIterator = @import("CoordIterator.zig");
-pub const BlendMeshSpec = @import("BlendMeshSpec.zig");
-pub const BlendAnimatedMeshSpec = @import("BlendAnimatedMeshSpec.zig");
-pub const terrain_sampler = @import("terrain_sampler.zig");
-pub const Stamp = @import("Stamp.zig");
+pub const types = @import("utils/types.zig");
+pub const Image = @import("utils/Image.zig");
+pub const vec_math = @import("utils/vec_math.zig");
+pub const mesh_helper = @import("utils/mesh_helper.zig");
+pub const forest = @import("utils/forest.zig");
+pub const tree = @import("utils/tree.zig");
+pub const raytrace = @import("utils/raytrace.zig");
+pub const subdiv = @import("utils/subdiv.zig");
+pub const CoordIterator = @import("utils/CoordIterator.zig");
+pub const BlendMeshSpec = @import("utils/BlendMeshSpec.zig");
+pub const BlendAnimatedMeshSpec = @import("utils/BlendAnimatedMeshSpec.zig");
+pub const terrain_sampler = @import("utils/terrain_sampler.zig");
+pub const Stamp = @import("utils/Stamp.zig");
 
 pub const Coord = CoordIterator.Coord;
 pub const Vec4 = @Vector(4, f32);

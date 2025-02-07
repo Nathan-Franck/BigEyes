@@ -1,7 +1,7 @@
 const std = @import("std");
 const utils = @import("utils");
-const NodeGraphBlueprintEntry = @import("./graph_runtime.zig").NodeGraphBlueprintEntry;
-const InputLink = @import("./graph_runtime.zig").InputLink;
+const NodeGraphBlueprintEntry = @import("../node_graph.zig").NodeGraphBlueprintEntry;
+const InputLink = @import("../node_graph.zig").InputLink;
 
 pub fn MutableInputs(node: NodeGraphBlueprintEntry, NodeInputs: type) type {
     var mutable_fields: []const std.builtin.Type.StructField = &.{};
