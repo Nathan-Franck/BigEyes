@@ -48,7 +48,7 @@ pub fn loadModelsFromBlends(
     var model_transforms = std.StringHashMap(zmath.Mat).init(arena);
     var armatures = std.StringHashMap(BlendMeshSpec.Armature).init(arena);
     inline for (blend_inputs) |blend_input| {
-        const json_data = @embedFile(std.fmt.comptimePrint("content/{s}.blend.json", .{blend_input.model_name}));
+        const json_data = @embedFile(std.fmt.comptimePrint("./content/{s}.blend.json", .{blend_input.model_name}));
         const blend = try loadBlendFromJson(arena, json_data);
         for (blend.nodes) |node| {
             if (node.armature) |armature| {
