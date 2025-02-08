@@ -1,5 +1,7 @@
 const std = @import("std");
 const game = @import("../game.zig");
+const types = @import("resources").types;
+const config = @import("resources").config;
 const graph_nodes = game.graph_nodes;
 const builtin = std.builtin;
 
@@ -18,64 +20,77 @@ fn declareStore(fields: anytype) type {
     return struct {};
 }
 
-fn MappedFields(t: type, map: fn (in: type) type) type {
-    var f: []const std.builtin.Type.StructField = &.{};
-    for (@typeInfo(t).@"struct".fields) |field| {
-        const new_t = map(field.type);
-        f = f ++ .{std.builtin.Type.StructField{
-            .name = field.name,
-            .type = new_t,
-            .default_value = null,
-            .is_comptime = false,
-            .alignment = @alignOf(new_t),
-        }};
-    }
-    return @Type(std.builtin.Type{ .@"struct" = .{
-        .layout = .auto,
-        .fields = f,
-        .decls = &.{},
-        .is_tuple = false,
-    } });
+fn AllocatorFirstParam(t: type) bool {
+    const fn_params = fnParams(t);
+    return switch (fn_params.len) {
+        1 => false,
+        2 => true,
+        else => @compileError("Unsupported node function parameters"),
+    };
 }
 
-fn Node(src: std.builtin.SourceLocation, @"fn": anytype, fields: anytype) type {
-    _ = .{ src, fields };
+fn fnParams(t: type) []const std.builtin.Type.Fn.Param {
+    return @typeInfo(t).@"fn".params;
+}
+
+fn NodeInputs(@"fn": anytype) type {
+    const fn_params = fnParams(@TypeOf(@"fn"));
+    return fn_params[if (AllocatorFirstParam(@TypeOf(@"fn"))) 1 else 0].type.?;
+}
+
+fn NodeOutputs(@"fn": anytype) type {
     const fn_return = @typeInfo(@TypeOf(@"fn")).@"fn".return_type.?;
-
-    const util = struct {
-        fn InnerType(t: type) type {
-            return struct { hi: t };
-        }
-    };
-    const t = switch (@typeInfo(fn_return)) {
+    return switch (@typeInfo(fn_return)) {
+        else => fn_return,
         .error_union => |e| e.payload,
-        .@"struct" => fn_return,
-        else => @compileError("unsupported type"),
     };
-    const f = MappedFields(t, util.InnerType);
+}
 
-    return f;
+fn node(comptime src: std.builtin.SourceLocation, @"fn": anytype, fields: NodeInputs(@"fn")) NodeOutputs(@"fn") {
+    _ = src;
+    @compileLog(fnParams(@TypeOf(@"fn")));
+    const fn_output = @call(.auto, @"fn", comptime if (AllocatorFirstParam(@TypeOf(@"fn")))
+        .{ std.heap.page_allocator, fields }
+    else
+        .{fields});
+    return switch (@typeInfo(@TypeOf(fn_output))) {
+        else => fn_output,
+        .error_union => try fn_output,
+    };
 }
-fn node(comptime src: std.builtin.SourceLocation, @"fn": anytype, fields: anytype) Node(src, @"fn", fields) {
-    return .{};
-}
+
 /// Meta-function that take multiple input slices and concatenate into a single output slice
 fn concat(slice_inputs: anytype) type {
     _ = slice_inputs;
 }
 
-pub fn gameBlueprint() bool {
-    const inputs = declareInputs(enum { time, last_time });
-    const store = declareStore(enum { orbit_camera, player, forest_chunk_cache });
-    const getResources = node(graph_nodes.getResources, .{});
-    const timing = node(graph_nodes.timing, .{
-        // .time = inputs.time,
-        // .last_time = inputs.last_time,
+pub fn gameBlueprint(
+    inputs: struct {
+        time: u64,
+        render_resolution: types.PixelPoint,
+        orbit_speed: f32,
+        input: types.Input,
+        selected_camera: types.SelectedCamera,
+        player_settings: types.PlayerSettings,
+        bounce: bool,
+        size_multiplier: f32,
+    },
+    store: struct {
+        last_time: u64,
+        orbit_camera: types.OrbitCamera,
+        player: types.Player,
+        forest_chunk_cache: config.ForestSpawner.ChunkCache,
+    },
+) bool {
+    const getResources = node(@src(), graph_nodes.getResources, .{});
+    const timing = node(@src(), graph_nodes.timing, .{
+        .time = inputs.time,
+        .last_time = store.last_time,
     });
-    const calculateTerrainDensityInfluenceRange = node(graph_nodes.calculateTerrainDensityInfluenceRange, .{
-        // .size_multiplier = inputs.size_multiplier,
+    const calculateTerrainDensityInfluenceRange = node(@src(), graph_nodes.calculateTerrainDensityInfluenceRange, .{
+        .size_multiplier = inputs.size_multiplier,
     });
-    const orbit = node(graph_nodes.orbit, .{
+    const orbit = node(@src(), graph_nodes.orbit, .{
         .delta_time = timing.delta_time,
         .render_resolution = inputs.render_resolution,
         .orbit_speed = inputs.orbit_speed,
@@ -86,28 +101,28 @@ pub fn gameBlueprint() bool {
         .player = store.player,
         .terrain_sampler = calculateTerrainDensityInfluenceRange.terrain_sampler,
     });
-    const displayTrees = node(graph_nodes.displayTrees, .{
+    const displayTrees = node(@src(), graph_nodes.displayTrees, .{
         .cutout_leaf = getResources.cutout_leaf,
         .trees = getResources.trees,
     });
-    const animateMeshes = node(graph_nodes.animateMeshes, .{
+    const animateMeshes = node(@src(), graph_nodes.animateMeshes, .{
         .models = getResources.models,
         .seconds_since_start = timing.seconds_since_start,
     });
-    const displayForest = node(graph_nodes.displayForest, .{
+    const displayForest = node(@src(), graph_nodes.displayForest, .{
         .forest_chunk_cache = store.forest_chunk_cache,
         .terrain_sampler = calculateTerrainDensityInfluenceRange.terrain_sampler,
     });
-    const displayBike = node(graph_nodes.displayBike, .{
+    const displayBike = node(@src(), graph_nodes.displayBike, .{
         .terrain_sampler = calculateTerrainDensityInfluenceRange.terrain_sampler,
         .seconds_since_start = timing.seconds_since_start,
         .model_transforms = getResources.model_transforms,
         .bounce = inputs.bounce,
     });
-    const displayTerrain = node(graph_nodes.displayTerrain, .{
+    const displayTerrain = node(@src(), graph_nodes.displayTerrain, .{
         .terrain_sampler = calculateTerrainDensityInfluenceRange.terrain_sampler,
     });
-    const getScreenspaceMesh = node(graph_nodes.getScreenspaceMesh, .{
+    const getScreenspaceMesh = node(@src(), graph_nodes.getScreenspaceMesh, .{
         .camera_position = orbit.camera_position,
         .world_matrix = orbit.world_matrix,
     });

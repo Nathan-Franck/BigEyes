@@ -79,7 +79,7 @@ pub const interface = struct {
     pub const getGraphJson = GameGraph.getDisplayDefinition;
 
     pub fn init() void {
-        std.debug.print("{any}\n", .{@import("game/new_graph.zig").gameBlueprint});
+        std.debug.print("{any}\n", .{@import("game/new_graph.zig").gameBlueprint(undefined, undefined)});
         game_graph = try GameGraph.init(.{
             .allocator = std.heap.page_allocator,
             .inputs = graph_inputs,
@@ -143,20 +143,12 @@ pub const graph_nodes = struct {
         props: struct {
             delta_time: queryable.Value(f32),
             orbit_speed: f32,
-            render_resolution: struct { x: i32, y: i32 },
-            input: struct {
-                mouse_delta: zmath.Vec,
-                movement: struct {
-                    left: ?u64,
-                    right: ?u64,
-                    forward: ?u64,
-                    backward: ?u64,
-                },
-            },
+            render_resolution: types.PixelPoint,
+            input: types.Input,
             orbit_camera: *types.OrbitCamera,
-            selected_camera: enum { orbit, first_person },
-            player_settings: struct { movement_speed: f32, look_speed: f32 },
-            player: *struct { position: Vec4, euler_rotation: Vec4 },
+            selected_camera: types.SelectedCamera,
+            player_settings: types.PlayerSettings,
+            player: *types.Player,
             terrain_sampler: TerrainSampler,
         },
     ) !struct {

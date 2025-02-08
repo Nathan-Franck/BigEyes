@@ -57,10 +57,35 @@ pub const QuadMeshHelper = mesh_helper.Polygon(.Quad);
 
 pub const PixelPoint = struct { x: u32, y: u32 };
 
+pub const Input = struct {
+    mouse_delta: Vec4,
+    movement: struct {
+        left: ?u64,
+        right: ?u64,
+        forward: ?u64,
+        backward: ?u64,
+    },
+};
+
+pub const SelectedCamera = enum {
+    orbit,
+    first_person,
+};
+
+pub const PlayerSettings = struct {
+    movement_speed: f32,
+    look_speed: f32,
+};
+
 pub const OrbitCamera = struct {
     position: zm.Vec,
     rotation: zm.Vec,
     track_distance: f32,
+};
+
+pub const Player = struct {
+    position: Vec4,
+    euler_rotation: Vec4,
 };
 
 pub const TreeMesh = struct {
