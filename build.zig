@@ -92,6 +92,35 @@ pub fn build(
     const zbullet = b.dependency("zbullet", .{});
     const zmath = b.dependency("zmath", .{});
     const zopengl = b.dependency("zopengl", .{});
+    const utils = b.createModule(.{
+        .root_source_file = b.path("src/utils.zig"),
+        .imports = &.{
+            .{ .name = "zmath", .module = zmath.module("root") },
+        },
+    });
+    const node_graph = b.createModule(.{
+        .root_source_file = b.path("src/node_graph.zig"),
+        .imports = &.{
+            .{ .name = "utils", .module = utils },
+        },
+    });
+    const resources = b.createModule(.{
+        .root_source_file = b.path("src/resources.zig"),
+        .imports = &.{
+            .{ .name = "zmath", .module = zmath.module("root") },
+            .{ .name = "utils", .module = utils },
+        },
+    });
+    const game = b.createModule(.{
+        .root_source_file = b.path("src/game.zig"),
+        .imports = &.{
+            .{ .name = "zmath", .module = zmath.module("root") },
+            .{ .name = "zbullet", .module = zbullet.module("root") },
+            .{ .name = "node_graph", .module = node_graph },
+            .{ .name = "resources", .module = resources },
+            .{ .name = "utils", .module = utils },
+        },
+    });
 
     // Tests (default)
     {
@@ -129,53 +158,26 @@ pub fn build(
 
     // Check
     {
-        const exe_check = b.addExecutable(.{
+        const check = b.addExecutable(.{
             .target = target,
             .optimize = optimize,
             .name = "check_exe",
             // .root_source_file = b.path("src/glfw_entry.zig"),
-            .root_source_file = b.path("src/wasm_entry.zig"),
+            .root_source_file = b.path("src/glfw.zig"),
             // .root_source_file = b.path("src/test_perf.zig"),
         });
-        exe_check.root_module.addImport("zmath", zmath.module("root"));
-        exe_check.root_module.addImport("zbullet", zbullet.module("root"));
+        check.root_module.addImport("game", game);
+        check.root_module.addImport("zglfw", zglfw.module("root"));
+        check.root_module.addImport("zopengl", zopengl.module("root"));
+        check.root_module.addImport("zmath", zmath.module("root"));
+        check.root_module.addImport("zbullet", zbullet.module("root"));
 
-        const check = b.step("check", "Check if wasm compiles");
-        check.dependOn(&exe_check.step);
+        const check_step = b.step("check", "Check if wasm compiles");
+        check_step.dependOn(&check.step);
     }
 
     // Exe glfw
     {
-        const utils = b.createModule(.{
-            .root_source_file = b.path("src/utils.zig"),
-            .imports = &.{
-                .{ .name = "zmath", .module = zmath.module("root") },
-            },
-        });
-        const node_graph = b.createModule(.{
-            .root_source_file = b.path("src/node_graph.zig"),
-            .imports = &.{
-                .{ .name = "utils", .module = utils },
-            },
-        });
-        const resources = b.createModule(.{
-            .root_source_file = b.path("src/resources.zig"),
-            .imports = &.{
-                .{ .name = "zmath", .module = zmath.module("root") },
-                .{ .name = "utils", .module = utils },
-            },
-        });
-        const game = b.createModule(.{
-            .root_source_file = b.path("src/game.zig"),
-            .imports = &.{
-                .{ .name = "zmath", .module = zmath.module("root") },
-                .{ .name = "zbullet", .module = zbullet.module("root") },
-                .{ .name = "node_graph", .module = node_graph },
-                .{ .name = "resources", .module = resources },
-                .{ .name = "utils", .module = utils },
-            },
-        });
-
         var exe = b.addExecutable(.{
             .name = "game_exe",
             .root_source_file = b.path("src/glfw.zig"),

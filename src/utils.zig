@@ -23,6 +23,21 @@ pub const Bounds = struct {
     size: Vec2,
 };
 
+pub const SmoothCurve = struct {
+    y_values: []const f32,
+    x_range: [2]f32,
+
+    pub fn sample(self: SmoothCurve, t: f32) f32 {
+        const normalized_t = (t - self.x_range[0]) / (self.x_range[1] - self.x_range[0]);
+        const clamped_t = std.math.clamp(normalized_t, 0, 1);
+        const index_float = clamped_t * @as(f32, @floatFromInt(self.y_values.len - 1));
+        const index_low = @as(usize, @intFromFloat(std.math.floor(index_float)));
+        const index_high = @as(usize, @intFromFloat(std.math.ceil(index_float)));
+        const frac = index_float - @as(f32, @floatFromInt(index_low));
+        return self.y_values[index_low] * (1 - frac) + self.y_values[index_high] * frac;
+    }
+};
+
 /// Apply the changes in `field_changes` to `source_data`.
 ///
 /// NOTE: This will fail to compile if not all field_changes are used in the original source_data.

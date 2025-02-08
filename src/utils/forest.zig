@@ -1,9 +1,7 @@
 const std = @import("std");
 const zm = @import("zmath");
 const vm = @import("./vec_math.zig");
-const util = .{
-    .tree = @import("./tree.zig"),
-};
+const SmoothCurve = @import("../utils.zig").SmoothCurve;
 const Vec2 = @import("../utils.zig").Vec2;
 const Vec4 = @import("../utils.zig").Vec4;
 const Coord = @import("../utils.zig").Coord;
@@ -22,7 +20,7 @@ pub fn Forest(comptime chunk_size: i32) type {
             spawn_radii: ?[]const SpawnRadius = null,
             density: i32,
             likelihood: f32,
-            scale_range: util.tree.SmoothCurve,
+            scale_range: SmoothCurve,
         };
 
         pub fn spawner(ForestSettings: type) type {

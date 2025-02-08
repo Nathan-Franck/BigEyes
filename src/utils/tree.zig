@@ -1,5 +1,6 @@
 const std = @import("std");
 const zm = @import("zmath");
+const utils = @import("../utils.zig");
 
 const math = std.math;
 const Allocator = std.mem.Allocator;
@@ -20,21 +21,6 @@ fn flattenAngle(unnormalized_angle: f32, rate: f32) f32 {
         (1 - rate) + offset);
 }
 
-pub const SmoothCurve = struct {
-    y_values: []const f32,
-    x_range: [2]f32,
-
-    pub fn sample(self: SmoothCurve, t: f32) f32 {
-        const normalized_t = (t - self.x_range[0]) / (self.x_range[1] - self.x_range[0]);
-        const clamped_t = std.math.clamp(normalized_t, 0, 1);
-        const index_float = clamped_t * @as(f32, @floatFromInt(self.y_values.len - 1));
-        const index_low = @as(usize, @intFromFloat(std.math.floor(index_float)));
-        const index_high = @as(usize, @intFromFloat(std.math.ceil(index_float)));
-        const frac = index_float - @as(f32, @floatFromInt(index_low));
-        return self.y_values[index_low] * (1 - frac) + self.y_values[index_high] * frac;
-    }
-};
-
 pub const DepthDefinition = struct {
     split_amount: f32,
     flatness: f32,
@@ -42,7 +28,7 @@ pub const DepthDefinition = struct {
     height_spread: f32,
     branch_pitch: f32,
     branch_roll: f32,
-    height_to_growth: SmoothCurve,
+    height_to_growth: utils.SmoothCurve,
 };
 
 pub const Settings = struct {
@@ -58,7 +44,7 @@ pub const MeshSettings = struct {
         length: f32,
         breadth: f32,
     },
-    growth_to_thickness: SmoothCurve,
+    growth_to_thickness: utils.SmoothCurve,
 };
 
 pub const Node = struct {
