@@ -79,7 +79,7 @@ pub const interface = struct {
     pub const getGraphJson = GameGraph.getDisplayDefinition;
 
     pub fn init() void {
-        // std.debug.print("{any}\n", .{@import("game/new_graph.zig").gameBlueprint(undefined, undefined)});
+        std.debug.print("{any}\n", .{@import("game/new_graph.zig").gameBlueprint(undefined, undefined)});
         game_graph = try GameGraph.init(.{
             .allocator = std.heap.page_allocator,
             .inputs = graph_inputs,
