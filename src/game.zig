@@ -79,7 +79,9 @@ pub const interface = struct {
     pub const getGraphJson = GameGraph.getDisplayDefinition;
 
     pub fn init() void {
-        std.debug.print("{any}\n", .{@import("game/new_graph.zig").gameBlueprint(undefined, undefined)});
+        const NewGameGraph = @import("game/new_graph.zig").GameGraph;
+        var new_game_graph = NewGameGraph.init(std.heap.page_allocator);
+        std.debug.print("{any}\n", .{new_game_graph.update(undefined)});
         game_graph = try GameGraph.init(.{
             .allocator = std.heap.page_allocator,
             .inputs = graph_inputs,
@@ -279,11 +281,7 @@ pub const graph_nodes = struct {
             camera_position: Vec4,
             world_matrix: zmath.Mat,
         },
-    ) !struct { screen_space_mesh: struct {
-        indices: []const u32,
-        uvs: []const Vec2,
-        normals: []const Vec4,
-    } } {
+    ) !struct { screen_space_mesh: types.ScreenspaceMesh } {
         const inverse_view_projection = zmath.inverse(props.world_matrix);
         var normals: [4]Vec4 = undefined;
         for (

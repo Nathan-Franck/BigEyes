@@ -31,6 +31,12 @@ pub const SubdivBoneMesh = struct {
     armature: Armature,
 };
 
+pub const ScreenspaceMesh = struct {
+    indices: []const u32,
+    uvs: []const Vec2,
+    normals: []const Vec4,
+};
+
 pub const TextureMesh = struct {
     diffuse_alpha: Image.Processed,
     indices: []const u32,

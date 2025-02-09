@@ -1,6 +1,7 @@
 const std = @import("std");
 const game = @import("../game.zig");
 const utils = @import("utils");
+const zmath = @import("zmath");
 const utils_node = @import("node_graph").utils_node;
 const types = @import("resources").types;
 const config = @import("resources").config;
@@ -122,136 +123,187 @@ fn NodeOutputs(@"fn": anytype) type {
     } });
 }
 
-fn node(comptime src: std.builtin.SourceLocation, @"fn": anytype, raw_props: NodeInputs(@"fn")) NodeOutputs(@"fn") {
-    _ = src;
-    const Props = ParamsToNodeProps(@TypeOf(@"fn"));
-    var props: Props = undefined;
-    var mutable_props: MutableProps(@"fn") = undefined;
-    inline for (@typeInfo(@TypeOf(mutable_props)).@"struct".fields) |field| {
-        @field(mutable_props, field.name) = @field(raw_props, field.name);
-    }
-    inline for (@typeInfo(Props).@"struct".fields) |prop| {
-        const default = @field(raw_props, prop.name);
-        @field(props, prop.name) = switch (@typeInfo(prop.type)) {
-            .@"struct" => blk: {
-                if (utils_node.queryable.getSourceOrNull(prop.type)) |t| {
-                    var is_field_dirty = false; // TODO - Proper queryable change detection
-                    var queried = true;
-                    break :blk utils_node.queryable.Value(t).initQueryable(default, &is_field_dirty, &queried);
-                } else {
-                    break :blk default;
-                }
-            },
-            .pointer => |pointer| if (!pointer.is_const) switch (pointer.size) {
-                else => default,
-                .One => &@field(mutable_props, prop.name),
-                .Slice => &@field(raw_props, prop.name),
-            } else default,
-            else => default,
+const Runtime = struct {
+    const NodeArenas = std.StringHashMap(std.heap.ArenaAllocator);
+    allocator: std.mem.Allocator,
+    node_arenas: NodeArenas,
+    pub fn init(allocator: std.mem.Allocator) @This() {
+        return .{
+            .allocator = allocator,
+            .node_arenas = NodeArenas.init(allocator),
         };
     }
-    const raw_fn_output = @call(.auto, @"fn", if (comptime isAllocatorFirstParam(@TypeOf(@"fn")))
-        .{ std.heap.page_allocator, props }
-    else
-        .{props});
-    const fn_output = switch (@typeInfo(@TypeOf(raw_fn_output))) {
-        else => raw_fn_output,
-        .error_union => raw_fn_output catch @panic("Error thrown in a node call!"),
-    };
-    var node_output: NodeOutputs(@"fn") = undefined;
-    inline for (@typeInfo(@TypeOf(fn_output)).@"struct".fields) |field| {
-        @field(node_output, field.name) = @field(fn_output, field.name);
+
+    pub fn node(self: *@This(), comptime src: std.builtin.SourceLocation, @"fn": anytype, raw_props: NodeInputs(@"fn")) NodeOutputs(@"fn") {
+        const src_key = std.fmt.comptimePrint("{s}:{d}:{d}", .{ src.file, src.line, src.column });
+        const arena = if (self.node_arenas.getPtr(src_key)) |arena| arena else blk: {
+            self.node_arenas.put(src_key, std.heap.ArenaAllocator.init(self.allocator)) catch unreachable;
+            break :blk self.node_arenas.getPtr(src_key).?;
+        };
+        _ = arena.reset(.retain_capacity);
+
+        const Props = ParamsToNodeProps(@TypeOf(@"fn"));
+        var props: Props = undefined;
+        var mutable_props: MutableProps(@"fn") = undefined;
+        inline for (@typeInfo(@TypeOf(mutable_props)).@"struct".fields) |field| {
+            const thinger = @field(raw_props, field.name);
+            @field(mutable_props, field.name) = utils.deepClone(
+                @TypeOf(thinger),
+                arena.allocator(),
+                thinger,
+            ) catch unreachable;
+        }
+        inline for (@typeInfo(Props).@"struct".fields) |prop| {
+            const default = @field(raw_props, prop.name);
+            @field(props, prop.name) = switch (@typeInfo(prop.type)) {
+                .@"struct" => blk: {
+                    if (utils_node.queryable.getSourceOrNull(prop.type)) |t| {
+                        var is_field_dirty = false; // TODO - Proper queryable change detection
+                        var queried = true;
+                        break :blk utils_node.queryable.Value(t).initQueryable(default, &is_field_dirty, &queried);
+                    } else {
+                        break :blk default;
+                    }
+                },
+                .pointer => |pointer| if (!pointer.is_const) switch (pointer.size) {
+                    else => default,
+                    .One => &@field(mutable_props, prop.name),
+                    .Slice => &@field(raw_props, prop.name),
+                } else default,
+                else => default,
+            };
+        }
+        const raw_fn_output = @call(.auto, @"fn", if (comptime isAllocatorFirstParam(@TypeOf(@"fn")))
+            .{ arena.allocator(), props }
+        else
+            .{props});
+        const fn_output = switch (@typeInfo(@TypeOf(raw_fn_output))) {
+            else => raw_fn_output,
+            .error_union => raw_fn_output catch @panic("Error thrown in a node call!"),
+        };
+        var node_output: NodeOutputs(@"fn") = undefined;
+        inline for (@typeInfo(@TypeOf(fn_output)).@"struct".fields) |field| {
+            @field(node_output, field.name) = @field(fn_output, field.name);
+        }
+        inline for (@typeInfo(@TypeOf(mutable_props)).@"struct".fields) |field| {
+            @field(node_output, field.name) = @field(mutable_props, field.name);
+        }
+        return node_output;
     }
-    inline for (@typeInfo(@TypeOf(mutable_props)).@"struct".fields) |field| {
-        @field(node_output, field.name) = @field(mutable_props, field.name);
-    }
-    return node_output;
-}
+};
 
 /// Meta-function that take multiple input slices and concatenate into a single output slice
 fn concat(slice_inputs: anytype) type {
     _ = slice_inputs;
 }
 
-pub fn gameBlueprint(
-    inputs: struct {
-        time: u64,
-        render_resolution: types.PixelPoint,
-        orbit_speed: f32,
-        input: types.Input,
-        selected_camera: types.SelectedCamera,
-        player_settings: types.PlayerSettings,
-        bounce: bool,
-        size_multiplier: f32,
-    },
+pub const GameGraph = struct {
+    allocator: std.mem.Allocator,
+    runtime: Runtime,
+
     store: struct {
         last_time: u64,
         orbit_camera: types.OrbitCamera,
         player: types.Player,
         forest_chunk_cache: config.ForestSpawner.ChunkCache,
     },
-) bool {
-    const getResources = node(@src(), graph_nodes.getResources, .{});
-    const timing = node(@src(), graph_nodes.timing, .{
-        .time = inputs.time,
-        .last_time = store.last_time,
-    });
-    const calculateTerrainDensityInfluenceRange = node(@src(), graph_nodes.calculateTerrainDensityInfluenceRange, .{
-        .size_multiplier = inputs.size_multiplier,
-    });
-    const orbit = node(@src(), graph_nodes.orbit, .{
-        .delta_time = timing.delta_time,
-        .render_resolution = inputs.render_resolution,
-        .orbit_speed = inputs.orbit_speed,
-        .input = inputs.input,
-        .orbit_camera = store.orbit_camera,
-        .selected_camera = inputs.selected_camera,
-        .player_settings = inputs.player_settings,
-        .player = store.player,
-        .terrain_sampler = calculateTerrainDensityInfluenceRange.terrain_sampler,
-    });
-    const displayTrees = node(@src(), graph_nodes.displayTrees, .{
-        .cutout_leaf = getResources.cutout_leaf,
-        .trees = getResources.trees,
-    });
-    const animateMeshes = node(@src(), graph_nodes.animateMeshes, .{
-        .models = getResources.models,
-        .seconds_since_start = timing.seconds_since_start,
-    });
-    const displayForest = node(@src(), graph_nodes.displayForest, .{
-        .forest_chunk_cache = store.forest_chunk_cache,
-        .terrain_sampler = calculateTerrainDensityInfluenceRange.terrain_sampler,
-    });
-    const displayBike = node(@src(), graph_nodes.displayBike, .{
-        .terrain_sampler = calculateTerrainDensityInfluenceRange.terrain_sampler,
-        .seconds_since_start = timing.seconds_since_start,
-        .model_transforms = getResources.model_transforms,
-        .bounce = inputs.bounce,
-    });
-    const displayTerrain = node(@src(), graph_nodes.displayTerrain, .{
-        .terrain_sampler = calculateTerrainDensityInfluenceRange.terrain_sampler,
-    });
-    const getScreenspaceMesh = node(@src(), graph_nodes.getScreenspaceMesh, .{
-        .camera_position = orbit.camera_position,
-        .world_matrix = orbit.world_matrix,
-    });
-    _ = .{
-        .store = .{
-            .orbit_camera = orbit.orbit_camera,
-            .last_time = timing.last_time,
-            .player = orbit.player,
-            .forest_chunk_cache = displayForest.forest_chunk_cache,
+
+    pub fn init(allocator: std.mem.Allocator) @This() {
+        return .{
+            .allocator = allocator,
+            .runtime = Runtime.init(allocator),
+            .store = .{
+                .last_time = 0,
+                .forest_chunk_cache = config.ForestSpawner.ChunkCache.init(std.heap.page_allocator),
+                .player = .{
+                    .position = .{ 0, -0.75, 0, 1 },
+                    .euler_rotation = .{ 0, 0, 0, 1 },
+                },
+                .orbit_camera = .{
+                    .position = .{ 0, -0.75, 0, 1 },
+                    .rotation = .{ 0, 0, 0, 1 },
+                    .track_distance = 10,
+                },
+            },
+        };
+    }
+
+    pub fn update(
+        self: *@This(),
+        inputs: struct {
+            time: u64,
+            render_resolution: types.PixelPoint,
+            orbit_speed: f32,
+            input: types.Input,
+            selected_camera: types.SelectedCamera,
+            player_settings: types.PlayerSettings,
+            bounce: bool,
+            size_multiplier: f32,
         },
-        .output = .{
+    ) struct {
+        skybox: types.ProcessedCubeMap,
+        models: []const types.GameModel,
+        screen_space_mesh: types.ScreenspaceMesh,
+        model_instances: []const types.ModelInstances,
+        terrain_mesh: types.GreyboxMesh,
+        terrain_instance: types.ModelInstances,
+        world_matrix: zmath.Mat,
+    } {
+        const rt = &self.runtime;
+        const store = &self.store;
+
+        const getResources = rt.node(@src(), graph_nodes.getResources, .{});
+        const timing = rt.node(@src(), graph_nodes.timing, .{
+            .time = inputs.time,
+            .last_time = store.last_time,
+        });
+        const calculateTerrainDensityInfluenceRange = rt.node(@src(), graph_nodes.calculateTerrainDensityInfluenceRange, .{
+            .size_multiplier = inputs.size_multiplier,
+        });
+        const orbit = rt.node(@src(), graph_nodes.orbit, .{
+            .delta_time = timing.delta_time,
+            .render_resolution = inputs.render_resolution,
+            .orbit_speed = inputs.orbit_speed,
+            .input = inputs.input,
+            .orbit_camera = store.orbit_camera,
+            .selected_camera = inputs.selected_camera,
+            .player_settings = inputs.player_settings,
+            .player = store.player,
+            .terrain_sampler = calculateTerrainDensityInfluenceRange.terrain_sampler,
+        });
+        const displayTrees = rt.node(@src(), graph_nodes.displayTrees, .{
+            .cutout_leaf = getResources.cutout_leaf,
+            .trees = getResources.trees,
+        });
+        const animateMeshes = rt.node(@src(), graph_nodes.animateMeshes, .{
+            .models = getResources.models,
+            .seconds_since_start = timing.seconds_since_start,
+        });
+        const displayForest = rt.node(@src(), graph_nodes.displayForest, .{
+            .forest_chunk_cache = store.forest_chunk_cache,
+            .terrain_sampler = calculateTerrainDensityInfluenceRange.terrain_sampler,
+        });
+        const displayBike = rt.node(@src(), graph_nodes.displayBike, .{
+            .terrain_sampler = calculateTerrainDensityInfluenceRange.terrain_sampler,
+            .seconds_since_start = timing.seconds_since_start,
+            .model_transforms = getResources.model_transforms,
+            .bounce = inputs.bounce,
+        });
+        const displayTerrain = rt.node(@src(), graph_nodes.displayTerrain, .{
+            .terrain_sampler = calculateTerrainDensityInfluenceRange.terrain_sampler,
+        });
+        const getScreenspaceMesh = rt.node(@src(), graph_nodes.getScreenspaceMesh, .{
+            .camera_position = orbit.camera_position,
+            .world_matrix = orbit.world_matrix,
+        });
+        return .{
             .skybox = getResources.skybox,
-            .models = concat(.{ getResources.models, animateMeshes.models, displayTrees.models }),
+            .models = std.mem.concat(self.allocator, types.GameModel, &.{ getResources.models, animateMeshes.models, displayTrees.models }) catch unreachable,
             .screen_space_mesh = getScreenspaceMesh.screen_space_mesh,
-            .model_instances = concat(.{ displayForest.model_instances, displayBike.model_instances }),
+            .model_instances = std.mem.concat(self.allocator, types.ModelInstances, &.{ displayForest.model_instances, displayBike.model_instances }) catch unreachable,
             .terrain_mesh = displayTerrain.terrain_mesh,
             .terrain_instance = displayTerrain.terrain_instance,
             .world_matrix = orbit.world_matrix,
-        },
-    };
-
-    return true;
-}
+        };
+    }
+};
