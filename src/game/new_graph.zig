@@ -48,7 +48,7 @@ fn NodeInputs(@"fn": anytype) type {
         };
         new_field = new_field ++ .{std.builtin.Type.StructField{
             .name = field.name,
-            .type = new_t,
+            .type = Dirtyable(new_t),
             .default_value = null,
             .is_comptime = false,
             .alignment = alignment,
@@ -101,6 +101,58 @@ fn NodeOutputs(@"fn": anytype) type {
     for (@typeInfo(MP).@"struct".fields) |mutable_field| {
         new_fields = new_fields ++ .{mutable_field};
     }
+    return DirtyableFields(@Type(std.builtin.Type{ .@"struct" = .{
+        .layout = .auto,
+        .fields = new_fields,
+        .decls = &.{},
+        .is_tuple = false,
+    } }));
+}
+
+fn PartialFields(t: type) type {
+    var new_fields: []const std.builtin.Type.StructField = &.{};
+    for (@typeInfo(t).@"struct".fields) |field| {
+        new_fields = new_fields ++ .{std.builtin.Type.StructField{
+            .name = field.name,
+            .type = ?field.type,
+            .default_value = blk: {
+                const default_value: ?field.type = null;
+                break :blk @ptrCast(&default_value);
+            },
+            .is_comptime = false,
+            .alignment = @alignOf(field.type),
+        }};
+    }
+    return @Type(std.builtin.Type{ .@"struct" = .{
+        .layout = .auto,
+        .fields = new_fields,
+        .decls = &.{},
+        .is_tuple = false,
+    } });
+}
+
+fn Dirtyable(T: type) type {
+    return struct {
+        raw: T,
+        is_dirty: bool,
+        fn set(self: *@This(), value: T) void {
+            self.is_dirty = true;
+            self.raw = value;
+        }
+    };
+}
+
+fn DirtyableFields(T: type) type {
+    var new_fields: []const std.builtin.Type.StructField = &.{};
+    for (@typeInfo(T).@"struct".fields) |field| {
+        new_fields = new_fields ++ .{std.builtin.Type.StructField{
+            .name = field.name,
+            .type = Dirtyable(field.type),
+            .default_value = null,
+            .is_comptime = false,
+            .alignment = @alignOf(field.type),
+        }};
+    }
     return @Type(std.builtin.Type{ .@"struct" = .{
         .layout = .auto,
         .fields = new_fields,
@@ -113,7 +165,7 @@ pub const Runtime = struct {
     allocator: std.mem.Allocator,
     node_states: std.StringHashMap(NodeState),
 
-    pub fn node(self: *@This(), comptime src: std.builtin.SourceLocation, @"fn": anytype, raw_props: NodeInputs(@"fn")) NodeOutputs(@"fn") {
+    pub fn node(self: *@This(), comptime src: std.builtin.SourceLocation, @"fn": anytype, dirtyable_props: NodeInputs(@"fn")) *NodeOutputs(@"fn") {
         const src_key = std.fmt.comptimePrint("{s}:{d}:{d}", .{ src.file, src.line, src.column });
 
         const state = if (self.node_states.getPtr(src_key)) |arena| arena else blk: {
@@ -130,24 +182,25 @@ pub const Runtime = struct {
 
         var mutable_props: MutableProps(@"fn") = undefined;
         inline for (@typeInfo(@TypeOf(mutable_props)).@"struct".fields) |field| {
-            const thinger = @field(raw_props, field.name);
+            const dirtyable_prop = @field(dirtyable_props, field.name);
             @field(mutable_props, field.name) = utils.deepClone(
-                @TypeOf(thinger),
+                @TypeOf(dirtyable_prop.raw),
                 state.arena.allocator(),
-                thinger,
+                dirtyable_prop.raw,
             ) catch unreachable;
         }
 
         const Props = ParamsToNodeProps(@TypeOf(@"fn"));
         var props: Props = undefined;
+        var is_input_dirty = false;
         inline for (@typeInfo(Props).@"struct".fields) |prop| {
-            const default = @field(raw_props, prop.name);
-            @field(props, prop.name) = switch (@typeInfo(prop.type)) {
+            var dirtyable_prop = @field(dirtyable_props, prop.name);
+            const default = dirtyable_prop.raw;
+            const input_field = switch (@typeInfo(prop.type)) {
                 .@"struct" => blk: {
                     if (utils_node.queryable.getSourceOrNull(prop.type)) |t| {
-                        var is_field_dirty = false; // TODO - Proper queryable change detection
                         var queried = true;
-                        break :blk utils_node.queryable.Value(t).initQueryable(default, &is_field_dirty, &queried);
+                        break :blk utils_node.queryable.Value(t).initQueryable(default, &dirtyable_prop.is_dirty, &queried);
                     } else {
                         break :blk default;
                     }
@@ -155,27 +208,39 @@ pub const Runtime = struct {
                 .pointer => |pointer| if (!pointer.is_const) switch (pointer.size) {
                     else => default,
                     .One => &@field(mutable_props, prop.name),
-                    .Slice => &@field(raw_props, prop.name),
+                    .Slice => &@field(dirtyable_props, prop.name),
                 } else default,
                 else => default,
             };
+            if (dirtyable_prop.is_dirty)
+                is_input_dirty = true;
+            @field(props, prop.name) = input_field;
         }
-        const raw_fn_output = @call(.auto, @"fn", if (comptime isAllocatorFirstParam(@TypeOf(@"fn")))
-            .{ state.arena.allocator(), props }
-        else
-            .{props});
-        const fn_output = switch (@typeInfo(@TypeOf(raw_fn_output))) {
-            else => raw_fn_output,
-            .error_union => raw_fn_output catch @panic("Error thrown in a node call!"),
-        };
-        var node_output: NodeOutputs(@"fn") = undefined;
-        inline for (@typeInfo(@TypeOf(fn_output)).@"struct".fields) |field| {
-            @field(node_output, field.name) = @field(fn_output, field.name);
+        if (is_input_dirty) {
+            const raw_fn_output = @call(.auto, @"fn", if (comptime isAllocatorFirstParam(@TypeOf(@"fn")))
+                .{ state.arena.allocator(), props }
+            else
+                .{props});
+            const fn_output = switch (@typeInfo(@TypeOf(raw_fn_output))) {
+                else => raw_fn_output,
+                .error_union => raw_fn_output catch @panic("Error thrown in a node call!"),
+            };
+            var node_output = state.arena.allocator().create(NodeOutputs(@"fn")) catch unreachable;
+            inline for (@typeInfo(@TypeOf(fn_output)).@"struct".fields) |field| {
+                @field(node_output, field.name) = .{ .raw = @field(fn_output, field.name), .is_dirty = true };
+            }
+            inline for (@typeInfo(@TypeOf(mutable_props)).@"struct".fields) |field| {
+                @field(node_output, field.name) = .{ .raw = @field(mutable_props, field.name), .is_dirty = true };
+            }
+            state.data = node_output;
+            return node_output;
+        } else {
+            const last_output: *NodeOutputs(@"fn") = @ptrCast(@alignCast(state.data));
+            inline for (@typeInfo(@TypeOf(last_output.*)).@"struct".fields) |field| {
+                @field(last_output, field.name).is_dirty = false;
+            }
+            return last_output;
         }
-        inline for (@typeInfo(@TypeOf(mutable_props)).@"struct".fields) |field| {
-            @field(node_output, field.name) = @field(mutable_props, field.name);
-        }
-        return node_output;
     }
 
     const NodeState = struct {
@@ -188,52 +253,44 @@ pub const Runtime = struct {
         const Inputs = @field(graph, "Inputs");
         const Outputs = @field(graph, "Outputs");
         const Store = @field(graph, "Store");
-        const PartialInputs = build_type: {
-            var new_fields: []const std.builtin.Type.StructField = &.{};
-            for (@typeInfo(Inputs).@"struct".fields) |field| {
-                const t = field.type;
-                new_fields = new_fields ++ .{std.builtin.Type.StructField{
-                    .name = field.name,
-                    .type = ?t,
-                    .default_value = blk: {
-                        const default_value: ?field.type = null;
-                        break :blk @ptrCast(&default_value);
-                    },
-                    .is_comptime = false,
-                    .alignment = @alignOf(t),
-                }};
-            }
-            break :build_type @Type(std.builtin.Type{ .@"struct" = .{
-                .layout = .auto,
-                .fields = new_fields,
-                .decls = &.{},
-                .is_tuple = false,
-            } });
-        };
+        const PartialInputs = PartialFields(Inputs);
         return struct {
-            store: Store,
-            inputs: Inputs,
+            store: DirtyableFields(Store),
+            inputs: DirtyableFields(Inputs),
             runtime: Runtime,
 
             pub fn init(allocator: std.mem.Allocator, inputs: Inputs, store: Store) @This() {
-                return .{
-                    .inputs = inputs,
-                    .store = store,
+                var result = @This(){
+                    .inputs = undefined,
+                    .store = undefined,
                     .runtime = .{
                         .allocator = allocator,
                         .node_states = std.StringHashMap(NodeState).init(allocator),
                     },
                 };
+                inline for (@typeInfo(@TypeOf(inputs)).@"struct".fields) |field| {
+                    @field(result.inputs, field.name) = .{ .raw = @field(inputs, field.name), .is_dirty = true };
+                }
+                inline for (@typeInfo(@TypeOf(store)).@"struct".fields) |field| {
+                    @field(result.store, field.name) = .{ .raw = @field(store, field.name), .is_dirty = false };
+                }
+                return result;
             }
             pub fn update(self: *@This(), partial_inputs: PartialInputs) Outputs {
                 inline for (@typeInfo(@TypeOf(partial_inputs)).@"struct".fields) |field| {
                     if (@field(partial_inputs, field.name)) |new_input| {
-                        @field(self.inputs, field.name) = new_input;
+                        @field(self.inputs, field.name).set(new_input);
                     }
                 }
                 const result = graph.update(&self.runtime, self.inputs, self.store);
-                self.store = result.store;
-                return result.outputs;
+                inline for (@typeInfo(@TypeOf(self.store)).@"struct".fields) |field| {
+                    @field(self.store, field.name) = @field(result.store, field.name);
+                }
+                var outputs: Outputs = undefined;
+                inline for (@typeInfo(Outputs).@"struct".fields) |field| {
+                    @field(outputs, field.name) = @field(result.outputs, field.name).raw;
+                }
+                return outputs;
             }
         };
     }
@@ -267,11 +324,11 @@ pub const GameGraph = Runtime.build(struct {
     };
     pub fn update(
         rt: *Runtime,
-        inputs: Inputs,
-        store: Store,
+        inputs: DirtyableFields(Inputs),
+        store: DirtyableFields(Store),
     ) struct {
-        outputs: Outputs,
-        store: Store,
+        outputs: DirtyableFields(Outputs),
+        store: DirtyableFields(Store),
     } {
         const getResources = rt.node(@src(), graph_nodes.getResources, .{});
         const timing = rt.node(@src(), graph_nodes.timing, .{
@@ -320,16 +377,22 @@ pub const GameGraph = Runtime.build(struct {
         return .{
             .outputs = .{
                 .skybox = getResources.skybox,
-                .models = std.mem.concat(rt.allocator, types.GameModel, &.{
-                    getResources.models,
-                    animateMeshes.models,
-                    displayTrees.models,
-                }) catch unreachable,
+                .models = .{
+                    .raw = std.mem.concat(rt.allocator, types.GameModel, &.{
+                        getResources.models.raw,
+                        animateMeshes.models.raw,
+                        displayTrees.models.raw,
+                    }) catch unreachable,
+                    .is_dirty = true,
+                },
                 .screen_space_mesh = getScreenspaceMesh.screen_space_mesh,
-                .model_instances = std.mem.concat(rt.allocator, types.ModelInstances, &.{
-                    displayForest.model_instances,
-                    displayBike.model_instances,
-                }) catch unreachable,
+                .model_instances = .{
+                    .raw = std.mem.concat(rt.allocator, types.ModelInstances, &.{
+                        displayForest.model_instances.raw,
+                        displayBike.model_instances.raw,
+                    }) catch unreachable,
+                    .is_dirty = true,
+                },
                 .terrain_mesh = displayTerrain.terrain_mesh,
                 .terrain_instance = displayTerrain.terrain_instance,
                 .world_matrix = orbit.world_matrix,
