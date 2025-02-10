@@ -1,4 +1,5 @@
 pub const utils_node = @import("./node_graph/utils_node.zig");
+pub const new_runtime = @import("./node_graph/new_runtime.zig");
 
 const std = @import("std");
 const utils = @import("utils");
