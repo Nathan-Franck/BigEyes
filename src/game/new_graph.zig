@@ -8,21 +8,6 @@ const config = @import("resources").config;
 const graph_nodes = game.graph_nodes;
 const builtin = std.builtin;
 
-fn declareInputs(fields: anytype) type {
-    _ = fields;
-    return struct {};
-}
-
-fn declareOutputs(fields: anytype) type {
-    _ = fields;
-    return struct {};
-}
-
-fn declareStore(fields: anytype) type {
-    _ = fields;
-    return struct {};
-}
-
 fn isAllocatorFirstParam(t: type) bool {
     const params = fnParams(t);
     return switch (params.len) {
@@ -76,6 +61,7 @@ fn NodeInputs(@"fn": anytype) type {
         .is_tuple = false,
     } });
 }
+
 fn MutableProps(@"fn": anytype) type {
     const raw_props = ParamsToNodeProps(@TypeOf(@"fn"));
     var new_field: []const std.builtin.Type.StructField = &.{};
@@ -123,36 +109,37 @@ fn NodeOutputs(@"fn": anytype) type {
     } });
 }
 
-const Runtime = struct {
-    const NodeArenas = std.StringHashMap(std.heap.ArenaAllocator);
+pub const Runtime = struct {
     allocator: std.mem.Allocator,
-    node_arenas: NodeArenas,
-    pub fn init(allocator: std.mem.Allocator) @This() {
-        return .{
-            .allocator = allocator,
-            .node_arenas = NodeArenas.init(allocator),
-        };
-    }
+    node_states: std.StringHashMap(NodeState),
 
     pub fn node(self: *@This(), comptime src: std.builtin.SourceLocation, @"fn": anytype, raw_props: NodeInputs(@"fn")) NodeOutputs(@"fn") {
         const src_key = std.fmt.comptimePrint("{s}:{d}:{d}", .{ src.file, src.line, src.column });
-        const arena = if (self.node_arenas.getPtr(src_key)) |arena| arena else blk: {
-            self.node_arenas.put(src_key, std.heap.ArenaAllocator.init(self.allocator)) catch unreachable;
-            break :blk self.node_arenas.getPtr(src_key).?;
-        };
-        _ = arena.reset(.retain_capacity);
 
-        const Props = ParamsToNodeProps(@TypeOf(@"fn"));
-        var props: Props = undefined;
+        const state = if (self.node_states.getPtr(src_key)) |arena| arena else blk: {
+            const new_state: NodeState = .{
+                .arena = std.heap.ArenaAllocator.init(self.allocator),
+                .dirty = false,
+                .data = undefined,
+            };
+
+            self.node_states.put(src_key, new_state) catch unreachable;
+            break :blk self.node_states.getPtr(src_key).?;
+        };
+        _ = state.arena.reset(.retain_capacity);
+
         var mutable_props: MutableProps(@"fn") = undefined;
         inline for (@typeInfo(@TypeOf(mutable_props)).@"struct".fields) |field| {
             const thinger = @field(raw_props, field.name);
             @field(mutable_props, field.name) = utils.deepClone(
                 @TypeOf(thinger),
-                arena.allocator(),
+                state.arena.allocator(),
                 thinger,
             ) catch unreachable;
         }
+
+        const Props = ParamsToNodeProps(@TypeOf(@"fn"));
+        var props: Props = undefined;
         inline for (@typeInfo(Props).@"struct".fields) |prop| {
             const default = @field(raw_props, prop.name);
             @field(props, prop.name) = switch (@typeInfo(prop.type)) {
@@ -174,7 +161,7 @@ const Runtime = struct {
             };
         }
         const raw_fn_output = @call(.auto, @"fn", if (comptime isAllocatorFirstParam(@TypeOf(@"fn")))
-            .{ arena.allocator(), props }
+            .{ state.arena.allocator(), props }
         else
             .{props});
         const fn_output = switch (@typeInfo(@TypeOf(raw_fn_output))) {
@@ -190,57 +177,86 @@ const Runtime = struct {
         }
         return node_output;
     }
+
+    const NodeState = struct {
+        arena: std.heap.ArenaAllocator,
+        dirty: bool,
+        data: *anyopaque,
+    };
+
+    pub fn build(graph: type) type {
+        const Inputs = @field(graph, "Inputs");
+        const Outputs = @field(graph, "Outputs");
+        const Store = @field(graph, "Store");
+        const PartialInputs = build_type: {
+            var new_fields: []const std.builtin.Type.StructField = &.{};
+            for (@typeInfo(Inputs).@"struct".fields) |field| {
+                const t = field.type;
+                new_fields = new_fields ++ .{std.builtin.Type.StructField{
+                    .name = field.name,
+                    .type = ?t,
+                    .default_value = blk: {
+                        const default_value: ?field.type = null;
+                        break :blk @ptrCast(&default_value);
+                    },
+                    .is_comptime = false,
+                    .alignment = @alignOf(t),
+                }};
+            }
+            break :build_type @Type(std.builtin.Type{ .@"struct" = .{
+                .layout = .auto,
+                .fields = new_fields,
+                .decls = &.{},
+                .is_tuple = false,
+            } });
+        };
+        return struct {
+            store: Store,
+            inputs: Inputs,
+            runtime: Runtime,
+
+            pub fn init(allocator: std.mem.Allocator, inputs: Inputs, store: Store) @This() {
+                return .{
+                    .inputs = inputs,
+                    .store = store,
+                    .runtime = .{
+                        .allocator = allocator,
+                        .node_states = std.StringHashMap(NodeState).init(allocator),
+                    },
+                };
+            }
+            pub fn update(self: *@This(), partial_inputs: PartialInputs) Outputs {
+                inline for (@typeInfo(@TypeOf(partial_inputs)).@"struct".fields) |field| {
+                    if (@field(partial_inputs, field.name)) |new_input| {
+                        @field(self.inputs, field.name) = new_input;
+                    }
+                }
+                const result = graph.update(&self.runtime, self.inputs, self.store);
+                self.store = result.store;
+                return result.outputs;
+            }
+        };
+    }
 };
 
-/// Meta-function that take multiple input slices and concatenate into a single output slice
-fn concat(slice_inputs: anytype) type {
-    _ = slice_inputs;
-}
-
-pub const GameGraph = struct {
-    allocator: std.mem.Allocator,
-    runtime: Runtime,
-
-    store: struct {
-        last_time: u64,
+pub const GameGraph = Runtime.build(struct {
+    pub const Store = struct {
+        last_time: u64 = 0,
         orbit_camera: types.OrbitCamera,
         player: types.Player,
         forest_chunk_cache: config.ForestSpawner.ChunkCache,
-    },
-
-    pub fn init(allocator: std.mem.Allocator) @This() {
-        return .{
-            .allocator = allocator,
-            .runtime = Runtime.init(allocator),
-            .store = .{
-                .last_time = 0,
-                .forest_chunk_cache = config.ForestSpawner.ChunkCache.init(std.heap.page_allocator),
-                .player = .{
-                    .position = .{ 0, -0.75, 0, 1 },
-                    .euler_rotation = .{ 0, 0, 0, 1 },
-                },
-                .orbit_camera = .{
-                    .position = .{ 0, -0.75, 0, 1 },
-                    .rotation = .{ 0, 0, 0, 1 },
-                    .track_distance = 10,
-                },
-            },
-        };
-    }
-
-    pub fn update(
-        self: *@This(),
-        inputs: struct {
-            time: u64,
-            render_resolution: types.PixelPoint,
-            orbit_speed: f32,
-            input: types.Input,
-            selected_camera: types.SelectedCamera,
-            player_settings: types.PlayerSettings,
-            bounce: bool,
-            size_multiplier: f32,
-        },
-    ) struct {
+    };
+    pub const Inputs = struct {
+        time: u64,
+        render_resolution: types.PixelPoint,
+        orbit_speed: f32,
+        input: types.Input,
+        selected_camera: types.SelectedCamera,
+        player_settings: types.PlayerSettings,
+        bounce: bool,
+        size_multiplier: f32,
+    };
+    pub const Outputs = struct {
         skybox: types.ProcessedCubeMap,
         models: []const types.GameModel,
         screen_space_mesh: types.ScreenspaceMesh,
@@ -248,10 +264,15 @@ pub const GameGraph = struct {
         terrain_mesh: types.GreyboxMesh,
         terrain_instance: types.ModelInstances,
         world_matrix: zmath.Mat,
+    };
+    pub fn update(
+        rt: *Runtime,
+        inputs: Inputs,
+        store: Store,
+    ) struct {
+        outputs: Outputs,
+        store: Store,
     } {
-        const rt = &self.runtime;
-        const store = &self.store;
-
         const getResources = rt.node(@src(), graph_nodes.getResources, .{});
         const timing = rt.node(@src(), graph_nodes.timing, .{
             .time = inputs.time,
@@ -297,13 +318,28 @@ pub const GameGraph = struct {
             .world_matrix = orbit.world_matrix,
         });
         return .{
-            .skybox = getResources.skybox,
-            .models = std.mem.concat(self.allocator, types.GameModel, &.{ getResources.models, animateMeshes.models, displayTrees.models }) catch unreachable,
-            .screen_space_mesh = getScreenspaceMesh.screen_space_mesh,
-            .model_instances = std.mem.concat(self.allocator, types.ModelInstances, &.{ displayForest.model_instances, displayBike.model_instances }) catch unreachable,
-            .terrain_mesh = displayTerrain.terrain_mesh,
-            .terrain_instance = displayTerrain.terrain_instance,
-            .world_matrix = orbit.world_matrix,
+            .outputs = .{
+                .skybox = getResources.skybox,
+                .models = std.mem.concat(rt.allocator, types.GameModel, &.{
+                    getResources.models,
+                    animateMeshes.models,
+                    displayTrees.models,
+                }) catch unreachable,
+                .screen_space_mesh = getScreenspaceMesh.screen_space_mesh,
+                .model_instances = std.mem.concat(rt.allocator, types.ModelInstances, &.{
+                    displayForest.model_instances,
+                    displayBike.model_instances,
+                }) catch unreachable,
+                .terrain_mesh = displayTerrain.terrain_mesh,
+                .terrain_instance = displayTerrain.terrain_instance,
+                .world_matrix = orbit.world_matrix,
+            },
+            .store = .{
+                .orbit_camera = orbit.orbit_camera,
+                .last_time = timing.last_time,
+                .player = orbit.player,
+                .forest_chunk_cache = displayForest.forest_chunk_cache,
+            },
         };
     }
-};
+});

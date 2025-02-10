@@ -80,8 +80,44 @@ pub const interface = struct {
 
     pub fn init() void {
         const NewGameGraph = @import("game/new_graph.zig").GameGraph;
-        var new_game_graph = NewGameGraph.init(std.heap.page_allocator);
-        std.debug.print("{any}\n", .{new_game_graph.update(undefined)});
+        var new_game_graph = NewGameGraph.init(
+            std.heap.page_allocator,
+            .{
+                .time = 0,
+                .input = .{
+                    .mouse_delta = .{ 0, 0, 0, 0 },
+                    .movement = .{
+                        .left = null,
+                        .right = null,
+                        .forward = null,
+                        .backward = null,
+                    },
+                },
+                .orbit_speed = 0.01,
+                .selected_camera = .orbit,
+                .player_settings = .{
+                    .look_speed = 0.004,
+                    .movement_speed = 0.8,
+                },
+                .render_resolution = .{ .x = 0, .y = 0 },
+                .size_multiplier = 1,
+                .bounce = false,
+            },
+            .{
+                .last_time = 0,
+                .forest_chunk_cache = config.ForestSpawner.ChunkCache.init(std.heap.page_allocator),
+                .player = .{
+                    .position = .{ 0, -0.75, 0, 1 },
+                    .euler_rotation = .{ 0, 0, 0, 1 },
+                },
+                .orbit_camera = .{
+                    .position = .{ 0, -0.75, 0, 1 },
+                    .rotation = .{ 0, 0, 0, 1 },
+                    .track_distance = 10,
+                },
+            },
+        );
+        std.debug.print("{any}\n", .{new_game_graph.update(.{})});
         game_graph = try GameGraph.init(.{
             .allocator = std.heap.page_allocator,
             .inputs = graph_inputs,
