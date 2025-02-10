@@ -171,8 +171,7 @@ pub const Runtime = struct {
         const state = if (self.node_states.getPtr(src_key)) |arena| arena else blk: {
             const new_state: NodeState = .{
                 .arena = std.heap.ArenaAllocator.init(self.allocator),
-                .dirty = false,
-                .data = undefined,
+                .data = null,
             };
 
             self.node_states.put(src_key, new_state) catch unreachable;
@@ -216,7 +215,7 @@ pub const Runtime = struct {
                 is_input_dirty = true;
             @field(props, prop.name) = input_field;
         }
-        if (is_input_dirty) {
+        if (is_input_dirty or state.data == null) {
             const raw_fn_output = @call(.auto, @"fn", if (comptime isAllocatorFirstParam(@TypeOf(@"fn")))
                 .{ state.arena.allocator(), props }
             else
@@ -232,10 +231,10 @@ pub const Runtime = struct {
             inline for (@typeInfo(@TypeOf(mutable_props)).@"struct".fields) |field| {
                 @field(node_output, field.name) = .{ .raw = @field(mutable_props, field.name), .is_dirty = true };
             }
-            state.data = node_output;
+            state.data = @ptrCast(node_output);
             return node_output;
         } else {
-            const last_output: *NodeOutputs(@"fn") = @ptrCast(@alignCast(state.data));
+            const last_output: *NodeOutputs(@"fn") = @ptrCast(@alignCast(state.data.?));
             inline for (@typeInfo(@TypeOf(last_output.*)).@"struct".fields) |field| {
                 @field(last_output, field.name).is_dirty = false;
             }
@@ -245,8 +244,7 @@ pub const Runtime = struct {
 
     const NodeState = struct {
         arena: std.heap.ArenaAllocator,
-        dirty: bool,
-        data: *anyopaque,
+        data: ?*anyopaque,
     };
 
     pub fn build(graph: type) type {
@@ -276,6 +274,7 @@ pub const Runtime = struct {
                 }
                 return result;
             }
+
             pub fn update(self: *@This(), partial_inputs: PartialInputs) Outputs {
                 inline for (@typeInfo(@TypeOf(partial_inputs)).@"struct".fields) |field| {
                     if (@field(partial_inputs, field.name)) |new_input| {

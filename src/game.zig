@@ -117,7 +117,9 @@ pub const interface = struct {
                 },
             },
         );
-        std.debug.print("{any}\n", .{new_game_graph.update(.{})});
+        const result = new_game_graph.update(.{ .time = 2 });
+        std.debug.print("This is a result {d}\n", .{result.skybox.nx.width});
+
         game_graph = try GameGraph.init(.{
             .allocator = std.heap.page_allocator,
             .inputs = graph_inputs,
@@ -166,6 +168,7 @@ pub const graph_nodes = struct {
         delta_time: f32,
         seconds_since_start: f32,
     } {
+        std.debug.print("props.time {d} start {d}\n", .{ props.time, start });
         if (start == 0) start = props.time;
         const delta_time = @as(f32, @floatFromInt(props.time - props.last_time)) / 1000.0;
         const seconds_since_start = @as(f32, @floatFromInt(props.time - start)) / 1000.0;
