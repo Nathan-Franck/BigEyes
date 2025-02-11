@@ -163,20 +163,27 @@ pub const Runtime = struct {
     allocator: std.mem.Allocator,
     node_states: std.StringHashMap(NodeState),
 
-    pub fn node(self: *@This(), comptime src: std.builtin.SourceLocation, @"fn": anytype, dirtyable_props: NodeInputs(@"fn")) *NodeOutputs(@"fn") {
+    pub fn node(
+        self: *@This(),
+        comptime src: std.builtin.SourceLocation,
+        @"fn": anytype,
+        dirtyable_props: NodeInputs(@"fn"),
+    ) *NodeOutputs(@"fn") {
         const src_key = std.fmt.comptimePrint("{s}:{d}:{d}", .{ src.file, src.line, src.column });
 
+        // Find existing state for this node.
         const state = if (self.node_states.getPtr(src_key)) |arena| arena else blk: {
             const new_state: NodeState = .{
                 .arena = std.heap.ArenaAllocator.init(self.allocator),
+                .queried = std.StringHashMap(bool).init(self.allocator),
                 .data = null,
             };
 
             self.node_states.put(src_key, new_state) catch unreachable;
             break :blk self.node_states.getPtr(src_key).?;
         };
-        _ = state.arena.reset(.retain_capacity);
 
+        // Discover which properties are mutable inputs - these have to be cloned so they don't affect their parent nodes.
         var mutable_props: MutableProps(@"fn") = undefined;
         inline for (@typeInfo(@TypeOf(mutable_props)).@"struct".fields) |field| {
             const dirtyable_prop = @field(dirtyable_props, field.name);
@@ -187,6 +194,7 @@ pub const Runtime = struct {
             ) catch unreachable;
         }
 
+        // Fill in the input properties, taking note of if any of them are dirty, then the node is dirty, and we need to re-run the function.
         const Props = ParamsToNodeProps(@TypeOf(@"fn"));
         var props: Props = undefined;
         var is_input_dirty = false;
@@ -196,8 +204,11 @@ pub const Runtime = struct {
             const input_field = switch (@typeInfo(prop.type)) {
                 .@"struct" => blk: {
                     if (utils_node.queryable.getSourceOrNull(prop.type)) |t| {
-                        var queried = true;
-                        break :blk utils_node.queryable.Value(t).initQueryable(default, &dirtyable_prop.is_dirty, &queried);
+                        const queried = if (state.queried.getPtr(prop.name)) |queried| queried else queried: {
+                            state.queried.put(prop.name, false) catch unreachable;
+                            break :queried state.queried.getPtr(prop.name).?;
+                        };
+                        break :blk utils_node.queryable.Value(t).initQueryable(default, &dirtyable_prop.is_dirty, queried);
                     } else {
                         break :blk default;
                     }
@@ -213,7 +224,11 @@ pub const Runtime = struct {
                 is_input_dirty = true;
             @field(props, prop.name) = input_field;
         }
+
         if (is_input_dirty or state.data == null) {
+            // The node is dirty, or there's no data, so let's run the function!
+            _ = state.arena.reset(.retain_capacity);
+
             const raw_fn_output = @call(.auto, @"fn", if (comptime isAllocatorFirstParam(@TypeOf(@"fn")))
                 .{ state.arena.allocator(), props }
             else
@@ -222,6 +237,7 @@ pub const Runtime = struct {
                 else => raw_fn_output,
                 .error_union => raw_fn_output catch @panic("Error thrown in a node call!"),
             };
+
             var node_output = state.arena.allocator().create(NodeOutputs(@"fn")) catch unreachable;
             inline for (@typeInfo(@TypeOf(fn_output)).@"struct".fields) |field| {
                 @field(node_output, field.name) = .{ .raw = @field(fn_output, field.name), .is_dirty = true };
@@ -229,9 +245,12 @@ pub const Runtime = struct {
             inline for (@typeInfo(@TypeOf(mutable_props)).@"struct".fields) |field| {
                 @field(node_output, field.name) = .{ .raw = @field(mutable_props, field.name), .is_dirty = true };
             }
+
             state.data = @ptrCast(node_output);
+
             return node_output;
         } else {
+            // Just use the existing data from the last time the function had ro run.
             const last_output: *NodeOutputs(@"fn") = @ptrCast(@alignCast(state.data.?));
             inline for (@typeInfo(@TypeOf(last_output.*)).@"struct".fields) |field| {
                 @field(last_output, field.name).is_dirty = false;
@@ -242,6 +261,7 @@ pub const Runtime = struct {
 
     const NodeState = struct {
         arena: std.heap.ArenaAllocator,
+        queried: std.StringHashMap(bool),
         data: ?*anyopaque,
     };
 
@@ -249,7 +269,9 @@ pub const Runtime = struct {
         const Inputs = @field(graph, "Inputs");
         const Outputs = @field(graph, "Outputs");
         const Store = @field(graph, "Store");
+
         const PartialInputs = PartialFields(Inputs);
+
         return struct {
             store: DirtyableFields(Store),
             inputs: DirtyableFields(Inputs),
