@@ -33,6 +33,7 @@ pub const GameGraph = Runtime.build(struct {
         terrain_instance: types.ModelInstances,
         world_matrix: zmath.Mat,
     };
+    pub const GraphStore = DirtyableFields;
     pub fn GraphInputs(inputs: type) type {
         _ = inputs;
         return struct {
@@ -42,28 +43,75 @@ pub const GameGraph = Runtime.build(struct {
     pub fn GraphOutputs(outputs: type) type {
         _ = outputs;
         return struct {
-            fn poll() void {}
+            fn submit() void {}
         };
     }
     pub fn update(
         rt: *Runtime,
         inputs: GraphInputs(Inputs),
         outputs: GraphOutputs(Outputs),
-        store: DirtyableFields(Store),
-    ) struct {
-        store: DirtyableFields(Store),
-    } {
-        const getResources = rt.node(@src(), graph_nodes.getResources, .{});
-        outputs.submit(.{
-            .skybox = getResources.skybox,
+        store: GraphStore(Store),
+    ) GraphStore(Store) {
+        // This stuff could exist outside of this graph probably, since it doesn't take any inputs,
+        // but because it's here, means that I could change my mind later!
+        const get_resources = rt.node(@src(), graph_nodes.getResources, .{});
+        // TODO - just combine with resources, unless I really want to have some sliders show show off
+        const display_trees = rt.node(@src(), graph_nodes.displayTrees, .{
+            .cutout_leaf = get_resources.cutout_leaf,
+            .trees = get_resources.trees,
         });
+        outputs.submit(.{
+            .skybox = get_resources.skybox,
+        });
+
+        // Behold - all the things the game loop can do BEFORE user input, that we can compute without needing to know what the user will do!
+        // Terrain things below!
+        const calculate_terrain_density_influence_range = rt.node(@src(), graph_nodes.calculateTerrainDensityInfluenceRange, .{
+            .size_multiplier = inputs.size_multiplier,
+        });
+        const display_forest = rt.node(@src(), graph_nodes.displayForest, .{
+            .forest_chunk_cache = store.forest_chunk_cache,
+            .terrain_sampler = calculate_terrain_density_influence_range.terrain_sampler,
+        });
+        const display_terrain = rt.node(@src(), graph_nodes.displayTerrain, .{
+            .terrain_sampler = calculate_terrain_density_influence_range.terrain_sampler,
+        });
+        // Animated things below!
         const timing = rt.node(@src(), graph_nodes.timing, .{
             .time = inputs.poll(.time),
             .last_time = store.last_time,
         });
-        const calculateTerrainDensityInfluenceRange = rt.node(@src(), graph_nodes.calculateTerrainDensityInfluenceRange, .{
-            .size_multiplier = inputs.size_multiplier,
+        const animate_meshes = rt.node(@src(), graph_nodes.animateMeshes, .{
+            .models = get_resources.models,
+            .seconds_since_start = timing.seconds_since_start,
         });
+        const display_bike = rt.node(@src(), graph_nodes.displayBike, .{
+            .terrain_sampler = calculate_terrain_density_influence_range.terrain_sampler,
+            .seconds_since_start = timing.seconds_since_start,
+            .model_transforms = get_resources.model_transforms,
+            .bounce = inputs.poll(.bounce),
+        });
+        outputs.submit(.{
+            .terrain_mesh = display_terrain.terrain_mesh,
+            .terrain_instance = display_terrain.terrain_instance,
+            .models = .{
+                .raw = std.mem.concat(rt.allocator, types.GameModel, &.{
+                    get_resources.models.raw,
+                    animate_meshes.models.raw,
+                    display_trees.models.raw,
+                }) catch unreachable,
+                .is_dirty = true,
+            },
+            .model_instances = .{
+                .raw = std.mem.concat(rt.allocator, types.ModelInstances, &.{
+                    display_forest.model_instances.raw,
+                    display_bike.model_instances.raw,
+                }) catch unreachable,
+                .is_dirty = true,
+            },
+        });
+
+        // Polling user input! (We can do it late, which should lead to lower latency!)
         const orbit = rt.node(@src(), graph_nodes.orbit, .{
             .delta_time = timing.delta_time,
             .render_resolution = inputs.poll(.render_resolution),
@@ -73,67 +121,24 @@ pub const GameGraph = Runtime.build(struct {
             .selected_camera = inputs.poll(.selected_camera),
             .player_settings = inputs.poll(.player_settings),
             .player = store.player,
-            .terrain_sampler = calculateTerrainDensityInfluenceRange.terrain_sampler,
+            .terrain_sampler = calculate_terrain_density_influence_range.terrain_sampler,
         });
-        outputs.submit(.{
-            .world_matrix = orbit.world_matrix,
-        });
-        const displayTrees = rt.node(@src(), graph_nodes.displayTrees, .{
-            .cutout_leaf = getResources.cutout_leaf,
-            .trees = getResources.trees,
-        });
-        const animateMeshes = rt.node(@src(), graph_nodes.animateMeshes, .{
-            .models = getResources.models,
-            .seconds_since_start = timing.seconds_since_start,
-        });
-        outputs.submit(.{
-            .models = .{
-                .raw = std.mem.concat(rt.allocator, types.GameModel, &.{
-                    getResources.models.raw,
-                    animateMeshes.models.raw,
-                    displayTrees.models.raw,
-                }) catch unreachable,
-                .is_dirty = true,
-            },
-        });
-        const displayForest = rt.node(@src(), graph_nodes.displayForest, .{
-            .forest_chunk_cache = store.forest_chunk_cache,
-            .terrain_sampler = calculateTerrainDensityInfluenceRange.terrain_sampler,
-        });
-        const displayBike = rt.node(@src(), graph_nodes.displayBike, .{
-            .terrain_sampler = calculateTerrainDensityInfluenceRange.terrain_sampler,
-            .seconds_since_start = timing.seconds_since_start,
-            .model_transforms = getResources.model_transforms,
-            .bounce = inputs.poll(.bounce),
-        });
-        outputs.submit(.{
-            .model_instances = .{
-                .raw = std.mem.concat(rt.allocator, types.ModelInstances, &.{
-                    displayForest.model_instances.raw,
-                    displayBike.model_instances.raw,
-                }) catch unreachable,
-                .is_dirty = true,
-            },
-        });
-        const displayTerrain = rt.node(@src(), graph_nodes.displayTerrain, .{
-            .terrain_sampler = calculateTerrainDensityInfluenceRange.terrain_sampler,
-        });
-        outputs.submit(.{
-            .terrain_mesh = displayTerrain.terrain_mesh,
-            .terrain_instance = displayTerrain.terrain_instance,
-        });
-        const getScreenspaceMesh = rt.node(@src(), graph_nodes.getScreenspaceMesh, .{
+        const get_screenspace_mesh = rt.node(@src(), graph_nodes.getScreenspaceMesh, .{
             .camera_position = orbit.camera_position,
             .world_matrix = orbit.world_matrix,
         });
         outputs.submit(.{
-            .screen_space_mesh = getScreenspaceMesh.screen_space_mesh,
+            .world_matrix = orbit.world_matrix,
+            .screen_space_mesh = get_screenspace_mesh.screen_space_mesh,
         });
+
+        // TODO - Last minute culling of model instances possibly?
+
         return .{
             .orbit_camera = orbit.orbit_camera,
             .last_time = timing.last_time,
             .player = orbit.player,
-            .forest_chunk_cache = displayForest.forest_chunk_cache,
+            .forest_chunk_cache = display_forest.forest_chunk_cache,
         };
     }
 });
