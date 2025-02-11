@@ -508,7 +508,7 @@ pub const graph_nodes = struct {
                                 animation[frame % animation.len].bones[bone_index],
                                 animation[(frame + 1) % animation.len].bones[bone_index],
                             };
-                            const lerp: Vec4 = @splat(inter_frame - @as(f32, @floatFromInt(frame)));
+                            const lerp = inter_frame - @as(f32, @floatFromInt(frame));
                             position.* = zmath.mul(
                                 zmath.mul(
                                     position.*,
@@ -521,9 +521,9 @@ pub const graph_nodes = struct {
                                     ),
                                 ),
                                 mesh_loader.translationRotationScaleToMatrix(
-                                    zmath.lerpV(animated_bone[0].position, animated_bone[1].position, lerp),
-                                    zmath.lerpV(animated_bone[0].rotation, animated_bone[1].rotation, lerp),
-                                    zmath.lerpV(animated_bone[0].scale, animated_bone[1].scale, lerp),
+                                    zmath.lerp(animated_bone[0].position, animated_bone[1].position, lerp),
+                                    zmath.slerp(animated_bone[0].rotation, animated_bone[1].rotation, lerp),
+                                    zmath.lerp(animated_bone[0].scale, animated_bone[1].scale, lerp),
                                 ),
                             );
                         }
