@@ -3,7 +3,7 @@ const std = @import("std");
 const zmath = @import("zmath");
 const zbullet = @import("zbullet");
 
-// Hey! You can totally create code before the build starts!
+// Hey! You can totally create code before the build starts! Consider this for pulling tags out from Blender exports!
 const gen = @import("generated");
 const _ = gen.GeneratedData;
 
@@ -19,7 +19,6 @@ const raytrace = @import("utils").raytrace;
 const subdiv = @import("utils").subdiv;
 const tree = @import("utils").tree;
 const math = @import("utils").vec_math;
-const types = @import("utils").types;
 const resources = @import("resources");
 
 const graph = @import("./game/graph.zig");
@@ -30,113 +29,8 @@ const config = resources.config;
 const Forest = config.Forest;
 const TerrainSampler = config.TerrainSampler;
 
-pub const GameGraph = node_graph.NodeGraph(
-    graph.blueprint,
-    graph_nodes,
-);
-
-pub const graph_inputs: GameGraph.SystemInputs = .{
-    .time = 0,
-    .input = .{
-        .mouse_delta = .{ 0, 0, 0, 0 },
-        .movement = .{
-            .left = null,
-            .right = null,
-            .forward = null,
-            .backward = null,
-        },
-    },
-    .orbit_speed = 0.01,
-    .selected_camera = .orbit,
-    .player_settings = .{
-        .look_speed = 0.004,
-        .movement_speed = 0.8,
-    },
-    .render_resolution = .{ .x = 0, .y = 0 },
-    .size_multiplier = 1,
-    .bounce = false,
-};
-
-pub const graph_store: GameGraph.SystemStore = .{
-    .last_time = 0,
-    .forest_chunk_cache = config.ForestSpawner.ChunkCache.init(std.heap.page_allocator),
-    .player = .{
-        .position = .{ 0, -0.75, 0, 1 },
-        .euler_rotation = .{ 0, 0, 0, 1 },
-    },
-    .orbit_camera = .{
-        .position = .{ 0, -0.75, 0, 1 },
-        .rotation = .{ 0, 0, 0, 1 },
-        .track_distance = 10,
-    },
-};
-
-pub const InterfaceEnum = std.meta.DeclEnum(interface);
-pub const interface = struct {
-    var game_graph: GameGraph = undefined;
-    var world: zbullet.World = undefined;
-
-    pub const getGraphJson = GameGraph.getDisplayDefinition;
-
-    pub fn init() void {
-        const NewGameGraph = @import("game/new_graph.zig").GameGraph;
-        var new_game_graph = NewGameGraph.init(
-            std.heap.page_allocator,
-            .{
-                .time = 0,
-                .input = .{
-                    .mouse_delta = .{ 0, 0, 0, 0 },
-                    .movement = .{
-                        .left = null,
-                        .right = null,
-                        .forward = null,
-                        .backward = null,
-                    },
-                },
-                .orbit_speed = 0.01,
-                .selected_camera = .orbit,
-                .player_settings = .{
-                    .look_speed = 0.004,
-                    .movement_speed = 0.8,
-                },
-                .render_resolution = .{ .x = 0, .y = 0 },
-                .size_multiplier = 1,
-                .bounce = false,
-            },
-            .{
-                .last_time = 0,
-                .forest_chunk_cache = config.ForestSpawner.ChunkCache.init(std.heap.page_allocator),
-                .player = .{
-                    .position = .{ 0, -0.75, 0, 1 },
-                    .euler_rotation = .{ 0, 0, 0, 1 },
-                },
-                .orbit_camera = .{
-                    .position = .{ 0, -0.75, 0, 1 },
-                    .rotation = .{ 0, 0, 0, 1 },
-                    .track_distance = 10,
-                },
-            },
-        );
-        const result = new_game_graph.update(.{ .time = 2 });
-        std.debug.print("This is a result {d}\n", .{result.skybox.nx.width});
-
-        game_graph = try GameGraph.init(.{
-            .allocator = std.heap.page_allocator,
-            .inputs = graph_inputs,
-            .store = graph_store,
-        });
-    }
-
-    pub fn updateNodeGraph(
-        inputs: GameGraph.PartialSystemInputs,
-    ) !struct {
-        outputs: GameGraph.SystemOutputs,
-    } {
-        return .{
-            .outputs = try game_graph.update(inputs),
-        };
-    }
-};
+pub const types = @import("utils").types;
+pub const GameGraph = @import("game/new_graph.zig").GameGraph;
 
 pub const graph_nodes = struct {
     pub fn calculateTerrainDensityInfluenceRange(
@@ -160,20 +54,21 @@ pub const graph_nodes = struct {
     }
 
     var start: u64 = 0;
-    pub fn timing(props: struct {
-        time: u64,
-        last_time: u64,
-    }) struct {
-        last_time: u64,
+    var last_time: u64 = 0;
+    pub fn timing(
+        props: struct {
+            time: u64,
+        },
+    ) struct {
         delta_time: f32,
         seconds_since_start: f32,
     } {
         std.debug.print("props.time {d} start {d}\n", .{ props.time, start });
         if (start == 0) start = props.time;
-        const delta_time = @as(f32, @floatFromInt(props.time - props.last_time)) / 1000.0;
+        const delta_time = @as(f32, @floatFromInt(props.time - last_time)) / 1000.0;
         const seconds_since_start = @as(f32, @floatFromInt(props.time - start)) / 1000.0;
+        last_time = props.time;
         return .{
-            .last_time = props.time,
             .seconds_since_start = seconds_since_start,
             .delta_time = delta_time,
         };
@@ -352,10 +247,11 @@ pub const graph_nodes = struct {
         } };
     }
 
+    var forest_chunk_cache: *config.ForestSpawner.ChunkCache = undefined;
+
     pub fn displayForest(
         arena: std.mem.Allocator,
         props: struct {
-            forest_chunk_cache: *config.ForestSpawner.ChunkCache,
             terrain_sampler: TerrainSampler,
         },
     ) !struct {
@@ -366,7 +262,7 @@ pub const graph_nodes = struct {
 
         const spawns = try config.ForestSpawner.gatherSpawnsInBounds(
             arena,
-            props.forest_chunk_cache,
+            forest_chunk_cache,
             config.demo_terrain_bounds,
         );
 

@@ -167,6 +167,7 @@ pub fn build(
             // .root_source_file = b.path("src/test_perf.zig"),
         });
         check.root_module.addImport("game", game);
+        check.root_module.addImport("node_graph", node_graph);
         check.root_module.addImport("zglfw", zglfw.module("root"));
         check.root_module.addImport("zopengl", zopengl.module("root"));
         check.root_module.addImport("zmath", zmath.module("root"));
@@ -186,6 +187,7 @@ pub fn build(
         });
 
         exe.root_module.addImport("game", game);
+        exe.root_module.addImport("node_graph", node_graph);
         exe.root_module.addImport("zglfw", zglfw.module("root"));
         exe.root_module.addImport("zopengl", zopengl.module("root"));
 

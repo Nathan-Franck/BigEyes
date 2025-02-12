@@ -1,6 +1,9 @@
 const std = @import("std");
 const Runtime = @import("node_graph").new_runtime.Runtime;
 const DirtyableFields = @import("node_graph").new_runtime.DirtyableFields;
+const GraphStore = @import("node_graph").new_runtime.GraphStore;
+const GraphOutputs = @import("node_graph").new_runtime.GraphOutputs;
+const GraphInputs = @import("node_graph").new_runtime.GraphInputs;
 const types = @import("utils").types;
 const config = @import("resources").config;
 const zmath = @import("zmath");
@@ -9,10 +12,8 @@ const graph_nodes = game.graph_nodes;
 
 pub const GameGraph = Runtime.build(struct {
     pub const Store = struct {
-        last_time: u64 = 0,
         orbit_camera: types.OrbitCamera,
         player: types.Player,
-        forest_chunk_cache: config.ForestSpawner.ChunkCache,
     };
     pub const Inputs = struct {
         time: u64,
@@ -33,19 +34,6 @@ pub const GameGraph = Runtime.build(struct {
         terrain_instance: types.ModelInstances,
         world_matrix: zmath.Mat,
     };
-    pub const GraphStore = DirtyableFields;
-    pub fn GraphInputs(inputs: type) type {
-        _ = inputs;
-        return struct {
-            fn poll() void {}
-        };
-    }
-    pub fn GraphOutputs(outputs: type) type {
-        _ = outputs;
-        return struct {
-            fn submit() void {}
-        };
-    }
     pub fn update(
         rt: *Runtime,
         inputs: GraphInputs(Inputs),
@@ -67,10 +55,9 @@ pub const GameGraph = Runtime.build(struct {
         // Behold - all the things the game loop can do BEFORE user input, that we can compute without needing to know what the user will do!
         // Terrain things below!
         const calculate_terrain_density_influence_range = rt.node(@src(), graph_nodes.calculateTerrainDensityInfluenceRange, .{
-            .size_multiplier = inputs.size_multiplier,
+            .size_multiplier = inputs.poll(.size_multiplier),
         });
         const display_forest = rt.node(@src(), graph_nodes.displayForest, .{
-            .forest_chunk_cache = store.forest_chunk_cache,
             .terrain_sampler = calculate_terrain_density_influence_range.terrain_sampler,
         });
         const display_terrain = rt.node(@src(), graph_nodes.displayTerrain, .{
@@ -79,7 +66,6 @@ pub const GameGraph = Runtime.build(struct {
         // Animated things below!
         const timing = rt.node(@src(), graph_nodes.timing, .{
             .time = inputs.poll(.time),
-            .last_time = store.last_time,
         });
         const animate_meshes = rt.node(@src(), graph_nodes.animateMeshes, .{
             .models = get_resources.models,
@@ -136,9 +122,7 @@ pub const GameGraph = Runtime.build(struct {
 
         return .{
             .orbit_camera = orbit.orbit_camera,
-            .last_time = timing.last_time,
             .player = orbit.player,
-            .forest_chunk_cache = display_forest.forest_chunk_cache,
         };
     }
 });

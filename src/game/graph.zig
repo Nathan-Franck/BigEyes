@@ -62,9 +62,6 @@ pub const blueprint = Blueprint{
             } },
         } },
         .{ .name = "displayForest", .function = "displayForest", .input_links = &[_]InputLink{
-            .{ .field = "forest_chunk_cache", .source = .{
-                .store_field = "forest_chunk_cache",
-            } },
             .{ .field = "terrain_sampler", .source = .{
                 .node = .{ .name = "calculateTerrainDensityInfluenceRange", .field = "terrain_sampler" },
             } },
@@ -102,7 +99,6 @@ pub const blueprint = Blueprint{
         .{ .output_node = "orbit", .output_field = "orbit_camera", .system_field = "orbit_camera" },
         .{ .output_node = "timing", .output_field = "last_time", .system_field = "last_time" },
         .{ .output_node = "orbit", .output_field = "player", .system_field = "player" },
-        .{ .output_node = "displayForest", .output_field = "forest_chunk_cache", .system_field = "forest_chunk_cache" },
     },
     .output = &[_]SystemSink{
         .{ .output_node = "getResources", .output_field = "skybox", .system_field = "skybox" },

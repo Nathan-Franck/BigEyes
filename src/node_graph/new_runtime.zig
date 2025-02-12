@@ -159,6 +159,65 @@ pub fn DirtyableFields(T: type) type {
     } });
 }
 
+pub const GraphStore = DirtyableFields;
+pub fn GraphInputs(inputs: type) type {
+    return struct {
+        data: *inputs,
+        polling_fn: PollFn,
+        fn pollFn(
+            comptime field_tag: std.meta.FieldEnum(inputs),
+        ) std.meta.fieldInfo(inputs, field_tag).type {
+            unreachable;
+        }
+        pub const PollFn = @TypeOf(pollFn);
+        pub fn init(polling_fn: PollFn, data: *inputs) @This() {
+            return @This(){
+                .data = data,
+                .polling_fn = polling_fn,
+            };
+        }
+        pub fn inity(self: @This()) void {
+            inline for (@typeInfo(inputs).@"struct".fields, 0..) |field, i| {
+                @field(self.data, field.name) = self.polling_fn(@enumFromInt(i));
+            }
+        }
+        pub fn poll(
+            self: @This(),
+            comptime field_tag: std.meta.FieldEnum(inputs),
+        ) Dirtyable(std.meta.fieldInfo(inputs, field_tag).type) {
+            const previous = &@field(self.data, @tagName(field_tag));
+            const current = self.polling_fn(field_tag);
+            defer previous.* = current;
+            return .{
+                .is_dirty = std.meta.eql(previous.*, current),
+                .raw = current,
+            };
+        }
+    };
+}
+pub fn GraphOutputs(outputs: type) type {
+    return struct {
+        fn submitFn(comptime field_tag: std.meta.FieldEnum(outputs), value: std.meta.fieldInfo(outputs, field_tag).type) void {
+            _ = value;
+            unreachable;
+        }
+        pub const SubmitFn = @TypeOf(submitFn);
+        submit_fn: SubmitFn,
+        pub fn init(submit_fn: SubmitFn) @This() {
+            return .{ .submit_fn = submit_fn };
+        }
+        pub fn submit(self: @This(), partial_outputs: PartialFields(DirtyableFields(outputs))) void {
+            inline for (@typeInfo(outputs).@"struct".fields, 0..) |field, i| {
+                if (@field(partial_outputs, field.name)) |out| {
+                    if (out.is_dirty) {
+                        self.submit_fn(@enumFromInt(i), out.raw);
+                    }
+                }
+            }
+        }
+    };
+}
+
 pub const Runtime = struct {
     allocator: std.mem.Allocator,
     node_states: std.StringHashMap(NodeState),
@@ -266,50 +325,48 @@ pub const Runtime = struct {
     };
 
     pub fn build(graph: type) type {
-        const Inputs = @field(graph, "Inputs");
-        const Outputs = @field(graph, "Outputs");
-        const Store = @field(graph, "Store");
-
-        const PartialInputs = PartialFields(Inputs);
-
         return struct {
-            store: DirtyableFields(Store),
-            inputs: DirtyableFields(Inputs),
-            runtime: Runtime,
+            pub const Store = @field(graph, "Store");
+            pub const Inputs = @field(graph, "Inputs");
+            pub const Outputs = @field(graph, "Outputs");
 
-            pub fn init(allocator: std.mem.Allocator, inputs: Inputs, store: Store) @This() {
-                var result = @This(){
-                    .inputs = undefined,
-                    .store = undefined,
-                    .runtime = .{
-                        .allocator = allocator,
-                        .node_states = std.StringHashMap(NodeState).init(allocator),
-                    },
-                };
-                inline for (@typeInfo(@TypeOf(inputs)).@"struct".fields) |field| {
-                    @field(result.inputs, field.name) = .{ .raw = @field(inputs, field.name), .is_dirty = true };
-                }
-                inline for (@typeInfo(@TypeOf(store)).@"struct".fields) |field| {
-                    @field(result.store, field.name) = .{ .raw = @field(store, field.name), .is_dirty = false };
-                }
-                return result;
-            }
+            pub const InputTag = std.meta.FieldEnum(Inputs);
+            pub const OutputTag = std.meta.FieldEnum(Outputs);
 
-            pub fn update(self: *@This(), partial_inputs: PartialInputs) Outputs {
-                inline for (@typeInfo(@TypeOf(partial_inputs)).@"struct".fields) |field| {
-                    if (@field(partial_inputs, field.name)) |new_input| {
-                        @field(self.inputs, field.name).set(new_input);
+            pub fn withHooks(
+                poll_fn: GraphInputs(Inputs).PollFn,
+                submit_fn: GraphOutputs(Outputs).SubmitFn,
+            ) type {
+                return struct {
+                    store: GraphStore(Store),
+                    runtime: Runtime,
+                    var data: Inputs = undefined;
+
+                    const inputs = GraphInputs(Inputs).init(poll_fn, &data);
+                    const outputs = GraphOutputs(Outputs).init(submit_fn);
+
+                    pub fn init(
+                        allocator: std.mem.Allocator,
+                        store: Store,
+                    ) @This() {
+                        inputs.inity();
+                        var result = @This(){
+                            .store = undefined,
+                            .runtime = .{
+                                .allocator = allocator,
+                                .node_states = std.StringHashMap(NodeState).init(allocator),
+                            },
+                        };
+                        inline for (@typeInfo(@TypeOf(store)).@"struct".fields) |field| {
+                            @field(result.store, field.name) = .{ .raw = @field(store, field.name), .is_dirty = false };
+                        }
+                        return result;
                     }
-                }
-                const result = graph.update(&self.runtime, self.inputs, self.store);
-                inline for (@typeInfo(@TypeOf(self.store)).@"struct".fields) |field| {
-                    @field(self.store, field.name) = @field(result.store, field.name);
-                }
-                var outputs: Outputs = undefined;
-                inline for (@typeInfo(Outputs).@"struct".fields) |field| {
-                    @field(outputs, field.name) = @field(result.outputs, field.name).raw;
-                }
-                return outputs;
+
+                    pub fn update(self: *@This()) void {
+                        self.store = graph.update(&self.runtime, inputs, outputs, self.store);
+                    }
+                };
             }
         };
     }

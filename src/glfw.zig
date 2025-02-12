@@ -2,9 +2,14 @@ const std = @import("std");
 const glfw = @import("zglfw");
 const zopengl = @import("zopengl");
 const GameGraph = @import("game").GameGraph;
+const runtime = @import("node_graph").new_runtime;
 const game = @import("game");
 
+const types = game.types;
+
 pub fn main() !void {
+    const allocator = std.heap.page_allocator;
+
     try glfw.init();
     defer glfw.terminate();
 
@@ -27,19 +32,40 @@ pub fn main() !void {
     const gl = zopengl.bindings;
 
     glfw.swapInterval(1);
-    game.interface.init();
+
+    var game_graph = game.GameGraph.withHooks(poll, submit).init(
+        allocator,
+        .{
+            .orbit_camera = types.OrbitCamera{ .position = .{ 0, 0, 0, 1 }, .rotation = .{ 0, 0, 0, 1 }, .track_distance = 2 },
+            .player = types.Player{ .position = .{ 0, 0, 0, 1 }, .euler_rotation = .{ 0, 0, 0, 0 } },
+        },
+    );
 
     while (!window.shouldClose()) {
         glfw.pollEvents();
 
         gl.clearBufferfv(gl.COLOR, 0, &[_]f32{ 0.2, 0.4, 0.4, 1.0 });
 
-        const inputs = GameGraph.PartialSystemInputs{
-            // populate input data
-        };
-        const outputs = try game.interface.updateNodeGraph(inputs);
-        _ = outputs;
+        game_graph.update();
 
         window.swapBuffers();
     }
+}
+
+fn poll(comptime field_tag: GameGraph.InputTag) std.meta.fieldInfo(GameGraph.Inputs, field_tag).type {
+    return switch (field_tag) {
+        .time => 0,
+        .render_resolution => .{ .x = 0, .y = 0 },
+        .orbit_speed => 1,
+        .input => .{ .mouse_delta = .{ 0, 0, 0, 0 }, .movement = .{ .left = null, .right = null, .forward = null, .backward = null } },
+        .selected_camera => .orbit,
+        .player_settings => .{ .movement_speed = 0.01, .look_speed = 0.01 },
+        .bounce => false,
+        .size_multiplier => 1,
+    };
+}
+
+fn submit(comptime field_tag: GameGraph.OutputTag, value: std.meta.fieldInfo(GameGraph.Outputs, field_tag).type) void {
+    _ = value;
+    unreachable;
 }
