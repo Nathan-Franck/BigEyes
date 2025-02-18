@@ -33,6 +33,7 @@ pub fn main() !void {
 
     glfw.swapInterval(1);
 
+    game.init(allocator);
     var game_graph = game.GameGraph.withHooks(poll, submit).init(
         allocator,
         .{
@@ -52,6 +53,7 @@ pub fn main() !void {
     }
 }
 
+// Provide inputs to the back-end from the user, disk and network.
 fn poll(comptime field_tag: GameGraph.InputTag) std.meta.fieldInfo(GameGraph.Inputs, field_tag).type {
     return switch (field_tag) {
         .time => 0,
@@ -65,7 +67,8 @@ fn poll(comptime field_tag: GameGraph.InputTag) std.meta.fieldInfo(GameGraph.Inp
     };
 }
 
+// Recieve state changes back to the front-end to show to user.
 fn submit(comptime field_tag: GameGraph.OutputTag, value: std.meta.fieldInfo(GameGraph.Outputs, field_tag).type) void {
     _ = value;
-    unreachable;
+    // std.debug.print("Got something back for field, {s}! {any}\n", .{ @tagName(field_tag), value });
 }

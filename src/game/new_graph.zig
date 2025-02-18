@@ -42,6 +42,7 @@ pub const GameGraph = Runtime.build(struct {
     ) GraphStore(Store) {
         // This stuff could exist outside of this graph probably, since it doesn't take any inputs,
         // but because it's here, means that I could change my mind later!
+        // TODO - Make resources load pngs and .blend.json files from disk instead of embedding, to help compile times!
         const get_resources = rt.node(@src(), graph_nodes.getResources, .{});
         // TODO - just combine with resources, unless I really want to have some sliders show show off
         const display_trees = rt.node(@src(), graph_nodes.displayTrees, .{

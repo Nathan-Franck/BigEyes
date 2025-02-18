@@ -170,13 +170,13 @@ pub fn GraphInputs(inputs: type) type {
             unreachable;
         }
         pub const PollFn = @TypeOf(pollFn);
-        pub fn init(polling_fn: PollFn, data: *inputs) @This() {
+        pub fn build(polling_fn: PollFn, data: *inputs) @This() {
             return @This(){
                 .data = data,
                 .polling_fn = polling_fn,
             };
         }
-        pub fn inity(self: @This()) void {
+        pub fn init(self: @This()) void {
             inline for (@typeInfo(inputs).@"struct".fields, 0..) |field, i| {
                 @field(self.data, field.name) = self.polling_fn(@enumFromInt(i));
             }
@@ -342,14 +342,14 @@ pub const Runtime = struct {
                     runtime: Runtime,
                     var data: Inputs = undefined;
 
-                    const inputs = GraphInputs(Inputs).init(poll_fn, &data);
+                    const inputs = GraphInputs(Inputs).build(poll_fn, &data);
                     const outputs = GraphOutputs(Outputs).init(submit_fn);
 
                     pub fn init(
                         allocator: std.mem.Allocator,
                         store: Store,
                     ) @This() {
-                        inputs.inity();
+                        inputs.init();
                         var result = @This(){
                             .store = undefined,
                             .runtime = .{

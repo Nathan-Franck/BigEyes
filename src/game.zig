@@ -32,6 +32,11 @@ const TerrainSampler = config.TerrainSampler;
 pub const types = @import("utils").types;
 pub const GameGraph = @import("game/new_graph.zig").GameGraph;
 
+pub fn init(allocator: std.mem.Allocator) void {
+    zbullet.init(allocator);
+    graph_nodes.forest_chunk_cache = config.ForestSpawner.ChunkCache.init(allocator);
+}
+
 pub const graph_nodes = struct {
     pub fn calculateTerrainDensityInfluenceRange(
         arena: std.mem.Allocator,
@@ -247,7 +252,7 @@ pub const graph_nodes = struct {
         } };
     }
 
-    var forest_chunk_cache: *config.ForestSpawner.ChunkCache = undefined;
+    var forest_chunk_cache: config.ForestSpawner.ChunkCache = undefined;
 
     pub fn displayForest(
         arena: std.mem.Allocator,
@@ -262,7 +267,7 @@ pub const graph_nodes = struct {
 
         const spawns = try config.ForestSpawner.gatherSpawnsInBounds(
             arena,
-            forest_chunk_cache,
+            &forest_chunk_cache,
             config.demo_terrain_bounds,
         );
 
@@ -321,7 +326,6 @@ pub const graph_nodes = struct {
     ) !struct {
         model_instances: []const types.ModelInstances,
     } {
-        zbullet.init(std.heap.page_allocator);
         var world = zbullet.initWorld();
         world.setGravity(&.{ 0, 9.81, 0 });
         world.addBody(zbullet.initBody(
