@@ -189,7 +189,7 @@ pub fn GraphInputs(inputs: type) type {
             const current = self.polling_fn(field_tag);
             defer previous.* = current;
             return .{
-                .is_dirty = std.meta.eql(previous.*, current),
+                .is_dirty = !std.meta.eql(previous.*, current),
                 .raw = current,
             };
         }

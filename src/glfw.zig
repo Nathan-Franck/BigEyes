@@ -151,42 +151,40 @@ pub fn initGLFW(allocator: std.mem.Allocator, window: *zglfw.Window) !struct {
     );
     errdefer gctx.destroy(allocator);
 
-    zgui.init(allocator);
-    const scale_factor = scale_factor: {
-        const scale = window.getContentScale();
-        break :scale_factor @max(scale[0], scale[1]);
-    };
+    { // IMGUI
+        zgui.init(allocator);
+        const scale_factor = scale_factor: {
+            const scale = window.getContentScale();
+            break :scale_factor @max(scale[0], scale[1]);
+        };
+        const cwd = try std.process.getCwdAlloc(allocator);
+        const path = try std.fmt.allocPrintZ(allocator, "{s}/" ++ content_dir ++ "Roboto-Medium.ttf", .{cwd});
+        std.debug.print("Path to font {s}\n", .{path});
+        const font_normal = zgui.io.addFontFromFile(
+            path,
+            math.floor(20.0 * scale_factor),
+        );
+        assert(zgui.io.getFont(0) == font_normal);
 
-    const cwd = try std.process.getCwdAlloc(allocator);
-    const path = try std.fmt.allocPrintZ(allocator, "{s}/" ++ content_dir ++ "Roboto-Medium.ttf", .{cwd});
-    std.debug.print("Path to font {s}\n", .{path});
-    const font_normal = zgui.io.addFontFromFile(
-        path,
-        math.floor(20.0 * scale_factor),
-    );
-    assert(zgui.io.getFont(0) == font_normal);
+        zgui.backend.init(
+            window,
+            gctx.device,
+            @intFromEnum(zgpu.GraphicsContext.swapchain_format),
+            @intFromEnum(wgpu.TextureFormat.undef),
+        );
 
-    // This needs to be called *after* adding your custom fonts.
-    zgui.backend.init(
-        window,
-        gctx.device,
-        @intFromEnum(zgpu.GraphicsContext.swapchain_format),
-        @intFromEnum(wgpu.TextureFormat.undef),
-    );
-
-    const style = zgui.getStyle();
-
-    style.window_min_size = .{ 320.0, 240.0 };
-    style.window_border_size = 8.0;
-    style.scrollbar_size = 6.0;
-    {
-        var color = style.getColor(.scrollbar_grab);
-        color[1] = 0.8;
-        style.setColor(.scrollbar_grab, color);
+        const style = zgui.getStyle();
+        style.window_min_size = .{ 320.0, 240.0 };
+        style.window_border_size = 8.0;
+        style.scrollbar_size = 6.0;
+        {
+            var color = style.getColor(.scrollbar_grab);
+            color[1] = 0.8;
+            style.setColor(.scrollbar_grab, color);
+        }
+        style.scaleAllSizes(scale_factor);
     }
-    style.scaleAllSizes(scale_factor);
 
-    // Create a bind group layout needed for our render pipeline.
     const bind_group_layout = gctx.createBindGroupLayout(&.{
         zgpu.bufferEntry(0, .{ .vertex = true }, .uniform, true, 0),
     });
@@ -253,7 +251,6 @@ pub fn initGLFW(allocator: std.mem.Allocator, window: *zglfw.Window) !struct {
         },
     });
 
-    // Create a depth texture and its 'view'.
     const depth = createDepthTexture(gctx);
 
     return .{
@@ -314,7 +311,6 @@ pub fn main() !void {
     defer zglfw.terminate();
 
     zglfw.windowHint(.client_api, .no_api);
-    // zglfw.windowHint(.doublebuffer, true);
 
     const window = try zglfw.Window.create(600, 600, "zig-gamedev: minimal_glfw_wgpu", null);
     defer window.destroy();
@@ -327,13 +323,12 @@ pub fn main() !void {
     // _ = gpu_state;
 
     game.init(allocator);
-    var game_graph: ?game.GameGraph.withHooks(poll, submit) = null;
-    window.show();
 
+    var game_graph: ?game.GameGraph.withHooks(poll, submit) = null;
     while (!window.shouldClose()) {
         zglfw.pollEvents();
 
-        {
+        { // IMGUI update
             zgui.backend.newFrame(
                 gpu_state.gctx.swapchain_descriptor.width,
                 gpu_state.gctx.swapchain_descriptor.height,
@@ -360,7 +355,8 @@ pub fn main() !void {
                 );
             }
         }
-        {
+
+        { // Final Render
             const gctx = gpu_state.gctx;
 
             const back_buffer_view = gctx.swapchain.getCurrentTextureView();
@@ -393,13 +389,9 @@ pub fn main() !void {
 
             gctx.submit(&.{commands});
             if (gctx.present() == .swap_chain_resized) {
-                gpu_state.dimensions = calculateDimensions(gctx);
-
-                // Release old depth texture.
                 gctx.releaseResource(gpu_state.depth.view);
                 gctx.destroyResource(gpu_state.depth.texture);
-
-                // Create a new depth texture to match the new window size.
+                gpu_state.dimensions = calculateDimensions(gctx);
                 gpu_state.depth = createDepthTexture(gctx);
             }
         }
@@ -407,6 +399,7 @@ pub fn main() !void {
     }
 }
 
+// GUI state
 var bounce = false;
 
 // Provide inputs to the back-end from the user, disk and network.
