@@ -1,7 +1,7 @@
 zig-cache
 .zig-cache
 zig-out
-bin
+bin/*exe
 *.blend.json
 *.blend1
 

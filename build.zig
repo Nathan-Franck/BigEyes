@@ -1,5 +1,6 @@
 const std = @import("std");
-const content_dir = "src/resources/content/";
+const embed_content_dir = "src/resources/content/";
+const content_dir = "content/";
 
 const ExportMeshes = struct {
     const BlendExport = struct {
@@ -33,7 +34,7 @@ const ExportMeshes = struct {
 
         for (self.blend_exports) |blend_export|
             for (blend_export.blend_paths) |blend_path| {
-                const full_path = try std.fmt.allocPrint(self.allocator, content_dir ++ "/{s}.blend", .{blend_path});
+                const full_path = try std.fmt.allocPrint(self.allocator, embed_content_dir ++ "/{s}.blend", .{blend_path});
 
                 var man = b.graph.cache.obtain();
                 defer man.deinit();
@@ -53,7 +54,7 @@ const ExportMeshes = struct {
                         full_path,
                         "--background",
                         "--python",
-                        std.fmt.allocPrint(self.allocator, "{s}/{s}.py", .{ content_dir, blend_export.script_path }) catch @panic("OOM"),
+                        std.fmt.allocPrint(self.allocator, "{s}/{s}.py", .{ embed_content_dir, blend_export.script_path }) catch @panic("OOM"),
                     },
                 });
                 std.debug.print("stdout: {s}\n", .{res.stdout});
@@ -178,6 +179,10 @@ pub fn build(
         exe.linkLibrary(zbullet.artifact("cbullet"));
 
         exe.step.dependOn(&export_meshes.step);
+
+        const exe_options = b.addOptions();
+        exe.root_module.addOptions("build_options", exe_options);
+        exe_options.addOption([]const u8, "content_dir", content_dir);
 
         const install_artifact = b.addInstallArtifact(exe, .{ .dest_dir = .{ .override = .{ .custom = "../bin" } } });
         const install_step = b.step("glfw", "build glfw entrypoint");
