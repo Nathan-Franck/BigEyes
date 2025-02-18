@@ -327,37 +327,41 @@ pub fn main() !void {
     // _ = gpu_state;
 
     game.init(allocator);
-    var game_graph = game.GameGraph.withHooks(poll, submit).init(
-        allocator,
-        .{
-            .orbit_camera = types.OrbitCamera{ .position = .{ 0, 0, 0, 1 }, .rotation = .{ 0, 0, 0, 1 }, .track_distance = 2 },
-            .player = types.Player{ .position = .{ 0, 0, 0, 1 }, .euler_rotation = .{ 0, 0, 0, 0 } },
-        },
-    );
+    var game_graph: ?game.GameGraph.withHooks(poll, submit) = null;
     window.show();
 
     while (!window.shouldClose()) {
         zglfw.pollEvents();
 
-        game_graph.update();
+        {
+            zgui.backend.newFrame(
+                gpu_state.gctx.swapchain_descriptor.width,
+                gpu_state.gctx.swapchain_descriptor.height,
+            );
+            _ = zgui.begin("Pill", .{
+                .flags = .{
+                    // .no_title_bar = true,
+                    // .no_move = true,
+                    // .no_collapse = true,
+                    // .always_auto_resize = true,
+                },
+            });
+            defer zgui.end();
+
+            if (game_graph) |*graph| {
+                graph.update();
+            } else {
+                game_graph = .init(
+                    allocator,
+                    .{
+                        .orbit_camera = types.OrbitCamera{ .position = .{ 0, 0, 0, 1 }, .rotation = .{ 0, 0, 0, 1 }, .track_distance = 2 },
+                        .player = types.Player{ .position = .{ 0, 0, 0, 1 }, .euler_rotation = .{ 0, 0, 0, 0 } },
+                    },
+                );
+            }
+        }
         {
             const gctx = gpu_state.gctx;
-
-            {
-                zgui.backend.newFrame(
-                    gctx.swapchain_descriptor.width,
-                    gctx.swapchain_descriptor.height,
-                );
-                _ = zgui.begin("Pill", .{
-                    .flags = .{
-                        .no_title_bar = true,
-                        .no_move = true,
-                        .no_collapse = true,
-                        .always_auto_resize = true,
-                    },
-                });
-                defer zgui.end();
-            }
 
             const back_buffer_view = gctx.swapchain.getCurrentTextureView();
             defer back_buffer_view.release();
@@ -403,6 +407,8 @@ pub fn main() !void {
     }
 }
 
+var bounce = false;
+
 // Provide inputs to the back-end from the user, disk and network.
 fn poll(comptime field_tag: GameGraph.InputTag) std.meta.fieldInfo(GameGraph.Inputs, field_tag).type {
     return switch (field_tag) {
@@ -412,7 +418,7 @@ fn poll(comptime field_tag: GameGraph.InputTag) std.meta.fieldInfo(GameGraph.Inp
         .input => .{ .mouse_delta = .{ 0, 0, 0, 0 }, .movement = .{ .left = null, .right = null, .forward = null, .backward = null } },
         .selected_camera => .orbit,
         .player_settings => .{ .movement_speed = 0.01, .look_speed = 0.01 },
-        .bounce => false,
+        .bounce => zgui.checkbox("Bounce", .{ .v = &bounce }),
         .size_multiplier => 1,
     };
 }

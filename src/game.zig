@@ -68,7 +68,6 @@ pub const graph_nodes = struct {
         delta_time: f32,
         seconds_since_start: f32,
     } {
-        std.debug.print("props.time {d} start {d}\n", .{ props.time, start });
         if (start == 0) start = props.time;
         const delta_time = @as(f32, @floatFromInt(props.time - last_time)) / 1000.0;
         const seconds_since_start = @as(f32, @floatFromInt(props.time - start)) / 1000.0;
@@ -343,7 +342,7 @@ pub const graph_nodes = struct {
                 body.getGraphicsWorldTransform(&transform);
                 break :object_to_world zmath.loadMat43(transform[0..]);
             };
-            std.debug.print("wow it's a body at location! {any}", .{transform});
+            _ = transform;
         }
 
         var terrain_chunk_cache = config.TerrainSpawner.ChunkCache.init(arena);
