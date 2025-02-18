@@ -89,6 +89,8 @@ pub fn build(
     });
 
     const zglfw = b.dependency("zglfw", .{ .target = target, .x11 = false });
+    const zgpu = b.dependency("zgpu", .{ .target = target });
+    const zgui = b.dependency("zgui", .{});
     const zbullet = b.dependency("zbullet", .{});
     const zmath = b.dependency("zmath", .{});
     const zopengl = b.dependency("zopengl", .{});
@@ -132,30 +134,6 @@ pub fn build(
         b.default_step.dependOn(test_step);
     }
 
-    // Typescript definitions
-    {
-        const exe = b.addExecutable(.{
-            .name = "build_types",
-            .root_source_file = .{ .cwd_relative = "src/tool_game_build_type_definitions.zig" },
-            .target = target,
-            .optimize = optimize,
-        });
-        exe.step.dependOn(&export_meshes.step);
-
-        exe.root_module.addImport("zmath", zmath.module("root"));
-
-        const install_artifact = b.addInstallArtifact(exe, .{});
-        const run_cmd = b.addRunArtifact(exe);
-        run_cmd.step.dependOn(&install_artifact.step);
-        if (b.args) |args| {
-            run_cmd.addArgs(args);
-        }
-        run_cmd.step.dependOn(&install_artifact.step);
-
-        const run_step = b.step("build_types", "Build the typescript types for use from the frontend");
-        run_step.dependOn(&run_cmd.step);
-    }
-
     // Check
     {
         const check = b.addExecutable(.{
@@ -186,12 +164,17 @@ pub fn build(
             .optimize = optimize,
         });
 
+        @import("zgpu").addLibraryPathsTo(exe);
+
         exe.root_module.addImport("game", game);
         exe.root_module.addImport("node_graph", node_graph);
         exe.root_module.addImport("zglfw", zglfw.module("root"));
+        exe.root_module.addImport("zgpu", zgpu.module("root"));
+        exe.root_module.addImport("zgui", zgui.module("root"));
         exe.root_module.addImport("zopengl", zopengl.module("root"));
 
         exe.linkLibrary(zglfw.artifact("glfw"));
+        exe.linkLibrary(zgpu.artifact("zdawn"));
         exe.linkLibrary(zbullet.artifact("cbullet"));
 
         exe.step.dependOn(&export_meshes.step);
@@ -207,73 +190,6 @@ pub fn build(
         }
         run_cmd.step.dependOn(&install_artifact.step);
         const run_step = b.step("glfw-run", "run the glfw entrypoint");
-        run_step.dependOn(&run_cmd.step);
-    }
-
-    // Wasm
-    {
-        var exe = b.addExecutable(.{
-            .target = b.resolveTargetQuery(.{ .cpu_arch = .wasm32, .os_tag = .freestanding }),
-            .optimize = optimize,
-            .name = "game",
-            .root_source_file = b.path("src/wasm_entry.zig"),
-        });
-
-        const gen = b.addWriteFile("generated.zig",
-            \\pub const GeneratedData = struct {
-            \\    pub const version = "1.0.0";
-            \\    pub const buildTime = @as(i64, @intCast(@typeInfo(u64).Int.bits));
-            \\    pub const constants = [_][]const u8{
-            \\        "value1",
-            \\        "value2",
-            \\        "value3",
-            \\    };
-            \\};
-        );
-        const gen_module = b.addModule("generated", .{
-            .root_source_file = .{ .generated = .{ .file = &gen.generated_directory, .up = 0, .sub_path = gen.files.items[0].sub_path } },
-        });
-        exe.root_module.addImport("generated", gen_module);
-
-        exe.root_module.addImport("zbullet", zbullet.module("root"));
-        exe.root_module.addImport("zmath", zmath.module("root"));
-
-        exe.entry = .disabled;
-        exe.rdynamic = true;
-        exe.stack_size = std.wasm.page_size * 128;
-
-        exe.step.dependOn(&export_meshes.step);
-
-        const install_artifact = b.addInstallArtifact(exe, .{ .dest_dir = .{ .override = .{ .custom = "../bin" } } });
-        const install_step = b.step("wasm", "build wasm entrypoint");
-        install_step.dependOn(&install_artifact.step);
-    }
-
-    // Test Perf in Terminal
-    {
-        const exe = b.addExecutable(.{
-            .name = "test_perf",
-            .root_source_file = .{ .cwd_relative = "src/test_perf.zig" },
-            .target = target,
-            .optimize = optimize,
-        });
-
-        exe.root_module.addImport("zmath", zmath.module("root"));
-
-        exe.step.dependOn(&export_meshes.step);
-
-        const install_artifact = b.addInstallArtifact(exe, .{});
-        const run_cmd = b.addRunArtifact(exe);
-        run_cmd.step.dependOn(&install_artifact.step);
-        if (b.args) |args| {
-            run_cmd.addArgs(args);
-        }
-        run_cmd.step.dependOn(&install_artifact.step);
-
-        // const install_step = b.step("test_perf", "build an exe");
-        // install_step.dependOn(&install_artifact.step);
-
-        const run_step = b.step("test_perf", "run the perf");
         run_step.dependOn(&run_cmd.step);
     }
 }

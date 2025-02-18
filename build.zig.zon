@@ -9,10 +9,11 @@
         .@"zig-webui" = .{ .path = "libs/zig-webui" },
         .zopengl = .{ .path = "libs/zopengl" },
         .zglfw = .{ .path = "libs/zglfw" },
-        .zsdl = .{ .path = "libs/zsdl" },
-        .@"sdl2-prebuilt-x86_64-linux-gnu" = .{
-            .url = "https://github.com/zig-gamedev/sdl2-prebuilt-x86_64-linux-gnu/archive/2eccc574ad909b0d00b694b10c217a95145c47af.tar.gz",
-            .hash = "12200ecb91c0596d0356ff39d573af83abcd44fecb27943589f11c2cd172763fea39",
+        .zgpu = .{ .path = "libs/zgpu" },
+        .zgui = .{ .path = "libs/zgui" },
+        .dawn_x86_64_linux_gnu = .{
+            .url = "https://github.com/michal-z/webgpu_dawn-x86_64-linux-gnu/archive/7d70db023bf254546024629cbec5ee6113e12a42.tar.gz",
+            .hash = "12204a3519efd49ea2d7cf63b544492a3a771d37eda320f86380813376801e4cfa73",
             .lazy = true,
         },
     },

@@ -10,3 +10,9 @@
 [submodule "libs/zbullet"]
 	path = libs/zbullet
 	url = https://github.com/zig-gamedev/zbullet.git
+[submodule "libs/zgpu"]
+	path = libs/zgpu
+	url = https://github.com/zig-gamedev/zgpu.git
+[submodule "libs/zgui"]
+	path = libs/zgui
+	url = https://github.com/zig-gamedev/zgui.git
