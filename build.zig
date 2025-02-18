@@ -91,10 +91,9 @@ pub fn build(
 
     const zglfw = b.dependency("zglfw", .{ .target = target, .x11 = false });
     const zgpu = b.dependency("zgpu", .{ .target = target });
-    const zgui = b.dependency("zgui", .{});
+    const zgui = b.dependency("zgui", .{ .target = target, .backend = .glfw_wgpu });
     const zbullet = b.dependency("zbullet", .{});
     const zmath = b.dependency("zmath", .{});
-    const zopengl = b.dependency("zopengl", .{});
     const utils = b.createModule(.{
         .root_source_file = b.path("src/utils.zig"),
         .imports = &.{
@@ -145,12 +144,26 @@ pub fn build(
             // .root_source_file = b.path("src/game/wasm_entry.zig"),
             // .root_source_file = b.path("src/test_perf.zig"),
         });
+        @import("zgpu").addLibraryPathsTo(check);
+
         check.root_module.addImport("game", game);
+        check.root_module.addImport("utils", utils);
+        check.root_module.addImport("zmath", zmath.module("root"));
         check.root_module.addImport("node_graph", node_graph);
         check.root_module.addImport("zglfw", zglfw.module("root"));
-        check.root_module.addImport("zopengl", zopengl.module("root"));
-        check.root_module.addImport("zmath", zmath.module("root"));
-        check.root_module.addImport("zbullet", zbullet.module("root"));
+        check.root_module.addImport("zgpu", zgpu.module("root"));
+        check.root_module.addImport("zgui", zgui.module("root"));
+
+        check.linkSystemLibrary("X11");
+
+        check.linkLibrary(zglfw.artifact("glfw"));
+        check.linkLibrary(zgpu.artifact("zdawn"));
+        check.linkLibrary(zgui.artifact("imgui"));
+        check.linkLibrary(zbullet.artifact("cbullet"));
+
+        const check_options = b.addOptions();
+        check.root_module.addOptions("build_options", check_options);
+        check_options.addOption([]const u8, "content_dir", content_dir);
 
         const check_step = b.step("check", "Check if wasm compiles");
         check_step.dependOn(&check.step);
@@ -168,14 +181,18 @@ pub fn build(
         @import("zgpu").addLibraryPathsTo(exe);
 
         exe.root_module.addImport("game", game);
+        exe.root_module.addImport("utils", utils);
+        exe.root_module.addImport("zmath", zmath.module("root"));
         exe.root_module.addImport("node_graph", node_graph);
         exe.root_module.addImport("zglfw", zglfw.module("root"));
         exe.root_module.addImport("zgpu", zgpu.module("root"));
         exe.root_module.addImport("zgui", zgui.module("root"));
-        exe.root_module.addImport("zopengl", zopengl.module("root"));
+
+        exe.linkSystemLibrary("X11");
 
         exe.linkLibrary(zglfw.artifact("glfw"));
         exe.linkLibrary(zgpu.artifact("zdawn"));
+        exe.linkLibrary(zgui.artifact("imgui"));
         exe.linkLibrary(zbullet.artifact("cbullet"));
 
         exe.step.dependOn(&export_meshes.step);

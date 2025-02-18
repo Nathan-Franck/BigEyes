@@ -1,6 +1,5 @@
 const std = @import("std");
 const zglfw = @import("zglfw");
-const zopengl = @import("zopengl");
 const GameGraph = @import("game").GameGraph;
 const runtime = @import("node_graph").new_runtime;
 const game = @import("game");
@@ -72,9 +71,12 @@ const wgsl_vs =
 \\      @location(0) normal: vec4<f32>,
 \\  }
 \\
-\\  mat4 matrix_from_instance(instance: Instance) -> mat4x4<f32> {
+\\  fn matrix_from_instance(i: Instance) -> mat4x4<f32> {
 \\     // Convert quaternion to rotation matrix
-\\     var x: f32 = rotation.x, y = rotation.y, z = rotation.z, w = rotation.w;
+\\     var x: f32 = i.rotation.x;
+\\     var y: f32 = i.rotation.y;
+\\     var z: f32 = i.rotation.z;
+\\     var w: f32 = i.rotation.w;
 \\     var rotationMatrix: mat3x3<f32> = mat3x3(
 \\         1.0 - 2.0 * (y * y + z * z), 2.0 * (x * y - w * z), 2.0 * (x * z + w * y),
 \\         2.0 * (x * y + w * z), 1.0 - 2.0 * (x * x + z * z), 2.0 * (y * z - w * x),
@@ -83,17 +85,17 @@ const wgsl_vs =
 \\     
 \\     // Scale the rotation matrix
 \\     var scaledRotation: mat3x3<f32> = mat3x3(
-\\         rotationMatrix[0] * scale.x,
-\\         rotationMatrix[1] * scale.y,
-\\         rotationMatrix[2] * scale.z
+\\         rotationMatrix[0] * i.scale.x,
+\\         rotationMatrix[1] * i.scale.y,
+\\         rotationMatrix[2] * i.scale.z
 \\     );
 \\     
 \\     // Expand scaledRotation into a mat4
-\\     var transform: mat4x4 = mat4x4(
+\\     var transform: mat4x4<f32> = mat4x4(
 \\         vec4(scaledRotation[0], 0.0),
 \\         vec4(scaledRotation[1], 0.0),
 \\         vec4(scaledRotation[2], 0.0),
-\\         position
+\\         i.position
 \\     );
 \\     return transform;
 \\  }
@@ -102,7 +104,7 @@ const wgsl_vs =
 \\      // WebGPU mat4x4 are column vectors - TODO might be a bug for me once this actually runs...
 \\      var fragment: Fragment;
 \\      var instance_mat: mat4x4<f32> = matrix_from_instance(instance);
-\\      fragment.position = vec4(vertex.position, 1.0) * instance_mat * object_to_clip;
+\\      fragment.position = vertex.position * instance_mat * object_to_clip;
 \\      fragment.normal = vertex.normal;
 \\      return fragment;
 \\  }
@@ -116,7 +118,7 @@ const wgsl_fs =
 \\  }
 \\
 \\  @fragment fn main(fragment: Fragment) -> Screen {
-\\      final_normal: vec4<f32> = vec4(normalize(fragment.normal.xyz), 0);
+\\      var final_normal: vec4<f32> = vec4(normalize(fragment.normal.xyz), 0);
 \\      var screen: Screen;
 \\      screen.color = vec4(final_normal.xyz * 0.5 + 0.5, 1);
 \\      return screen;
@@ -124,7 +126,14 @@ const wgsl_fs =
 // zig fmt: on
 ;
 
-pub fn initGLFW(allocator: std.mem.Allocator, window: *zglfw.Window) void {
+pub fn initGLFW(allocator: std.mem.Allocator, window: *zglfw.Window) !struct {
+    window: *zglfw.Window,
+    gctx: *zgpu.GraphicsContext,
+    dimensions: Dimensions,
+    pipeline: zgpu.RenderPipelineHandle,
+    bind_group: zgpu.BindGroupHandle,
+    depth: Depth,
+} {
     const gctx = try zgpu.GraphicsContext.create(
         allocator,
         .{
@@ -147,8 +156,12 @@ pub fn initGLFW(allocator: std.mem.Allocator, window: *zglfw.Window) void {
         const scale = window.getContentScale();
         break :scale_factor @max(scale[0], scale[1]);
     };
+
+    const cwd = try std.process.getCwdAlloc(allocator);
+    const path = try std.fmt.allocPrintZ(allocator, "{s}/" ++ content_dir ++ "Roboto-Medium.ttf", .{cwd});
+    std.debug.print("Path to font {s}\n", .{path});
     const font_normal = zgui.io.addFontFromFile(
-        content_dir ++ "Roboto-Medium.ttf",
+        path,
         math.floor(20.0 * scale_factor),
     );
     assert(zgui.io.getFont(0) == font_normal);
@@ -215,7 +228,6 @@ pub fn initGLFW(allocator: std.mem.Allocator, window: *zglfw.Window) void {
                 .front_face = .ccw,
                 .cull_mode = .back,
                 .topology = .triangle_list,
-                .strip_index_format = .uint32,
             },
             .depth_stencil = &wgpu.DepthStencilState{
                 .format = .depth32_float,
@@ -247,23 +259,19 @@ pub fn initGLFW(allocator: std.mem.Allocator, window: *zglfw.Window) void {
     return .{
         .window = window,
         .gctx = gctx,
-        .dimension = calculateDimensions(gctx),
+        .dimensions = calculateDimensions(gctx),
         .pipeline = pipeline,
-        .vertex_buffer = .{},
-        .index_buffer = .{},
-        .instance_buffer = .{},
         .bind_group = bind_group,
-        .depth_texture = depth.texture,
-        .depth_texture_view = depth.view,
+        .depth = depth,
     };
 }
 
-const Dimension = struct {
+const Dimensions = struct {
     width: f32,
     height: f32,
 };
 
-fn calculateDimensions(gctx: *zgpu.GraphicsContext) Dimension {
+fn calculateDimensions(gctx: *zgpu.GraphicsContext) Dimensions {
     const width = @as(f32, @floatFromInt(gctx.swapchain_descriptor.width));
     const height = @as(f32, @floatFromInt(gctx.swapchain_descriptor.height));
     const delta = math.sign(
@@ -277,10 +285,12 @@ fn calculateDimensions(gctx: *zgpu.GraphicsContext) Dimension {
     };
 }
 
-fn createDepthTexture(gctx: *zgpu.GraphicsContext) struct {
+const Depth = struct {
     texture: zgpu.TextureHandle,
     view: zgpu.TextureViewHandle,
-} {
+};
+
+fn createDepthTexture(gctx: *zgpu.GraphicsContext) Depth {
     const texture = gctx.createTexture(.{
         .usage = .{ .render_attachment = true },
         .dimension = .tdim_2d,
@@ -303,25 +313,18 @@ pub fn main() !void {
     try zglfw.init();
     defer zglfw.terminate();
 
-    const gl_major = 4;
-    const gl_minor = 0;
-    zglfw.windowHint(.context_version_major, gl_major);
-    zglfw.windowHint(.context_version_minor, gl_minor);
-    zglfw.windowHint(.opengl_profile, .opengl_core_profile);
-    zglfw.windowHint(.opengl_forward_compat, true);
-    zglfw.windowHint(.client_api, .opengl_api);
-    zglfw.windowHint(.doublebuffer, true);
+    zglfw.windowHint(.client_api, .no_api);
+    // zglfw.windowHint(.doublebuffer, true);
 
-    const window = try zglfw.Window.create(600, 600, "zig-gamedev: minimal_glfw_gl", null);
+    const window = try zglfw.Window.create(600, 600, "zig-gamedev: minimal_glfw_wgpu", null);
     defer window.destroy();
 
     zglfw.makeContextCurrent(window);
 
-    try zopengl.loadCoreProfile(zglfw.getProcAddress, gl_major, gl_minor);
+    // zglfw.swapInterval(1);
 
-    const gl = zopengl.bindings;
-
-    zglfw.swapInterval(1);
+    var gpu_state = try initGLFW(allocator, window);
+    // _ = gpu_state;
 
     game.init(allocator);
     var game_graph = game.GameGraph.withHooks(poll, submit).init(
@@ -331,14 +334,71 @@ pub fn main() !void {
             .player = types.Player{ .position = .{ 0, 0, 0, 1 }, .euler_rotation = .{ 0, 0, 0, 0 } },
         },
     );
+    window.show();
 
     while (!window.shouldClose()) {
         zglfw.pollEvents();
 
-        gl.clearBufferfv(gl.COLOR, 0, &[_]f32{ 0.2, 0.4, 0.4, 1.0 });
-
         game_graph.update();
+        {
+            const gctx = gpu_state.gctx;
 
+            {
+                zgui.backend.newFrame(
+                    gctx.swapchain_descriptor.width,
+                    gctx.swapchain_descriptor.height,
+                );
+                _ = zgui.begin("Pill", .{
+                    .flags = .{
+                        .no_title_bar = true,
+                        .no_move = true,
+                        .no_collapse = true,
+                        .always_auto_resize = true,
+                    },
+                });
+                defer zgui.end();
+            }
+
+            const back_buffer_view = gctx.swapchain.getCurrentTextureView();
+            defer back_buffer_view.release();
+
+            const commands = commands: {
+                const encoder = gctx.device.createCommandEncoder(null);
+                defer encoder.release();
+                {
+                    const color_attachments = [_]wgpu.RenderPassColorAttachment{.{
+                        .view = back_buffer_view,
+                        .load_op = .load,
+                        .store_op = .store,
+                    }};
+                    const render_pass_info = wgpu.RenderPassDescriptor{
+                        .color_attachment_count = color_attachments.len,
+                        .color_attachments = &color_attachments,
+                    };
+                    const pass = encoder.beginRenderPass(render_pass_info);
+                    defer {
+                        pass.end();
+                        pass.release();
+                    }
+
+                    zgui.backend.draw(pass);
+                }
+
+                break :commands encoder.finish(null);
+            };
+
+            gctx.submit(&.{commands});
+            if (gctx.present() == .swap_chain_resized) {
+                gpu_state.dimensions = calculateDimensions(gctx);
+
+                // Release old depth texture.
+                gctx.releaseResource(gpu_state.depth.view);
+                gctx.destroyResource(gpu_state.depth.texture);
+
+                // Create a new depth texture to match the new window size.
+                gpu_state.depth = createDepthTexture(gctx);
+            }
+        }
         window.swapBuffers();
     }
 }

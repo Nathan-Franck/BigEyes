@@ -7,7 +7,6 @@
         .zmath = .{ .path = "libs/zmath" },
         .zbullet = .{ .path = "libs/zbullet" },
         .@"zig-webui" = .{ .path = "libs/zig-webui" },
-        .zopengl = .{ .path = "libs/zopengl" },
         .zglfw = .{ .path = "libs/zglfw" },
         .zgpu = .{ .path = "libs/zgpu" },
         .zgui = .{ .path = "libs/zgui" },
