@@ -6,8 +6,123 @@ const runtime = @import("node_graph").new_runtime;
 const game = @import("game");
 const zgpu = @import("zgpu");
 const zgui = @import("zgui");
+const Vec4 = @import("utils").Vec4;
+const zmath = @import("zmath");
+
+const wgpu = zgpu.wgpu;
+const math = std.math;
+const assert = std.debug.assert;
+
+const content_dir = @import("build_options").content_dir;
 
 const types = game.types;
+
+const Vertex = struct {
+    position: Vec4,
+    normal: Vec4,
+};
+
+const Instance = struct {
+    position: Vec4,
+    rotation: Vec4,
+    scale: Vec4,
+};
+
+const vertex_attributes = [_]wgpu.VertexAttribute{ .{
+    .format = .float32x4,
+    .offset = @offsetOf(Vertex, "position"),
+    .shader_location = 0,
+}, .{
+    .format = .float32x4,
+    .offset = @offsetOf(Vertex, "normal"),
+    .shader_location = 1,
+} };
+
+const instance_attributes = [_]wgpu.VertexAttribute{ .{
+    .format = .float32x4,
+    .offset = @offsetOf(Instance, "position"),
+    .shader_location = 10,
+}, .{
+    .format = .float32x4,
+    .offset = @offsetOf(Instance, "rotation"),
+    .shader_location = 11,
+}, .{
+    .format = .float32x4,
+    .offset = @offsetOf(Instance, "scale"),
+    .shader_location = 12,
+} };
+
+// zig fmt: off
+const wgsl_vs =
+\\  @group(0) @binding(0) var<uniform> object_to_clip: mat4x4<f32>;
+\\
+\\  struct Vertex {
+\\      @location(0) position: vec4<f32>,
+\\      @location(1) normal: vec4<f32>,
+\\  }
+\\
+\\  struct Instance {
+\\      @location(10) position: vec4<f32>,
+\\      @location(11) rotation: vec4<f32>,
+\\      @location(12) scale: vec4<f32>,
+\\  }
+\\
+\\  struct Fragment {
+\\      @builtin(position) position: vec4<f32>,
+\\      @location(0) normal: vec4<f32>,
+\\  }
+\\
+\\  mat4 matrix_from_instance(instance: Instance) -> mat4x4<f32> {
+\\     // Convert quaternion to rotation matrix
+\\     var x: f32 = rotation.x, y = rotation.y, z = rotation.z, w = rotation.w;
+\\     var rotationMatrix: mat3x3<f32> = mat3x3(
+\\         1.0 - 2.0 * (y * y + z * z), 2.0 * (x * y - w * z), 2.0 * (x * z + w * y),
+\\         2.0 * (x * y + w * z), 1.0 - 2.0 * (x * x + z * z), 2.0 * (y * z - w * x),
+\\         2.0 * (x * z - w * y), 2.0 * (y * z + w * x), 1.0 - 2.0 * (x * x + y * y)
+\\     );
+\\     
+\\     // Scale the rotation matrix
+\\     var scaledRotation: mat3x3<f32> = mat3x3(
+\\         rotationMatrix[0] * scale.x,
+\\         rotationMatrix[1] * scale.y,
+\\         rotationMatrix[2] * scale.z
+\\     );
+\\     
+\\     // Expand scaledRotation into a mat4
+\\     var transform: mat4x4 = mat4x4(
+\\         vec4(scaledRotation[0], 0.0),
+\\         vec4(scaledRotation[1], 0.0),
+\\         vec4(scaledRotation[2], 0.0),
+\\         position
+\\     );
+\\     return transform;
+\\  }
+\\
+\\  @vertex fn main(vertex: Vertex, instance: Instance) -> Fragment {
+\\      // WebGPU mat4x4 are column vectors - TODO might be a bug for me once this actually runs...
+\\      var fragment: Fragment;
+\\      var instance_mat: mat4x4<f32> = matrix_from_instance(instance);
+\\      fragment.position = vec4(vertex.position, 1.0) * instance_mat * object_to_clip;
+\\      fragment.normal = vertex.normal;
+\\      return fragment;
+\\  }
+;
+const wgsl_fs =
+\\  struct Fragment {
+\\      @location(0) normal: vec4<f32>,
+\\  }
+\\  struct Screen {
+\\      @location(0) color: vec4<f32>,
+\\  }
+\\
+\\  @fragment fn main(fragment: Fragment) -> Screen {
+\\      final_normal: vec4<f32> = vec4(normalize(fragment.normal.xyz), 0);
+\\      var screen: Screen;
+\\      screen.color = vec4(final_normal.xyz * 0.5 + 0.5, 1);
+\\      return screen;
+\\  }
+// zig fmt: on
+;
 
 pub fn initGLFW(allocator: std.mem.Allocator, window: *zglfw.Window) void {
     const gctx = try zgpu.GraphicsContext.create(
@@ -78,48 +193,12 @@ pub fn initGLFW(allocator: std.mem.Allocator, window: *zglfw.Window) void {
             .format = zgpu.GraphicsContext.swapchain_format,
         }};
 
-        const vertex_attributes = [_]wgpu.VertexAttribute{ .{
-            .format = .float32x2,
-            .offset = @offsetOf(Vertex, "position"),
-            .shader_location = 0,
-        }, .{
-            .format = .float32,
-            .offset = @offsetOf(Vertex, "side"),
-            .shader_location = 1,
-        } };
-
-        const instance_attributes = [_]wgpu.VertexAttribute{ .{
-            .format = .float32,
-            .offset = @offsetOf(Pill, "width"),
-            .shader_location = 10,
-        }, .{
-            .format = .float32,
-            .offset = @offsetOf(Pill, "length"),
-            .shader_location = 11,
-        }, .{
-            .format = .float32,
-            .offset = @offsetOf(Pill, "angle"),
-            .shader_location = 12,
-        }, .{
-            .format = .float32x2,
-            .offset = @offsetOf(Pill, "position"),
-            .shader_location = 13,
-        }, .{
-            .format = .float32x4,
-            .offset = @offsetOf(Pill, "start_color"),
-            .shader_location = 14,
-        }, .{
-            .format = .float32x4,
-            .offset = @offsetOf(Pill, "end_color"),
-            .shader_location = 15,
-        } };
-
         const vertex_buffers = [_]wgpu.VertexBufferLayout{ .{
             .array_stride = @sizeOf(Vertex),
             .attribute_count = vertex_attributes.len,
             .attributes = &vertex_attributes,
         }, .{
-            .array_stride = @sizeOf(Pill),
+            .array_stride = @sizeOf(Instance),
             .step_mode = .instance,
             .attribute_count = instance_attributes.len,
             .attributes = &instance_attributes,
@@ -135,8 +214,8 @@ pub fn initGLFW(allocator: std.mem.Allocator, window: *zglfw.Window) void {
             .primitive = wgpu.PrimitiveState{
                 .front_face = .ccw,
                 .cull_mode = .back,
-                .topology = .triangle_strip,
-                .strip_index_format = .uint16,
+                .topology = .triangle_list,
+                .strip_index_format = .uint32,
             },
             .depth_stencil = &wgpu.DepthStencilState{
                 .format = .depth32_float,
@@ -158,7 +237,7 @@ pub fn initGLFW(allocator: std.mem.Allocator, window: *zglfw.Window) void {
             .binding = 0,
             .buffer_handle = gctx.uniforms.buffer,
             .offset = 0,
-            .size = @sizeOf(zm.Mat),
+            .size = @sizeOf(zmath.Mat),
         },
     });
 
@@ -168,8 +247,6 @@ pub fn initGLFW(allocator: std.mem.Allocator, window: *zglfw.Window) void {
     return .{
         .window = window,
         .gctx = gctx,
-        .pills = std.ArrayList(Pill).init(allocator),
-        .vertex_count = 0,
         .dimension = calculateDimensions(gctx),
         .pipeline = pipeline,
         .vertex_buffer = .{},
@@ -179,6 +256,45 @@ pub fn initGLFW(allocator: std.mem.Allocator, window: *zglfw.Window) void {
         .depth_texture = depth.texture,
         .depth_texture_view = depth.view,
     };
+}
+
+const Dimension = struct {
+    width: f32,
+    height: f32,
+};
+
+fn calculateDimensions(gctx: *zgpu.GraphicsContext) Dimension {
+    const width = @as(f32, @floatFromInt(gctx.swapchain_descriptor.width));
+    const height = @as(f32, @floatFromInt(gctx.swapchain_descriptor.height));
+    const delta = math.sign(
+        @as(i32, @bitCast(gctx.swapchain_descriptor.width)) - @as(i32, @bitCast(gctx.swapchain_descriptor.height)),
+    );
+    return switch (delta) {
+        -1 => .{ .width = 2.0, .height = 2 * width / height },
+        0 => .{ .width = 2.0, .height = 2.0 },
+        1 => .{ .width = 2 * height / width, .height = 2.0 },
+        else => unreachable,
+    };
+}
+
+fn createDepthTexture(gctx: *zgpu.GraphicsContext) struct {
+    texture: zgpu.TextureHandle,
+    view: zgpu.TextureViewHandle,
+} {
+    const texture = gctx.createTexture(.{
+        .usage = .{ .render_attachment = true },
+        .dimension = .tdim_2d,
+        .size = .{
+            .width = gctx.swapchain_descriptor.width,
+            .height = gctx.swapchain_descriptor.height,
+            .depth_or_array_layers = 1,
+        },
+        .format = .depth32_float,
+        .mip_level_count = 1,
+        .sample_count = 1,
+    });
+    const view = gctx.createTextureView(texture, .{});
+    return .{ .texture = texture, .view = view };
 }
 
 pub fn main() !void {
