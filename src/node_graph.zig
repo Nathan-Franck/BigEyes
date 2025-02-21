@@ -106,7 +106,7 @@ pub fn NodeGraph(
                         output_fields = comptime output_fields ++ .{std.builtin.Type.StructField{
                             .name = input_field.name,
                             .type = pointer.child,
-                            .default_value = null,
+                            .default_value_ptr = null,
                             .is_comptime = false,
                             .alignment = @alignOf(input_field.type),
                         }};
@@ -115,7 +115,7 @@ pub fn NodeGraph(
                         output_fields = comptime output_fields ++ .{.{
                             .name = input_field.name,
                             .type = []const pointer.child,
-                            .default_value = null,
+                            .default_value_ptr = null,
                             .is_comptime = false,
                             .alignment = @alignOf(input_field.type),
                         }};
@@ -133,7 +133,7 @@ pub fn NodeGraph(
             node_output_fields = comptime node_output_fields ++ .{std.builtin.Type.StructField{
                 .name = node.name[0.. :0],
                 .type = non_error_outputs_and_pointers,
-                .default_value = null,
+                .default_value_ptr = null,
                 .is_comptime = false,
                 .alignment = @alignOf(non_error_outputs),
             }};
@@ -152,7 +152,7 @@ pub fn NodeGraph(
             fields = comptime fields ++ .{std.builtin.Type.StructField{
                 .name = node.name[0.. :0],
                 .type = bool,
-                .default_value = null,
+                .default_value_ptr = null,
                 .is_comptime = false,
                 .alignment = @alignOf(bool),
             }};
@@ -178,7 +178,7 @@ pub fn NodeGraph(
                         .name = field.name,
                         .type = bool,
                         .alignment = @alignOf(bool),
-                        .default_value = null,
+                        .default_value_ptr = null,
                         .is_comptime = false,
                     }};
                 }
@@ -191,7 +191,7 @@ pub fn NodeGraph(
                     .decls = &.{},
                     .is_tuple = false,
                 } }),
-                .default_value = null,
+                .default_value_ptr = null,
                 .is_comptime = false,
                 .alignment = @alignOf(bool),
             }};
@@ -308,7 +308,7 @@ pub fn NodeGraph(
                             .{std.builtin.Type.StructField{
                                 .name = input_field[0.. :0],
                                 .type = field_type,
-                                .default_value = null,
+                                .default_value_ptr = null,
                                 .is_comptime = false,
                                 .alignment = @alignOf(field_type),
                             }};
@@ -328,7 +328,7 @@ pub fn NodeGraph(
                 fields = fields ++ .{std.builtin.Type.StructField{
                     .name = input_field.name[0.. :0],
                     .type = ?input_field.type,
-                    .default_value = blk: {
+                    .default_value_ptr = blk: {
                         const default_value: ?input_field.type = null;
                         break :blk @ptrCast(&default_value);
                     },
@@ -359,7 +359,7 @@ pub fn NodeGraph(
                             .{std.builtin.Type.StructField{
                                 .name = input_field[0.. :0],
                                 .type = bool,
-                                .default_value = null,
+                                .default_value_ptr = null,
                                 .is_comptime = false,
                                 .alignment = @alignOf(bool),
                             }};
@@ -389,7 +389,7 @@ pub fn NodeGraph(
                 fields = fields ++ .{std.builtin.Type.StructField{
                     .name = name[0.. :0],
                     .type = ?field_type,
-                    .default_value = null,
+                    .default_value_ptr = null,
                     .is_comptime = false,
                     .alignment = @alignOf(?field_type),
                 }};
@@ -416,7 +416,7 @@ pub fn NodeGraph(
                 system_store_fields = system_store_fields ++ .{std.builtin.Type.StructField{
                     .name = name[0.. :0],
                     .type = field_type,
-                    .default_value = null,
+                    .default_value_ptr = null,
                     .is_comptime = false,
                     .alignment = @alignOf(field_type),
                 }};

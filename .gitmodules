@@ -16,3 +16,6 @@
 [submodule "libs/zgui"]
 	path = libs/zgui
 	url = https://github.com/zig-gamedev/zgui.git
+[submodule "libs/zpool"]
+	path = libs/zpool
+	url = https://github.com/zig-gamedev/zpool.git

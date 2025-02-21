@@ -7,6 +7,7 @@ const zgpu = @import("zgpu");
 const zgui = @import("zgui");
 const Vec4 = @import("utils").Vec4;
 const zmath = @import("zmath");
+const resources = @import("resources");
 
 const wgpu = zgpu.wgpu;
 const math = std.math;
@@ -82,14 +83,14 @@ const wgsl_vs =
 \\         2.0 * (x * y + w * z), 1.0 - 2.0 * (x * x + z * z), 2.0 * (y * z - w * x),
 \\         2.0 * (x * z - w * y), 2.0 * (y * z + w * x), 1.0 - 2.0 * (x * x + y * y)
 \\     );
-\\     
+\\
 \\     // Scale the rotation matrix
 \\     var scaledRotation: mat3x3<f32> = mat3x3(
 \\         rotationMatrix[0] * i.scale.x,
 \\         rotationMatrix[1] * i.scale.y,
 \\         rotationMatrix[2] * i.scale.z
 \\     );
-\\     
+\\
 \\     // Expand scaledRotation into a mat4
 \\     var transform: mat4x4<f32> = mat4x4(
 \\         vec4(scaledRotation[0], 0.0),
@@ -411,7 +412,7 @@ fn poll(comptime field_tag: GameGraph.InputTag) std.meta.fieldInfo(GameGraph.Inp
         .input => .{ .mouse_delta = .{ 0, 0, 0, 0 }, .movement = .{ .left = null, .right = null, .forward = null, .backward = null } },
         .selected_camera => .orbit,
         .player_settings => .{ .movement_speed = 0.01, .look_speed = 0.01 },
-        .bounce => zgui.checkbox("Bounce", .{ .v = &bounce }),
+        .bounce => bounce,
         .size_multiplier => 1,
     };
 }

@@ -92,5 +92,6 @@ pub fn loadPngAndProcess(
     png_data: []const u8,
 ) !Processed {
     const image_data = try loadPng(allocator, png_data);
-    return processImageForGPU(allocator, image_data);
+    _ = image_data;
+    return undefined; //processImageForGPU(allocator, image_data);
 }

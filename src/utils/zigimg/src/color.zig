@@ -138,65 +138,8 @@ fn RgbMethods(
     const has_alpha_type = @hasField(Self, "a");
 
     return struct {
-        pub fn initRgb(r: RedT, g: GreenT, b: BlueT) Self {
-            return Self{
-                .r = r,
-                .g = g,
-                .b = b,
-            };
-        }
-
-        pub fn toColorf32(self: Self) Colorf32 {
-            return Colorf32{
-                .r = toF32Color(self.r),
-                .g = toF32Color(self.g),
-                .b = toF32Color(self.b),
-                .a = if (has_alpha_type) toF32Color(self.a) else 1.0,
-            };
-        }
-
-        pub fn fromU32Rgba(value: u32) Self {
-            var res = Self{
-                .r = scaleToIntColor(RedT, @as(u8, @truncate(value >> 24))),
-                .g = scaleToIntColor(GreenT, @as(u8, @truncate(value >> 16))),
-                .b = scaleToIntColor(BlueT, @as(u8, @truncate(value >> 8))),
-            };
-            if (has_alpha_type) {
-                res.a = scaleToIntColor(AlphaT, @as(u8, @truncate(value)));
-            }
-            return res;
-        }
-
-        pub fn fromU32Rgb(value: u32) Self {
-            return Self{
-                .r = scaleToIntColor(RedT, @as(u8, @truncate(value >> 16))),
-                .g = scaleToIntColor(GreenT, @as(u8, @truncate(value >> 8))),
-                .b = scaleToIntColor(BlueT, @as(u8, @truncate(value))),
-            };
-        }
-
-        pub fn fromU64Rgba(value: u64) Self {
-            var res = Self{
-                .r = scaleToIntColor(RedT, @as(u16, @truncate(value >> 48))),
-                .g = scaleToIntColor(GreenT, @as(u16, @truncate(value >> 32))),
-                .b = scaleToIntColor(BlueT, @as(u16, @truncate(value >> 16))),
-            };
-            if (has_alpha_type) {
-                res.a = scaleToIntColor(AlphaT, @as(u16, @truncate(value)));
-            }
-            return res;
-        }
-
-        pub fn fromU64Rgb(value: u64) Self {
-            return Self{
-                .r = scaleToIntColor(RedT, @as(u16, @truncate(value >> 32))),
-                .g = scaleToIntColor(GreenT, @as(u16, @truncate(value >> 16))),
-                .b = scaleToIntColor(BlueT, @as(u16, @truncate(value))),
-            };
-        }
-
         // Only enable fromHtmlHex when all color component type are u8
-        pub usingnamespace if (isAll8BitColor(RedT, GreenT, BlueT, AlphaT))
+        byte_color: if (isAll8BitColor(RedT, GreenT, BlueT, AlphaT))
             struct {
                 pub fn fromHtmlHex(hex_string: []const u8) !Self {
                     if (hex_string.len == 0) {
@@ -282,29 +225,91 @@ fn RgbMethods(
                 }
             }
         else
-            struct {};
+            struct {} = .{},
 
-        pub fn toU32Rgba(self: Self) u32 {
+        pub fn initRgb(r: RedT, g: GreenT, b: BlueT) Self {
+            return Self{
+                .r = r,
+                .g = g,
+                .b = b,
+            };
+        }
+
+        // pub fn toColorf32(m: *@This()) Colorf32 {
+        //     const self: *Self = @alignCast(@fieldParentPtr("rgb", m));
+        //     return Colorf32{
+        //         .r = toF32Color(self.r),
+        //         .g = toF32Color(self.g),
+        //         .b = toF32Color(self.b),
+        //         .a = if (has_alpha_type) toF32Color(self.a) else 1.0,
+        //     };
+        // }
+
+        pub fn fromU32Rgba(value: u32) Self {
+            var res = Self{
+                .r = scaleToIntColor(RedT, @as(u8, @truncate(value >> 24))),
+                .g = scaleToIntColor(GreenT, @as(u8, @truncate(value >> 16))),
+                .b = scaleToIntColor(BlueT, @as(u8, @truncate(value >> 8))),
+            };
+            if (has_alpha_type) {
+                res.a = scaleToIntColor(AlphaT, @as(u8, @truncate(value)));
+            }
+            return res;
+        }
+
+        pub fn fromU32Rgb(value: u32) Self {
+            return Self{
+                .r = scaleToIntColor(RedT, @as(u8, @truncate(value >> 16))),
+                .g = scaleToIntColor(GreenT, @as(u8, @truncate(value >> 8))),
+                .b = scaleToIntColor(BlueT, @as(u8, @truncate(value))),
+            };
+        }
+
+        pub fn fromU64Rgba(value: u64) Self {
+            var res = Self{
+                .r = scaleToIntColor(RedT, @as(u16, @truncate(value >> 48))),
+                .g = scaleToIntColor(GreenT, @as(u16, @truncate(value >> 32))),
+                .b = scaleToIntColor(BlueT, @as(u16, @truncate(value >> 16))),
+            };
+            if (has_alpha_type) {
+                res.a = scaleToIntColor(AlphaT, @as(u16, @truncate(value)));
+            }
+            return res;
+        }
+
+        pub fn fromU64Rgb(value: u64) Self {
+            return Self{
+                .r = scaleToIntColor(RedT, @as(u16, @truncate(value >> 32))),
+                .g = scaleToIntColor(GreenT, @as(u16, @truncate(value >> 16))),
+                .b = scaleToIntColor(BlueT, @as(u16, @truncate(value))),
+            };
+        }
+
+        pub fn toU32Rgba(m: *@This()) u32 {
+            const self: *Self = @alignCast(@fieldParentPtr("rgb", m));
             return @as(u32, scaleToIntColor(u8, self.r)) << 24 |
                 @as(u32, scaleToIntColor(u8, self.g)) << 16 |
                 @as(u32, scaleToIntColor(u8, self.b)) << 8 |
                 if (@hasField(Self, "a")) scaleToIntColor(u8, self.a) else 0xff;
         }
 
-        pub fn toU32Rgb(self: Self) u32 {
+        pub fn toU32Rgb(m: *@This()) u32 {
+            const self: *Self = @alignCast(@fieldParentPtr("rgb", m));
             return @as(u32, scaleToIntColor(u8, self.r)) << 16 |
                 @as(u32, scaleToIntColor(u8, self.g)) << 8 |
                 scaleToIntColor(u8, self.b);
         }
 
-        pub fn toU64Rgba(self: Self) u64 {
+        pub fn toU64Rgba(m: *@This()) u64 {
+            const self: *Self = @alignCast(@fieldParentPtr("rgb", m));
             return @as(u64, scaleToIntColor(u16, self.r)) << 48 |
                 @as(u64, scaleToIntColor(u16, self.g)) << 32 |
                 @as(u64, scaleToIntColor(u16, self.b)) << 16 |
                 if (@hasField(Self, "a")) scaleToIntColor(u16, self.a) else 0xffff;
         }
 
-        pub fn toU64Rgb(self: Self) u64 {
+        pub fn toU64Rgb(m: *@This()) u64 {
+            const self: *Self = @alignCast(@fieldParentPtr("rgb", m));
             return @as(u64, scaleToIntColor(u16, self.r)) << 32 |
                 @as(u64, scaleToIntColor(u16, self.g)) << 16 |
                 scaleToIntColor(u16, self.b);
@@ -326,7 +331,8 @@ fn RgbaMethods(comptime Self: type) type {
             };
         }
 
-        pub fn toPremultipliedAlpha(self: Self) Self {
+        pub fn toPremultipliedAlpha(m: *@This()) Self {
+            const self: Self = @alignCast(@fieldParentPtr("rgba", m));
             const max = math.maxInt(T);
             return Self{
                 .r = @as(T, @truncate((@as(u32, self.r) * self.a + max / 2) / max)),
@@ -344,7 +350,7 @@ fn RgbColor(comptime T: type) type {
         g: T align(1),
         b: T align(1),
 
-        pub usingnamespace RgbMethods(@This(), T, T, T, void);
+        rgb: RgbMethods(@This(), T, T, T, void) = .{},
     };
 }
 
@@ -361,7 +367,7 @@ pub const Bgr555 = packed struct {
     g: u5 = 0,
     b: u5 = 0,
 
-    pub usingnamespace RgbMethods(@This(), u5, u5, u5, void);
+    rgb: RgbMethods(@This(), u5, u5, u5, void) = .{},
 };
 
 // Rgb555
@@ -373,7 +379,7 @@ pub const Rgb555 = packed struct {
     g: u5,
     r: u5,
 
-    pub usingnamespace RgbMethods(@This(), u5, u5, u5, void);
+    rgb: RgbMethods(@This(), u5, u5, u5, void) = .{},
 };
 
 // Rgb565
@@ -385,7 +391,7 @@ pub const Rgb565 = packed struct {
     g: u6,
     r: u5,
 
-    pub usingnamespace RgbMethods(@This(), u5, u6, u5, void);
+    rgb: RgbMethods(@This(), u5, u6, u5, void) = .{},
 };
 
 fn RgbaColor(comptime T: type) type {
@@ -395,8 +401,8 @@ fn RgbaColor(comptime T: type) type {
         b: T align(1),
         a: T align(1) = math.maxInt(T),
 
-        pub usingnamespace RgbMethods(@This(), T, T, T, T);
-        pub usingnamespace RgbaMethods(@This());
+        // rgb: RgbMethods(@This(), T, T, T, T) = .{},
+        rgba: RgbaMethods(@This()) = .{},
     };
 }
 
@@ -430,7 +436,7 @@ fn BgrColor(comptime T: type) type {
         g: T align(1),
         r: T align(1),
 
-        pub usingnamespace RgbMethods(@This(), T, T, T, void);
+        rgb: RgbMethods(@This(), T, T, T, void) = .{},
     };
 }
 
@@ -441,8 +447,8 @@ fn BgraColor(comptime T: type) type {
         r: T align(1),
         a: T = math.maxInt(T),
 
-        pub usingnamespace RgbMethods(@This(), T, T, T, T);
-        pub usingnamespace RgbaMethods(@This());
+        rgb: RgbMethods(@This(), T, T, T, T) = .{},
+        rgba: RgbaMethods(@This()) = .{},
     };
 }
 

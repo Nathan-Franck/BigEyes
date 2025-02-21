@@ -118,7 +118,7 @@ fn PickFields(@"struct": type, fields: []const std.meta.FieldEnum(@"struct")) ty
             tuple_fields[i] = .{
                 .name = std.fmt.bufPrintZ(&buf, "{d}", .{i}) catch unreachable,
                 .type = @TypeOf(@field(temp_struct, @tagName(field))),
-                .default_value = null,
+                .default_value_ptr = null,
                 .is_comptime = false,
                 .alignment = 0,
             };
@@ -483,7 +483,7 @@ pub fn DeepHashableStruct(t: type) struct { type: type, changed: bool = false } 
                     .name = field.name,
                     .type = new_field.type,
                     .alignment = @alignOf(new_field.type),
-                    .default_value = if (new_field.type == field.type)
+                    .default_value_ptr = if (new_field.type == field.type)
                         field.default_value
                     else
                         null,

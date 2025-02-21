@@ -39,15 +39,15 @@ fn NodeInputs(@"fn": anytype) type {
             },
             .pointer => |pointer| if (!pointer.is_const) switch (pointer.size) {
                 else => default,
-                .One => .{ pointer.child, @alignOf(field.type) },
-                .Slice => .{ []const pointer.child, @alignOf(field.type) },
+                .one => .{ pointer.child, @alignOf(field.type) },
+                .slice => .{ []const pointer.child, @alignOf(field.type) },
             } else default,
             else => default,
         };
         new_field = new_field ++ .{std.builtin.Type.StructField{
             .name = field.name,
             .type = Dirtyable(new_t),
-            .default_value = null,
+            .default_value_ptr = null,
             .is_comptime = false,
             .alignment = alignment,
         }};
@@ -67,15 +67,15 @@ fn MutableProps(@"fn": anytype) type {
         const new_t: type, const alignment: comptime_int = switch (@typeInfo(field.type)) {
             .pointer => |pointer| if (!pointer.is_const) switch (pointer.size) {
                 else => continue,
-                .One => .{ pointer.child, @alignOf(pointer.child) },
-                .Slice => .{ []const pointer.child, @alignOf(pointer.child) },
+                .one => .{ pointer.child, @alignOf(pointer.child) },
+                .slice => .{ []const pointer.child, @alignOf(pointer.child) },
             } else continue,
             else => continue,
         };
         new_field = new_field ++ .{std.builtin.Type.StructField{
             .name = field.name,
             .type = new_t,
-            .default_value = null,
+            .default_value_ptr = null,
             .is_comptime = false,
             .alignment = alignment,
         }};
@@ -113,7 +113,7 @@ fn PartialFields(t: type) type {
         new_fields = new_fields ++ .{std.builtin.Type.StructField{
             .name = field.name,
             .type = ?field.type,
-            .default_value = blk: {
+            .default_value_ptr = blk: {
                 const default_value: ?field.type = null;
                 break :blk @ptrCast(&default_value);
             },
@@ -146,7 +146,7 @@ pub fn DirtyableFields(T: type) type {
         new_fields = new_fields ++ .{std.builtin.Type.StructField{
             .name = field.name,
             .type = Dirtyable(field.type),
-            .default_value = null,
+            .default_value_ptr = null,
             .is_comptime = false,
             .alignment = @alignOf(field.type),
         }};
@@ -274,8 +274,8 @@ pub const Runtime = struct {
                 },
                 .pointer => |pointer| if (!pointer.is_const) switch (pointer.size) {
                     else => default,
-                    .One => &@field(mutable_props, prop.name),
-                    .Slice => &@field(dirtyable_props, prop.name),
+                    .one => &@field(mutable_props, prop.name),
+                    .slice => &@field(dirtyable_props, prop.name),
                 } else default,
                 else => default,
             };

@@ -178,10 +178,13 @@ pub fn build(
             .optimize = optimize,
         });
 
+        // exe.use_llvm = false;
+
         @import("zgpu").addLibraryPathsTo(exe);
 
         exe.root_module.addImport("game", game);
         exe.root_module.addImport("utils", utils);
+        exe.root_module.addImport("resources", resources);
         exe.root_module.addImport("zmath", zmath.module("root"));
         exe.root_module.addImport("node_graph", node_graph);
         exe.root_module.addImport("zglfw", zglfw.module("root"));

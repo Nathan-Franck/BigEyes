@@ -83,7 +83,7 @@ pub fn generateStructure(allocator: Allocator, settings: Settings) !Skeleton {
 
     try generation_queue.append(.{ .node = start_node, .parent_index = null });
 
-    while (generation_queue.popOrNull()) |gen_item| {
+    while (generation_queue.pop()) |gen_item| {
         const node_index = nodes.items.len;
         try nodes.append(gen_item.node);
         try node_to_primary_child_index.append(null);

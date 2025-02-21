@@ -15,30 +15,30 @@ pub export fn getResources(resources: *types.Resources) void {
         .{ .model_name = "Sonic (rough)", .subdiv_level = 2 },
     }) catch unreachable;
 
-    const skybox = blk: {
-        var images: types.ProcessedCubeMap = undefined;
-        inline for (@typeInfo(types.ProcessedCubeMap).@"struct".fields) |field| {
-            const image_png = @embedFile("./resources/content/cloudy skybox/" ++ field.name ++ ".png");
-            const image_data = Image.loadPngAndProcess(arena, image_png) catch unreachable;
-            @field(images, field.name) = image_data;
-        }
-        break :blk images;
-    };
+    // const skybox = blk: {
+    //     var images: types.ProcessedCubeMap = undefined;
+    //     inline for (@typeInfo(types.ProcessedCubeMap).@"struct".fields) |field| {
+    //         const image_png = @embedFile("./resources/content/cloudy skybox/" ++ field.name ++ ".png");
+    //         const image_data = Image.loadPngAndProcess(arena, image_png) catch unreachable;
+    //         @field(images, field.name) = image_data;
+    //     }
+    //     break :blk images;
+    // };
 
-    const cutout_leaf = blk: {
-        const diffuse = Image.loadPng(arena, @embedFile("./resources/content/manitoba maple/diffuse.png")) catch unreachable;
-        const alpha = Image.loadPng(arena, @embedFile("./resources/content/manitoba maple/alpha.png")) catch unreachable;
-        const cutout_diffuse = Image.Rgba32Image{
-            .width = diffuse.width,
-            .height = diffuse.height,
-            .pixels = arena.alloc(@TypeOf(diffuse.pixels[0]), diffuse.pixels.len) catch unreachable,
-        };
-        for (cutout_diffuse.pixels, 0..) |*pixel, pixel_index| {
-            pixel.* = diffuse.pixels[pixel_index];
-            pixel.*.a = alpha.pixels[pixel_index].r;
-        }
-        break :blk Image.processImageForGPU(arena, cutout_diffuse) catch unreachable;
-    };
+    // const cutout_leaf = blk: {
+    //     const diffuse = Image.loadPng(arena, @embedFile("./resources/content/manitoba maple/diffuse.png")) catch unreachable;
+    //     const alpha = Image.loadPng(arena, @embedFile("./resources/content/manitoba maple/alpha.png")) catch unreachable;
+    //     const cutout_diffuse = Image.Rgba32Image{
+    //         .width = diffuse.width,
+    //         .height = diffuse.height,
+    //         .pixels = arena.alloc(@TypeOf(diffuse.pixels[0]), diffuse.pixels.len) catch unreachable,
+    //     };
+    //     for (cutout_diffuse.pixels, 0..) |*pixel, pixel_index| {
+    //         pixel.* = diffuse.pixels[pixel_index];
+    //         pixel.*.a = alpha.pixels[pixel_index].r;
+    //     }
+    //     break :blk Image.processImageForGPU(arena, cutout_diffuse) catch unreachable;
+    // };
 
     var trees = std.ArrayList(types.TreeMesh).init(arena);
     inline for (@typeInfo(config.ForestSettings).@"struct".decls) |decl| {
@@ -62,8 +62,8 @@ pub export fn getResources(resources: *types.Resources) void {
     resources.* = types.Resources{
         .models = result.models.items,
         .model_transforms = result.model_transforms,
-        .skybox = skybox,
-        .cutout_leaf = cutout_leaf,
+        .skybox = undefined, //skybox,
+        .cutout_leaf = undefined, //cutout_leaf,
         .trees = trees.items,
     };
 }
