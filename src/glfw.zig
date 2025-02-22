@@ -417,6 +417,14 @@ fn poll(comptime field_tag: GameGraph.InputTag) std.meta.fieldInfo(GameGraph.Inp
     };
 }
 
+// This function we should be able to make an extern that others can call externally, since there's no comptime and it should just be pretty plain looking values...
+fn pollVirtual(field_tag: *GameGraph.InputTag) GameGraph.SelectedInput {
+    inline for (0..@typeInfo(GameGraph.InputTag).@"enum".fields.len) |i| {
+        const tag: GameGraph.InputTag = @enumFromInt(i);
+        if (tag == field_tag) return @unionInit(GameGraph.SelectedInput, @tagName(tag), poll(tag));
+    }
+}
+
 // Recieve state changes back to the front-end to show to user.
 fn submit(comptime field_tag: GameGraph.OutputTag, value: std.meta.fieldInfo(GameGraph.Outputs, field_tag).type) void {
     _ = value;

@@ -329,6 +329,17 @@ pub const Runtime = struct {
             pub const Store = @field(graph, "Store");
             pub const Inputs = @field(graph, "Inputs");
             pub const Outputs = @field(graph, "Outputs");
+            pub const SelectedInput = @Type(.{ .@"union" = std.builtin.Type.Union{ .tag_type = null, .fields = blk: {
+                var fields: std.builtin.Type.UnionField = &.{};
+                for (@typeInfo(Inputs).@"struct".fields) |field| {
+                    fields = fields ++ .{std.builtin.Type.UnionField{
+                        .name = field.name,
+                        .type = field.type,
+                        .alignment = @alignOf(field.type),
+                    }};
+                }
+                break :blk fields;
+            } } });
 
             pub const InputTag = std.meta.FieldEnum(Inputs);
             pub const OutputTag = std.meta.FieldEnum(Outputs);
