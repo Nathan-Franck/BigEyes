@@ -197,7 +197,7 @@ pub fn build(
         // exe.linkLibrary(zglfw.artifact("glfw"));
         // exe.linkLibrary(zgpu.artifact("zdawn"));
         // exe.linkLibrary(zgui.artifact("imgui"));
-        // exe.linkLibrary(zbullet.artifact("cbullet"));
+        exe.linkLibrary(zbullet.artifact("cbullet"));
 
         exe.step.dependOn(&export_meshes.step);
 
