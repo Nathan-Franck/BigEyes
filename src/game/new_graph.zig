@@ -55,15 +55,15 @@ pub const GameGraph = Runtime.build(struct {
 
         // Behold - all the things the game loop can do BEFORE user input, that we can compute without needing to know what the user will do!
         // Terrain things below!
-        const calculate_terrain_density_influence_range = rt.node(@src(), graph_nodes.calculateTerrainDensityInfluenceRange, .{
-            .size_multiplier = inputs.poll(.size_multiplier),
-        });
-        const display_forest = rt.node(@src(), graph_nodes.displayForest, .{
-            .terrain_sampler = calculate_terrain_density_influence_range.terrain_sampler,
-        });
-        const display_terrain = rt.node(@src(), graph_nodes.displayTerrain, .{
-            .terrain_sampler = calculate_terrain_density_influence_range.terrain_sampler,
-        });
+        // const calculate_terrain_density_influence_range = rt.node(@src(), graph_nodes.calculateTerrainDensityInfluenceRange, .{
+        //     .size_multiplier = inputs.poll(.size_multiplier),
+        // });
+        // const display_forest = rt.node(@src(), graph_nodes.displayForest, .{
+        //     .terrain_sampler = calculate_terrain_density_influence_range.terrain_sampler,
+        // });
+        // const display_terrain = rt.node(@src(), graph_nodes.displayTerrain, .{
+        //     .terrain_sampler = calculate_terrain_density_influence_range.terrain_sampler,
+        // });
         // Animated things below!
         const timing = rt.node(@src(), graph_nodes.timing, .{
             .time = inputs.poll(.time),
@@ -98,18 +98,19 @@ pub const GameGraph = Runtime.build(struct {
         //     },
         // });
 
-        // // Polling user input! (We can do it late, which should lead to lower latency!)
-        // const orbit = rt.node(@src(), graph_nodes.orbit, .{
-        //     .delta_time = timing.delta_time,
-        //     .render_resolution = inputs.poll(.render_resolution),
-        //     .orbit_speed = inputs.poll(.orbit_speed),
-        //     .input = inputs.poll(.input),
-        //     .orbit_camera = store.orbit_camera,
-        //     .selected_camera = inputs.poll(.selected_camera),
-        //     .player_settings = inputs.poll(.player_settings),
-        //     .player = store.player,
-        //     .terrain_sampler = calculate_terrain_density_influence_range.terrain_sampler,
-        // });
+        // Polling user input! (We can do it late, which should lead to lower latency!)
+        const orbit = rt.node(@src(), graph_nodes.orbit, .{
+            .delta_time = timing.delta_time,
+            .render_resolution = inputs.poll(.render_resolution),
+            .orbit_speed = inputs.poll(.orbit_speed),
+            .input = inputs.poll(.input),
+            .orbit_camera = store.orbit_camera,
+            .selected_camera = inputs.poll(.selected_camera),
+            .player_settings = inputs.poll(.player_settings),
+            .player = store.player,
+            // .terrain_sampler = calculate_terrain_density_influence_range.terrain_sampler,
+        });
+
         // const get_screenspace_mesh = rt.node(@src(), graph_nodes.getScreenspaceMesh, .{
         //     .camera_position = orbit.camera_position,
         //     .world_matrix = orbit.world_matrix,
@@ -118,12 +119,13 @@ pub const GameGraph = Runtime.build(struct {
         //     .world_matrix = orbit.world_matrix,
         //     .screen_space_mesh = get_screenspace_mesh.screen_space_mesh,
         // });
+
         _ = .{
             display_trees,
-            display_forest,
-            display_terrain,
+            // display_forest,
+            // display_terrain,
             // display_bike,
-            // orbit,
+            orbit,
             timing,
         };
 

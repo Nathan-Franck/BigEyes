@@ -80,7 +80,7 @@ pub const graph_nodes = struct {
     }
 
     pub fn orbit(
-        arena: std.mem.Allocator,
+        // arena: std.mem.Allocator,
         props: struct {
             delta_time: queryable.Value(f32),
             orbit_speed: f32,
@@ -90,7 +90,7 @@ pub const graph_nodes = struct {
             selected_camera: types.SelectedCamera,
             player_settings: types.PlayerSettings,
             player: *types.Player,
-            terrain_sampler: TerrainSampler,
+            // terrain_sampler: TerrainSampler,
         },
     ) !struct {
         camera_position: Vec4,
@@ -98,117 +98,122 @@ pub const graph_nodes = struct {
     } {
         switch (props.selected_camera) {
             .orbit => {
-                props.orbit_camera.rotation = props.orbit_camera.rotation +
-                    props.input.mouse_delta *
-                    zmath.splat(Vec4, -props.orbit_speed);
-                const view_projection = zmath.perspectiveFovLh(
-                    0.25 * 3.14151,
-                    @as(f32, @floatFromInt(props.render_resolution.x)) /
-                        @as(f32, @floatFromInt(props.render_resolution.y)),
-                    0.1,
-                    500,
-                );
-                const location = location: {
-                    const t = zmath.translationV(props.orbit_camera.position);
-                    const r = .{
-                        .y = zmath.matFromRollPitchYaw(0, props.orbit_camera.rotation[0], 0),
-                        .x = zmath.matFromRollPitchYaw(props.orbit_camera.rotation[1], 0, 0),
-                    };
-                    const offset = zmath.translationV(zmath.loadArr3(.{ 0.0, 0.0, props.orbit_camera.track_distance }));
-                    break :location zmath.mul(t, zmath.mul(zmath.mul(r.y, r.x), offset));
-                };
+                // props.orbit_camera.rotation = props.orbit_camera.rotation +
+                //     props.input.mouse_delta *
+                //     zmath.splat(Vec4, -props.orbit_speed);
+                // const view_projection = zmath.perspectiveFovLh(
+                //     0.25 * 3.14151,
+                //     @as(f32, @floatFromInt(props.render_resolution.x)) /
+                //         @as(f32, @floatFromInt(props.render_resolution.y)),
+                //     0.1,
+                //     500,
+                // );
+                // const location = location: {
+                //     const t = zmath.translationV(props.orbit_camera.position);
+                //     const r = .{
+                //         .y = zmath.matFromRollPitchYaw(0, props.orbit_camera.rotation[0], 0),
+                //         .x = zmath.matFromRollPitchYaw(props.orbit_camera.rotation[1], 0, 0),
+                //     };
+                //     const offset = zmath.translationV(zmath.loadArr3(.{ 0.0, 0.0, props.orbit_camera.track_distance }));
+                //     break :location zmath.mul(t, zmath.mul(zmath.mul(r.y, r.x), offset));
+                // };
 
                 return .{
-                    .camera_position = zmath.mul(zmath.inverse(location), Vec4{ 0, 0, 0, 1 }),
-                    .world_matrix = zmath.mul(
-                        location,
-                        view_projection,
-                    ),
+                    .camera_position = undefined,
+                    .world_matrix = undefined,
                 };
+                // return .{
+                //     .camera_position = zmath.mul(zmath.inverse(location), Vec4{ 0, 0, 0, 1 }),
+                //     .world_matrix = zmath.mul(
+                //         location,
+                //         view_projection,
+                //     ),
+                // };
             },
             .first_person => {
                 props.player.euler_rotation = props.player.euler_rotation +
                     props.input.mouse_delta *
                     zmath.splat(Vec4, -props.player_settings.look_speed);
 
-                const rotation_matrix = zmath.matFromRollPitchYaw(
-                    -props.player.euler_rotation[1],
-                    -props.player.euler_rotation[0],
-                    0,
-                );
+                // const rotation_matrix = zmath.matFromRollPitchYaw(
+                //     -props.player.euler_rotation[1],
+                //     -props.player.euler_rotation[0],
+                //     0,
+                // );
+                // _ = rotation_matrix;
 
-                const right = Vec4{ 1, 0, 0, 0 };
-                const forward = Vec4{ 0, 0, 1, 0 };
+                // const right = Vec4{ 1, 0, 0, 0 };
+                // const forward = Vec4{ 0, 0, 1, 0 };
 
-                var horizontal_movement = Vec4{ 0, 0, 0, 0 };
-                const movement = props.input.movement;
+                // var horizontal_movement = Vec4{ 0, 0, 0, 0 };
+                // const movement = props.input.movement;
 
-                if (movement.left != null and movement.right != null) {
-                    if (movement.left.? > movement.right.?) {
-                        horizontal_movement = horizontal_movement - right;
-                    } else {
-                        horizontal_movement = horizontal_movement + right;
-                    }
-                } else if (movement.left != null) {
-                    horizontal_movement = horizontal_movement - right;
-                } else if (movement.right != null) {
-                    horizontal_movement = horizontal_movement + right;
-                }
+                // if (movement.left != null and movement.right != null) {
+                //     if (movement.left.? > movement.right.?) {
+                //         horizontal_movement = horizontal_movement - right;
+                //     } else {
+                //         horizontal_movement = horizontal_movement + right;
+                //     }
+                // } else if (movement.left != null) {
+                //     horizontal_movement = horizontal_movement - right;
+                // } else if (movement.right != null) {
+                //     horizontal_movement = horizontal_movement + right;
+                // }
 
-                var vertical_movement = Vec4{ 0, 0, 0, 0 };
-                if (movement.forward != null and movement.backward != null) {
-                    if (movement.forward.? > movement.backward.?) {
-                        vertical_movement = vertical_movement + forward;
-                    } else {
-                        vertical_movement = vertical_movement - forward;
-                    }
-                } else if (movement.forward != null) {
-                    vertical_movement = vertical_movement + forward;
-                } else if (movement.backward != null) {
-                    vertical_movement = vertical_movement - forward;
-                }
+                // var vertical_movement = Vec4{ 0, 0, 0, 0 };
+                // if (movement.forward != null and movement.backward != null) {
+                //     if (movement.forward.? > movement.backward.?) {
+                //         vertical_movement = vertical_movement + forward;
+                //     } else {
+                //         vertical_movement = vertical_movement - forward;
+                //     }
+                // } else if (movement.forward != null) {
+                //     vertical_movement = vertical_movement + forward;
+                // } else if (movement.backward != null) {
+                //     vertical_movement = vertical_movement - forward;
+                // }
 
-                const combined_movement = horizontal_movement + vertical_movement;
+                // const combined_movement = horizontal_movement + vertical_movement;
 
-                if (zmath.length3(combined_movement)[0] > 0.001) {
-                    const final_movement = blk: {
-                        const world_direction = zmath.mul(zmath.normalize3(combined_movement), rotation_matrix);
-                        const movement_delta: Vec4 = @splat(props.player_settings.movement_speed * props.delta_time.get());
-                        break :blk world_direction * movement_delta;
-                    };
+                // if (zmath.length3(combined_movement)[0] > 0.001) {
+                //     const final_movement = blk: {
+                //         const world_direction = zmath.mul(zmath.normalize3(combined_movement), rotation_matrix);
+                //         const movement_delta: Vec4 = @splat(props.player_settings.movement_speed * props.delta_time.get());
+                //         break :blk world_direction * movement_delta;
+                //     };
 
-                    var new_position = props.player.position;
-                    new_position += final_movement;
+                //     var new_position = props.player.position;
+                //     new_position += final_movement;
 
-                    var terrain_chunk_cache = config.TerrainSpawner.ChunkCache.init(arena);
-                    const terrain_height = try props.terrain_sampler
-                        .loadCache(&terrain_chunk_cache)
-                        .sample(arena, Vec2{ new_position[0], new_position[2] });
+                //     // var terrain_chunk_cache = config.TerrainSpawner.ChunkCache.init(arena);
+                //     // const terrain_height = try props.terrain_sampler
+                //     //     .loadCache(&terrain_chunk_cache)
+                //     //     .sample(arena, Vec2{ new_position[0], new_position[2] });
 
-                    new_position[1] = terrain_height + 0.7;
+                //     // new_position[1] = terrain_height + 0.7;
 
-                    props.player.position = new_position;
-                }
+                //     props.player.position = new_position;
+                // }
 
-                const view_projection = zmath.perspectiveFovLh(
-                    0.25 * 3.14151,
-                    @as(f32, @floatFromInt(props.render_resolution.x)) /
-                        @as(f32, @floatFromInt(props.render_resolution.y)),
-                    0.1,
-                    500,
-                );
+                // const view_projection = zmath.perspectiveFovLh(
+                //     0.25 * 3.14151,
+                //     @as(f32, @floatFromInt(props.render_resolution.x)) /
+                //         @as(f32, @floatFromInt(props.render_resolution.y)),
+                //     0.1,
+                //     500,
+                // );
 
-                const location = zmath.mul(
-                    zmath.translationV(-props.player.position),
-                    zmath.inverse(rotation_matrix),
-                );
+                // const location = zmath.mul(
+                //     zmath.translationV(-props.player.position),
+                //     zmath.inverse(rotation_matrix),
+                // );
 
                 return .{
-                    .camera_position = zmath.mul(zmath.inverse(location), Vec4{ 0, 0, 0, 1 }),
-                    .world_matrix = zmath.mul(
-                        location,
-                        view_projection,
-                    ),
+                    .camera_position = undefined, //zmath.mul(zmath.inverse(location), Vec4{ 0, 0, 0, 1 }),
+                    .world_matrix = undefined, //zmath.mul(
+                    //     location,
+                    //     view_projection,
+                    // ),
                 };
             },
         }
