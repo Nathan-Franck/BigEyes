@@ -1,22 +1,21 @@
 const std = @import("std");
-// const zglfw = @import("zglfw");
+const zglfw = @import("zglfw");
 const GameGraph = @import("game").GameGraph;
 const runtime = @import("node_graph").new_runtime;
 const game = @import("game");
-// const zgpu = @import("zgpu");
-// const zgui = @import("zgui");
-// const Vec4 = @import("utils").Vec4;
+const zgpu = @import("zgpu");
+const zgui = @import("zgui");
+const Vec4 = @import("utils").Vec4;
 const zmath = @import("zmath");
 const types = @import("utils").types;
 const resources = @import("resources");
 
-// const wgpu = zgpu.wgpu;
+const wgpu = zgpu.wgpu;
 const math = std.math;
 const assert = std.debug.assert;
+const print = std.debug.print;
 
 const content_dir = @import("build_options").content_dir;
-
-// const types = game.types;
 
 // const Vertex = struct {
 //     position: Vec4,
@@ -344,6 +343,8 @@ pub fn main() !void {
     //             },
     //         });
     //         defer zgui.end();
+
+    print("Hello world!!\n", .{});
 
     if (game_graph) |*graph| {
         graph.update();

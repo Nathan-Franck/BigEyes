@@ -1,6 +1,7 @@
 const std = @import("std");
 const embed_content_dir = "src/resources/content/";
 const content_dir = "content/";
+const print = std.debug.print;
 
 const ExportMeshes = struct {
     const BlendExport = struct {
@@ -44,7 +45,7 @@ const ExportMeshes = struct {
                     continue;
                 }
 
-                std.debug.print("Working on {s}", .{blend_path});
+                print("Working on {s}", .{blend_path});
                 var timer = try std.time.Timer.start();
                 const res = try std.process.Child.run(.{
                     .allocator = self.allocator,
@@ -54,12 +55,12 @@ const ExportMeshes = struct {
                         full_path,
                         "--background",
                         "--python",
-                        std.fmt.allocPrint(self.allocator, "{s}/{s}.py", .{ embed_content_dir, blend_export.script_path }) catch @panic("OOM"),
+                        std.fmt.allocPrint(self.allocator, "{s}/{s}.py", .{ embed_content_dir, blend_export.script_path }) catch unreachable,
                     },
                 });
-                std.debug.print("stdout: {s}\n", .{res.stdout});
+                print("stdout: {s}\n", .{res.stdout});
                 if (res.stderr.len > 0) {
-                    std.debug.print("stderr: {s}\n", .{res.stderr});
+                    print("stderr: {s}\n", .{res.stderr});
                     return error.ExportFailed;
                 }
 
@@ -67,11 +68,11 @@ const ExportMeshes = struct {
                 try man.writeManifest();
 
                 const ns = timer.read();
-                std.debug.print("Process took {d} ms\n", .{@as(f64, @floatFromInt(ns)) / 1_000_000});
+                print("Process took {d} ms\n", .{@as(f64, @floatFromInt(ns)) / 1_000_000});
                 export_count += 1;
             };
         if (export_count > 0) {
-            std.debug.print("Exported {d} meshes\n", .{export_count});
+            print("Exported {d} meshes\n", .{export_count});
         }
     }
 };
@@ -89,10 +90,10 @@ pub fn build(
         } },
     });
 
-    // const zglfw = b.dependency("zglfw", .{ .target = target, .x11 = false });
-    // const zgpu = b.dependency("zgpu", .{ .target = target });
-    // const zgui = b.dependency("zgui", .{ .target = target, .backend = .glfw_wgpu });
-    // const zbullet = b.dependency("zbullet", .{});
+    const zglfw = b.dependency("zglfw", .{ .target = target, .x11 = false });
+    const zgpu = b.dependency("zgpu", .{ .target = target });
+    const zgui = b.dependency("zgui", .{ .target = target, .backend = .glfw_wgpu });
+    const zbullet = b.dependency("zbullet", .{});
     const zmath = b.dependency("zmath", .{});
     const utils = b.createModule(.{
         .root_source_file = b.path("src/utils.zig"),
@@ -117,7 +118,7 @@ pub fn build(
         .root_source_file = b.path("src/game.zig"),
         .imports = &.{
             .{ .name = "zmath", .module = zmath.module("root") },
-            // .{ .name = "zbullet", .module = zbullet.module("root") },
+            .{ .name = "zbullet", .module = zbullet.module("root") },
             .{ .name = "node_graph", .module = node_graph },
             .{ .name = "resources", .module = resources },
             .{ .name = "utils", .module = utils },
@@ -187,9 +188,9 @@ pub fn build(
         exe.root_module.addImport("resources", resources);
         exe.root_module.addImport("zmath", zmath.module("root"));
         exe.root_module.addImport("node_graph", node_graph);
-        // exe.root_module.addImport("zglfw", zglfw.module("root"));
-        // exe.root_module.addImport("zgpu", zgpu.module("root"));
-        // exe.root_module.addImport("zgui", zgui.module("root"));
+        exe.root_module.addImport("zglfw", zglfw.module("root"));
+        exe.root_module.addImport("zgpu", zgpu.module("root"));
+        exe.root_module.addImport("zgui", zgui.module("root"));
 
         // exe.linkSystemLibrary("X11");
 

@@ -5,6 +5,9 @@ bin/*exe
 *.blend.json
 *.blend1
 
+# Imgui state
+imgui.ini
+
 # Logs
 logs
 *.log

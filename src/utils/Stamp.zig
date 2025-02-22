@@ -18,7 +18,7 @@ pub fn getHeight(
     spawn_pos: Vec2,
     pos_2d: Vec2,
 ) ?f32 {
-    const rel_pos = vm.div((pos_2d - spawn_pos), @splat(self.size));
+    const rel_pos = vm.div(pos_2d - spawn_pos, @splat(self.size));
     const stamp_pos = vm.mul(
         vm.add(rel_pos, @splat(0.5)),
         .{
@@ -36,10 +36,10 @@ pub fn getHeight(
     const pos_int: Coord = @intFromFloat(pos0);
     const fract = stamp_pos - pos0;
 
-    const h00 = self.sample(pos_int + Coord{ 0, 0 });
-    const h10 = self.sample(pos_int + Coord{ 1, 0 });
-    const h01 = self.sample(pos_int + Coord{ 0, 1 });
-    const h11 = self.sample(pos_int + Coord{ 1, 1 });
+    const h00 = self.sample(pos_int +% Coord{ 0, 0 });
+    const h10 = self.sample(pos_int +% Coord{ 1, 0 });
+    const h01 = self.sample(pos_int +% Coord{ 0, 1 });
+    const h11 = self.sample(pos_int +% Coord{ 1, 1 });
 
     const h0 = h00 * (1 - fract[0]) + h10 * fract[0];
     const h1 = h01 * (1 - fract[0]) + h11 * fract[0];
