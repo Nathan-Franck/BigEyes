@@ -356,6 +356,7 @@ pub fn main() !void {
                 .player = types.Player{ .position = .{ 0, 0, 0, 1 }, .euler_rotation = .{ 0, 0, 0, 0 } },
             },
         );
+        game_graph.?.update();
     }
     //     }
 

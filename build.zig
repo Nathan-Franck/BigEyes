@@ -93,7 +93,7 @@ pub fn build(
     const zglfw = b.dependency("zglfw", .{ .target = target, .x11 = false });
     const zgpu = b.dependency("zgpu", .{ .target = target });
     const zgui = b.dependency("zgui", .{ .target = target, .backend = .glfw_wgpu });
-    const zbullet = b.dependency("zbullet", .{});
+    // const zbullet = b.dependency("zbullet", .{});
     const zmath = b.dependency("zmath", .{});
     const utils = b.createModule(.{
         .root_source_file = b.path("src/utils.zig"),
@@ -118,7 +118,7 @@ pub fn build(
         .root_source_file = b.path("src/game.zig"),
         .imports = &.{
             .{ .name = "zmath", .module = zmath.module("root") },
-            .{ .name = "zbullet", .module = zbullet.module("root") },
+            // .{ .name = "zbullet", .module = zbullet.module("root") },
             .{ .name = "node_graph", .module = node_graph },
             .{ .name = "resources", .module = resources },
             .{ .name = "utils", .module = utils },
@@ -135,43 +135,15 @@ pub fn build(
         b.default_step.dependOn(test_step);
     }
 
-    // // Check
-    // {
-    //     const check = b.addExecutable(.{
-    //         .target = target,
-    //         .optimize = optimize,
-    //         .name = "check_exe",
-    //         .root_source_file = b.path("src/glfw.zig"),
-    //         // .root_source_file = b.path("src/game/wasm_entry.zig"),
-    //         // .root_source_file = b.path("src/test_perf.zig"),
-    //     });
-    //     @import("zgpu").addLibraryPathsTo(check);
-
-    //     check.root_module.addImport("game", game);
-    //     check.root_module.addImport("utils", utils);
-    //     check.root_module.addImport("zmath", zmath.module("root"));
-    //     check.root_module.addImport("node_graph", node_graph);
-    //     check.root_module.addImport("zglfw", zglfw.module("root"));
-    //     check.root_module.addImport("zgpu", zgpu.module("root"));
-    //     check.root_module.addImport("zgui", zgui.module("root"));
-
-    //     check.linkSystemLibrary("X11");
-
-    //     check.linkLibrary(zglfw.artifact("glfw"));
-    //     check.linkLibrary(zgpu.artifact("zdawn"));
-    //     check.linkLibrary(zgui.artifact("imgui"));
-    //     check.linkLibrary(zbullet.artifact("cbullet"));
-
-    //     const check_options = b.addOptions();
-    //     check.root_module.addOptions("build_options", check_options);
-    //     check_options.addOption([]const u8, "content_dir", content_dir);
-
-    //     const check_step = b.step("check", "Check if wasm compiles");
-    //     check_step.dependOn(&check.step);
-    // }
-
-    // Exe glfw
+    // Check
     {
+        const check = b.addExecutable(.{
+            .target = target,
+            .optimize = optimize,
+            .name = "check_exe",
+            .root_source_file = b.path("src/glfw.zig"),
+        });
+
         var exe = b.addExecutable(.{
             .name = "game_exe",
             .root_source_file = b.path("src/glfw.zig"),
@@ -181,36 +153,38 @@ pub fn build(
 
         exe.use_llvm = false;
 
-        // @import("zgpu").addLibraryPathsTo(exe);
+        inline for (.{ check, exe }) |elem| {
+            // @import("zgpu").addLibraryPathsTo(elem);
 
-        exe.root_module.addImport("game", game);
-        exe.root_module.addImport("utils", utils);
-        exe.root_module.addImport("resources", resources);
-        exe.root_module.addImport("zmath", zmath.module("root"));
-        exe.root_module.addImport("node_graph", node_graph);
-        exe.root_module.addImport("zglfw", zglfw.module("root"));
-        exe.root_module.addImport("zgpu", zgpu.module("root"));
-        exe.root_module.addImport("zgui", zgui.module("root"));
+            elem.root_module.addImport("game", game);
+            elem.root_module.addImport("utils", utils);
+            elem.root_module.addImport("zmath", zmath.module("root"));
+            elem.root_module.addImport("node_graph", node_graph);
+            elem.root_module.addImport("resources", resources);
+            elem.root_module.addImport("zglfw", zglfw.module("root"));
+            elem.root_module.addImport("zgpu", zgpu.module("root"));
+            elem.root_module.addImport("zgui", zgui.module("root"));
 
-        // exe.linkSystemLibrary("X11");
+            // elem.linkSystemLibrary("X11");
 
-        // exe.linkLibrary(zglfw.artifact("glfw"));
-        // exe.linkLibrary(zgpu.artifact("zdawn"));
-        // exe.linkLibrary(zgui.artifact("imgui"));
-        exe.linkLibrary(zbullet.artifact("cbullet"));
+            // elem.linkLibrary(zglfw.artifact("glfw"));
+            // elem.linkLibrary(zgpu.artifact("zdawn"));
+            // elem.linkLibrary(zgui.artifact("imgui"));
+            // elem.linkLibrary(zbullet.artifact("cbullet"));
 
-        exe.step.dependOn(&export_meshes.step);
+            const elem_options = b.addOptions();
+            elem.root_module.addOptions("build_options", elem_options);
+            elem_options.addOption([]const u8, "content_dir", content_dir);
+        }
 
-        const exe_options = b.addOptions();
-        exe.root_module.addOptions("build_options", exe_options);
-        exe_options.addOption([]const u8, "content_dir", content_dir);
+        const check_step = b.step("check", "Just compile, don't emit an executable (llvm)");
+        check_step.dependOn(&check.step);
 
         const install_artifact = b.addInstallArtifact(exe, .{ .dest_dir = .{ .override = .{ .custom = "../bin" } } });
+        install_artifact.step.dependOn(&export_meshes.step);
         const install_step = b.step("glfw", "build glfw entrypoint");
         install_step.dependOn(&install_artifact.step);
-
         const run_cmd = b.addRunArtifact(exe);
-        run_cmd.step.dependOn(&install_artifact.step);
         if (b.args) |args| {
             run_cmd.addArgs(args);
         }
