@@ -68,56 +68,64 @@ pub const GameGraph = Runtime.build(struct {
         const timing = rt.node(@src(), graph_nodes.timing, .{
             .time = inputs.poll(.time),
         });
-        const animate_meshes = rt.node(@src(), graph_nodes.animateMeshes, .{
-            .models = get_resources.models,
-            .seconds_since_start = timing.seconds_since_start,
-        });
-        const display_bike = rt.node(@src(), graph_nodes.displayBike, .{
-            .terrain_sampler = calculate_terrain_density_influence_range.terrain_sampler,
-            .seconds_since_start = timing.seconds_since_start,
-            .model_transforms = get_resources.model_transforms,
-            .bounce = inputs.poll(.bounce),
-        });
-        outputs.submit(.{
-            .terrain_mesh = display_terrain.terrain_mesh,
-            .terrain_instance = display_terrain.terrain_instance,
-            .models = .{
-                .raw = std.mem.concat(rt.allocator, types.GameModel, &.{
-                    get_resources.models.raw,
-                    animate_meshes.models.raw,
-                    display_trees.models.raw,
-                }) catch unreachable,
-                .is_dirty = true,
-            },
-            .model_instances = .{
-                .raw = std.mem.concat(rt.allocator, types.ModelInstances, &.{
-                    display_forest.model_instances.raw,
-                    display_bike.model_instances.raw,
-                }) catch unreachable,
-                .is_dirty = true,
-            },
-        });
+        // const animate_meshes = rt.node(@src(), graph_nodes.animateMeshes, .{
+        //     .models = get_resources.models,
+        //     .seconds_since_start = timing.seconds_since_start,
+        // });
+        // const display_bike = rt.node(@src(), graph_nodes.displayBike, .{
+        //     .terrain_sampler = calculate_terrain_density_influence_range.terrain_sampler,
+        //     .seconds_since_start = timing.seconds_since_start,
+        //     .model_transforms = get_resources.model_transforms,
+        //     .bounce = inputs.poll(.bounce),
+        // });
+        // outputs.submit(.{
+        //     .terrain_mesh = display_terrain.terrain_mesh,
+        //     .terrain_instance = display_terrain.terrain_instance,
+        //     .models = .{
+        //         .raw = std.mem.concat(rt.allocator, types.GameModel, &.{
+        //             get_resources.models.raw,
+        //             animate_meshes.models.raw,
+        //             display_trees.models.raw,
+        //         }) catch unreachable,
+        //         .is_dirty = true,
+        //     },
+        //     .model_instances = .{
+        //         .raw = std.mem.concat(rt.allocator, types.ModelInstances, &.{
+        //             display_forest.model_instances.raw,
+        //             display_bike.model_instances.raw,
+        //         }) catch unreachable,
+        //         .is_dirty = true,
+        //     },
+        // });
 
-        // Polling user input! (We can do it late, which should lead to lower latency!)
-        const orbit = rt.node(@src(), graph_nodes.orbit, .{
-            .delta_time = timing.delta_time,
-            .render_resolution = inputs.poll(.render_resolution),
-            .orbit_speed = inputs.poll(.orbit_speed),
-            .input = inputs.poll(.input),
-            .orbit_camera = store.orbit_camera,
-            .selected_camera = inputs.poll(.selected_camera),
-            .player_settings = inputs.poll(.player_settings),
-            .player = store.player,
-            .terrain_sampler = calculate_terrain_density_influence_range.terrain_sampler,
-        });
-        const get_screenspace_mesh = rt.node(@src(), graph_nodes.getScreenspaceMesh, .{
-            .camera_position = orbit.camera_position,
-            .world_matrix = orbit.world_matrix,
-        });
-        outputs.submit(.{
-            .world_matrix = orbit.world_matrix,
-            .screen_space_mesh = get_screenspace_mesh.screen_space_mesh,
-        });
+        // // Polling user input! (We can do it late, which should lead to lower latency!)
+        // const orbit = rt.node(@src(), graph_nodes.orbit, .{
+        //     .delta_time = timing.delta_time,
+        //     .render_resolution = inputs.poll(.render_resolution),
+        //     .orbit_speed = inputs.poll(.orbit_speed),
+        //     .input = inputs.poll(.input),
+        //     .orbit_camera = store.orbit_camera,
+        //     .selected_camera = inputs.poll(.selected_camera),
+        //     .player_settings = inputs.poll(.player_settings),
+        //     .player = store.player,
+        //     .terrain_sampler = calculate_terrain_density_influence_range.terrain_sampler,
+        // });
+        // const get_screenspace_mesh = rt.node(@src(), graph_nodes.getScreenspaceMesh, .{
+        //     .camera_position = orbit.camera_position,
+        //     .world_matrix = orbit.world_matrix,
+        // });
+        // outputs.submit(.{
+        //     .world_matrix = orbit.world_matrix,
+        //     .screen_space_mesh = get_screenspace_mesh.screen_space_mesh,
+        // });
+        _ = .{
+            display_trees,
+            display_forest,
+            display_terrain,
+            // display_bike,
+            // orbit,
+            timing,
+        };
 
         return .{
             .orbit_camera = store.orbit_camera,

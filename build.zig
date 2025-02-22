@@ -93,7 +93,7 @@ pub fn build(
     const zglfw = b.dependency("zglfw", .{ .target = target, .x11 = false });
     const zgpu = b.dependency("zgpu", .{ .target = target });
     const zgui = b.dependency("zgui", .{ .target = target, .backend = .glfw_wgpu });
-    // const zbullet = b.dependency("zbullet", .{});
+    const zbullet = b.dependency("zbullet", .{});
     const zmath = b.dependency("zmath", .{});
     const utils = b.createModule(.{
         .root_source_file = b.path("src/utils.zig"),
@@ -118,7 +118,7 @@ pub fn build(
         .root_source_file = b.path("src/game.zig"),
         .imports = &.{
             .{ .name = "zmath", .module = zmath.module("root") },
-            // .{ .name = "zbullet", .module = zbullet.module("root") },
+            .{ .name = "zbullet", .module = zbullet.module("root") },
             .{ .name = "node_graph", .module = node_graph },
             .{ .name = "resources", .module = resources },
             .{ .name = "utils", .module = utils },
@@ -144,7 +144,7 @@ pub fn build(
             .root_source_file = b.path("src/glfw.zig"),
         });
 
-        var exe = b.addExecutable(.{
+        const exe = b.addExecutable(.{
             .name = "game_exe",
             .root_source_file = b.path("src/glfw.zig"),
             .target = target,
@@ -170,7 +170,7 @@ pub fn build(
             // elem.linkLibrary(zglfw.artifact("glfw"));
             // elem.linkLibrary(zgpu.artifact("zdawn"));
             // elem.linkLibrary(zgui.artifact("imgui"));
-            // elem.linkLibrary(zbullet.artifact("cbullet"));
+            elem.linkLibrary(zbullet.artifact("cbullet"));
 
             const elem_options = b.addOptions();
             elem.root_module.addOptions("build_options", elem_options);

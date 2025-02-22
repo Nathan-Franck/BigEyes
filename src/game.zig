@@ -1,7 +1,7 @@
 const std = @import("std");
 
 const zmath = @import("zmath");
-// const zbullet = @import("zbullet");
+const zbullet = @import("zbullet");
 
 // Hey! You can totally create code before the build starts! Consider this for pulling tags out from Blender exports!
 const gen = @import("generated");
@@ -23,6 +23,7 @@ const resources = @import("resources");
 
 const graph = @import("./game/graph.zig");
 
+const print = std.debug.print;
 const queryable = node_graph.utils_node.queryable;
 const mesh_loader = resources.mesh_loader;
 const config = resources.config;
@@ -33,7 +34,7 @@ pub const types = @import("utils").types;
 pub const GameGraph = @import("game/new_graph.zig").GameGraph;
 
 pub fn init(allocator: std.mem.Allocator) void {
-    // zbullet.init(allocator);
+    zbullet.init(allocator);
     graph_nodes.forest_chunk_cache = config.ForestSpawner.ChunkCache.init(allocator);
 }
 
@@ -325,25 +326,25 @@ pub const graph_nodes = struct {
     ) !struct {
         model_instances: []const types.ModelInstances,
     } {
-        // var world = zbullet.initWorld();
-        // world.setGravity(&.{ 0, 9.81, 0 });
-        // world.addBody(zbullet.initBody(
-        //     1,
-        //     &zmath.matToArr43(zmath.translation(0, 0, 0)),
-        //     zbullet.initBoxShape(&.{ 1, 1, 1 }).asShape(),
-        // ));
-        // for (0..100) |_| {
-        //     _ = world.stepSimulation(1, .{});
-        // }
-        // for (0..@intCast(world.getNumBodies())) |body_index| {
-        //     const body = world.getBody(@intCast(body_index));
-        //     const transform = object_to_world: {
-        //         var transform: [12]f32 = undefined;
-        //         body.getGraphicsWorldTransform(&transform);
-        //         break :object_to_world zmath.loadMat43(transform[0..]);
-        //     };
-        //     _ = transform;
-        // }
+        var world = zbullet.initWorld();
+        world.setGravity(&.{ 0, 9.81, 0 });
+        world.addBody(zbullet.initBody(
+            1,
+            &zmath.matToArr43(zmath.translation(0, 0, 0)),
+            zbullet.initBoxShape(&.{ 1, 1, 1 }).asShape(),
+        ));
+        for (0..100) |_| {
+            _ = world.stepSimulation(1, .{});
+        }
+        for (0..@intCast(world.getNumBodies())) |body_index| {
+            const body = world.getBody(@intCast(body_index));
+            const transform = object_to_world: {
+                var transform: [12]f32 = undefined;
+                body.getGraphicsWorldTransform(&transform);
+                break :object_to_world zmath.loadMat43(transform[0..]);
+            };
+            print("Hello! There's some bodies!! {any}\n", .{transform});
+        }
 
         var terrain_chunk_cache = config.TerrainSpawner.ChunkCache.init(arena);
 
@@ -534,7 +535,7 @@ pub const graph_nodes = struct {
                 };
                 var quad: [4]u32 = undefined;
                 inline for (0..4) |quad_index| {
-                    const quad_corner = quad_coord + quad_corners[quad_index];
+                    const quad_corner = quad_coord +% quad_corners[quad_index];
                     quad[quad_index] = @intCast(quad_corner[0] + quad_corner[1] * vertex_iterator.width());
                 }
                 quads[index] = quad;
