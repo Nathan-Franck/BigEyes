@@ -151,11 +151,9 @@ pub fn build(
             .optimize = optimize,
         });
 
-        exe.use_llvm = false;
+        // exe.use_llvm = false;
 
         inline for (.{ check, exe }) |elem| {
-            // @import("zgpu").addLibraryPathsTo(elem);
-
             elem.root_module.addImport("game", game);
             elem.root_module.addImport("utils", utils);
             elem.root_module.addImport("zmath", zmath.module("root"));
@@ -165,16 +163,19 @@ pub fn build(
             elem.root_module.addImport("zgpu", zgpu.module("root"));
             elem.root_module.addImport("zgui", zgui.module("root"));
 
-            // elem.linkSystemLibrary("X11");
-
-            // elem.linkLibrary(zglfw.artifact("glfw"));
-            // elem.linkLibrary(zgpu.artifact("zdawn"));
-            // elem.linkLibrary(zgui.artifact("imgui"));
-            elem.linkLibrary(zbullet.artifact("cbullet"));
-
             const elem_options = b.addOptions();
             elem.root_module.addOptions("build_options", elem_options);
             elem_options.addOption([]const u8, "content_dir", content_dir);
+        }
+
+        {
+            @import("zgpu").addLibraryPathsTo(exe);
+            exe.linkSystemLibrary("X11");
+
+            exe.linkLibrary(zglfw.artifact("glfw"));
+            exe.linkLibrary(zgpu.artifact("zdawn"));
+            exe.linkLibrary(zgui.artifact("imgui"));
+            exe.linkLibrary(zbullet.artifact("cbullet"));
         }
 
         const check_step = b.step("check", "Just compile, don't emit an executable (llvm)");
