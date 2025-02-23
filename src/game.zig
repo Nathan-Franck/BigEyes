@@ -31,7 +31,7 @@ const Forest = config.Forest;
 const TerrainSampler = config.TerrainSampler;
 
 pub const types = @import("utils").types;
-pub const GameGraph = @import("game/new_graph.zig").GameGraph;
+pub const GameGraph = @import("game/graph.zig").GameGraph;
 
 pub fn init(allocator: std.mem.Allocator) void {
     zbullet.init(allocator);

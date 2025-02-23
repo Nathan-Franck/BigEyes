@@ -1,115 +1,128 @@
-const node_graph = @import("node_graph");
+const std = @import("std");
+const Runtime = @import("node_graph").new_runtime.Runtime;
+const DirtyableFields = @import("node_graph").new_runtime.DirtyableFields;
+const GraphStore = @import("node_graph").new_runtime.GraphStore;
+const GraphOutputs = @import("node_graph").new_runtime.GraphOutputs;
+const GraphInputs = @import("node_graph").new_runtime.GraphInputs;
+const types = @import("utils").types;
+const config = @import("resources").config;
+const zmath = @import("zmath");
+const game = @import("../game.zig");
+const graph_nodes = game.graph_nodes;
 
-const Blueprint = node_graph.Blueprint;
-const NodeGraphBlueprintEntry = node_graph.NodeGraphBlueprintEntry;
-const InputLink = node_graph.InputLink;
-const SystemSink = node_graph.SystemSink;
+pub const GameGraph = Runtime.build(struct {
+    pub const Store = struct {
+        orbit_camera: types.OrbitCamera,
+        player: types.Player,
+    };
+    pub const Inputs = struct {
+        time: u64,
+        render_resolution: types.PixelPoint,
+        orbit_speed: f32,
+        input: types.Input,
+        selected_camera: types.SelectedCamera,
+        player_settings: types.PlayerSettings,
+        bounce: bool,
+        size_multiplier: f32,
+    };
+    pub const Outputs = struct {
+        skybox: types.ProcessedCubeMap,
+        models: []const types.GameModel,
+        screen_space_mesh: types.ScreenspaceMesh,
+        model_instances: []const types.ModelInstances,
+        terrain_mesh: types.GreyboxMesh,
+        terrain_instance: types.ModelInstances,
+        world_matrix: zmath.Mat,
+    };
+    pub fn update(
+        rt: *Runtime,
+        inputs: GraphInputs(Inputs),
+        outputs: GraphOutputs(Outputs),
+        store: GraphStore(Store),
+    ) GraphStore(Store) {
+        // This stuff could exist outside of this graph probably, since it doesn't take any inputs,
+        // but because it's here, means that I could change my mind later!
+        // TODO - Make resources load pngs and .blend.json files from disk instead of embedding, to help compile times!
+        const get_resources = rt.node(@src(), graph_nodes.getResources, .{});
+        // TODO - just combine with resources, unless I really want to have some sliders show show off
+        const display_trees = rt.node(@src(), graph_nodes.displayTrees, .{
+            .cutout_leaf = get_resources.cutout_leaf,
+            .trees = get_resources.trees,
+        });
+        outputs.submit(.{
+            .skybox = get_resources.skybox,
+        });
 
-pub const blueprint = Blueprint{
-    .nodes = &[_]NodeGraphBlueprintEntry{
-        .{ .name = "getResources", .function = "getResources", .input_links = &[_]InputLink{} },
-        .{ .name = "timing", .function = "timing", .input_links = &[_]InputLink{
-            .{ .field = "time", .source = .{
-                .input_field = "time",
-            } },
-            .{ .field = "last_time", .source = .{
-                .store_field = "last_time",
-            } },
-        } },
-        .{ .name = "orbit", .function = "orbit", .input_links = &[_]InputLink{
-            .{ .field = "delta_time", .source = .{
-                .node = .{ .name = "timing", .field = "delta_time" },
-            } },
-            .{ .field = "render_resolution", .source = .{
-                .input_field = "render_resolution",
-            } },
-            .{ .field = "orbit_speed", .source = .{
-                .input_field = "orbit_speed",
-            } },
-            .{ .field = "input", .source = .{
-                .input_field = "input",
-            } },
-            .{ .field = "orbit_camera", .source = .{
-                .store_field = "orbit_camera",
-            } },
-            .{ .field = "selected_camera", .source = .{
-                .input_field = "selected_camera",
-            } },
-            .{ .field = "player_settings", .source = .{
-                .input_field = "player_settings",
-            } },
-            .{ .field = "player", .source = .{
-                .store_field = "player",
-            } },
-            .{ .field = "terrain_sampler", .source = .{
-                .node = .{ .name = "calculateTerrainDensityInfluenceRange", .field = "terrain_sampler" },
-            } },
-        } },
-        .{ .name = "displayTrees", .function = "displayTrees", .input_links = &[_]InputLink{
-            .{ .field = "cutout_leaf", .source = .{
-                .node = .{ .name = "getResources", .field = "cutout_leaf" },
-            } },
-            .{ .field = "trees", .source = .{
-                .node = .{ .name = "getResources", .field = "trees" },
-            } },
-        } },
-        .{ .name = "animateMeshes", .function = "animateMeshes", .input_links = &[_]InputLink{
-            .{ .field = "models", .source = .{
-                .node = .{ .name = "getResources", .field = "models" },
-            } },
-            .{ .field = "seconds_since_start", .source = .{
-                .node = .{ .name = "timing", .field = "seconds_since_start" },
-            } },
-        } },
-        .{ .name = "displayForest", .function = "displayForest", .input_links = &[_]InputLink{
-            .{ .field = "terrain_sampler", .source = .{
-                .node = .{ .name = "calculateTerrainDensityInfluenceRange", .field = "terrain_sampler" },
-            } },
-        } },
-        .{ .name = "displayBike", .function = "displayBike", .input_links = &[_]InputLink{
-            .{ .field = "terrain_sampler", .source = .{
-                .node = .{ .name = "calculateTerrainDensityInfluenceRange", .field = "terrain_sampler" },
-            } },
-            .{ .field = "seconds_since_start", .source = .{
-                .node = .{ .name = "timing", .field = "seconds_since_start" },
-            } },
-            .{ .field = "model_transforms", .source = .{
-                .node = .{ .name = "getResources", .field = "model_transforms" },
-            } },
-            .{ .field = "bounce", .source = .{ .input_field = "bounce" } },
-        } },
-        .{ .name = "displayTerrain", .function = "displayTerrain", .input_links = &[_]InputLink{
-            .{ .field = "terrain_sampler", .source = .{
-                .node = .{ .name = "calculateTerrainDensityInfluenceRange", .field = "terrain_sampler" },
-            } },
-        } },
-        .{ .name = "calculateTerrainDensityInfluenceRange", .function = "calculateTerrainDensityInfluenceRange", .input_links = &[_]InputLink{
-            .{ .field = "size_multiplier", .source = .{ .input_field = "size_multiplier" } },
-        } },
-        .{ .name = "getScreenspaceMesh", .function = "getScreenspaceMesh", .input_links = &[_]InputLink{
-            .{ .field = "camera_position", .source = .{
-                .node = .{ .name = "orbit", .field = "camera_position" },
-            } },
-            .{ .field = "world_matrix", .source = .{
-                .node = .{ .name = "orbit", .field = "world_matrix" },
-            } },
-        } },
-    },
-    .store = &[_]SystemSink{
-        .{ .output_node = "orbit", .output_field = "orbit_camera", .system_field = "orbit_camera" },
-        .{ .output_node = "timing", .output_field = "last_time", .system_field = "last_time" },
-        .{ .output_node = "orbit", .output_field = "player", .system_field = "player" },
-    },
-    .output = &[_]SystemSink{
-        .{ .output_node = "getResources", .output_field = "skybox", .system_field = "skybox" },
-        .{ .output_node = "getResources", .output_field = "models", .system_field = "models" },
-        .{ .output_node = "animateMeshes", .output_field = "models", .system_field = "models" },
-        .{ .output_node = "getScreenspaceMesh", .output_field = "screen_space_mesh", .system_field = "screen_space_mesh" },
-        .{ .output_node = "displayTrees", .output_field = "models", .system_field = "models" },
-        .{ .output_node = "displayForest", .output_field = "model_instances", .system_field = "model_instances" },
-        .{ .output_node = "displayBike", .output_field = "model_instances", .system_field = "model_instances" },
-        .{ .output_node = "displayTerrain", .output_field = "terrain_mesh", .system_field = "terrain_mesh" },
-        .{ .output_node = "displayTerrain", .output_field = "terrain_instance", .system_field = "terrain_instance" },
-        .{ .output_node = "orbit", .output_field = "world_matrix", .system_field = "world_matrix" },
-    },
-};
+        // Behold - all the things the game loop can do BEFORE user input, that we can compute without needing to know what the user will do!
+        // Terrain things below!
+        const calculate_terrain_density_influence_range = rt.node(@src(), graph_nodes.calculateTerrainDensityInfluenceRange, .{
+            .size_multiplier = inputs.poll(.size_multiplier),
+        });
+        const display_forest = rt.node(@src(), graph_nodes.displayForest, .{
+            .terrain_sampler = calculate_terrain_density_influence_range.terrain_sampler,
+        });
+        const display_terrain = rt.node(@src(), graph_nodes.displayTerrain, .{
+            .terrain_sampler = calculate_terrain_density_influence_range.terrain_sampler,
+        });
+        // Animated things below!
+        const timing = rt.node(@src(), graph_nodes.timing, .{
+            .time = inputs.poll(.time),
+        });
+        const animate_meshes = rt.node(@src(), graph_nodes.animateMeshes, .{
+            .models = get_resources.models,
+            .seconds_since_start = timing.seconds_since_start,
+        });
+        const display_bike = rt.node(@src(), graph_nodes.displayBike, .{
+            .terrain_sampler = calculate_terrain_density_influence_range.terrain_sampler,
+            .seconds_since_start = timing.seconds_since_start,
+            .model_transforms = get_resources.model_transforms,
+            .bounce = inputs.poll(.bounce),
+        });
+        outputs.submit(.{
+            .terrain_mesh = display_terrain.terrain_mesh,
+            .terrain_instance = display_terrain.terrain_instance,
+            .models = .{
+                .raw = std.mem.concat(rt.allocator, types.GameModel, &.{
+                    get_resources.models.raw,
+                    animate_meshes.models.raw,
+                    display_trees.models.raw,
+                }) catch unreachable,
+                .is_dirty = true,
+            },
+            .model_instances = .{
+                .raw = std.mem.concat(rt.allocator, types.ModelInstances, &.{
+                    display_forest.model_instances.raw,
+                    display_bike.model_instances.raw,
+                }) catch unreachable,
+                .is_dirty = true,
+            },
+        });
+
+        // Polling user input! (We can do it late, which should lead to lower latency!)
+        const orbit = rt.node(@src(), graph_nodes.orbit, .{
+            .delta_time = timing.delta_time,
+            .render_resolution = inputs.poll(.render_resolution),
+            .orbit_speed = inputs.poll(.orbit_speed),
+            .input = inputs.poll(.input),
+            .orbit_camera = store.orbit_camera,
+            .selected_camera = inputs.poll(.selected_camera),
+            .player_settings = inputs.poll(.player_settings),
+            .player = store.player,
+            .terrain_sampler = calculate_terrain_density_influence_range.terrain_sampler,
+        });
+
+        const get_screenspace_mesh = rt.node(@src(), graph_nodes.getScreenspaceMesh, .{
+            .camera_position = orbit.camera_position,
+            .world_matrix = orbit.world_matrix,
+        });
+        outputs.submit(.{
+            .world_matrix = orbit.world_matrix,
+            .screen_space_mesh = get_screenspace_mesh.screen_space_mesh,
+        });
+
+        return .{
+            .orbit_camera = store.orbit_camera,
+            .player = store.player,
+        };
+    }
+});
