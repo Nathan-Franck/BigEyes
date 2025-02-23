@@ -402,7 +402,7 @@ pub fn main() !void {
 }
 
 // GUI state
-var bounce = true;
+var bounce = false;
 
 // Provide inputs to the back-end from the user, disk and network.
 fn poll(comptime field_tag: GameGraph.InputTag) std.meta.fieldInfo(GameGraph.Inputs, field_tag).type {
@@ -413,8 +413,8 @@ fn poll(comptime field_tag: GameGraph.InputTag) std.meta.fieldInfo(GameGraph.Inp
         .input => .{ .mouse_delta = .{ 0, 0, 0, 0 }, .movement = .{ .left = null, .right = null, .forward = null, .backward = null } },
         .selected_camera => .orbit,
         .player_settings => .{ .movement_speed = 0.01, .look_speed = 0.01 },
-        .bounce => 2,
-        .size_multiplier => 10,
+        .bounce => zgui.checkbox("bounce", .{ .v = &bounce }),
+        .size_multiplier => 1,
     };
 }
 
