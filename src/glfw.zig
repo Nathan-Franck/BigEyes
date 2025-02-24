@@ -37,7 +37,6 @@ pub const vs = common ++
 \\      @builtin(vertex_index) index: u32,
 \\  }
 \\ fn matrix_from_instance(i: Instance) -> mat4x4<f32> {
-\\    // Convert quaternion to rotation matrix
 \\    var x: f32 = i.rotation.x;
 \\    var y: f32 = i.rotation.y;
 \\    var z: f32 = i.rotation.z;
@@ -47,13 +46,11 @@ pub const vs = common ++
 \\        2.0 * (x * y + w * z), 1.0 - 2.0 * (x * x + z * z), 2.0 * (y * z - w * x),
 \\        2.0 * (x * z - w * y), 2.0 * (y * z + w * x), 1.0 - 2.0 * (x * x + y * y)
 \\    );
-\\    // Scale the rotation matrix
 \\    var scaledRotation: mat3x3<f32> = mat3x3(
 \\        rotationMatrix[0] * i.scale.x,
 \\        rotationMatrix[1] * i.scale.y,
 \\        rotationMatrix[2] * i.scale.z
 \\    );
-\\    // Expand scaledRotation into a mat4
 \\    var transform: mat4x4<f32> = mat4x4(
 \\        vec4(scaledRotation[0], 0.0),
 \\        vec4(scaledRotation[1], 0.0),
@@ -67,7 +64,12 @@ pub const vs = common ++
 \\      instance: Instance,
 \\  ) -> VertexOut {
 \\      var output: VertexOut;
-\\      let transform = matrix_from_instance(instance);
+\\      let transform = mat4x4(
+\\          1.0, 0.0, 0.0, instance.position.x,
+\\          0.0, 1.0, 0.0, instance.position.y,
+\\          0.0, 0.0, 1.0, instance.position.z,
+\\          0.0, 0.0, 0.0, 1.0,
+\\      );
 \\      output.position_clip = vec4(vertex.position, 1.0) * transform * frame_uniforms.world_to_clip;
 \\      output.position = (vec4(vertex.position, 1.0) * transform).xyz;
 \\      output.normal = vertex.normal * mat3x3(
