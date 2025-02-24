@@ -817,10 +817,10 @@ fn draw(game: *GameState) void {
                 // Draw.
                 pass.drawIndexed(
                     game.meshes.items[drawable.mesh_index].num_indices,
-                    drawable.mesh_index,
+                    1,
                     game.meshes.items[drawable.mesh_index].index_offset,
                     game.meshes.items[drawable.mesh_index].vertex_offset,
-                    0,
+                    drawable.mesh_index,
                 );
             }
         }
