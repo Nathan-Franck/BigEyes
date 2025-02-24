@@ -1,417 +1,872 @@
 const std = @import("std");
-const zglfw = @import("zglfw");
-const GameGraph = @import("game").GameGraph;
-const runtime = @import("node_graph").runtime;
-const game_backend = @import("game");
-const zgpu = @import("zgpu");
-const zgui = @import("zgui");
-const Vec4 = @import("utils").Vec4;
-const zmath = @import("zmath");
-const types = @import("utils").types;
-const resources = @import("resources");
-
-const wgpu = zgpu.wgpu;
 const math = std.math;
-const assert = std.debug.assert;
-const print = std.debug.print;
+const zglfw = @import("zglfw");
+const zgpu = @import("zgpu");
+const wgpu = zgpu.wgpu;
+const zgui = @import("zgui");
+const zm = @import("zmath");
+const zmesh = @import("zmesh");
+const znoise = @import("znoise");
+const ztracy = @import("ztracy");
+const wgsl = struct {
+    // zig fmt: off
+const common =
+\\  struct DrawUniforms {
+\\      object_to_world: mat4x4<f32>,
+\\      basecolor_roughness: vec4<f32>,
+\\  }
+\\  @group(1) @binding(0) var<uniform> draw_uniforms: DrawUniforms;
+\\
+\\  struct FrameUniforms {
+\\      world_to_clip: mat4x4<f32>,
+\\      camera_position: vec3<f32>,
+\\  }
+\\  @group(0) @binding(0) var<uniform> frame_uniforms: FrameUniforms;
+;
+pub const vs = common ++
+\\  struct VertexOut {
+\\      @builtin(position) position_clip: vec4<f32>,
+\\      @location(0) position: vec3<f32>,
+\\      @location(1) normal: vec3<f32>,
+\\      @location(2) barycentrics: vec3<f32>,
+\\  }
+\\  @vertex fn main(
+\\      @location(0) position: vec3<f32>,
+\\      @location(1) normal: vec3<f32>,
+\\      @builtin(vertex_index) vertex_index: u32,
+\\  ) -> VertexOut {
+\\      var output: VertexOut;
+\\      output.position_clip = vec4(position, 1.0) * draw_uniforms.object_to_world * frame_uniforms.world_to_clip;
+\\      output.position = (vec4(position, 1.0) * draw_uniforms.object_to_world).xyz;
+\\      output.normal = normal * mat3x3(
+\\          draw_uniforms.object_to_world[0].xyz,
+\\          draw_uniforms.object_to_world[1].xyz,
+\\          draw_uniforms.object_to_world[2].xyz,
+\\      );
+\\      let index = vertex_index % 3u;
+\\      output.barycentrics = vec3(f32(index == 0u), f32(index == 1u), f32(index == 2u));
+\\      return output;
+\\  }
+;
+pub const fs = common ++
+\\  const pi = 3.1415926;
+\\
+\\  fn saturate(x: f32) -> f32 { return clamp(x, 0.0, 1.0); }
+\\
+\\  // Trowbridge-Reitz GGX normal distribution function.
+\\  fn distributionGgx(n: vec3<f32>, h: vec3<f32>, alpha: f32) -> f32 {
+\\      let alpha_sq = alpha * alpha;
+\\      let n_dot_h = saturate(dot(n, h));
+\\      let k = n_dot_h * n_dot_h * (alpha_sq - 1.0) + 1.0;
+\\      return alpha_sq / (pi * k * k);
+\\  }
+\\
+\\  fn geometrySchlickGgx(x: f32, k: f32) -> f32 {
+\\      return x / (x * (1.0 - k) + k);
+\\  }
+\\
+\\  fn geometrySmith(n: vec3<f32>, v: vec3<f32>, l: vec3<f32>, k: f32) -> f32 {
+\\      let n_dot_v = saturate(dot(n, v));
+\\      let n_dot_l = saturate(dot(n, l));
+\\      return geometrySchlickGgx(n_dot_v, k) * geometrySchlickGgx(n_dot_l, k);
+\\  }
+\\
+\\  fn fresnelSchlick(h_dot_v: f32, f0: vec3<f32>) -> vec3<f32> {
+\\      return f0 + (vec3(1.0, 1.0, 1.0) - f0) * pow(1.0 - h_dot_v, 5.0);
+\\  }
+\\
+\\  @fragment fn main(
+\\      @location(0) position: vec3<f32>,
+\\      @location(1) normal: vec3<f32>,
+\\      @location(2) barycentrics: vec3<f32>,
+\\  ) -> @location(0) vec4<f32> {
+\\      let v = normalize(frame_uniforms.camera_position - position);
+\\      let n = normalize(normal);
+\\
+\\      let base_color = draw_uniforms.basecolor_roughness.xyz;
+\\      let ao = 1.0;
+\\      var roughness = draw_uniforms.basecolor_roughness.a;
+\\      var metallic: f32;
+\\      if (roughness < 0.0) { metallic = 1.0; } else { metallic = 0.0; }
+\\      roughness = abs(roughness);
+\\
+\\      let alpha = roughness * roughness;
+\\      var k = alpha + 1.0;
+\\      k = (k * k) / 8.0;
+\\      var f0 = vec3(0.04);
+\\      f0 = mix(f0, base_color, metallic);
+\\
+\\      let light_positions = array<vec3<f32>, 4>(
+\\          vec3(25.0, 15.0, 25.0),
+\\          vec3(-25.0, 15.0, 25.0),
+\\          vec3(25.0, 15.0, -25.0),
+\\          vec3(-25.0, 15.0, -25.0),
+\\      );
+\\      let light_radiance = array<vec3<f32>, 4>(
+\\          4.0 * vec3(0.0, 100.0, 250.0),
+\\          8.0 * vec3(200.0, 150.0, 250.0),
+\\          3.0 * vec3(200.0, 0.0, 0.0),
+\\          9.0 * vec3(200.0, 150.0, 0.0),
+\\      );
+\\
+\\      var lo = vec3(0.0);
+\\      for (var light_index: i32 = 0; light_index < 4; light_index = light_index + 1) {
+\\          let lvec = light_positions[light_index] - position;
+\\
+\\          let l = normalize(lvec);
+\\          let h = normalize(l + v);
+\\
+\\          let distance_sq = dot(lvec, lvec);
+\\          let attenuation = 1.0 / distance_sq;
+\\          let radiance = light_radiance[light_index] * attenuation;
+\\
+\\          let f = fresnelSchlick(saturate(dot(h, v)), f0);
+\\
+\\          let ndf = distributionGgx(n, h, alpha);
+\\          let g = geometrySmith(n, v, l, k);
+\\
+\\          let numerator = ndf * g * f;
+\\          let denominator = 4.0 * saturate(dot(n, v)) * saturate(dot(n, l));
+\\          let specular = numerator / max(denominator, 0.001);
+\\
+\\          let ks = f;
+\\          let kd = (vec3(1.0) - ks) * (1.0 - metallic);
+\\
+\\          let n_dot_l = saturate(dot(n, l));
+\\          lo = lo + (kd * base_color / pi + specular) * radiance * n_dot_l;
+\\      }
+\\
+\\      let ambient = vec3(0.03) * base_color * ao;
+\\      var color = ambient + lo;
+\\      color = color / (color + 1.0);
+\\      color = pow(color, vec3(1.0 / 2.2));
+\\
+\\      // wireframe
+\\      var barys = barycentrics;
+\\      barys.z = 1.0 - barys.x - barys.y;
+\\      let deltas = fwidth(barys);
+\\      let smoothing = deltas * 1.0;
+\\      let thickness = deltas * 0.25;
+\\      barys = smoothstep(thickness, thickness + smoothing, barys);
+\\      let min_bary = min(barys.x, min(barys.y, barys.z));
+\\      return vec4(min_bary * color, 1.0);
+\\  }
+// zig fmt: on
+    ;
+};
 
 const content_dir = @import("build_options").content_dir;
+const window_title = "zig-gamedev: procedural mesh (wgpu)";
+
+const IndexType = zmesh.Shape.IndexType;
 
 const Vertex = struct {
-    position: Vec4,
-    normal: Vec4,
+    position: [3]f32,
+    normal: [3]f32,
 };
 
-const Instance = struct {
-    position: Vec4,
-    rotation: Vec4,
-    scale: Vec4,
+const FrameUniforms = struct {
+    world_to_clip: zm.Mat,
+    camera_position: [3]f32,
 };
 
-const vertex_attributes = [_]wgpu.VertexAttribute{ .{
-    .format = .float32x4,
-    .offset = @offsetOf(Vertex, "position"),
-    .shader_location = 0,
-}, .{
-    .format = .float32x4,
-    .offset = @offsetOf(Vertex, "normal"),
-    .shader_location = 1,
-} };
+const DrawUniforms = struct {
+    object_to_world: zm.Mat,
+    basecolor_roughness: [4]f32,
+};
 
-const instance_attributes = [_]wgpu.VertexAttribute{ .{
-    .format = .float32x4,
-    .offset = @offsetOf(Instance, "position"),
-    .shader_location = 10,
-}, .{
-    .format = .float32x4,
-    .offset = @offsetOf(Instance, "rotation"),
-    .shader_location = 11,
-}, .{
-    .format = .float32x4,
-    .offset = @offsetOf(Instance, "scale"),
-    .shader_location = 12,
-} };
+const Mesh = struct {
+    index_offset: u32,
+    vertex_offset: i32,
+    num_indices: u32,
+    num_vertices: u32,
+};
 
-const wgsl_vs =
-    \\  @group(0) @binding(0) var<uniform> object_to_clip: mat4x4<f32>;
-    \\
-    \\  struct Vertex {
-    \\      @location(0) position: vec4<f32>,
-    \\      @location(1) normal: vec4<f32>,
-    \\  }
-    \\
-    \\  struct Instance {
-    \\      @location(10) position: vec4<f32>,
-    \\      @location(11) rotation: vec4<f32>,
-    \\      @location(12) scale: vec4<f32>,
-    \\  }
-    \\
-    \\  struct Fragment {
-    \\      @builtin(position) position: vec4<f32>,
-    \\      @location(0) normal: vec4<f32>,
-    \\  }
-++ @embedFile("glfw/greybox.vert.wgsl");
+const Drawable = struct {
+    mesh_index: u32,
+    position: [3]f32,
+    basecolor_roughness: [4]f32,
+};
 
-const wgsl_fs =
-    \\  struct Fragment {
-    \\      @location(0) normal: vec4<f32>,
-    \\  }
-    \\  struct Screen {
-    \\      @location(0) color: vec4<f32>,
-    \\  }
-    \\
-++ @embedFile("glfw/greybox.frag.wgsl");
-
-const Game = struct {
+const GameState = struct {
     window: *zglfw.Window,
     gctx: *zgpu.GraphicsContext,
-    dimensions: Dimensions,
+
     pipeline: zgpu.RenderPipelineHandle,
     bind_group: zgpu.BindGroupHandle,
-    depth: Depth,
-    pass: wgpu.RenderPassEncoder = undefined,
 
-    pub fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !@This() {
-        const gctx = try zgpu.GraphicsContext.create(
-            allocator,
-            .{
-                .window = window,
-                .fn_getTime = @ptrCast(&zglfw.getTime),
-                .fn_getFramebufferSize = @ptrCast(&zglfw.Window.getFramebufferSize),
-                .fn_getWin32Window = @ptrCast(&zglfw.getWin32Window),
-                .fn_getX11Display = @ptrCast(&zglfw.getX11Display),
-                .fn_getX11Window = @ptrCast(&zglfw.getX11Window),
-                .fn_getWaylandDisplay = @ptrCast(&zglfw.getWaylandDisplay),
-                .fn_getWaylandSurface = @ptrCast(&zglfw.getWaylandWindow),
-                .fn_getCocoaWindow = @ptrCast(&zglfw.getCocoaWindow),
-            },
-            .{},
-        );
-        errdefer gctx.destroy(allocator);
+    vertex_buffer: zgpu.BufferHandle,
+    index_buffer: zgpu.BufferHandle,
 
-        { // IMGUI
-            zgui.init(allocator);
-            const scale_factor = scale_factor: {
-                const scale = window.getContentScale();
-                break :scale_factor @max(scale[0], scale[1]);
-            };
-            const cwd = try std.process.getCwdAlloc(allocator);
-            const path = try std.fmt.allocPrintZ(allocator, "{s}/" ++ content_dir ++ "Roboto-Medium.ttf", .{cwd});
-            std.debug.print("Path to font {s}\n", .{path});
-            const font_normal = zgui.io.addFontFromFile(
-                path,
-                math.floor(20.0 * scale_factor),
-            );
-            assert(zgui.io.getFont(0) == font_normal);
+    depth_texture: zgpu.TextureHandle,
+    depth_texture_view: zgpu.TextureViewHandle,
 
-            zgui.backend.init(
-                window,
-                gctx.device,
-                @intFromEnum(zgpu.GraphicsContext.swapchain_format),
-                @intFromEnum(wgpu.TextureFormat.undef),
-            );
+    meshes: std.ArrayList(Mesh),
+    drawables: std.ArrayList(Drawable),
 
-            const style = zgui.getStyle();
-            style.window_min_size = .{ 320.0, 240.0 };
-            style.window_border_size = 8.0;
-            style.scrollbar_size = 6.0;
-            {
-                var color = style.getColor(.scrollbar_grab);
-                color[1] = 0.8;
-                style.setColor(.scrollbar_grab, color);
-            }
-            style.scaleAllSizes(scale_factor);
-        }
-
-        const bind_group_layout = gctx.createBindGroupLayout(&.{
-            zgpu.bufferEntry(0, .{ .vertex = true }, .uniform, true, 0),
-        });
-        defer gctx.releaseResource(bind_group_layout);
-
-        const pipeline_layout = gctx.createPipelineLayout(&.{bind_group_layout});
-        defer gctx.releaseResource(pipeline_layout);
-
-        const pipeline = pipline: {
-            const vs_module = zgpu.createWgslShaderModule(gctx.device, wgsl_vs, "vs");
-            defer vs_module.release();
-
-            const fs_module = zgpu.createWgslShaderModule(gctx.device, wgsl_fs, "fs");
-            defer fs_module.release();
-
-            const color_targets = [_]wgpu.ColorTargetState{.{
-                .format = zgpu.GraphicsContext.swapchain_format,
-            }};
-
-            const vertex_buffers = [_]wgpu.VertexBufferLayout{ .{
-                .array_stride = @sizeOf(Vertex),
-                .attribute_count = vertex_attributes.len,
-                .attributes = &vertex_attributes,
-            }, .{
-                .array_stride = @sizeOf(Instance),
-                .step_mode = .instance,
-                .attribute_count = instance_attributes.len,
-                .attributes = &instance_attributes,
-            } };
-
-            const pipeline_descriptor = wgpu.RenderPipelineDescriptor{
-                .vertex = wgpu.VertexState{
-                    .module = vs_module,
-                    .entry_point = "main",
-                    .buffer_count = vertex_buffers.len,
-                    .buffers = &vertex_buffers,
-                },
-                .primitive = wgpu.PrimitiveState{
-                    .front_face = .ccw,
-                    .cull_mode = .back,
-                    .topology = .triangle_list,
-                },
-                .depth_stencil = &wgpu.DepthStencilState{
-                    .format = .depth32_float,
-                    .depth_write_enabled = true,
-                    .depth_compare = .less,
-                },
-                .fragment = &wgpu.FragmentState{
-                    .module = fs_module,
-                    .entry_point = "main",
-                    .target_count = color_targets.len,
-                    .targets = &color_targets,
-                },
-            };
-            break :pipline gctx.createRenderPipeline(pipeline_layout, pipeline_descriptor);
-        };
-
-        const bind_group = gctx.createBindGroup(bind_group_layout, &.{
-            .{
-                .binding = 0,
-                .buffer_handle = gctx.uniforms.buffer,
-                .offset = 0,
-                .size = @sizeOf(zmath.Mat),
-            },
-        });
-
-        const depth = createDepthTexture(gctx);
-
-        return .{
-            .window = window,
-            .gctx = gctx,
-            .dimensions = calculateDimensions(gctx),
-            .pipeline = pipeline,
-            .bind_group = bind_group,
-            .depth = depth,
-        };
-    }
-
-    const Dimensions = struct {
-        width: f32,
-        height: f32,
-    };
-
-    fn calculateDimensions(gctx: *zgpu.GraphicsContext) Dimensions {
-        const width = @as(f32, @floatFromInt(gctx.swapchain_descriptor.width));
-        const height = @as(f32, @floatFromInt(gctx.swapchain_descriptor.height));
-        const delta = math.sign(
-            @as(i32, @bitCast(gctx.swapchain_descriptor.width)) - @as(i32, @bitCast(gctx.swapchain_descriptor.height)),
-        );
-        return switch (delta) {
-            -1 => .{ .width = 2.0, .height = 2 * width / height },
-            0 => .{ .width = 2.0, .height = 2.0 },
-            1 => .{ .width = 2 * height / width, .height = 2.0 },
-            else => unreachable,
-        };
-    }
-
-    const Depth = struct {
-        texture: zgpu.TextureHandle,
-        view: zgpu.TextureViewHandle,
-    };
-
-    fn createDepthTexture(gctx: *zgpu.GraphicsContext) Depth {
-        const texture = gctx.createTexture(.{
-            .usage = .{ .render_attachment = true },
-            .dimension = .tdim_2d,
-            .size = .{
-                .width = gctx.swapchain_descriptor.width,
-                .height = gctx.swapchain_descriptor.height,
-                .depth_or_array_layers = 1,
-            },
-            .format = .depth32_float,
-            .mip_level_count = 1,
-            .sample_count = 1,
-        });
-        const view = gctx.createTextureView(texture, .{});
-        return .{ .texture = texture, .view = view };
-    }
-
-    // Global state
-    var bounce: bool = false;
-
-    // Provide inputs to the back-end from the user, disk and network.
-    pub fn poll(self: @This(), comptime field_tag: GameGraph.InputTag) std.meta.fieldInfo(GameGraph.Inputs, field_tag).type {
-        _ = self;
-        return switch (field_tag) {
-            .time => 0,
-            .render_resolution => .{ .x = 0, .y = 0 },
-            .orbit_speed => 1,
-            .input => .{ .mouse_delta = .{ 0, 0, 0, 0 }, .movement = .{ .left = null, .right = null, .forward = null, .backward = null } },
-            .selected_camera => .orbit,
-            .player_settings => .{ .movement_speed = 0.01, .look_speed = 0.01 },
-            .bounce => zgui.checkbox("bounce", .{ .v = &bounce }),
-            .size_multiplier => 1,
-        };
-    }
-
-    // Recieve state changes back to the front-end to show to user.
-    pub fn submit(self: @This(), comptime field_tag: GameGraph.OutputTag, value: std.meta.fieldInfo(GameGraph.Outputs, field_tag).type) void {
-        _ = self;
-        _ = value;
-        switch (field_tag) {
-            .world_matrix => {
-                // const mem = self.gctx.uniformsAllocate(struct { world_matrix: zmath.Mat }, 1);
-                // mem.slice[0].world_matrix = value;
-
-                // self.pass.setBindGroup(0, self.gctx.lookupResource(self.bind_group).?, &.{mem.offset});
-            },
-            else => {},
-        }
-    }
+    camera: struct {
+        position: [3]f32 = .{ 0.0, 4.0, -4.0 },
+        forward: [3]f32 = .{ 0.0, 0.0, 1.0 },
+        pitch: f32 = 0.15 * math.pi,
+        yaw: f32 = 0.0,
+    } = .{},
+    mouse: struct {
+        cursor_pos: [2]f64 = .{ 0, 0 },
+    } = .{},
 };
 
-pub fn main() !void {
-    const allocator = std.heap.page_allocator;
+fn appendMesh(
+    mesh: zmesh.Shape,
+    meshes: *std.ArrayList(Mesh),
+    meshes_indices: *std.ArrayList(IndexType),
+    meshes_positions: *std.ArrayList([3]f32),
+    meshes_normals: *std.ArrayList([3]f32),
+) void {
+    meshes.append(.{
+        .index_offset = @as(u32, @intCast(meshes_indices.items.len)),
+        .vertex_offset = @as(i32, @intCast(meshes_positions.items.len)),
+        .num_indices = @as(u32, @intCast(mesh.indices.len)),
+        .num_vertices = @as(u32, @intCast(mesh.positions.len)),
+    }) catch unreachable;
 
+    meshes_indices.appendSlice(mesh.indices) catch unreachable;
+    meshes_positions.appendSlice(mesh.positions) catch unreachable;
+    meshes_normals.appendSlice(mesh.normals.?) catch unreachable;
+}
+
+fn initScene(
+    allocator: std.mem.Allocator,
+    drawables: *std.ArrayList(Drawable),
+    meshes: *std.ArrayList(Mesh),
+    meshes_indices: *std.ArrayList(IndexType),
+    meshes_positions: *std.ArrayList([3]f32),
+    meshes_normals: *std.ArrayList([3]f32),
+) void {
+    const tracy_zone = ztracy.ZoneNC(@src(), "initScene", 0x00_ff_00_00);
+    defer tracy_zone.End();
+
+    var arena_state = std.heap.ArenaAllocator.init(allocator);
+    defer arena_state.deinit();
+    const arena = arena_state.allocator();
+
+    zmesh.init(arena);
+    defer zmesh.deinit();
+
+    // Trefoil knot.
+    {
+        var mesh = zmesh.Shape.initTrefoilKnot(10, 128, 0.8);
+        defer mesh.deinit();
+        mesh.rotate(math.pi * 0.5, 1.0, 0.0, 0.0);
+        mesh.unweld();
+        mesh.computeNormals();
+
+        drawables.append(.{
+            .mesh_index = @as(u32, @intCast(meshes.items.len)),
+            .position = .{ 0, 1, 0 },
+            .basecolor_roughness = .{ 0.0, 0.7, 0.0, 0.6 },
+        }) catch unreachable;
+
+        appendMesh(mesh, meshes, meshes_indices, meshes_positions, meshes_normals);
+    }
+    // Parametric sphere.
+    {
+        var mesh = zmesh.Shape.initParametricSphere(20, 20);
+        defer mesh.deinit();
+        mesh.rotate(math.pi * 0.5, 1.0, 0.0, 0.0);
+        mesh.unweld();
+        mesh.computeNormals();
+
+        drawables.append(.{
+            .mesh_index = @as(u32, @intCast(meshes.items.len)),
+            .position = .{ 3, 1, 0 },
+            .basecolor_roughness = .{ 0.7, 0.0, 0.0, 0.2 },
+        }) catch unreachable;
+
+        appendMesh(mesh, meshes, meshes_indices, meshes_positions, meshes_normals);
+    }
+    // Icosahedron.
+    {
+        var mesh = zmesh.Shape.initIcosahedron();
+        defer mesh.deinit();
+        mesh.unweld();
+        mesh.computeNormals();
+
+        drawables.append(.{
+            .mesh_index = @as(u32, @intCast(meshes.items.len)),
+            .position = .{ -3, 1, 0 },
+            .basecolor_roughness = .{ 0.7, 0.6, 0.0, 0.4 },
+        }) catch unreachable;
+
+        appendMesh(mesh, meshes, meshes_indices, meshes_positions, meshes_normals);
+    }
+    // Dodecahedron.
+    {
+        var mesh = zmesh.Shape.initDodecahedron();
+        defer mesh.deinit();
+        mesh.unweld();
+        mesh.computeNormals();
+
+        drawables.append(.{
+            .mesh_index = @as(u32, @intCast(meshes.items.len)),
+            .position = .{ 0, 1, 3 },
+            .basecolor_roughness = .{ 0.0, 0.1, 1.0, 0.2 },
+        }) catch unreachable;
+
+        appendMesh(mesh, meshes, meshes_indices, meshes_positions, meshes_normals);
+    }
+    // Cylinder with top and bottom caps.
+    {
+        var disk = zmesh.Shape.initParametricDisk(10, 2);
+        defer disk.deinit();
+        disk.invert(0, 0);
+
+        var cylinder = zmesh.Shape.initCylinder(10, 4);
+        defer cylinder.deinit();
+
+        cylinder.merge(disk);
+        cylinder.translate(0, 0, -1);
+        disk.invert(0, 0);
+        cylinder.merge(disk);
+
+        cylinder.scale(0.5, 0.5, 2);
+        cylinder.rotate(math.pi * 0.5, 1.0, 0.0, 0.0);
+
+        cylinder.unweld();
+        cylinder.computeNormals();
+
+        drawables.append(.{
+            .mesh_index = @as(u32, @intCast(meshes.items.len)),
+            .position = .{ -3, 0, 3 },
+            .basecolor_roughness = .{ 1.0, 0.0, 0.0, 0.3 },
+        }) catch unreachable;
+
+        appendMesh(cylinder, meshes, meshes_indices, meshes_positions, meshes_normals);
+    }
+    // Torus.
+    {
+        var mesh = zmesh.Shape.initTorus(10, 20, 0.2);
+        defer mesh.deinit();
+
+        drawables.append(.{
+            .mesh_index = @as(u32, @intCast(meshes.items.len)),
+            .position = .{ 3, 1.5, 3 },
+            .basecolor_roughness = .{ 1.0, 0.5, 0.0, 0.2 },
+        }) catch unreachable;
+
+        appendMesh(mesh, meshes, meshes_indices, meshes_positions, meshes_normals);
+    }
+    // Subdivided sphere.
+    {
+        var mesh = zmesh.Shape.initSubdividedSphere(3);
+        defer mesh.deinit();
+        mesh.unweld();
+        mesh.computeNormals();
+
+        drawables.append(.{
+            .mesh_index = @as(u32, @intCast(meshes.items.len)),
+            .position = .{ 3, 1, 6 },
+            .basecolor_roughness = .{ 0.0, 1.0, 0.0, 0.2 },
+        }) catch unreachable;
+
+        appendMesh(mesh, meshes, meshes_indices, meshes_positions, meshes_normals);
+    }
+    // Tetrahedron.
+    {
+        var mesh = zmesh.Shape.initTetrahedron();
+        defer mesh.deinit();
+        mesh.unweld();
+        mesh.computeNormals();
+
+        drawables.append(.{
+            .mesh_index = @as(u32, @intCast(meshes.items.len)),
+            .position = .{ 0, 0.5, 6 },
+            .basecolor_roughness = .{ 1.0, 0.0, 1.0, 0.2 },
+        }) catch unreachable;
+
+        appendMesh(mesh, meshes, meshes_indices, meshes_positions, meshes_normals);
+    }
+    // Octahedron.
+    {
+        var mesh = zmesh.Shape.initOctahedron();
+        defer mesh.deinit();
+        mesh.unweld();
+        mesh.computeNormals();
+
+        drawables.append(.{
+            .mesh_index = @as(u32, @intCast(meshes.items.len)),
+            .position = .{ -3, 1, 6 },
+            .basecolor_roughness = .{ 0.2, 0.0, 1.0, 0.2 },
+        }) catch unreachable;
+
+        appendMesh(mesh, meshes, meshes_indices, meshes_positions, meshes_normals);
+    }
+    // Rock.
+    {
+        var rock = zmesh.Shape.initRock(123, 4);
+        defer rock.deinit();
+        rock.unweld();
+        rock.computeNormals();
+
+        drawables.append(.{
+            .mesh_index = @as(u32, @intCast(meshes.items.len)),
+            .position = .{ -6, 0, 3 },
+            .basecolor_roughness = .{ 1.0, 1.0, 1.0, 1.0 },
+        }) catch unreachable;
+
+        appendMesh(rock, meshes, meshes_indices, meshes_positions, meshes_normals);
+    }
+    // Custom parametric (simple terrain).
+    {
+        const gen = znoise.FnlGenerator{
+            .fractal_type = .fbm,
+            .frequency = 2.0,
+            .octaves = 5,
+            .lacunarity = 2.02,
+        };
+        const local = struct {
+            fn terrain(uv: *const [2]f32, position: *[3]f32, userdata: ?*anyopaque) callconv(.C) void {
+                _ = userdata;
+                position[0] = uv[0];
+                position[1] = 0.025 * gen.noise2(uv[0], uv[1]);
+                position[2] = uv[1];
+            }
+        };
+        var ground = zmesh.Shape.initParametric(local.terrain, 40, 40, null);
+        defer ground.deinit();
+        ground.translate(-0.5, -0.0, -0.5);
+        ground.invert(0, 0);
+        ground.scale(20, 20, 20);
+        ground.computeNormals();
+
+        drawables.append(.{
+            .mesh_index = @as(u32, @intCast(meshes.items.len)),
+            .position = .{ 0, 0, 0 },
+            .basecolor_roughness = .{ 0.1, 0.1, 0.1, 1.0 },
+        }) catch unreachable;
+
+        appendMesh(ground, meshes, meshes_indices, meshes_positions, meshes_normals);
+    }
+}
+
+fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !GameState {
+    const gctx = try zgpu.GraphicsContext.create(
+        allocator,
+        .{
+            .window = window,
+            .fn_getTime = @ptrCast(&zglfw.getTime),
+            .fn_getFramebufferSize = @ptrCast(&zglfw.Window.getFramebufferSize),
+            .fn_getWin32Window = @ptrCast(&zglfw.getWin32Window),
+            .fn_getX11Display = @ptrCast(&zglfw.getX11Display),
+            .fn_getX11Window = @ptrCast(&zglfw.getX11Window),
+            .fn_getWaylandDisplay = @ptrCast(&zglfw.getWaylandDisplay),
+            .fn_getWaylandSurface = @ptrCast(&zglfw.getWaylandWindow),
+            .fn_getCocoaWindow = @ptrCast(&zglfw.getCocoaWindow),
+        },
+        .{},
+    );
+    errdefer gctx.destroy(allocator);
+
+    var arena_state = std.heap.ArenaAllocator.init(allocator);
+    defer arena_state.deinit();
+    const arena = arena_state.allocator();
+
+    const bind_group_layout = gctx.createBindGroupLayout(&.{
+        zgpu.bufferEntry(0, .{ .vertex = true, .fragment = true }, .uniform, true, 0),
+    });
+    defer gctx.releaseResource(bind_group_layout);
+
+    const pipeline_layout = gctx.createPipelineLayout(&.{
+        bind_group_layout,
+        bind_group_layout,
+    });
+    defer gctx.releaseResource(pipeline_layout);
+
+    const pipeline = pipeline: {
+        const vs_module = zgpu.createWgslShaderModule(gctx.device, wgsl.vs, "vs");
+        defer vs_module.release();
+
+        const fs_module = zgpu.createWgslShaderModule(gctx.device, wgsl.fs, "fs");
+        defer fs_module.release();
+
+        const color_targets = [_]wgpu.ColorTargetState{.{
+            .format = zgpu.GraphicsContext.swapchain_format,
+        }};
+
+        const vertex_attributes = [_]wgpu.VertexAttribute{
+            .{ .format = .float32x3, .offset = 0, .shader_location = 0 },
+            .{ .format = .float32x3, .offset = @offsetOf(Vertex, "normal"), .shader_location = 1 },
+        };
+        const vertex_buffers = [_]wgpu.VertexBufferLayout{.{
+            .array_stride = @sizeOf(Vertex),
+            .attribute_count = vertex_attributes.len,
+            .attributes = &vertex_attributes,
+        }};
+
+        // Create a render pipeline.
+        const pipeline_descriptor = wgpu.RenderPipelineDescriptor{
+            .vertex = wgpu.VertexState{
+                .module = vs_module,
+                .entry_point = "main",
+                .buffer_count = vertex_buffers.len,
+                .buffers = &vertex_buffers,
+            },
+            .primitive = wgpu.PrimitiveState{
+                .front_face = .cw,
+                .cull_mode = .back,
+                .topology = .triangle_list,
+            },
+            .depth_stencil = &wgpu.DepthStencilState{
+                .format = .depth32_float,
+                .depth_write_enabled = true,
+                .depth_compare = .less,
+            },
+            .fragment = &wgpu.FragmentState{
+                .module = fs_module,
+                .entry_point = "main",
+                .target_count = color_targets.len,
+                .targets = &color_targets,
+            },
+        };
+        break :pipeline gctx.createRenderPipeline(pipeline_layout, pipeline_descriptor);
+    };
+
+    const bind_group = gctx.createBindGroup(bind_group_layout, &.{
+        .{
+            .binding = 0,
+            .buffer_handle = gctx.uniforms.buffer,
+            .offset = 0,
+            .size = @max(@sizeOf(FrameUniforms), @sizeOf(DrawUniforms)),
+        },
+    });
+
+    var drawables = std.ArrayList(Drawable).init(allocator);
+    var meshes = std.ArrayList(Mesh).init(allocator);
+    var meshes_indices = std.ArrayList(IndexType).init(arena);
+    var meshes_positions = std.ArrayList([3]f32).init(arena);
+    var meshes_normals = std.ArrayList([3]f32).init(arena);
+    initScene(allocator, &drawables, &meshes, &meshes_indices, &meshes_positions, &meshes_normals);
+
+    const total_num_vertices = @as(u32, @intCast(meshes_positions.items.len));
+    const total_num_indices = @as(u32, @intCast(meshes_indices.items.len));
+
+    // Create a vertex buffer.
+    const vertex_buffer = gctx.createBuffer(.{
+        .usage = .{ .copy_dst = true, .vertex = true },
+        .size = total_num_vertices * @sizeOf(Vertex),
+    });
+    {
+        var vertex_data = std.ArrayList(Vertex).init(arena);
+        defer vertex_data.deinit();
+        vertex_data.resize(total_num_vertices) catch unreachable;
+
+        for (meshes_positions.items, 0..) |_, i| {
+            vertex_data.items[i].position = meshes_positions.items[i];
+            vertex_data.items[i].normal = meshes_normals.items[i];
+        }
+        gctx.queue.writeBuffer(gctx.lookupResource(vertex_buffer).?, 0, Vertex, vertex_data.items);
+    }
+
+    // Create an index buffer.
+    const index_buffer = gctx.createBuffer(.{
+        .usage = .{ .copy_dst = true, .index = true },
+        .size = total_num_indices * @sizeOf(IndexType),
+    });
+    gctx.queue.writeBuffer(gctx.lookupResource(index_buffer).?, 0, IndexType, meshes_indices.items);
+
+    // Create a depth texture and its 'view'.
+    const depth = createDepthTexture(gctx);
+
+    return GameState{
+        .window = window,
+        .gctx = gctx,
+        .pipeline = pipeline,
+        .bind_group = bind_group,
+        .vertex_buffer = vertex_buffer,
+        .index_buffer = index_buffer,
+        .depth_texture = depth.texture,
+        .depth_texture_view = depth.view,
+        .meshes = meshes,
+        .drawables = drawables,
+    };
+}
+
+fn deinit(allocator: std.mem.Allocator, demo: *GameState) void {
+    demo.meshes.deinit();
+    demo.drawables.deinit();
+    demo.gctx.destroy(allocator);
+    demo.* = undefined;
+}
+
+fn update(demo: *GameState) void {
+    zgui.backend.newFrame(
+        demo.gctx.swapchain_descriptor.width,
+        demo.gctx.swapchain_descriptor.height,
+    );
+
+    zgui.setNextWindowPos(.{ .x = 20.0, .y = 20.0, .cond = .always });
+    zgui.setNextWindowSize(.{ .w = -1.0, .h = -1.0, .cond = .always });
+
+    if (zgui.begin("Demo Settings", .{ .flags = .{ .no_move = true, .no_resize = true } })) {
+        zgui.bulletText(
+            "Average : {d:.3} ms/frame ({d:.1} fps)",
+            .{ demo.gctx.stats.average_cpu_time, demo.gctx.stats.fps },
+        );
+        zgui.bulletText("RMB + drag : rotate camera", .{});
+        zgui.bulletText("W, A, S, D : move camera", .{});
+    }
+    zgui.end();
+
+    const window = demo.window;
+
+    // Handle camera rotation with mouse.
+    {
+        const cursor_pos = window.getCursorPos();
+        const delta_x = @as(f32, @floatCast(cursor_pos[0] - demo.mouse.cursor_pos[0]));
+        const delta_y = @as(f32, @floatCast(cursor_pos[1] - demo.mouse.cursor_pos[1]));
+        demo.mouse.cursor_pos = cursor_pos;
+
+        if (window.getMouseButton(.right) == .press) {
+            demo.camera.pitch += 0.0025 * delta_y;
+            demo.camera.yaw += 0.0025 * delta_x;
+            demo.camera.pitch = @min(demo.camera.pitch, 0.48 * math.pi);
+            demo.camera.pitch = @max(demo.camera.pitch, -0.48 * math.pi);
+            demo.camera.yaw = zm.modAngle(demo.camera.yaw);
+        }
+    }
+
+    // Handle camera movement with 'WASD' keys.
+    {
+        const speed = zm.f32x4s(2.0);
+        const delta_time = zm.f32x4s(demo.gctx.stats.delta_time);
+        const transform = zm.mul(zm.rotationX(demo.camera.pitch), zm.rotationY(demo.camera.yaw));
+        var forward = zm.normalize3(zm.mul(zm.f32x4(0.0, 0.0, 1.0, 0.0), transform));
+
+        zm.storeArr3(&demo.camera.forward, forward);
+
+        const right = speed * delta_time * zm.normalize3(zm.cross3(zm.f32x4(0.0, 1.0, 0.0, 0.0), forward));
+        forward = speed * delta_time * forward;
+
+        var cam_pos = zm.loadArr3(demo.camera.position);
+
+        if (window.getKey(.w) == .press) {
+            cam_pos += forward;
+        } else if (window.getKey(.s) == .press) {
+            cam_pos -= forward;
+        }
+        if (window.getKey(.d) == .press) {
+            cam_pos += right;
+        } else if (window.getKey(.a) == .press) {
+            cam_pos -= right;
+        }
+
+        zm.storeArr3(&demo.camera.position, cam_pos);
+    }
+}
+
+fn draw(demo: *GameState) void {
+    const gctx = demo.gctx;
+    const fb_width = gctx.swapchain_descriptor.width;
+    const fb_height = gctx.swapchain_descriptor.height;
+
+    const cam_world_to_view = zm.lookToLh(
+        zm.loadArr3(demo.camera.position),
+        zm.loadArr3(demo.camera.forward),
+        zm.f32x4(0.0, 1.0, 0.0, 0.0),
+    );
+    const cam_view_to_clip = zm.perspectiveFovLh(
+        0.25 * math.pi,
+        @as(f32, @floatFromInt(fb_width)) / @as(f32, @floatFromInt(fb_height)),
+        0.01,
+        200.0,
+    );
+    const cam_world_to_clip = zm.mul(cam_world_to_view, cam_view_to_clip);
+
+    const back_buffer_view = gctx.swapchain.getCurrentTextureView();
+    defer back_buffer_view.release();
+
+    const commands = commands: {
+        const encoder = gctx.device.createCommandEncoder(null);
+        defer encoder.release();
+
+        // Main pass.
+        pass: {
+            const vb_info = gctx.lookupResourceInfo(demo.vertex_buffer) orelse break :pass;
+            const ib_info = gctx.lookupResourceInfo(demo.index_buffer) orelse break :pass;
+            const pipeline = gctx.lookupResource(demo.pipeline) orelse break :pass;
+            const bind_group = gctx.lookupResource(demo.bind_group) orelse break :pass;
+            const depth_view = gctx.lookupResource(demo.depth_texture_view) orelse break :pass;
+
+            const color_attachments = [_]wgpu.RenderPassColorAttachment{.{
+                .view = back_buffer_view,
+                .load_op = .clear,
+                .store_op = .store,
+            }};
+            const depth_attachment = wgpu.RenderPassDepthStencilAttachment{
+                .view = depth_view,
+                .depth_load_op = .clear,
+                .depth_store_op = .store,
+                .depth_clear_value = 1.0,
+            };
+            const render_pass_info = wgpu.RenderPassDescriptor{
+                .color_attachment_count = color_attachments.len,
+                .color_attachments = &color_attachments,
+                .depth_stencil_attachment = &depth_attachment,
+            };
+            const pass = encoder.beginRenderPass(render_pass_info);
+            defer {
+                pass.end();
+                pass.release();
+            }
+
+            pass.setVertexBuffer(0, vb_info.gpuobj.?, 0, vb_info.size);
+            pass.setIndexBuffer(
+                ib_info.gpuobj.?,
+                if (IndexType == u16) .uint16 else .uint32,
+                0,
+                ib_info.size,
+            );
+
+            pass.setPipeline(pipeline);
+
+            // Update "world to clip" (camera) xform.
+            {
+                const mem = gctx.uniformsAllocate(FrameUniforms, 1);
+                mem.slice[0].world_to_clip = zm.transpose(cam_world_to_clip);
+                mem.slice[0].camera_position = demo.camera.position;
+
+                pass.setBindGroup(0, bind_group, &.{mem.offset});
+            }
+
+            for (demo.drawables.items) |drawable| {
+                // Update "object to world" xform.
+                const object_to_world = zm.translationV(zm.loadArr3(drawable.position));
+
+                const mem = gctx.uniformsAllocate(DrawUniforms, 1);
+                mem.slice[0].object_to_world = zm.transpose(object_to_world);
+                mem.slice[0].basecolor_roughness = drawable.basecolor_roughness;
+
+                pass.setBindGroup(1, bind_group, &.{mem.offset});
+
+                // Draw.
+                pass.drawIndexed(
+                    demo.meshes.items[drawable.mesh_index].num_indices,
+                    1,
+                    demo.meshes.items[drawable.mesh_index].index_offset,
+                    demo.meshes.items[drawable.mesh_index].vertex_offset,
+                    0,
+                );
+            }
+        }
+
+        // Gui pass.
+        {
+            const color_attachments = [_]wgpu.RenderPassColorAttachment{.{
+                .view = back_buffer_view,
+                .load_op = .load,
+                .store_op = .store,
+            }};
+            const render_pass_info = wgpu.RenderPassDescriptor{
+                .color_attachment_count = color_attachments.len,
+                .color_attachments = &color_attachments,
+            };
+            const pass = encoder.beginRenderPass(render_pass_info);
+            defer {
+                pass.end();
+                pass.release();
+            }
+
+            zgui.backend.draw(pass);
+        }
+
+        break :commands encoder.finish(null);
+    };
+    defer commands.release();
+
+    gctx.submit(&.{commands});
+
+    if (gctx.present() == .swap_chain_resized) {
+        // Release old depth texture.
+        gctx.releaseResource(demo.depth_texture_view);
+        gctx.destroyResource(demo.depth_texture);
+
+        // Create a new depth texture to match the new window size.
+        const depth = createDepthTexture(gctx);
+        demo.depth_texture = depth.texture;
+        demo.depth_texture_view = depth.view;
+    }
+    ztracy.FrameMark();
+}
+
+fn createDepthTexture(gctx: *zgpu.GraphicsContext) struct {
+    texture: zgpu.TextureHandle,
+    view: zgpu.TextureViewHandle,
+} {
+    const texture = gctx.createTexture(.{
+        .usage = .{ .render_attachment = true },
+        .dimension = .tdim_2d,
+        .size = .{
+            .width = gctx.swapchain_descriptor.width,
+            .height = gctx.swapchain_descriptor.height,
+            .depth_or_array_layers = 1,
+        },
+        .format = .depth32_float,
+        .mip_level_count = 1,
+        .sample_count = 1,
+    });
+    const view = gctx.createTextureView(texture, .{});
+    return .{ .texture = texture, .view = view };
+}
+
+pub fn main() !void {
     try zglfw.init();
     defer zglfw.terminate();
 
+    // Change current working directory to where the executable is located.
+    {
+        var buffer: [1024]u8 = undefined;
+        const path = std.fs.selfExeDirPath(buffer[0..]) catch ".";
+        std.posix.chdir(path) catch {};
+    }
+
     zglfw.windowHint(.client_api, .no_api);
 
-    const window = try zglfw.Window.create(600, 600, "zig-gamedev: minimal_glfw_wgpu", null);
+    const window = try zglfw.Window.create(1600, 1000, window_title, null);
     defer window.destroy();
+    window.setSizeLimits(400, 400, -1, -1);
 
-    zglfw.makeContextCurrent(window);
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
 
-    // zglfw.swapInterval(1);
+    const allocator = gpa.allocator();
 
-    var game = try Game.init(allocator, window);
-    // _ = gpu_state;
+    var game = try init(allocator, window);
+    defer deinit(allocator, &game);
 
-    game_backend.init(allocator);
+    const scale_factor = scale_factor: {
+        const scale = window.getContentScale();
+        break :scale_factor @max(scale[0], scale[1]);
+    };
 
-    var game_graph: ?game_backend.GameGraph.withFrontend(Game) = null;
-    while (!window.shouldClose()) {
+    zgui.init(allocator);
+    defer zgui.deinit();
+
+    const dir = content_dir ++ "Roboto-Medium.ttf";
+    std.debug.print("dir {s}\n", .{dir});
+    // _ = zgui.io.addFontFromFile(content_dir ++ "Roboto-Medium.ttf", math.floor(16.0 * scale_factor));
+
+    zgui.backend.init(
+        window,
+        game.gctx.device,
+        @intFromEnum(zgpu.GraphicsContext.swapchain_format),
+        @intFromEnum(wgpu.TextureFormat.undef),
+    );
+    defer zgui.backend.deinit();
+
+    zgui.getStyle().scaleAllSizes(scale_factor);
+
+    while (!window.shouldClose() and window.getKey(.escape) != .press) {
         zglfw.pollEvents();
-
-        { // IMGUI update
-            zgui.backend.newFrame(
-                game.gctx.swapchain_descriptor.width,
-                game.gctx.swapchain_descriptor.height,
-            );
-            _ = zgui.begin("Pill", .{
-                .flags = .{
-                    // .no_title_bar = true,
-                    // .no_move = true,
-                    // .no_collapse = true,
-                    // .always_auto_resize = true,
-                },
-            });
-            defer zgui.end();
-
-            if (game_graph) |*graph| {
-                graph.update();
-            } else {
-                game_graph = .init(
-                    allocator,
-                    game,
-                    .{
-                        .orbit_camera = types.OrbitCamera{ .position = .{ 0, 0, 0, 1 }, .rotation = .{ 0, 0, 0, 1 }, .track_distance = 2 },
-                        .player = types.Player{ .position = .{ 0, 0, 0, 1 }, .euler_rotation = .{ 0, 0, 0, 0 } },
-                    },
-                );
-                game_graph.?.update();
-            }
-        }
-
-        { // Final Render
-            const gctx = game.gctx;
-
-            const back_buffer_view = gctx.swapchain.getCurrentTextureView();
-            defer back_buffer_view.release();
-
-            const commands = commands: {
-                const encoder = gctx.device.createCommandEncoder(null);
-                defer encoder.release();
-                {
-                    const color_attachments = [_]wgpu.RenderPassColorAttachment{.{
-                        .view = back_buffer_view,
-                        .load_op = .load,
-                        .store_op = .store,
-                    }};
-                    const render_pass_info = wgpu.RenderPassDescriptor{
-                        .color_attachment_count = color_attachments.len,
-                        .color_attachments = &color_attachments,
-                    };
-                    game.pass = encoder.beginRenderPass(render_pass_info);
-                    defer {
-                        game.pass.end();
-                        game.pass.release();
-                    }
-
-                    { // IMGUI update
-                        zgui.backend.newFrame(
-                            game.gctx.swapchain_descriptor.width,
-                            game.gctx.swapchain_descriptor.height,
-                        );
-                        _ = zgui.begin("Pill", .{});
-                        defer zgui.end();
-
-                        if (game_graph) |*graph| {
-                            graph.update();
-                        } else {
-                            game_graph = .init(
-                                allocator,
-                                game,
-                                .{
-                                    .orbit_camera = types.OrbitCamera{ .position = .{ 0, 0, 0, 1 }, .rotation = .{ 0, 0, 0, 1 }, .track_distance = 2 },
-                                    .player = types.Player{ .position = .{ 0, 0, 0, 1 }, .euler_rotation = .{ 0, 0, 0, 0 } },
-                                },
-                            );
-                            game_graph.?.update();
-                        }
-                    }
-
-                    zgui.backend.draw(game.pass);
-                }
-
-                break :commands encoder.finish(null);
-            };
-
-            gctx.submit(&.{commands});
-            if (gctx.present() == .swap_chain_resized) {
-                gctx.releaseResource(game.depth.view);
-                gctx.destroyResource(game.depth.texture);
-                game.dimensions = Game.calculateDimensions(gctx);
-                game.depth = Game.createDepthTexture(gctx);
-            }
-        }
-        window.swapBuffers();
+        update(&game);
+        draw(&game);
     }
 }

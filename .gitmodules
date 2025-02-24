@@ -19,3 +19,12 @@
 [submodule "libs/zpool"]
 	path = libs/zpool
 	url = https://github.com/zig-gamedev/zpool.git
+[submodule "libs/zmesh"]
+	path = libs/zmesh
+	url = https://github.com/zig-gamedev/zmesh.git
+[submodule "libs/ztracy"]
+	path = libs/ztracy
+	url = https://github.com/zig-gamedev/ztracy.git
+[submodule "libs/znoise"]
+	path = libs/znoise
+	url = https://github.com/zig-gamedev/znoise.git

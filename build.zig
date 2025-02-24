@@ -92,6 +92,9 @@ pub fn build(
 
     const zglfw = b.dependency("zglfw", .{ .target = target, .x11 = false });
     const zgpu = b.dependency("zgpu", .{ .target = target });
+    const zmesh = b.dependency("zmesh", .{ .target = target });
+    const ztracy = b.dependency("ztracy", .{ .target = target });
+    const znoise = b.dependency("znoise", .{ .target = target });
     const zgui = b.dependency("zgui", .{ .target = target, .backend = .glfw_wgpu });
     const zbullet = b.dependency("zbullet", .{});
     const zmath = b.dependency("zmath", .{});
@@ -162,6 +165,9 @@ pub fn build(
             elem.root_module.addImport("zglfw", zglfw.module("root"));
             elem.root_module.addImport("zgpu", zgpu.module("root"));
             elem.root_module.addImport("zgui", zgui.module("root"));
+            elem.root_module.addImport("zmesh", zmesh.module("root"));
+            elem.root_module.addImport("ztracy", ztracy.module("root"));
+            elem.root_module.addImport("znoise", znoise.module("root"));
 
             const elem_options = b.addOptions();
             elem.root_module.addOptions("build_options", elem_options);
@@ -176,6 +182,8 @@ pub fn build(
             exe.linkLibrary(zgpu.artifact("zdawn"));
             exe.linkLibrary(zgui.artifact("imgui"));
             exe.linkLibrary(zbullet.artifact("cbullet"));
+            exe.linkLibrary(zmesh.artifact("zmesh"));
+            exe.linkLibrary(znoise.artifact("FastNoiseLite"));
         }
 
         const check_step = b.step("check", "Just compile, don't emit an executable (llvm)");
