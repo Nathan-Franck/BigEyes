@@ -21,7 +21,7 @@ pub const vs = common ++
 \\  struct Instance {
 \\      @location(10) position: vec3<f32>,
 \\      @location(11) rotation: vec4<f32>,
-\\      @location(12) scale: vec3<f32>,
+\\      @location(12) scale: f32,
 \\      @location(13) basecolor_roughness: vec4<f32>,
 \\  }
 \\  struct VertexOut {
@@ -47,15 +47,15 @@ pub const vs = common ++
 \\        2.0 * (x * z - w * y), 2.0 * (y * z + w * x), 1.0 - 2.0 * (x * x + y * y)
 \\    );
 \\    var scaledRotation: mat3x3<f32> = mat3x3(
-\\        rotationMatrix[0] * i.scale.x,
-\\        rotationMatrix[1] * i.scale.y,
-\\        rotationMatrix[2] * i.scale.z
+\\        rotationMatrix[0] * i.scale,
+\\        rotationMatrix[1] * i.scale,
+\\        rotationMatrix[2] * i.scale
 \\    );
 \\    var transform: mat4x4<f32> = mat4x4(
-\\        vec4(scaledRotation[0], 0.0),
-\\        vec4(scaledRotation[1], 0.0),
-\\        vec4(scaledRotation[2], 0.0),
-\\        vec4(i.position, 1.0),
+\\        vec4(scaledRotation[0], i.position.x),
+\\        vec4(scaledRotation[1], i.position.y),
+\\        vec4(scaledRotation[2], i.position.z),
+\\        vec4(0.0, 0.0, 0.0, 1.0),
 \\    );
 \\    return transform;
 \\ }
@@ -64,12 +64,7 @@ pub const vs = common ++
 \\      instance: Instance,
 \\  ) -> VertexOut {
 \\      var output: VertexOut;
-\\      let transform = mat4x4(
-\\          1.0, 0.0, 0.0, instance.position.x,
-\\          0.0, 1.0, 0.0, instance.position.y,
-\\          0.0, 0.0, 1.0, instance.position.z,
-\\          0.0, 0.0, 0.0, 1.0,
-\\      );
+\\      let transform = matrix_from_instance(instance);
 \\      output.position_clip = vec4(vertex.position, 1.0) * transform * frame_uniforms.world_to_clip;
 \\      output.position = (vec4(vertex.position, 1.0) * transform).xyz;
 \\      output.normal = vertex.normal * mat3x3(
@@ -204,7 +199,7 @@ const Vertex = struct {
 const Instance = struct {
     position: [3]f32,
     rotation: [4]f32,
-    scale: [3]f32,
+    scale: f32,
     basecolor_roughness: [4]f32,
 };
 
@@ -546,7 +541,7 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !GameState {
             .offset = @offsetOf(Instance, "rotation"),
             .shader_location = 11,
         }, .{
-            .format = .float32x3,
+            .format = .float32,
             .offset = @offsetOf(Instance, "scale"),
             .shader_location = 12,
         }, .{
@@ -641,7 +636,7 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !GameState {
         try instances.append(.{
             .position = drawable.position,
             .rotation = .{ 0, 0, 0, 1 },
-            .scale = .{ 1, 1, 1 },
+            .scale = 1,
             .basecolor_roughness = drawable.basecolor_roughness,
         });
     }
