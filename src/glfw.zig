@@ -634,11 +634,20 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !GameState {
     });
     gctx.queue.writeBuffer(gctx.lookupResource(index_buffer).?, 0, IndexType, meshes_indices.items);
 
-    const instances = 1; // TODO - instancing for many things, not just one!
+    var instances = std.ArrayList(Instance).init(allocator);
+    for (drawables.items) |drawable| {
+        try instances.append(.{
+            .position = drawable.position,
+            .rotation = .{ 0, 0, 0, 1 },
+            .scale = .{ 1, 1, 1 },
+            .basecolor_roughness = drawable.basecolor_roughness,
+        });
+    }
     const instance_buffer = gctx.createBuffer(.{
         .usage = .{ .copy_dst = true, .vertex = true },
-        .size = instances * @sizeOf(Instance),
+        .size = instances.items.len * @sizeOf(Instance),
     });
+    gctx.queue.writeBuffer(gctx.lookupResource(instance_buffer).?, 0, Instance, instances.items);
 
     // Create a depth texture and its 'view'.
     const depth = createDepthTexture(gctx);
@@ -804,17 +813,11 @@ fn draw(game: *GameState) void {
             }
 
             for (game.drawables.items) |drawable| {
-                gctx.queue.writeBuffer(gctx.lookupResource(game.instance_buffer).?, 0, Instance, &.{Instance{
-                    .position = drawable.position,
-                    .rotation = undefined,
-                    .scale = undefined,
-                    .basecolor_roughness = undefined,
-                }});
 
                 // Draw.
                 pass.drawIndexed(
                     game.meshes.items[drawable.mesh_index].num_indices,
-                    1,
+                    drawable.mesh_index,
                     game.meshes.items[drawable.mesh_index].index_offset,
                     game.meshes.items[drawable.mesh_index].vertex_offset,
                     0,
