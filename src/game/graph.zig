@@ -1,16 +1,15 @@
 const std = @import("std");
-const Runtime = @import("node_graph").new_runtime.Runtime;
-const DirtyableFields = @import("node_graph").new_runtime.DirtyableFields;
-const GraphStore = @import("node_graph").new_runtime.GraphStore;
-const GraphOutputs = @import("node_graph").new_runtime.GraphOutputs;
-const GraphInputs = @import("node_graph").new_runtime.GraphInputs;
+const DirtyableFields = @import("node_graph").runtime.DirtyableFields;
+const GraphStore = @import("node_graph").runtime.GraphStore;
+const GraphOutputs = @import("node_graph").runtime.GraphOutputs;
+const GraphInputs = @import("node_graph").runtime.GraphInputs;
 const types = @import("utils").types;
 const config = @import("resources").config;
 const zmath = @import("zmath");
 const game = @import("../game.zig");
 const graph_nodes = game.graph_nodes;
 
-pub const GameGraph = Runtime.build(struct {
+const Runtime = @import("node_graph").Runtime(struct {
     pub const Store = struct {
         orbit_camera: types.OrbitCamera,
         player: types.Player,
@@ -34,12 +33,14 @@ pub const GameGraph = Runtime.build(struct {
         terrain_instance: types.ModelInstances,
         world_matrix: zmath.Mat,
     };
+});
+
+pub const GameGraph = Runtime.build(struct {
     pub fn update(
         rt: *Runtime,
-        inputs: GraphInputs(Inputs),
-        outputs: GraphOutputs(Outputs),
-        store: GraphStore(Store),
-    ) GraphStore(Store) {
+        frontend: anytype,
+        store: Runtime.Store,
+    ) Runtime.Store {
         // This stuff could exist outside of this graph probably, since it doesn't take any inputs,
         // but because it's here, means that I could change my mind later!
         // TODO - Make resources load pngs and .blend.json files from disk instead of embedding, to help compile times!
@@ -49,14 +50,14 @@ pub const GameGraph = Runtime.build(struct {
             .cutout_leaf = get_resources.cutout_leaf,
             .trees = get_resources.trees,
         });
-        outputs.submit(.{
+        frontend.submit(.{
             .skybox = get_resources.skybox,
         });
 
         // Behold - all the things the game loop can do BEFORE user input, that we can compute without needing to know what the user will do!
         // Terrain things below!
         const calculate_terrain_density_influence_range = rt.node(@src(), graph_nodes.calculateTerrainDensityInfluenceRange, .{
-            .size_multiplier = inputs.poll(.size_multiplier),
+            .size_multiplier = frontend.poll(.size_multiplier),
         });
         const display_forest = rt.node(@src(), graph_nodes.displayForest, .{
             .terrain_sampler = calculate_terrain_density_influence_range.terrain_sampler,
@@ -66,7 +67,7 @@ pub const GameGraph = Runtime.build(struct {
         });
         // Animated things below!
         const timing = rt.node(@src(), graph_nodes.timing, .{
-            .time = inputs.poll(.time),
+            .time = frontend.poll(.time),
         });
         const animate_meshes = rt.node(@src(), graph_nodes.animateMeshes, .{
             .models = get_resources.models,
@@ -76,9 +77,9 @@ pub const GameGraph = Runtime.build(struct {
             .terrain_sampler = calculate_terrain_density_influence_range.terrain_sampler,
             .seconds_since_start = timing.seconds_since_start,
             .model_transforms = get_resources.model_transforms,
-            .bounce = inputs.poll(.bounce),
+            .bounce = frontend.poll(.bounce),
         });
-        outputs.submit(.{
+        frontend.submit(.{
             .terrain_mesh = display_terrain.terrain_mesh,
             .terrain_instance = display_terrain.terrain_instance,
             .models = .{
@@ -101,12 +102,12 @@ pub const GameGraph = Runtime.build(struct {
         // Polling user input! (We can do it late, which should lead to lower latency!)
         const orbit = rt.node(@src(), graph_nodes.orbit, .{
             .delta_time = timing.delta_time,
-            .render_resolution = inputs.poll(.render_resolution),
-            .orbit_speed = inputs.poll(.orbit_speed),
-            .input = inputs.poll(.input),
+            .render_resolution = frontend.poll(.render_resolution),
+            .orbit_speed = frontend.poll(.orbit_speed),
+            .input = frontend.poll(.input),
             .orbit_camera = store.orbit_camera,
-            .selected_camera = inputs.poll(.selected_camera),
-            .player_settings = inputs.poll(.player_settings),
+            .selected_camera = frontend.poll(.selected_camera),
+            .player_settings = frontend.poll(.player_settings),
             .player = store.player,
             .terrain_sampler = calculate_terrain_density_influence_range.terrain_sampler,
         });
@@ -115,7 +116,7 @@ pub const GameGraph = Runtime.build(struct {
             .camera_position = orbit.camera_position,
             .world_matrix = orbit.world_matrix,
         });
-        outputs.submit(.{
+        frontend.submit(.{
             .world_matrix = orbit.world_matrix,
             .screen_space_mesh = get_screenspace_mesh.screen_space_mesh,
         });
