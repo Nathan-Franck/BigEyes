@@ -11,12 +11,6 @@ const ztracy = @import("ztracy");
 const wgsl = struct {
     // zig fmt: off
 const common =
-\\  struct DrawUniforms {
-\\      object_to_world: mat4x4<f32>,
-\\      basecolor_roughness: vec4<f32>,
-\\  }
-\\  @group(1) @binding(0) var<uniform> draw_uniforms: DrawUniforms;
-\\
 \\  struct FrameUniforms {
 \\      world_to_clip: mat4x4<f32>,
 \\      camera_position: vec3<f32>,
@@ -24,27 +18,66 @@ const common =
 \\  @group(0) @binding(0) var<uniform> frame_uniforms: FrameUniforms;
 ;
 pub const vs = common ++
+\\  struct Instance {
+\\      @location(10) position: vec3<f32>,
+\\      @location(11) rotation: vec4<f32>,
+\\      @location(12) scale: vec3<f32>,
+\\      @location(13) basecolor_roughness: vec4<f32>,
+\\  }
 \\  struct VertexOut {
 \\      @builtin(position) position_clip: vec4<f32>,
 \\      @location(0) position: vec3<f32>,
 \\      @location(1) normal: vec3<f32>,
 \\      @location(2) barycentrics: vec3<f32>,
+\\      @location(3) basecolor_roughness: vec4<f32>,
 \\  }
-\\  @vertex fn main(
+\\  struct Vertex {
 \\      @location(0) position: vec3<f32>,
 \\      @location(1) normal: vec3<f32>,
-\\      @builtin(vertex_index) vertex_index: u32,
+\\      @builtin(vertex_index) index: u32,
+\\  }
+\\ fn matrix_from_instance(i: Instance) -> mat4x4<f32> {
+\\    // Convert quaternion to rotation matrix
+\\    var x: f32 = i.rotation.x;
+\\    var y: f32 = i.rotation.y;
+\\    var z: f32 = i.rotation.z;
+\\    var w: f32 = i.rotation.w;
+\\    var rotationMatrix: mat3x3<f32> = mat3x3(
+\\        1.0 - 2.0 * (y * y + z * z), 2.0 * (x * y - w * z), 2.0 * (x * z + w * y),
+\\        2.0 * (x * y + w * z), 1.0 - 2.0 * (x * x + z * z), 2.0 * (y * z - w * x),
+\\        2.0 * (x * z - w * y), 2.0 * (y * z + w * x), 1.0 - 2.0 * (x * x + y * y)
+\\    );
+\\    // Scale the rotation matrix
+\\    var scaledRotation: mat3x3<f32> = mat3x3(
+\\        rotationMatrix[0] * i.scale.x,
+\\        rotationMatrix[1] * i.scale.y,
+\\        rotationMatrix[2] * i.scale.z
+\\    );
+\\    // Expand scaledRotation into a mat4
+\\    var transform: mat4x4<f32> = mat4x4(
+\\        vec4(scaledRotation[0], 0.0),
+\\        vec4(scaledRotation[1], 0.0),
+\\        vec4(scaledRotation[2], 0.0),
+\\        vec4(i.position, 1.0),
+\\    );
+\\    return transform;
+\\ }
+\\  @vertex fn main(
+\\      vertex: Vertex,
+\\      instance: Instance,
 \\  ) -> VertexOut {
 \\      var output: VertexOut;
-\\      output.position_clip = vec4(position, 1.0) * draw_uniforms.object_to_world * frame_uniforms.world_to_clip;
-\\      output.position = (vec4(position, 1.0) * draw_uniforms.object_to_world).xyz;
-\\      output.normal = normal * mat3x3(
-\\          draw_uniforms.object_to_world[0].xyz,
-\\          draw_uniforms.object_to_world[1].xyz,
-\\          draw_uniforms.object_to_world[2].xyz,
+\\      let transform = matrix_from_instance(instance);
+\\      output.position_clip = vec4(vertex.position, 1.0) * transform * frame_uniforms.world_to_clip;
+\\      output.position = (vec4(vertex.position, 1.0) * transform).xyz;
+\\      output.normal = vertex.normal * mat3x3(
+\\          transform[0].xyz,
+\\          transform[1].xyz,
+\\          transform[2].xyz,
 \\      );
-\\      let index = vertex_index % 3u;
+\\      let index = vertex.index % 3u;
 \\      output.barycentrics = vec3(f32(index == 0u), f32(index == 1u), f32(index == 2u));
+\\      output.basecolor_roughness = instance.basecolor_roughness;
 \\      return output;
 \\  }
 ;
@@ -79,13 +112,14 @@ pub const fs = common ++
 \\      @location(0) position: vec3<f32>,
 \\      @location(1) normal: vec3<f32>,
 \\      @location(2) barycentrics: vec3<f32>,
+\\      @location(3) basecolor_roughness: vec4<f32>,
 \\  ) -> @location(0) vec4<f32> {
 \\      let v = normalize(frame_uniforms.camera_position - position);
 \\      let n = normalize(normal);
 \\
-\\      let base_color = draw_uniforms.basecolor_roughness.xyz;
+\\      let base_color = basecolor_roughness.xyz;
 \\      let ao = 1.0;
-\\      var roughness = draw_uniforms.basecolor_roughness.a;
+\\      var roughness = basecolor_roughness.a;
 \\      var metallic: f32;
 \\      if (roughness < 0.0) { metallic = 1.0; } else { metallic = 0.0; }
 \\      roughness = abs(roughness);
@@ -165,14 +199,16 @@ const Vertex = struct {
     normal: [3]f32,
 };
 
+const Instance = struct {
+    position: [3]f32,
+    rotation: [4]f32,
+    scale: [3]f32,
+    basecolor_roughness: [4]f32,
+};
+
 const FrameUniforms = struct {
     world_to_clip: zm.Mat,
     camera_position: [3]f32,
-};
-
-const DrawUniforms = struct {
-    object_to_world: zm.Mat,
-    basecolor_roughness: [4]f32,
 };
 
 const Mesh = struct {
@@ -197,6 +233,7 @@ const GameState = struct {
 
     vertex_buffer: zgpu.BufferHandle,
     index_buffer: zgpu.BufferHandle,
+    instance_buffer: zgpu.BufferHandle,
 
     depth_texture: zgpu.TextureHandle,
     depth_texture_view: zgpu.TextureViewHandle,
@@ -475,10 +512,7 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !GameState {
     });
     defer gctx.releaseResource(bind_group_layout);
 
-    const pipeline_layout = gctx.createPipelineLayout(&.{
-        bind_group_layout,
-        bind_group_layout,
-    });
+    const pipeline_layout = gctx.createPipelineLayout(&.{bind_group_layout});
     defer gctx.releaseResource(pipeline_layout);
 
     const pipeline = pipeline: {
@@ -492,15 +526,42 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !GameState {
             .format = zgpu.GraphicsContext.swapchain_format,
         }};
 
-        const vertex_attributes = [_]wgpu.VertexAttribute{
-            .{ .format = .float32x3, .offset = 0, .shader_location = 0 },
-            .{ .format = .float32x3, .offset = @offsetOf(Vertex, "normal"), .shader_location = 1 },
-        };
-        const vertex_buffers = [_]wgpu.VertexBufferLayout{.{
+        const vertex_attributes = [_]wgpu.VertexAttribute{ .{
+            .format = .float32x3,
+            .offset = @offsetOf(Vertex, "position"),
+            .shader_location = 0,
+        }, .{
+            .format = .float32x3,
+            .offset = @offsetOf(Vertex, "normal"),
+            .shader_location = 1,
+        } };
+        const instance_attributes = [_]wgpu.VertexAttribute{ .{
+            .format = .float32x3,
+            .offset = @offsetOf(Instance, "position"),
+            .shader_location = 10,
+        }, .{
+            .format = .float32x4,
+            .offset = @offsetOf(Instance, "rotation"),
+            .shader_location = 11,
+        }, .{
+            .format = .float32x3,
+            .offset = @offsetOf(Instance, "scale"),
+            .shader_location = 12,
+        }, .{
+            .format = .float32x4,
+            .offset = @offsetOf(Instance, "basecolor_roughness"),
+            .shader_location = 13,
+        } };
+        const vertex_buffers = [_]wgpu.VertexBufferLayout{ .{
             .array_stride = @sizeOf(Vertex),
             .attribute_count = vertex_attributes.len,
             .attributes = &vertex_attributes,
-        }};
+        }, .{
+            .array_stride = @sizeOf(Instance),
+            .step_mode = .instance,
+            .attribute_count = instance_attributes.len,
+            .attributes = &instance_attributes,
+        } };
 
         // Create a render pipeline.
         const pipeline_descriptor = wgpu.RenderPipelineDescriptor{
@@ -535,7 +596,7 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !GameState {
             .binding = 0,
             .buffer_handle = gctx.uniforms.buffer,
             .offset = 0,
-            .size = @max(@sizeOf(FrameUniforms), @sizeOf(DrawUniforms)),
+            .size = @sizeOf(FrameUniforms),
         },
     });
 
@@ -573,6 +634,12 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !GameState {
     });
     gctx.queue.writeBuffer(gctx.lookupResource(index_buffer).?, 0, IndexType, meshes_indices.items);
 
+    const instances = 1; // TODO - instancing for many things, not just one!
+    const instance_buffer = gctx.createBuffer(.{
+        .usage = .{ .copy_dst = true, .vertex = true },
+        .size = instances * @sizeOf(Instance),
+    });
+
     // Create a depth texture and its 'view'.
     const depth = createDepthTexture(gctx);
 
@@ -583,6 +650,7 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !GameState {
         .bind_group = bind_group,
         .vertex_buffer = vertex_buffer,
         .index_buffer = index_buffer,
+        .instance_buffer = instance_buffer,
         .depth_texture = depth.texture,
         .depth_texture_view = depth.view,
         .meshes = meshes,
@@ -590,63 +658,63 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !GameState {
     };
 }
 
-fn deinit(allocator: std.mem.Allocator, demo: *GameState) void {
-    demo.meshes.deinit();
-    demo.drawables.deinit();
-    demo.gctx.destroy(allocator);
-    demo.* = undefined;
+fn deinit(allocator: std.mem.Allocator, game: *GameState) void {
+    game.meshes.deinit();
+    game.drawables.deinit();
+    game.gctx.destroy(allocator);
+    game.* = undefined;
 }
 
-fn update(demo: *GameState) void {
+fn update(game: *GameState) void {
     zgui.backend.newFrame(
-        demo.gctx.swapchain_descriptor.width,
-        demo.gctx.swapchain_descriptor.height,
+        game.gctx.swapchain_descriptor.width,
+        game.gctx.swapchain_descriptor.height,
     );
 
     zgui.setNextWindowPos(.{ .x = 20.0, .y = 20.0, .cond = .always });
     zgui.setNextWindowSize(.{ .w = -1.0, .h = -1.0, .cond = .always });
 
-    if (zgui.begin("Demo Settings", .{ .flags = .{ .no_move = true, .no_resize = true } })) {
+    if (zgui.begin("Game Settings", .{ .flags = .{ .no_move = true, .no_resize = true } })) {
         zgui.bulletText(
             "Average : {d:.3} ms/frame ({d:.1} fps)",
-            .{ demo.gctx.stats.average_cpu_time, demo.gctx.stats.fps },
+            .{ game.gctx.stats.average_cpu_time, game.gctx.stats.fps },
         );
         zgui.bulletText("RMB + drag : rotate camera", .{});
         zgui.bulletText("W, A, S, D : move camera", .{});
     }
     zgui.end();
 
-    const window = demo.window;
+    const window = game.window;
 
     // Handle camera rotation with mouse.
     {
         const cursor_pos = window.getCursorPos();
-        const delta_x = @as(f32, @floatCast(cursor_pos[0] - demo.mouse.cursor_pos[0]));
-        const delta_y = @as(f32, @floatCast(cursor_pos[1] - demo.mouse.cursor_pos[1]));
-        demo.mouse.cursor_pos = cursor_pos;
+        const delta_x = @as(f32, @floatCast(cursor_pos[0] - game.mouse.cursor_pos[0]));
+        const delta_y = @as(f32, @floatCast(cursor_pos[1] - game.mouse.cursor_pos[1]));
+        game.mouse.cursor_pos = cursor_pos;
 
         if (window.getMouseButton(.right) == .press) {
-            demo.camera.pitch += 0.0025 * delta_y;
-            demo.camera.yaw += 0.0025 * delta_x;
-            demo.camera.pitch = @min(demo.camera.pitch, 0.48 * math.pi);
-            demo.camera.pitch = @max(demo.camera.pitch, -0.48 * math.pi);
-            demo.camera.yaw = zm.modAngle(demo.camera.yaw);
+            game.camera.pitch += 0.0025 * delta_y;
+            game.camera.yaw += 0.0025 * delta_x;
+            game.camera.pitch = @min(game.camera.pitch, 0.48 * math.pi);
+            game.camera.pitch = @max(game.camera.pitch, -0.48 * math.pi);
+            game.camera.yaw = zm.modAngle(game.camera.yaw);
         }
     }
 
     // Handle camera movement with 'WASD' keys.
     {
         const speed = zm.f32x4s(2.0);
-        const delta_time = zm.f32x4s(demo.gctx.stats.delta_time);
-        const transform = zm.mul(zm.rotationX(demo.camera.pitch), zm.rotationY(demo.camera.yaw));
+        const delta_time = zm.f32x4s(game.gctx.stats.delta_time);
+        const transform = zm.mul(zm.rotationX(game.camera.pitch), zm.rotationY(game.camera.yaw));
         var forward = zm.normalize3(zm.mul(zm.f32x4(0.0, 0.0, 1.0, 0.0), transform));
 
-        zm.storeArr3(&demo.camera.forward, forward);
+        zm.storeArr3(&game.camera.forward, forward);
 
         const right = speed * delta_time * zm.normalize3(zm.cross3(zm.f32x4(0.0, 1.0, 0.0, 0.0), forward));
         forward = speed * delta_time * forward;
 
-        var cam_pos = zm.loadArr3(demo.camera.position);
+        var cam_pos = zm.loadArr3(game.camera.position);
 
         if (window.getKey(.w) == .press) {
             cam_pos += forward;
@@ -659,18 +727,18 @@ fn update(demo: *GameState) void {
             cam_pos -= right;
         }
 
-        zm.storeArr3(&demo.camera.position, cam_pos);
+        zm.storeArr3(&game.camera.position, cam_pos);
     }
 }
 
-fn draw(demo: *GameState) void {
-    const gctx = demo.gctx;
+fn draw(game: *GameState) void {
+    const gctx = game.gctx;
     const fb_width = gctx.swapchain_descriptor.width;
     const fb_height = gctx.swapchain_descriptor.height;
 
     const cam_world_to_view = zm.lookToLh(
-        zm.loadArr3(demo.camera.position),
-        zm.loadArr3(demo.camera.forward),
+        zm.loadArr3(game.camera.position),
+        zm.loadArr3(game.camera.forward),
         zm.f32x4(0.0, 1.0, 0.0, 0.0),
     );
     const cam_view_to_clip = zm.perspectiveFovLh(
@@ -690,11 +758,12 @@ fn draw(demo: *GameState) void {
 
         // Main pass.
         pass: {
-            const vb_info = gctx.lookupResourceInfo(demo.vertex_buffer) orelse break :pass;
-            const ib_info = gctx.lookupResourceInfo(demo.index_buffer) orelse break :pass;
-            const pipeline = gctx.lookupResource(demo.pipeline) orelse break :pass;
-            const bind_group = gctx.lookupResource(demo.bind_group) orelse break :pass;
-            const depth_view = gctx.lookupResource(demo.depth_texture_view) orelse break :pass;
+            const vb_info = gctx.lookupResourceInfo(game.vertex_buffer) orelse break :pass;
+            const itb_info = gctx.lookupResourceInfo(game.instance_buffer) orelse break :pass;
+            const ib_info = gctx.lookupResourceInfo(game.index_buffer) orelse break :pass;
+            const pipeline = gctx.lookupResource(game.pipeline) orelse break :pass;
+            const bind_group = gctx.lookupResource(game.bind_group) orelse break :pass;
+            const depth_view = gctx.lookupResource(game.depth_texture_view) orelse break :pass;
 
             const color_attachments = [_]wgpu.RenderPassColorAttachment{.{
                 .view = back_buffer_view,
@@ -719,12 +788,9 @@ fn draw(demo: *GameState) void {
             }
 
             pass.setVertexBuffer(0, vb_info.gpuobj.?, 0, vb_info.size);
-            pass.setIndexBuffer(
-                ib_info.gpuobj.?,
-                if (IndexType == u16) .uint16 else .uint32,
-                0,
-                ib_info.size,
-            );
+            pass.setVertexBuffer(1, itb_info.gpuobj.?, 0, itb_info.size);
+
+            pass.setIndexBuffer(ib_info.gpuobj.?, if (IndexType == u16) .uint16 else .uint32, 0, ib_info.size);
 
             pass.setPipeline(pipeline);
 
@@ -732,27 +798,25 @@ fn draw(demo: *GameState) void {
             {
                 const mem = gctx.uniformsAllocate(FrameUniforms, 1);
                 mem.slice[0].world_to_clip = zm.transpose(cam_world_to_clip);
-                mem.slice[0].camera_position = demo.camera.position;
+                mem.slice[0].camera_position = game.camera.position;
 
                 pass.setBindGroup(0, bind_group, &.{mem.offset});
             }
 
-            for (demo.drawables.items) |drawable| {
-                // Update "object to world" xform.
-                const object_to_world = zm.translationV(zm.loadArr3(drawable.position));
-
-                const mem = gctx.uniformsAllocate(DrawUniforms, 1);
-                mem.slice[0].object_to_world = zm.transpose(object_to_world);
-                mem.slice[0].basecolor_roughness = drawable.basecolor_roughness;
-
-                pass.setBindGroup(1, bind_group, &.{mem.offset});
+            for (game.drawables.items) |drawable| {
+                gctx.queue.writeBuffer(gctx.lookupResource(game.instance_buffer).?, 0, Instance, &.{Instance{
+                    .position = drawable.position,
+                    .rotation = undefined,
+                    .scale = undefined,
+                    .basecolor_roughness = undefined,
+                }});
 
                 // Draw.
                 pass.drawIndexed(
-                    demo.meshes.items[drawable.mesh_index].num_indices,
+                    game.meshes.items[drawable.mesh_index].num_indices,
                     1,
-                    demo.meshes.items[drawable.mesh_index].index_offset,
-                    demo.meshes.items[drawable.mesh_index].vertex_offset,
+                    game.meshes.items[drawable.mesh_index].index_offset,
+                    game.meshes.items[drawable.mesh_index].vertex_offset,
                     0,
                 );
             }
@@ -786,13 +850,13 @@ fn draw(demo: *GameState) void {
 
     if (gctx.present() == .swap_chain_resized) {
         // Release old depth texture.
-        gctx.releaseResource(demo.depth_texture_view);
-        gctx.destroyResource(demo.depth_texture);
+        gctx.releaseResource(game.depth_texture_view);
+        gctx.destroyResource(game.depth_texture);
 
         // Create a new depth texture to match the new window size.
         const depth = createDepthTexture(gctx);
-        demo.depth_texture = depth.texture;
-        demo.depth_texture_view = depth.view;
+        game.depth_texture = depth.texture;
+        game.depth_texture_view = depth.view;
     }
     ztracy.FrameMark();
 }
