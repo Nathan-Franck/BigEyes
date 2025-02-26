@@ -282,14 +282,14 @@ pub fn Runtime(graph_types: type) type {
 
                 pub fn withFrontend(Frontend: type) type {
                     return struct {
-                        frontend: Frontend,
+                        frontend: *Frontend,
                         inputs: Inputs,
                         store: Store,
                         runtime: RuntimeSelf,
 
                         pub fn init(
                             allocator: std.mem.Allocator,
-                            frontend: Frontend,
+                            frontend: *Frontend,
                             store: _Store,
                         ) @This() {
                             var result = @This(){
@@ -301,6 +301,7 @@ pub fn Runtime(graph_types: type) type {
                                     .node_states = std.StringHashMap(NodeState).init(allocator),
                                 },
                             };
+                            graph.init(allocator);
                             inline for (@typeInfo(Inputs).@"struct".fields, 0..) |field, i| {
                                 @field(result.inputs, field.name) = frontend.poll(@enumFromInt(i));
                             }

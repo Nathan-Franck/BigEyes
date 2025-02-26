@@ -7,7 +7,8 @@ const zgui = @import("zgui");
 const zm = @import("zmath");
 const zmesh = @import("zmesh");
 const znoise = @import("znoise");
-const ztracy = @import("ztracy");
+const runtime = @import("node_graph").Runtime;
+const GameGraph = @import("game").GameGraph;
 const wgsl = struct {
     // zig fmt: off
 const common =
@@ -247,6 +248,40 @@ const GameState = struct {
     mouse: struct {
         cursor_pos: [2]f64 = .{ 0, 0 },
     } = .{},
+
+    bounce: bool = false,
+    graph: ?GameGraph.withFrontend(@This()) = null,
+
+    // Provide inputs to the back-end from the user, disk and network.
+    pub fn poll(self: *@This(), comptime field_tag: GameGraph.InputTag) std.meta.fieldInfo(GameGraph.Inputs, field_tag).type {
+        return switch (field_tag) {
+            .time => 0,
+            .render_resolution => .{ .x = 0, .y = 0 },
+            .orbit_speed => 1,
+            .input => .{ .mouse_delta = .{ 0, 0, 0, 0 }, .movement = .{ .left = null, .right = null, .forward = null, .backward = null } },
+            .selected_camera => .orbit,
+            .player_settings => .{ .movement_speed = 0.01, .look_speed = 0.01 },
+            .bounce => zgui.checkbox("bounce", .{ .v = &self.bounce }),
+            .size_multiplier => 1,
+        };
+    }
+
+    // Recieve state changes back to the front-end to show to user.
+    pub fn submit(self: *@This(), comptime field_tag: GameGraph.OutputTag, value: std.meta.fieldInfo(GameGraph.Outputs, field_tag).type) void {
+        _ = self;
+        _ = value;
+        switch (field_tag) {
+            .world_matrix => {
+                // const mem = self.gctx.uniformsAllocate(struct { world_matrix: zm.Mat }, 1);
+                // mem.slice[0].world_matrix = value;
+
+                // const bind_group = self.gctx.lookupResource(self.bind_group) orelse @panic("ono");
+
+                // self.pass.setBindGroup(0, bind_group, &.{mem.offset});
+            },
+            else => {},
+        }
+    }
 };
 
 fn appendMesh(
@@ -276,9 +311,6 @@ fn initScene(
     meshes_positions: *std.ArrayList([3]f32),
     meshes_normals: *std.ArrayList([3]f32),
 ) void {
-    const tracy_zone = ztracy.ZoneNC(@src(), "initScene", 0x00_ff_00_00);
-    defer tracy_zone.End();
-
     var arena_state = std.heap.ArenaAllocator.init(allocator);
     defer arena_state.deinit();
     const arena = arena_state.allocator();
@@ -671,7 +703,7 @@ fn deinit(allocator: std.mem.Allocator, game: *GameState) void {
     game.* = undefined;
 }
 
-fn update(game: *GameState) void {
+fn update(allocator: std.mem.Allocator, game: *GameState) void {
     zgui.backend.newFrame(
         game.gctx.swapchain_descriptor.width,
         game.gctx.swapchain_descriptor.height,
@@ -680,7 +712,23 @@ fn update(game: *GameState) void {
     zgui.setNextWindowPos(.{ .x = 20.0, .y = 20.0, .cond = .always });
     zgui.setNextWindowSize(.{ .w = -1.0, .h = -1.0, .cond = .always });
 
-    if (zgui.begin("Game Settings", .{ .flags = .{ .no_move = true, .no_resize = true } })) {
+    if (game.graph) |*graph| {
+        graph.update();
+    } else {
+        game.graph = @TypeOf(game.graph.?).init(allocator, game, .{
+            .orbit_camera = .{
+                .position = .{ 0, 0, 0, 1 },
+                .rotation = .{ 0, 0, 0, 1 },
+                .track_distance = 1,
+            },
+            .player = .{
+                .position = .{ 0, 0, 0, 1 },
+                .euler_rotation = .{ 0, 0, 0, 0 },
+            },
+        });
+    }
+
+    if (zgui.begin("Gamer Settings", .{ .flags = .{ .no_move = true, .no_resize = true } })) {
         zgui.bulletText(
             "Average : {d:.3} ms/frame ({d:.1} fps)",
             .{ game.gctx.stats.average_cpu_time, game.gctx.stats.fps },
@@ -858,7 +906,6 @@ fn draw(game: *GameState) void {
         game.depth_texture = depth.texture;
         game.depth_texture_view = depth.view;
     }
-    ztracy.FrameMark();
 }
 
 fn createDepthTexture(gctx: *zgpu.GraphicsContext) struct {
@@ -930,7 +977,7 @@ pub fn main() !void {
 
     while (!window.shouldClose() and window.getKey(.escape) != .press) {
         zglfw.pollEvents();
-        update(&game);
+        update(allocator, &game);
         draw(&game);
     }
 }

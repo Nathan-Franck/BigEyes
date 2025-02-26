@@ -93,7 +93,6 @@ pub fn build(
     const zglfw = b.dependency("zglfw", .{ .target = target, .x11 = false });
     const zgpu = b.dependency("zgpu", .{ .target = target });
     const zmesh = b.dependency("zmesh", .{ .target = target });
-    const ztracy = b.dependency("ztracy", .{ .target = target });
     const znoise = b.dependency("znoise", .{ .target = target });
     const zgui = b.dependency("zgui", .{ .target = target, .backend = .glfw_wgpu });
     const zbullet = b.dependency("zbullet", .{});
@@ -166,7 +165,6 @@ pub fn build(
             elem.root_module.addImport("zgpu", zgpu.module("root"));
             elem.root_module.addImport("zgui", zgui.module("root"));
             elem.root_module.addImport("zmesh", zmesh.module("root"));
-            elem.root_module.addImport("ztracy", ztracy.module("root"));
             elem.root_module.addImport("znoise", znoise.module("root"));
 
             const elem_options = b.addOptions();

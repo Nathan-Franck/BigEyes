@@ -11,7 +11,6 @@
         .zgpu = .{ .path = "libs/zgpu" },
         .zgui = .{ .path = "libs/zgui" },
         .zmesh = .{ .path = "libs/zmesh" },
-        .ztracy = .{ .path = "libs/ztracy" },
         .znoise = .{ .path = "libs/znoise" },
         .dawn_x86_64_linux_gnu = .{
             .url = "https://github.com/michal-z/webgpu_dawn-x86_64-linux-gnu/archive/7d70db023bf254546024629cbec5ee6113e12a42.tar.gz",

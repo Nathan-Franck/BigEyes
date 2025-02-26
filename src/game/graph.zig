@@ -36,6 +36,9 @@ const Runtime = @import("node_graph").Runtime(struct {
 });
 
 pub const GameGraph = Runtime.build(struct {
+    pub fn init(allocator: std.mem.Allocator) void {
+        game.init(allocator);
+    }
     pub fn update(
         rt: *Runtime,
         frontend: anytype,
