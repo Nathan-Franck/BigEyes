@@ -84,24 +84,25 @@ pub const GameGraph = Runtime.build(struct {
             .model_transforms = get_resources.model_transforms,
             .bounce = frontend.poll(.bounce),
         });
+        _ = .{ animate_meshes, display_bike, display_trees, display_forest };
         frontend.submit(.{
             .terrain_mesh = display_terrain.terrain_mesh,
             .terrain_instance = display_terrain.terrain_instance,
-            .models = .{
-                .raw = std.mem.concat(rt.allocator, types.GameModel, &.{
-                    get_resources.models.raw,
-                    animate_meshes.models.raw,
-                    display_trees.models.raw,
-                }) catch unreachable,
-                .is_dirty = true,
-            },
-            .model_instances = .{
-                .raw = std.mem.concat(rt.allocator, types.ModelInstances, &.{
-                    display_forest.model_instances.raw,
-                    display_bike.model_instances.raw,
-                }) catch unreachable,
-                .is_dirty = true,
-            },
+            // .models = .{
+            //     .raw = std.mem.concat(rt.allocator, types.GameModel, &.{
+            //         get_resources.models.raw,
+            //         animate_meshes.models.raw,
+            //         display_trees.models.raw,
+            //     }) catch unreachable,
+            //     .is_dirty = true,
+            // },
+            // .model_instances = .{
+            //     .raw = std.mem.concat(rt.allocator, types.ModelInstances, &.{
+            //         display_forest.model_instances.raw,
+            //         display_bike.model_instances.raw,
+            //     }) catch unreachable,
+            //     .is_dirty = true,
+            // },
         });
 
         // Polling user input! (We can do it late, which should lead to lower latency!)

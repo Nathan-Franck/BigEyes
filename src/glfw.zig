@@ -243,7 +243,7 @@ const GameState = struct {
         cursor_pos: [2]f64 = .{ 0, 0 },
     } = .{},
 
-    cam_world_to_clip: zm.Mat = undefined,
+    world_matrix: zm.Mat = undefined,
     camera_position: zm.Vec = undefined,
 
     bounce: bool = false,
@@ -253,28 +253,27 @@ const GameState = struct {
     // Provide inputs to the back-end from the user, disk and network.
     pub fn poll(self: *@This(), comptime field_tag: GameGraph.InputTag) std.meta.fieldInfo(GameGraph.Inputs, field_tag).type {
         return switch (field_tag) {
-            .time => 0,
+            .time => 0, //@intCast(@divFloor(std.time.nanoTimestamp(), std.time.ns_per_ms)),
             .render_resolution => blk: {
                 const size = self.window.getSize();
                 break :blk .{ .x = @intCast(size[0]), .y = @intCast(size[1]) };
             },
-            .orbit_speed => 0.001,
+
             .input => blk: {
+                zglfw.pollEvents();
                 const cursor_pos = self.window.getCursorPos();
                 defer self.last_cursor_pos = cursor_pos;
 
                 break :blk .{
-                    .mouse_delta = .{
-                        @floatCast(cursor_pos[0] - self.last_cursor_pos[0]),
-                        @floatCast(cursor_pos[1] - self.last_cursor_pos[1]),
-                        0,
-                        0,
-                    },
+                    .mouse_delta = .{ @floatCast(cursor_pos[0] - self.last_cursor_pos[0]), @floatCast(cursor_pos[1] - self.last_cursor_pos[1]), 0, 0 },
                     .movement = .{ .left = null, .right = null, .forward = null, .backward = null },
                 };
             },
+
             .selected_camera => .orbit,
+            .orbit_speed => 0.01,
             .player_settings => .{ .movement_speed = 0.01, .look_speed = 0.001 },
+
             .bounce => zgui.checkbox("bounce", .{ .v = &self.bounce }),
             .size_multiplier => 1,
         };
@@ -283,12 +282,7 @@ const GameState = struct {
     // Recieve state changes back to the front-end to show to user.
     pub fn submit(self: *@This(), comptime field_tag: GameGraph.OutputTag, value: std.meta.fieldInfo(GameGraph.Outputs, field_tag).type) void {
         switch (field_tag) {
-            .world_matrix => {
-                self.cam_world_to_clip = value;
-            },
-            .camera_position => {
-                self.camera_position = value;
-            },
+            .world_matrix, .camera_position => @field(self, @tagName(field_tag)) = value,
             else => {},
         }
     }
@@ -538,7 +532,9 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !GameState {
             .fn_getWaylandSurface = @ptrCast(&zglfw.getWaylandWindow),
             .fn_getCocoaWindow = @ptrCast(&zglfw.getCocoaWindow),
         },
-        .{},
+        .{
+            .present_mode = .immediate,
+        },
     );
     errdefer gctx.destroy(allocator);
 
@@ -722,6 +718,7 @@ fn update(allocator: std.mem.Allocator, game: *GameState) void {
     zgui.setNextWindowPos(.{ .x = 20.0, .y = 20.0, .cond = .always });
     zgui.setNextWindowSize(.{ .w = -1.0, .h = -1.0, .cond = .always });
 
+    // _ = allocator;
     if (game.graph) |*graph| {
         graph.update();
     } else {
@@ -736,6 +733,7 @@ fn update(allocator: std.mem.Allocator, game: *GameState) void {
                 .euler_rotation = .{ 0, 0, 0, 0 },
             },
         });
+        game.graph.?.update();
     }
 
     if (zgui.begin("Gamer Settings", .{ .flags = .{ .no_move = true, .no_resize = true } })) {
@@ -800,7 +798,7 @@ fn draw(game: *GameState) void {
             // Update "world to clip" (camera) xform.
             {
                 const mem = gctx.uniformsAllocate(FrameUniforms, 1);
-                mem.slice[0].world_to_clip = zm.transpose(game.cam_world_to_clip);
+                mem.slice[0].world_to_clip = zm.transpose(game.world_matrix);
                 mem.slice[0].camera_position = @as([4]f32, @bitCast(game.camera_position))[0..3].*;
 
                 pass.setBindGroup(0, bind_group, &.{mem.offset});
