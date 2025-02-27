@@ -292,6 +292,7 @@ pub fn Runtime(graph_types: type) type {
                             frontend: *Frontend,
                             store: _Store,
                         ) @This() {
+                            graph.init(allocator);
                             var result = @This(){
                                 .frontend = frontend,
                                 .inputs = undefined,
@@ -301,7 +302,6 @@ pub fn Runtime(graph_types: type) type {
                                     .node_states = std.StringHashMap(NodeState).init(allocator),
                                 },
                             };
-                            graph.init(allocator);
                             inline for (@typeInfo(Inputs).@"struct".fields, 0..) |field, i| {
                                 @field(result.inputs, field.name) = frontend.poll(@enumFromInt(i));
                             }

@@ -32,6 +32,7 @@ const Runtime = @import("node_graph").Runtime(struct {
         terrain_mesh: types.GreyboxMesh,
         terrain_instance: types.ModelInstances,
         world_matrix: zmath.Mat,
+        camera_position: zmath.Vec,
     };
 });
 
@@ -44,6 +45,7 @@ pub const GameGraph = Runtime.build(struct {
         frontend: anytype,
         store: Runtime.Store,
     ) Runtime.Store {
+
         // This stuff could exist outside of this graph probably, since it doesn't take any inputs,
         // but because it's here, means that I could change my mind later!
         // TODO - Make resources load pngs and .blend.json files from disk instead of embedding, to help compile times!
@@ -121,12 +123,13 @@ pub const GameGraph = Runtime.build(struct {
         });
         frontend.submit(.{
             .world_matrix = orbit.world_matrix,
+            .camera_position = orbit.camera_position,
             .screen_space_mesh = get_screenspace_mesh.screen_space_mesh,
         });
 
         return .{
-            .orbit_camera = store.orbit_camera,
-            .player = store.player,
+            .orbit_camera = orbit.orbit_camera,
+            .player = orbit.player,
         };
     }
 });

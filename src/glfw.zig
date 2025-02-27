@@ -239,28 +239,42 @@ const GameState = struct {
     meshes: std.ArrayList(Mesh),
     drawables: std.ArrayList(Drawable),
 
-    camera: struct {
-        position: [3]f32 = .{ 0.0, 4.0, -4.0 },
-        forward: [3]f32 = .{ 0.0, 0.0, 1.0 },
-        pitch: f32 = 0.15 * math.pi,
-        yaw: f32 = 0.0,
-    } = .{},
     mouse: struct {
         cursor_pos: [2]f64 = .{ 0, 0 },
     } = .{},
 
+    cam_world_to_clip: zm.Mat = undefined,
+    camera_position: zm.Vec = undefined,
+
     bounce: bool = false,
     graph: ?GameGraph.withFrontend(@This()) = null,
+    last_cursor_pos: [2]f64 = .{ 0, 0 },
 
     // Provide inputs to the back-end from the user, disk and network.
     pub fn poll(self: *@This(), comptime field_tag: GameGraph.InputTag) std.meta.fieldInfo(GameGraph.Inputs, field_tag).type {
         return switch (field_tag) {
             .time => 0,
-            .render_resolution => .{ .x = 0, .y = 0 },
-            .orbit_speed => 1,
-            .input => .{ .mouse_delta = .{ 0, 0, 0, 0 }, .movement = .{ .left = null, .right = null, .forward = null, .backward = null } },
+            .render_resolution => blk: {
+                const size = self.window.getSize();
+                break :blk .{ .x = @intCast(size[0]), .y = @intCast(size[1]) };
+            },
+            .orbit_speed => 0.001,
+            .input => blk: {
+                const cursor_pos = self.window.getCursorPos();
+                defer self.last_cursor_pos = cursor_pos;
+
+                break :blk .{
+                    .mouse_delta = .{
+                        @floatCast(cursor_pos[0] - self.last_cursor_pos[0]),
+                        @floatCast(cursor_pos[1] - self.last_cursor_pos[1]),
+                        0,
+                        0,
+                    },
+                    .movement = .{ .left = null, .right = null, .forward = null, .backward = null },
+                };
+            },
             .selected_camera => .orbit,
-            .player_settings => .{ .movement_speed = 0.01, .look_speed = 0.01 },
+            .player_settings => .{ .movement_speed = 0.01, .look_speed = 0.001 },
             .bounce => zgui.checkbox("bounce", .{ .v = &self.bounce }),
             .size_multiplier => 1,
         };
@@ -268,16 +282,12 @@ const GameState = struct {
 
     // Recieve state changes back to the front-end to show to user.
     pub fn submit(self: *@This(), comptime field_tag: GameGraph.OutputTag, value: std.meta.fieldInfo(GameGraph.Outputs, field_tag).type) void {
-        _ = self;
-        _ = value;
         switch (field_tag) {
             .world_matrix => {
-                // const mem = self.gctx.uniformsAllocate(struct { world_matrix: zm.Mat }, 1);
-                // mem.slice[0].world_matrix = value;
-
-                // const bind_group = self.gctx.lookupResource(self.bind_group) orelse @panic("ono");
-
-                // self.pass.setBindGroup(0, bind_group, &.{mem.offset});
+                self.cam_world_to_clip = value;
+            },
+            .camera_position => {
+                self.camera_position = value;
             },
             else => {},
         }
@@ -737,71 +747,10 @@ fn update(allocator: std.mem.Allocator, game: *GameState) void {
         zgui.bulletText("W, A, S, D : move camera", .{});
     }
     zgui.end();
-
-    const window = game.window;
-
-    // Handle camera rotation with mouse.
-    {
-        const cursor_pos = window.getCursorPos();
-        const delta_x = @as(f32, @floatCast(cursor_pos[0] - game.mouse.cursor_pos[0]));
-        const delta_y = @as(f32, @floatCast(cursor_pos[1] - game.mouse.cursor_pos[1]));
-        game.mouse.cursor_pos = cursor_pos;
-
-        if (window.getMouseButton(.right) == .press) {
-            game.camera.pitch += 0.0025 * delta_y;
-            game.camera.yaw += 0.0025 * delta_x;
-            game.camera.pitch = @min(game.camera.pitch, 0.48 * math.pi);
-            game.camera.pitch = @max(game.camera.pitch, -0.48 * math.pi);
-            game.camera.yaw = zm.modAngle(game.camera.yaw);
-        }
-    }
-
-    // Handle camera movement with 'WASD' keys.
-    {
-        const speed = zm.f32x4s(2.0);
-        const delta_time = zm.f32x4s(game.gctx.stats.delta_time);
-        const transform = zm.mul(zm.rotationX(game.camera.pitch), zm.rotationY(game.camera.yaw));
-        var forward = zm.normalize3(zm.mul(zm.f32x4(0.0, 0.0, 1.0, 0.0), transform));
-
-        zm.storeArr3(&game.camera.forward, forward);
-
-        const right = speed * delta_time * zm.normalize3(zm.cross3(zm.f32x4(0.0, 1.0, 0.0, 0.0), forward));
-        forward = speed * delta_time * forward;
-
-        var cam_pos = zm.loadArr3(game.camera.position);
-
-        if (window.getKey(.w) == .press) {
-            cam_pos += forward;
-        } else if (window.getKey(.s) == .press) {
-            cam_pos -= forward;
-        }
-        if (window.getKey(.d) == .press) {
-            cam_pos += right;
-        } else if (window.getKey(.a) == .press) {
-            cam_pos -= right;
-        }
-
-        zm.storeArr3(&game.camera.position, cam_pos);
-    }
 }
 
 fn draw(game: *GameState) void {
     const gctx = game.gctx;
-    const fb_width = gctx.swapchain_descriptor.width;
-    const fb_height = gctx.swapchain_descriptor.height;
-
-    const cam_world_to_view = zm.lookToLh(
-        zm.loadArr3(game.camera.position),
-        zm.loadArr3(game.camera.forward),
-        zm.f32x4(0.0, 1.0, 0.0, 0.0),
-    );
-    const cam_view_to_clip = zm.perspectiveFovLh(
-        0.25 * math.pi,
-        @as(f32, @floatFromInt(fb_width)) / @as(f32, @floatFromInt(fb_height)),
-        0.01,
-        200.0,
-    );
-    const cam_world_to_clip = zm.mul(cam_world_to_view, cam_view_to_clip);
 
     const back_buffer_view = gctx.swapchain.getCurrentTextureView();
     defer back_buffer_view.release();
@@ -851,8 +800,8 @@ fn draw(game: *GameState) void {
             // Update "world to clip" (camera) xform.
             {
                 const mem = gctx.uniformsAllocate(FrameUniforms, 1);
-                mem.slice[0].world_to_clip = zm.transpose(cam_world_to_clip);
-                mem.slice[0].camera_position = game.camera.position;
+                mem.slice[0].world_to_clip = zm.transpose(game.cam_world_to_clip);
+                mem.slice[0].camera_position = @as([4]f32, @bitCast(game.camera_position))[0..3].*;
 
                 pass.setBindGroup(0, bind_group, &.{mem.offset});
             }
