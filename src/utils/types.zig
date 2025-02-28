@@ -16,10 +16,14 @@ pub const Point = @Vector(4, f32);
 pub const Face = []const u32;
 pub const Quad = [4]u32;
 
+pub const GreyboxVertex = struct {
+    position: [3]f32,
+    normal: [3]f32,
+};
+
 pub const GreyboxMesh = struct {
     indices: []const u32,
-    position: []const Vec4,
-    normal: []const Vec4,
+    vertices: []const GreyboxVertex,
 };
 
 pub const SubdivBoneMesh = struct {
@@ -102,11 +106,16 @@ pub const TreeMesh = struct {
     bark_mesh: tree.Mesh,
 };
 
+pub const Instance = struct {
+    position: [3]f32,
+    rotation: [4]f32,
+    scale: f32,
+    basecolor_roughness: [4]f32,
+};
+
 pub const ModelInstances = struct {
     label: []const u8,
-    positions: []const Vec4,
-    rotations: []const Vec4,
-    scales: []const Vec4,
+    instances: []const Instance,
 };
 
 pub const GameModel = struct {

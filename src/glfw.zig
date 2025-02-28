@@ -9,6 +9,7 @@ const zmesh = @import("zmesh");
 const znoise = @import("znoise");
 const runtime = @import("node_graph").Runtime;
 const GameGraph = @import("game").GameGraph;
+const types = @import("game").types;
 const wgsl = struct {
     // zig fmt: off
 const common =
@@ -190,19 +191,10 @@ pub const fs = common ++
 const content_dir = @import("build_options").content_dir;
 const window_title = "zig-gamedev: procedural mesh (wgpu)";
 
-const IndexType = zmesh.Shape.IndexType;
+const IndexType = u32;
 
-const Vertex = struct {
-    position: [3]f32,
-    normal: [3]f32,
-};
-
-const Instance = struct {
-    position: [3]f32,
-    rotation: [4]f32,
-    scale: f32,
-    basecolor_roughness: [4]f32,
-};
+const Vertex = types.GreyboxVertex;
+const Instance = types.Instance;
 
 const FrameUniforms = struct {
     world_to_clip: zm.Mat,
@@ -290,7 +282,42 @@ const GameState = struct {
         switch (field_tag) {
             .world_matrix, .camera_position => @field(self, @tagName(field_tag)) = value,
             .terrain_mesh => {
-                // std.debug.print("Wow a new terrain! {any}\n", .{value});
+                const gctx = self.gctx;
+                // Create a vertex buffer.
+                const vertex_buffer = gctx.createBuffer(.{
+                    .usage = .{ .copy_dst = true, .vertex = true },
+                    .size = value.vertices.len * @sizeOf(Vertex),
+                });
+                {
+                    gctx.queue.writeBuffer(gctx.lookupResource(vertex_buffer).?, 0, Vertex, value.vertices);
+                }
+
+                // Create an index buffer.
+                const index_buffer = gctx.createBuffer(.{
+                    .usage = .{ .copy_dst = true, .index = true },
+                    .size = value.indices.len * @sizeOf(IndexType),
+                });
+                gctx.queue.writeBuffer(gctx.lookupResource(index_buffer).?, 0, IndexType, value.indices);
+                const result = self.mesh_resources.getOrPut("terrain") catch unreachable;
+                const resources = result.value_ptr;
+                resources.num_indices = @intCast(value.indices.len);
+                resources.vertex_buffer = vertex_buffer;
+                resources.index_buffer = index_buffer;
+            },
+            .terrain_instance => {
+                const gctx = self.gctx;
+                // Create a vertex buffer.
+                const instance_buffer = gctx.createBuffer(.{
+                    .usage = .{ .copy_dst = true, .vertex = true },
+                    .size = 1 * @sizeOf(Instance),
+                });
+                {
+                    gctx.queue.writeBuffer(gctx.lookupResource(instance_buffer).?, 0, Instance, &.{value});
+                }
+                const result = self.mesh_resources.getOrPut("terrain") catch unreachable;
+                const resources = result.value_ptr;
+                resources.num_instances = 1;
+                resources.instance_buffer = instance_buffer;
             },
             else => {},
         }
@@ -801,12 +828,13 @@ fn draw(game: *GameState) void {
             while (mesh_resources.next()) |entry| {
                 const resource = entry.value_ptr;
                 const key = entry.key_ptr.*;
+
                 const vb_info = gctx.lookupResourceInfo(resource.vertex_buffer) orelse break :pass;
                 const itb_info = gctx.lookupResourceInfo(resource.instance_buffer) orelse break :pass;
                 const ib_info = gctx.lookupResourceInfo(resource.index_buffer) orelse break :pass;
+
                 pass.setVertexBuffer(0, vb_info.gpuobj.?, 0, vb_info.size);
                 pass.setVertexBuffer(1, itb_info.gpuobj.?, 0, itb_info.size);
-
                 pass.setIndexBuffer(ib_info.gpuobj.?, if (IndexType == u16) .uint16 else .uint32, 0, ib_info.size);
 
                 if (std.mem.eql(u8, key, "demo")) {

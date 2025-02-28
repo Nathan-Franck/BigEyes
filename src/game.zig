@@ -497,7 +497,7 @@ pub const graph_nodes = struct {
         },
     ) !struct {
         terrain_mesh: types.GreyboxMesh,
-        terrain_instance: types.ModelInstances,
+        terrain_instance: types.Instance,
     } {
         var terrain_chunk_cache = config.TerrainSpawner.ChunkCache.init(arena);
         try terrain_chunk_cache.ensureTotalCapacity(256);
@@ -550,17 +550,22 @@ pub const graph_nodes = struct {
         const indices = mesh_helper.Polygon(.Quad).toTriangleIndices(arena, quads);
         const normals = mesh_helper.Polygon(.Quad).calculateNormals(arena, positions, quads);
 
+        const vertices = try arena.alloc(types.GreyboxVertex, positions.len);
+        for (normals, positions, vertices) |normal, position, *vertex| {
+            zmath.storeArr3(&vertex.position, position);
+            zmath.storeArr3(&vertex.normal, normal);
+        }
+
         return .{
             .terrain_mesh = types.GreyboxMesh{
                 .indices = indices,
-                .position = positions,
-                .normal = normals,
+                .vertices = vertices,
             },
-            .terrain_instance = types.ModelInstances{
-                .label = "terrain",
-                .positions = try arena.dupe(Vec4, &.{.{ 0, 0, 0, 1 }}),
-                .rotations = try arena.dupe(Vec4, &.{zmath.qidentity()}),
-                .scales = try arena.dupe(Vec4, &.{.{ 1, 1, 1, 0 }}),
+            .terrain_instance = types.Instance{
+                .position = .{ 0, 0, 0 },
+                .rotation = zmath.qidentity(),
+                .scale = 1,
+                .basecolor_roughness = .{ 1, 1, 1, 1 },
             },
         };
     }
