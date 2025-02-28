@@ -222,6 +222,14 @@ const Drawable = struct {
     basecolor_roughness: [4]f32,
 };
 
+const MeshResources = struct {
+    num_indices: u32,
+    num_instances: u32,
+    vertex_buffer: zgpu.BufferHandle,
+    index_buffer: zgpu.BufferHandle,
+    instance_buffer: zgpu.BufferHandle,
+};
+
 const GameState = struct {
     window: *zglfw.Window,
     gctx: *zgpu.GraphicsContext,
@@ -229,16 +237,13 @@ const GameState = struct {
     pipeline: zgpu.RenderPipelineHandle,
     bind_group: zgpu.BindGroupHandle,
 
-    vertex_buffer: zgpu.BufferHandle,
-    index_buffer: zgpu.BufferHandle,
-    instance_buffer: zgpu.BufferHandle,
+    mesh_resources: std.StringHashMap(MeshResources),
 
     depth_texture: zgpu.TextureHandle,
     depth_texture_view: zgpu.TextureViewHandle,
 
     meshes: std.ArrayList(Mesh),
     drawables: std.ArrayList(Drawable),
-
     mouse: struct {
         cursor_pos: [2]f64 = .{ 0, 0 },
     } = .{},
@@ -284,6 +289,9 @@ const GameState = struct {
     pub fn submit(self: *@This(), comptime field_tag: GameGraph.OutputTag, value: std.meta.fieldInfo(GameGraph.Outputs, field_tag).type) void {
         switch (field_tag) {
             .world_matrix, .camera_position => @field(self, @tagName(field_tag)) = value,
+            .terrain_mesh => {
+                // std.debug.print("Wow a new terrain! {any}\n", .{value});
+            },
             else => {},
         }
     }
@@ -688,14 +696,22 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !GameState {
     // Create a depth texture and its 'view'.
     const depth = createDepthTexture(gctx);
 
+    var mesh_resources: std.StringHashMap(MeshResources) = .init(allocator);
+
+    try mesh_resources.put("demo", .{
+        .num_indices = @intCast(meshes_indices.items.len),
+        .num_instances = @intCast(drawables.items.len),
+        .vertex_buffer = vertex_buffer,
+        .index_buffer = index_buffer,
+        .instance_buffer = instance_buffer,
+    });
+
     return GameState{
         .window = window,
         .gctx = gctx,
         .pipeline = pipeline,
         .bind_group = bind_group,
-        .vertex_buffer = vertex_buffer,
-        .index_buffer = index_buffer,
-        .instance_buffer = instance_buffer,
+        .mesh_resources = mesh_resources,
         .depth_texture = depth.texture,
         .depth_texture_view = depth.view,
         .meshes = meshes,
@@ -744,9 +760,6 @@ fn draw(game: *GameState) void {
 
         // Main pass.
         pass: {
-            const vb_info = gctx.lookupResourceInfo(game.vertex_buffer) orelse break :pass;
-            const itb_info = gctx.lookupResourceInfo(game.instance_buffer) orelse break :pass;
-            const ib_info = gctx.lookupResourceInfo(game.index_buffer) orelse break :pass;
             const pipeline = gctx.lookupResource(game.pipeline) orelse break :pass;
             const bind_group = gctx.lookupResource(game.bind_group) orelse break :pass;
             const depth_view = gctx.lookupResource(game.depth_texture_view) orelse break :pass;
@@ -773,11 +786,6 @@ fn draw(game: *GameState) void {
                 pass.release();
             }
 
-            pass.setVertexBuffer(0, vb_info.gpuobj.?, 0, vb_info.size);
-            pass.setVertexBuffer(1, itb_info.gpuobj.?, 0, itb_info.size);
-
-            pass.setIndexBuffer(ib_info.gpuobj.?, if (IndexType == u16) .uint16 else .uint32, 0, ib_info.size);
-
             pass.setPipeline(pipeline);
 
             // Update "world to clip" (camera) xform.
@@ -789,16 +797,37 @@ fn draw(game: *GameState) void {
                 pass.setBindGroup(0, bind_group, &.{mem.offset});
             }
 
-            for (game.drawables.items) |drawable| {
+            var mesh_resources = game.mesh_resources.iterator();
+            while (mesh_resources.next()) |entry| {
+                const resource = entry.value_ptr;
+                const key = entry.key_ptr.*;
+                const vb_info = gctx.lookupResourceInfo(resource.vertex_buffer) orelse break :pass;
+                const itb_info = gctx.lookupResourceInfo(resource.instance_buffer) orelse break :pass;
+                const ib_info = gctx.lookupResourceInfo(resource.index_buffer) orelse break :pass;
+                pass.setVertexBuffer(0, vb_info.gpuobj.?, 0, vb_info.size);
+                pass.setVertexBuffer(1, itb_info.gpuobj.?, 0, itb_info.size);
 
-                // Draw.
-                pass.drawIndexed(
-                    game.meshes.items[drawable.mesh_index].num_indices,
-                    1,
-                    game.meshes.items[drawable.mesh_index].index_offset,
-                    game.meshes.items[drawable.mesh_index].vertex_offset,
-                    drawable.mesh_index,
-                );
+                pass.setIndexBuffer(ib_info.gpuobj.?, if (IndexType == u16) .uint16 else .uint32, 0, ib_info.size);
+
+                if (std.mem.eql(u8, key, "demo")) {
+                    for (game.drawables.items) |drawable| {
+                        pass.drawIndexed(
+                            game.meshes.items[drawable.mesh_index].num_indices,
+                            1,
+                            game.meshes.items[drawable.mesh_index].index_offset,
+                            game.meshes.items[drawable.mesh_index].vertex_offset,
+                            drawable.mesh_index,
+                        );
+                    }
+                } else {
+                    pass.drawIndexed(
+                        resource.num_indices,
+                        resource.num_instances,
+                        0,
+                        0,
+                        0,
+                    );
+                }
             }
         }
 
