@@ -131,7 +131,7 @@ fn PartialFields(t: type) type {
     } });
 }
 
-fn Dirtyable(T: type) type {
+pub fn Dirtyable(T: type) type {
     return struct {
         raw: T,
         is_dirty: bool,
@@ -168,6 +168,7 @@ pub fn Runtime(graph_types: type) type {
 
         pub const Store = GraphStore(_Store);
 
+        frame_arena: std.heap.ArenaAllocator,
         allocator: std.mem.Allocator,
         node_states: std.StringHashMap(NodeState),
 
@@ -299,6 +300,7 @@ pub fn Runtime(graph_types: type) type {
                                 .store = undefined,
                                 .runtime = .{
                                     .allocator = allocator,
+                                    .frame_arena = .init(allocator),
                                     .node_states = std.StringHashMap(NodeState).init(allocator),
                                 },
                             };
@@ -324,7 +326,7 @@ pub fn Runtime(graph_types: type) type {
                             };
                         }
 
-                        pub fn submit(
+                        pub fn submitDirty(
                             self: @This(),
                             partial_outputs: PartialFields(DirtyableFields(Outputs)),
                         ) void {
@@ -337,7 +339,19 @@ pub fn Runtime(graph_types: type) type {
                             }
                         }
 
+                        pub fn submit(
+                            self: @This(),
+                            partial_outputs: PartialFields(Outputs),
+                        ) void {
+                            inline for (@typeInfo(Outputs).@"struct".fields, 0..) |field, i| {
+                                if (@field(partial_outputs, field.name)) |out| {
+                                    self.frontend.submit(@enumFromInt(i), out);
+                                }
+                            }
+                        }
+
                         pub fn update(self: *@This()) void {
+                            _ = self.runtime.frame_arena.reset(.retain_capacity);
                             self.store = graph.update(&self.runtime, self, self.store);
                         }
                     };

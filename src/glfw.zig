@@ -243,17 +243,18 @@ const GameState = struct {
         cursor_pos: [2]f64 = .{ 0, 0 },
     } = .{},
 
+    graph: GameGraph.withFrontend(@This()) = undefined,
+
     world_matrix: zm.Mat = undefined,
     camera_position: zm.Vec = undefined,
 
     bounce: bool = false,
-    graph: ?GameGraph.withFrontend(@This()) = null,
     last_cursor_pos: [2]f64 = .{ 0, 0 },
 
     // Provide inputs to the back-end from the user, disk and network.
     pub fn poll(self: *@This(), comptime field_tag: GameGraph.InputTag) std.meta.fieldInfo(GameGraph.Inputs, field_tag).type {
         return switch (field_tag) {
-            .time => 0, //@intCast(@divFloor(std.time.nanoTimestamp(), std.time.ns_per_ms)),
+            .time => @intCast(@divFloor(std.time.nanoTimestamp(), std.time.ns_per_ms)),
             .render_resolution => blk: {
                 const size = self.window.getSize();
                 break :blk .{ .x = @intCast(size[0]), .y = @intCast(size[1]) };
@@ -709,32 +710,16 @@ fn deinit(allocator: std.mem.Allocator, game: *GameState) void {
     game.* = undefined;
 }
 
-fn update(allocator: std.mem.Allocator, game: *GameState) void {
+fn update(game: *GameState) void {
     zgui.backend.newFrame(
         game.gctx.swapchain_descriptor.width,
         game.gctx.swapchain_descriptor.height,
     );
 
+    game.graph.update();
+
     zgui.setNextWindowPos(.{ .x = 20.0, .y = 20.0, .cond = .always });
     zgui.setNextWindowSize(.{ .w = -1.0, .h = -1.0, .cond = .always });
-
-    // _ = allocator;
-    if (game.graph) |*graph| {
-        graph.update();
-    } else {
-        game.graph = @TypeOf(game.graph.?).init(allocator, game, .{
-            .orbit_camera = .{
-                .position = .{ 0, 0, 0, 1 },
-                .rotation = .{ 0, 0, 0, 1 },
-                .track_distance = 1,
-            },
-            .player = .{
-                .position = .{ 0, 0, 0, 1 },
-                .euler_rotation = .{ 0, 0, 0, 0 },
-            },
-        });
-        game.graph.?.update();
-    }
 
     if (zgui.begin("Gamer Settings", .{ .flags = .{ .no_move = true, .no_resize = true } })) {
         zgui.bulletText(
@@ -920,11 +905,21 @@ pub fn main() !void {
     );
     defer zgui.backend.deinit();
 
+    zgui.backend.newFrame(0, 0);
+    game.graph = .init(allocator, &game, .{ .orbit_camera = .{
+        .position = .{ 0, 0, 0, 1 },
+        .rotation = .{ 0, 0, 0, 1 },
+        .track_distance = 1,
+    }, .player = .{
+        .position = .{ 0, 0, 0, 1 },
+        .euler_rotation = .{ 0, 0, 0, 0 },
+    } });
+
     zgui.getStyle().scaleAllSizes(scale_factor);
 
     while (!window.shouldClose() and window.getKey(.escape) != .press) {
         zglfw.pollEvents();
-        update(allocator, &game);
+        update(&game);
         draw(&game);
     }
 }

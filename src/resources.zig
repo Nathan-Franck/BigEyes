@@ -12,7 +12,7 @@ pub export fn getResources(resources: *types.Resources) void {
     const arena = std.heap.page_allocator;
     const result = mesh_loader.loadModelsFromBlends(arena, &.{
         .{ .model_name = "ebike" },
-        .{ .model_name = "Sonic (rough)", .subdiv_level = 2 },
+        .{ .model_name = "Sonic (rough)", .subdiv_level = 1 },
     }) catch unreachable;
 
     // const skybox = blk: {

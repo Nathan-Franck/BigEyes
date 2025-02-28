@@ -1,8 +1,5 @@
 const std = @import("std");
-const DirtyableFields = @import("node_graph").runtime.DirtyableFields;
-const GraphStore = @import("node_graph").runtime.GraphStore;
-const GraphOutputs = @import("node_graph").runtime.GraphOutputs;
-const GraphInputs = @import("node_graph").runtime.GraphInputs;
+const Dirtyable = @import("node_graph").Dirtyable;
 const types = @import("utils").types;
 const config = @import("resources").config;
 const zmath = @import("zmath");
@@ -36,6 +33,19 @@ const Runtime = @import("node_graph").Runtime(struct {
     };
 });
 
+pub fn concatChanged(arena: std.mem.Allocator, T: type, inputs: []const Dirtyable([]const T)) []const T {
+    for (inputs) |input| {
+        if (input.is_dirty) break;
+    } else return &.{};
+    var to_concat: std.ArrayList([]const T) = .init(arena);
+    for (inputs) |input| {
+        if (input.is_dirty) {
+            to_concat.append(input.raw) catch unreachable;
+        }
+    }
+    return std.mem.concat(arena, T, to_concat.items) catch unreachable;
+}
+
 pub const GameGraph = Runtime.build(struct {
     pub fn init(allocator: std.mem.Allocator) void {
         game.init(allocator);
@@ -55,7 +65,7 @@ pub const GameGraph = Runtime.build(struct {
             .cutout_leaf = get_resources.cutout_leaf,
             .trees = get_resources.trees,
         });
-        frontend.submit(.{
+        frontend.submitDirty(.{
             .skybox = get_resources.skybox,
         });
 
@@ -84,25 +94,20 @@ pub const GameGraph = Runtime.build(struct {
             .model_transforms = get_resources.model_transforms,
             .bounce = frontend.poll(.bounce),
         });
-        _ = .{ animate_meshes, display_bike, display_trees, display_forest };
-        frontend.submit(.{
+        frontend.submitDirty(.{
             .terrain_mesh = display_terrain.terrain_mesh,
             .terrain_instance = display_terrain.terrain_instance,
-            // .models = .{
-            //     .raw = std.mem.concat(rt.allocator, types.GameModel, &.{
-            //         get_resources.models.raw,
-            //         animate_meshes.models.raw,
-            //         display_trees.models.raw,
-            //     }) catch unreachable,
-            //     .is_dirty = true,
-            // },
-            // .model_instances = .{
-            //     .raw = std.mem.concat(rt.allocator, types.ModelInstances, &.{
-            //         display_forest.model_instances.raw,
-            //         display_bike.model_instances.raw,
-            //     }) catch unreachable,
-            //     .is_dirty = true,
-            // },
+        });
+        frontend.submit(.{
+            .models = concatChanged(rt.frame_arena.allocator(), types.GameModel, &.{
+                get_resources.models,
+                animate_meshes.models,
+                display_trees.models,
+            }),
+            .model_instances = concatChanged(rt.frame_arena.allocator(), types.ModelInstances, &.{
+                display_forest.model_instances,
+                display_bike.model_instances,
+            }),
         });
 
         // Polling user input! (We can do it late, which should lead to lower latency!)
@@ -122,7 +127,7 @@ pub const GameGraph = Runtime.build(struct {
             .camera_position = orbit.camera_position,
             .world_matrix = orbit.world_matrix,
         });
-        frontend.submit(.{
+        frontend.submitDirty(.{
             .world_matrix = orbit.world_matrix,
             .camera_position = orbit.camera_position,
             .screen_space_mesh = get_screenspace_mesh.screen_space_mesh,
