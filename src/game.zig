@@ -518,8 +518,7 @@ pub const graph_nodes = struct {
                 const pos_2d: Vec2 = pos_2d: {
                     const res: Vec2 = @splat(terrain_resolution);
                     const span = config.demo_terrain_bounds.size / res;
-                    var coord: Vec2 = @floatFromInt(vertex_coord);
-                    coord[0] -= coord[1] / 2;
+                    const coord: Vec2 = @floatFromInt(vertex_coord);
                     break :pos_2d config.demo_terrain_bounds.min + (span * coord);
                 };
                 const height = try terrain_sampler.sample(stack_arena.get(), pos_2d);

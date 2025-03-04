@@ -22,9 +22,9 @@ const Runtime = @import("node_graph").Runtime(struct {
         size_multiplier: f32,
     };
     pub const Outputs = struct {
+        screen_space_mesh: types.ScreenspaceMesh,
         skybox: types.ProcessedCubeMap,
         models: []const types.GameModel,
-        screen_space_mesh: types.ScreenspaceMesh,
         model_instances: []const types.ModelInstances,
         terrain_mesh: types.GreyboxMesh,
         terrain_instance: types.ModelInstances,

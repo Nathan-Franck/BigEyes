@@ -230,7 +230,6 @@ pub fn Runtime(graph_types: type) type {
                     else => default,
                 };
                 if (dirtyable_prop.is_dirty) {
-                    std.debug.print("{s} dirty!\n", .{prop.name});
                     is_input_dirty = true;
                 }
                 @field(props, prop.name) = input_field;
@@ -323,8 +322,6 @@ pub fn Runtime(graph_types: type) type {
                             const current = self.frontend.poll(field_tag);
                             defer previous.* = current;
                             const is_dirty = !std.meta.eql(previous.*, current);
-                            if (is_dirty)
-                                std.debug.print("{any} is dirty!\n", .{field_tag});
                             return .{
                                 .is_dirty = is_dirty,
                                 .raw = current,

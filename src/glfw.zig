@@ -222,9 +222,15 @@ const Drawable = struct {
     basecolor_roughness: [4]f32,
 };
 
-const MeshResources = struct {
+const Submesh = struct {
+    index_offset: u32,
+    vertex_offset: i32,
     num_indices: u32,
+};
+
+const MeshResources = struct {
     num_instances: u32,
+    submesh: []const Submesh,
     vertex_buffer: zgpu.BufferHandle,
     index_buffer: zgpu.BufferHandle,
     instance_buffer: zgpu.BufferHandle,
@@ -261,9 +267,13 @@ const GameState = struct {
 
     // Provide inputs to the back-end from the user, disk and network.
     pub fn poll(self: *@This(), comptime field_tag: GameGraph.InputTag) std.meta.fieldInfo(GameGraph.Inputs, field_tag).type {
+        const ms_delay = 1000 / 15;
         return switch (field_tag) {
-            // .time => @intCast(@divFloor(std.time.nanoTimestamp(), std.time.ns_per_ms)),
-            .time => 0,
+            .time => @intCast(@divFloor(
+                std.time.nanoTimestamp(),
+                std.time.ns_per_ms * ms_delay,
+            ) * ms_delay),
+            // .time => 0,
             .render_resolution => blk: {
                 const size = self.window.getSize();
                 break :blk .{ .x = @intCast(size[0]), .y = @intCast(size[1]) };
@@ -292,9 +302,12 @@ const GameState = struct {
 
     // Recieve state changes back to the front-end to show to user.
     pub fn submit(self: *@This(), comptime field_tag: GameGraph.OutputTag, value: std.meta.fieldInfo(GameGraph.Outputs, field_tag).type) !void {
-        self.should_render = true;
         switch (field_tag) {
-            .world_matrix, .camera_position => @field(self, @tagName(field_tag)) = value,
+            .world_matrix, .camera_position => {
+                @field(self, @tagName(field_tag)) = value;
+                self.should_render = true;
+            },
+
             .terrain_mesh => {
                 const gctx = self.gctx;
                 const vertices = try self.frame_arena.allocator().alloc(Vertex, value.position.len);
@@ -317,9 +330,14 @@ const GameState = struct {
                 gctx.queue.writeBuffer(gctx.lookupResource(index_buffer).?, 0, IndexType, value.indices);
                 const result = self.mesh_resources.getOrPut("terrain") catch unreachable;
                 const resources = result.value_ptr;
-                resources.num_indices = @intCast(value.indices.len);
+                resources.submesh = try self.frame_arena.allocator().dupe(Submesh, &.{Submesh{
+                    .index_offset = 0,
+                    .vertex_offset = 0,
+                    .num_indices = @intCast(value.indices.len),
+                }});
                 resources.vertex_buffer = vertex_buffer;
                 resources.index_buffer = index_buffer;
+                self.should_render = true;
             },
             .terrain_instance => {
                 const gctx = self.gctx;
@@ -345,8 +363,84 @@ const GameState = struct {
                 const resources = result.value_ptr;
                 resources.num_instances = 1;
                 resources.instance_buffer = instance_buffer;
+                self.should_render = true;
             },
-            else => self.should_render = false,
+            .models => {
+                const gctx = self.gctx;
+                for (value) |model| {
+                    var vertices: std.ArrayList(Vertex) = .init(self.frame_arena.allocator());
+                    var indices: std.ArrayList(u32) = .init(self.frame_arena.allocator());
+                    var submeshes: std.ArrayList(Submesh) = .init(self.frame_arena.allocator());
+                    for (model.meshes) |mesh| {
+                        switch (mesh) {
+                            .greybox => |greybox| {
+                                const submesh: Submesh = .{
+                                    .index_offset = @intCast(vertices.items.len),
+                                    .vertex_offset = @intCast(indices.items.len),
+                                    .num_indices = @intCast(greybox.position.len),
+                                };
+                                try submeshes.append(submesh);
+                                for (greybox.position, greybox.normal) |position, normal| {
+                                    var vertex: Vertex = undefined;
+                                    zm.storeArr3(&vertex.position, position);
+                                    zm.storeArr3(&vertex.normal, normal);
+                                    try vertices.append(vertex);
+                                }
+                                try indices.appendSlice(greybox.indices);
+                            },
+                            else => {},
+                        }
+                    }
+                    const vertex_buffer = gctx.createBuffer(.{
+                        .usage = .{ .copy_dst = true, .vertex = true },
+                        .size = vertices.items.len * @sizeOf(Vertex),
+                    });
+                    {
+                        gctx.queue.writeBuffer(gctx.lookupResource(vertex_buffer).?, 0, Vertex, vertices.items);
+                    }
+                    const index_buffer = gctx.createBuffer(.{
+                        .usage = .{ .copy_dst = true, .index = true },
+                        .size = indices.items.len * @sizeOf(IndexType),
+                    });
+                    gctx.queue.writeBuffer(gctx.lookupResource(index_buffer).?, 0, IndexType, indices.items);
+                    const result = self.mesh_resources.getOrPut(model.label) catch unreachable;
+                    const resources = result.value_ptr;
+                    resources.submesh = submeshes.items;
+                    resources.vertex_buffer = vertex_buffer;
+                    resources.index_buffer = index_buffer;
+                    self.should_render = true;
+                }
+            },
+            .model_instances => {
+                const gctx = self.gctx;
+                for (value) |_instances| {
+                    var instances: std.ArrayList(Instance) = .init(self.frame_arena.allocator());
+                    for (_instances.positions, _instances.rotations, _instances.scales) |position, rotation, scale| {
+                        var instance: Instance = undefined;
+                        zm.storeArr3(&instance.position, position);
+                        zm.storeArr4(&instance.rotation, rotation);
+                        instance.scale = scale[0];
+                        instance.basecolor_roughness = .{ 1, 1, 1, 0.5 };
+                        try instances.append(instance);
+                    }
+                    const instance_buffer = gctx.createBuffer(.{
+                        .usage = .{ .copy_dst = true, .vertex = true },
+                        .size = instances.items.len * @sizeOf(Instance),
+                    });
+                    gctx.queue.writeBuffer(
+                        gctx.lookupResource(instance_buffer).?,
+                        0,
+                        Instance,
+                        instances.items,
+                    );
+                    const result = self.mesh_resources.getOrPut(_instances.label) catch unreachable;
+                    const resources = result.value_ptr;
+                    resources.num_instances = 1;
+                    resources.instance_buffer = instance_buffer;
+                    self.should_render = true;
+                }
+            },
+            else => {},
         }
     }
 };
@@ -753,7 +847,7 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !GameState {
     var mesh_resources: std.StringHashMap(MeshResources) = .init(allocator);
 
     try mesh_resources.put("demo", .{
-        .num_indices = @intCast(meshes_indices.items.len),
+        .submesh = &.{},
         .num_instances = @intCast(drawables.items.len),
         .vertex_buffer = vertex_buffer,
         .index_buffer = index_buffer,
@@ -781,25 +875,25 @@ fn deinit(allocator: std.mem.Allocator, game: *GameState) void {
     game.* = undefined;
 }
 
-// fn update(game: *GameState) void {
-//     zgui.backend.newFrame(
-//         game.gctx.swapchain_descriptor.width,
-//         game.gctx.swapchain_descriptor.height,
-//     );
+fn update(game: *GameState) void {
+    zgui.backend.newFrame(
+        game.gctx.swapchain_descriptor.width,
+        game.gctx.swapchain_descriptor.height,
+    );
 
-//     zgui.setNextWindowPos(.{ .x = 20.0, .y = 20.0, .cond = .always });
-//     zgui.setNextWindowSize(.{ .w = -1.0, .h = -1.0, .cond = .always });
+    zgui.setNextWindowPos(.{ .x = 20.0, .y = 20.0, .cond = .always });
+    zgui.setNextWindowSize(.{ .w = -1.0, .h = -1.0, .cond = .always });
 
-//     if (zgui.begin("Gamer Settings", .{ .flags = .{ .no_move = true, .no_resize = true } })) {
-//         zgui.bulletText(
-//             "Average : {d:.3} ms/frame ({d:.1} fps)",
-//             .{ game.gctx.stats.average_cpu_time, game.gctx.stats.fps },
-//         );
-//         zgui.bulletText("RMB + drag : rotate camera", .{});
-//         zgui.bulletText("W, A, S, D : move camera", .{});
-//     }
-//     zgui.end();
-// }
+    if (zgui.begin("Gamer Settings", .{ .flags = .{ .no_move = true, .no_resize = true } })) {
+        zgui.bulletText(
+            "Average : {d:.3} ms/frame ({d:.1} fps)",
+            .{ game.gctx.stats.average_cpu_time, game.gctx.stats.fps },
+        );
+        zgui.bulletText("RMB + drag : rotate camera", .{});
+        zgui.bulletText("W, A, S, D : move camera", .{});
+    }
+    zgui.end();
+}
 
 fn draw(game: *GameState) void {
     if (!game.should_render) {
@@ -807,6 +901,8 @@ fn draw(game: *GameState) void {
         return;
     }
     game.should_render = false;
+
+    update(game);
 
     const gctx = game.gctx;
 
@@ -855,7 +951,6 @@ fn draw(game: *GameState) void {
 
                 pass.setBindGroup(0, bind_group, &.{mem.offset});
             }
-
             var mesh_resources = game.mesh_resources.iterator();
             while (mesh_resources.next()) |entry| {
                 const resource = entry.value_ptr;
@@ -867,7 +962,7 @@ fn draw(game: *GameState) void {
 
                 pass.setVertexBuffer(0, vb_info.gpuobj.?, 0, vb_info.size);
                 pass.setVertexBuffer(1, itb_info.gpuobj.?, 0, itb_info.size);
-                pass.setIndexBuffer(ib_info.gpuobj.?, if (IndexType == u16) .uint16 else .uint32, 0, ib_info.size);
+                pass.setIndexBuffer(ib_info.gpuobj.?, .uint32, 0, ib_info.size);
 
                 if (std.mem.eql(u8, key, "demo")) {
                     for (game.drawables.items) |drawable| {
@@ -880,13 +975,15 @@ fn draw(game: *GameState) void {
                         );
                     }
                 } else {
-                    pass.drawIndexed(
-                        resource.num_indices,
-                        resource.num_instances,
-                        0,
-                        0,
-                        0,
-                    );
+                    for (resource.submesh) |submesh| {
+                        pass.drawIndexed(
+                            submesh.num_indices,
+                            resource.num_instances,
+                            submesh.index_offset,
+                            submesh.vertex_offset,
+                            0,
+                        );
+                    }
                 }
             }
         }
