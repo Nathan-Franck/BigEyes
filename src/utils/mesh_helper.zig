@@ -158,8 +158,8 @@ pub fn Polygon(comptime poly_selection: enum { Quad, Face }) type {
                 for (polygon[1 .. polygon.len - 1], 1..) |_, i| {
                     indices.appendSlice(&.{
                         polygon[0],
-                        polygon[i],
                         polygon[i + 1],
+                        polygon[i],
                     }) catch unreachable;
                 }
             }

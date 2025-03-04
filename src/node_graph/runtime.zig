@@ -229,8 +229,10 @@ pub fn Runtime(graph_types: type) type {
                     } else default,
                     else => default,
                 };
-                if (dirtyable_prop.is_dirty)
+                if (dirtyable_prop.is_dirty) {
+                    std.debug.print("{s} dirty!\n", .{prop.name});
                     is_input_dirty = true;
+                }
                 @field(props, prop.name) = input_field;
             }
 
@@ -259,7 +261,7 @@ pub fn Runtime(graph_types: type) type {
 
                 return node_output;
             } else {
-                // Just use the existing data from the last time the function had ro run.
+                // Just use the existing data from the last time the function had to run.
                 const last_output: *NodeOutputs(@"fn") = @ptrCast(@alignCast(state.data.?));
                 inline for (@typeInfo(@TypeOf(last_output.*)).@"struct".fields) |field| {
                     @field(last_output, field.name).is_dirty = false;
@@ -320,8 +322,11 @@ pub fn Runtime(graph_types: type) type {
                             const previous = &@field(self.inputs, @tagName(field_tag));
                             const current = self.frontend.poll(field_tag);
                             defer previous.* = current;
+                            const is_dirty = !std.meta.eql(previous.*, current);
+                            if (is_dirty)
+                                std.debug.print("{any} is dirty!\n", .{field_tag});
                             return .{
-                                .is_dirty = !std.meta.eql(previous.*, current),
+                                .is_dirty = is_dirty,
                                 .raw = current,
                             };
                         }
@@ -333,7 +338,7 @@ pub fn Runtime(graph_types: type) type {
                             inline for (@typeInfo(Outputs).@"struct".fields, 0..) |field, i| {
                                 if (@field(partial_outputs, field.name)) |out| {
                                     if (out.is_dirty) {
-                                        self.frontend.submit(@enumFromInt(i), out.raw);
+                                        self.frontend.submit(@enumFromInt(i), out.raw) catch unreachable;
                                     }
                                 }
                             }
@@ -345,7 +350,7 @@ pub fn Runtime(graph_types: type) type {
                         ) void {
                             inline for (@typeInfo(Outputs).@"struct".fields, 0..) |field, i| {
                                 if (@field(partial_outputs, field.name)) |out| {
-                                    self.frontend.submit(@enumFromInt(i), out);
+                                    self.frontend.submit(@enumFromInt(i), out) catch unreachable;
                                 }
                             }
                         }
@@ -353,6 +358,9 @@ pub fn Runtime(graph_types: type) type {
                         pub fn update(self: *@This()) void {
                             _ = self.runtime.frame_arena.reset(.retain_capacity);
                             self.store = graph.update(&self.runtime, self, self.store);
+                            inline for (@typeInfo(@TypeOf(self.store)).@"struct".fields) |field| {
+                                @field(self.store, field.name).is_dirty = false;
+                            }
                         }
                     };
                 }

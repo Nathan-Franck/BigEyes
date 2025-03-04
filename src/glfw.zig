@@ -178,7 +178,7 @@ pub const fs = common ++
 \\      barys.z = 1.0 - barys.x - barys.y;
 \\      let deltas = fwidth(barys);
 \\      let smoothing = deltas * 1.0;
-\\      let thickness = deltas * 0.25;
+\\      let thickness = deltas * 0.125;
 \\      barys = smoothstep(thickness, thickness + smoothing, barys);
 \\      let min_bary = min(barys.x, min(barys.y, barys.z));
 \\      return vec4(min_bary * color, 1.0);
@@ -190,7 +190,7 @@ pub const fs = common ++
 const content_dir = @import("build_options").content_dir;
 const window_title = "zig-gamedev: procedural mesh (wgpu)";
 
-const IndexType = zmesh.Shape.IndexType;
+const IndexType = u32;
 
 const Vertex = struct {
     position: [3]f32,
@@ -253,13 +253,17 @@ const GameState = struct {
     world_matrix: zm.Mat = undefined,
     camera_position: zm.Vec = undefined,
 
-    bounce: bool = false,
+    // bounce: bool = false,
     last_cursor_pos: [2]f64 = .{ 0, 0 },
+    should_render: bool = false,
+
+    frame_arena: std.heap.ArenaAllocator,
 
     // Provide inputs to the back-end from the user, disk and network.
     pub fn poll(self: *@This(), comptime field_tag: GameGraph.InputTag) std.meta.fieldInfo(GameGraph.Inputs, field_tag).type {
         return switch (field_tag) {
-            .time => @intCast(@divFloor(std.time.nanoTimestamp(), std.time.ns_per_ms)),
+            // .time => @intCast(@divFloor(std.time.nanoTimestamp(), std.time.ns_per_ms)),
+            .time => 0,
             .render_resolution => blk: {
                 const size = self.window.getSize();
                 break :blk .{ .x = @intCast(size[0]), .y = @intCast(size[1]) };
@@ -280,19 +284,69 @@ const GameState = struct {
             .orbit_speed => 0.01,
             .player_settings => .{ .movement_speed = 0.01, .look_speed = 0.001 },
 
-            .bounce => zgui.checkbox("bounce", .{ .v = &self.bounce }),
+            // .bounce => zgui.checkbox("bounce", .{ .v = &self.bounce }),
+            .bounce => false,
             .size_multiplier => 1,
         };
     }
 
     // Recieve state changes back to the front-end to show to user.
-    pub fn submit(self: *@This(), comptime field_tag: GameGraph.OutputTag, value: std.meta.fieldInfo(GameGraph.Outputs, field_tag).type) void {
+    pub fn submit(self: *@This(), comptime field_tag: GameGraph.OutputTag, value: std.meta.fieldInfo(GameGraph.Outputs, field_tag).type) !void {
+        self.should_render = true;
         switch (field_tag) {
             .world_matrix, .camera_position => @field(self, @tagName(field_tag)) = value,
             .terrain_mesh => {
-                // std.debug.print("Wow a new terrain! {any}\n", .{value});
+                const gctx = self.gctx;
+                const vertices = try self.frame_arena.allocator().alloc(Vertex, value.position.len);
+                for (vertices, value.position, value.normal) |*vertex, position, normal| {
+                    zm.storeArr3(&vertex.position, position);
+                    zm.storeArr3(&vertex.normal, normal);
+                }
+
+                const vertex_buffer = gctx.createBuffer(.{
+                    .usage = .{ .copy_dst = true, .vertex = true },
+                    .size = vertices.len * @sizeOf(Vertex),
+                });
+                {
+                    gctx.queue.writeBuffer(gctx.lookupResource(vertex_buffer).?, 0, Vertex, vertices);
+                }
+                const index_buffer = gctx.createBuffer(.{
+                    .usage = .{ .copy_dst = true, .index = true },
+                    .size = value.indices.len * @sizeOf(IndexType),
+                });
+                gctx.queue.writeBuffer(gctx.lookupResource(index_buffer).?, 0, IndexType, value.indices);
+                const result = self.mesh_resources.getOrPut("terrain") catch unreachable;
+                const resources = result.value_ptr;
+                resources.num_indices = @intCast(value.indices.len);
+                resources.vertex_buffer = vertex_buffer;
+                resources.index_buffer = index_buffer;
             },
-            else => {},
+            .terrain_instance => {
+                const gctx = self.gctx;
+                // Create a vertex buffer.
+                const instance_buffer = gctx.createBuffer(.{
+                    .usage = .{ .copy_dst = true, .vertex = true },
+                    .size = 1 * @sizeOf(Instance),
+                });
+                {
+                    var instance: Instance = undefined;
+                    zm.storeArr3(&instance.position, value.positions[0]);
+                    zm.storeArr4(&instance.rotation, value.rotations[0]);
+                    instance.scale = value.scales[0][0];
+                    instance.basecolor_roughness = .{ 1, 1, 1, 0.5 };
+                    gctx.queue.writeBuffer(
+                        gctx.lookupResource(instance_buffer).?,
+                        0,
+                        Instance,
+                        &.{instance},
+                    );
+                }
+                const result = self.mesh_resources.getOrPut("terrain") catch unreachable;
+                const resources = result.value_ptr;
+                resources.num_instances = 1;
+                resources.instance_buffer = instance_buffer;
+            },
+            else => self.should_render = false,
         }
     }
 };
@@ -716,6 +770,7 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !GameState {
         .depth_texture_view = depth.view,
         .meshes = meshes,
         .drawables = drawables,
+        .frame_arena = .init(allocator),
     };
 }
 
@@ -726,29 +781,33 @@ fn deinit(allocator: std.mem.Allocator, game: *GameState) void {
     game.* = undefined;
 }
 
-fn update(game: *GameState) void {
-    zgui.backend.newFrame(
-        game.gctx.swapchain_descriptor.width,
-        game.gctx.swapchain_descriptor.height,
-    );
+// fn update(game: *GameState) void {
+//     zgui.backend.newFrame(
+//         game.gctx.swapchain_descriptor.width,
+//         game.gctx.swapchain_descriptor.height,
+//     );
 
-    game.graph.update();
+//     zgui.setNextWindowPos(.{ .x = 20.0, .y = 20.0, .cond = .always });
+//     zgui.setNextWindowSize(.{ .w = -1.0, .h = -1.0, .cond = .always });
 
-    zgui.setNextWindowPos(.{ .x = 20.0, .y = 20.0, .cond = .always });
-    zgui.setNextWindowSize(.{ .w = -1.0, .h = -1.0, .cond = .always });
-
-    if (zgui.begin("Gamer Settings", .{ .flags = .{ .no_move = true, .no_resize = true } })) {
-        zgui.bulletText(
-            "Average : {d:.3} ms/frame ({d:.1} fps)",
-            .{ game.gctx.stats.average_cpu_time, game.gctx.stats.fps },
-        );
-        zgui.bulletText("RMB + drag : rotate camera", .{});
-        zgui.bulletText("W, A, S, D : move camera", .{});
-    }
-    zgui.end();
-}
+//     if (zgui.begin("Gamer Settings", .{ .flags = .{ .no_move = true, .no_resize = true } })) {
+//         zgui.bulletText(
+//             "Average : {d:.3} ms/frame ({d:.1} fps)",
+//             .{ game.gctx.stats.average_cpu_time, game.gctx.stats.fps },
+//         );
+//         zgui.bulletText("RMB + drag : rotate camera", .{});
+//         zgui.bulletText("W, A, S, D : move camera", .{});
+//     }
+//     zgui.end();
+// }
 
 fn draw(game: *GameState) void {
+    if (!game.should_render) {
+        std.Thread.sleep(1_000_000);
+        return;
+    }
+    game.should_render = false;
+
     const gctx = game.gctx;
 
     const back_buffer_view = gctx.swapchain.getCurrentTextureView();
@@ -801,12 +860,13 @@ fn draw(game: *GameState) void {
             while (mesh_resources.next()) |entry| {
                 const resource = entry.value_ptr;
                 const key = entry.key_ptr.*;
+
                 const vb_info = gctx.lookupResourceInfo(resource.vertex_buffer) orelse break :pass;
                 const itb_info = gctx.lookupResourceInfo(resource.instance_buffer) orelse break :pass;
                 const ib_info = gctx.lookupResourceInfo(resource.index_buffer) orelse break :pass;
+
                 pass.setVertexBuffer(0, vb_info.gpuobj.?, 0, vb_info.size);
                 pass.setVertexBuffer(1, itb_info.gpuobj.?, 0, itb_info.size);
-
                 pass.setIndexBuffer(ib_info.gpuobj.?, if (IndexType == u16) .uint16 else .uint32, 0, ib_info.size);
 
                 if (std.mem.eql(u8, key, "demo")) {
@@ -936,9 +996,9 @@ pub fn main() !void {
 
     zgui.backend.newFrame(0, 0);
     game.graph = .init(allocator, &game, .{ .orbit_camera = .{
-        .position = .{ 0, 0, 0, 1 },
+        .position = .{ -3, 0, 0, 1 },
         .rotation = .{ 0, 0, 0, 1 },
-        .track_distance = 1,
+        .track_distance = 10,
     }, .player = .{
         .position = .{ 0, 0, 0, 1 },
         .euler_rotation = .{ 0, 0, 0, 0 },
@@ -948,7 +1008,8 @@ pub fn main() !void {
 
     while (!window.shouldClose() and window.getKey(.escape) != .press) {
         zglfw.pollEvents();
-        update(&game);
+        game.graph.update();
+        // update(&game);
         draw(&game);
     }
 }

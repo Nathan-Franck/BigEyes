@@ -504,7 +504,7 @@ pub const graph_nodes = struct {
         const terrain_sampler = props.terrain_sampler.loadCache(&terrain_chunk_cache);
 
         // const terrain_resolution = 512;
-        const terrain_resolution = 256;
+        const terrain_resolution = 255;
         // const terrain_resolution = 128;
 
         var vertex_iterator = CoordIterator.init(@splat(0), @splat(terrain_resolution + 1));
@@ -518,7 +518,8 @@ pub const graph_nodes = struct {
                 const pos_2d: Vec2 = pos_2d: {
                     const res: Vec2 = @splat(terrain_resolution);
                     const span = config.demo_terrain_bounds.size / res;
-                    const coord: Vec2 = @floatFromInt(vertex_coord);
+                    var coord: Vec2 = @floatFromInt(vertex_coord);
+                    coord[0] -= coord[1] / 2;
                     break :pos_2d config.demo_terrain_bounds.min + (span * coord);
                 };
                 const height = try terrain_sampler.sample(stack_arena.get(), pos_2d);
