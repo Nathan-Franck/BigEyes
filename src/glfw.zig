@@ -29,7 +29,6 @@ pub const vs = common ++
 \\      @builtin(position) position_clip: vec4<f32>,
 \\      @location(0) position: vec3<f32>,
 \\      @location(1) normal: vec3<f32>,
-\\      @location(2) barycentrics: vec3<f32>,
 \\      @location(3) basecolor_roughness: vec4<f32>,
 \\  }
 \\  struct Vertex {
@@ -74,7 +73,6 @@ pub const vs = common ++
 \\          transform[2].xyz,
 \\      );
 \\      let index = vertex.index % 3u;
-\\      output.barycentrics = vec3(f32(index == 0u), f32(index == 1u), f32(index == 2u));
 \\      output.basecolor_roughness = instance.basecolor_roughness;
 \\      return output;
 \\  }
@@ -109,7 +107,6 @@ pub const fs = common ++
 \\  @fragment fn main(
 \\      @location(0) position: vec3<f32>,
 \\      @location(1) normal: vec3<f32>,
-\\      @location(2) barycentrics: vec3<f32>,
 \\      @location(3) basecolor_roughness: vec4<f32>,
 \\  ) -> @location(0) vec4<f32> {
 \\      let v = normalize(frame_uniforms.camera_position - position);
@@ -174,14 +171,7 @@ pub const fs = common ++
 \\      color = pow(color, vec3(1.0 / 2.2));
 \\
 \\      // wireframe
-\\      var barys = barycentrics;
-\\      barys.z = 1.0 - barys.x - barys.y;
-\\      let deltas = fwidth(barys);
-\\      let smoothing = deltas * 1.0;
-\\      let thickness = deltas * 0.125;
-\\      barys = smoothstep(thickness, thickness + smoothing, barys);
-\\      let min_bary = min(barys.x, min(barys.y, barys.z));
-\\      return vec4(min_bary * color, 1.0);
+\\      return vec4(color, 1.0);
 \\  }
 // zig fmt: on
     ;
@@ -375,9 +365,9 @@ const GameState = struct {
                         switch (mesh) {
                             .greybox => |greybox| {
                                 const submesh: Submesh = .{
-                                    .index_offset = @intCast(vertices.items.len),
-                                    .vertex_offset = @intCast(indices.items.len),
-                                    .num_indices = @intCast(greybox.position.len),
+                                    .index_offset = @intCast(indices.items.len),
+                                    .vertex_offset = @intCast(vertices.items.len),
+                                    .num_indices = @intCast(greybox.indices.len),
                                 };
                                 try submeshes.append(submesh);
                                 for (greybox.position, greybox.normal) |position, normal| {
@@ -435,7 +425,7 @@ const GameState = struct {
                     );
                     const result = self.mesh_resources.getOrPut(_instances.label) catch unreachable;
                     const resources = result.value_ptr;
-                    resources.num_instances = 1;
+                    resources.num_instances = @intCast(instances.items.len);
                     resources.instance_buffer = instance_buffer;
                     self.should_render = true;
                 }
@@ -1059,7 +1049,7 @@ pub fn main() !void {
 
     zglfw.windowHint(.client_api, .no_api);
 
-    const window = try zglfw.Window.create(1600, 1000, window_title, null);
+    const window = try zglfw.Window.create(640, 480, window_title, null);
     defer window.destroy();
     window.setSizeLimits(400, 400, -1, -1);
 
