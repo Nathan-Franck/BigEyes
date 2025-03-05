@@ -30,9 +30,9 @@ for object in bpy.data.objects:
             1,
         ],
         "rotation": [
-            -rotation.x,
-            rotation.z,
-            -rotation.y,
+            rotation.x,
+            -rotation.z,
+            rotation.y,
             rotation.w,
         ],
         "scale": [
