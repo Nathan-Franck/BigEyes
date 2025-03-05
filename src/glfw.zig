@@ -263,12 +263,10 @@ const GameState = struct {
                 std.time.nanoTimestamp(),
                 std.time.ns_per_ms * ms_delay,
             ) * ms_delay),
-            // .time => 0,
             .render_resolution => blk: {
                 const size = self.window.getSize();
                 break :blk .{ .x = @intCast(size[0]), .y = @intCast(size[1]) };
             },
-
             .input => blk: {
                 zglfw.pollEvents();
                 const cursor_pos = self.window.getCursorPos();
@@ -279,12 +277,9 @@ const GameState = struct {
                     .movement = .{ .left = null, .right = null, .forward = null, .backward = null },
                 };
             },
-
             .selected_camera => .orbit,
             .orbit_speed => 0.01,
             .player_settings => .{ .movement_speed = 0.01, .look_speed = 0.001 },
-
-            // .bounce => zgui.checkbox("bounce", .{ .v = &self.bounce }),
             .bounce => false,
             .size_multiplier => 1,
         };
@@ -1096,7 +1091,6 @@ pub fn main() !void {
     while (!window.shouldClose() and window.getKey(.escape) != .press) {
         zglfw.pollEvents();
         game.graph.update();
-        // update(&game);
         draw(&game);
     }
 }
