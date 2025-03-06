@@ -18,7 +18,7 @@ const common =
 \\      light_view_proj: mat4x4<f32>,  // Added for shadow mapping
 \\  }
 \\  @group(0) @binding(0) var<uniform> frame_uniforms: FrameUniforms;
-\\  @group(0) @binding(1) var shadow_sampler: sampler;
+\\  @group(0) @binding(1) var shadow_sampler: sampler_comparison;
 \\  @group(0) @binding(2) var shadow_texture: texture_depth_2d;
 ;
 pub const vs = common ++
@@ -96,25 +96,19 @@ pub const fs = common ++
 \\      // Transform to [0,1] range
 \\      let uv = vec2(proj_coords.xy * vec2(0.5, -0.5) + vec2(0.5));
 \\      
-\\      // Get depth from shadow map
-\\      let closest_depth = textureSample(shadow_texture, shadow_sampler, uv);
-\\      
 \\      // Current fragment depth
 \\      let current_depth = proj_coords.z * 0.5 + 0.5;
 \\      
 \\      // Check if fragment is in shadow
 \\      let bias = 0.005; // Adjust based on your scene
-\\      let shadow = 0.0;
+\\      let shadow_sample = textureSampleCompare(shadow_texture, shadow_sampler, uv, current_depth - bias);
+\\      var shadow: f32 = 0.0;
 \\      if (uv.x >= 0.0 && uv.x <= 1.0 && uv.y >= 0.0 && uv.y <= 1.0) {
-\\          shadow = select(1.0, 0.5, current_depth - bias > closest_depth);
+\\          shadow = shadow_sample;
 \\      }
 \\      
 \\      return shadow;
 \\  }
-\\
-\\  const pi = 3.1415926;
-\\
-\\  fn saturate(x: f32) -> f32 { return clamp(x, 0.0, 1.0); }
 \\
 \\  // Trowbridge-Reitz GGX normal distribution function.
 \\  fn distributionGgx(n: vec3<f32>, h: vec3<f32>, alpha: f32) -> f32 {
@@ -731,7 +725,7 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !GameState {
 
     const bind_group_layout = gctx.createBindGroupLayout(&.{
         zgpu.bufferEntry(0, .{ .vertex = true, .fragment = true }, .uniform, true, 0),
-        zgpu.samplerEntry(1, .{ .fragment = true }, .filtering),
+        zgpu.samplerEntry(1, .{ .fragment = true }, .comparison),
         zgpu.textureEntry(2, .{ .fragment = true }, .depth, .tvdim_2d, false),
     });
     defer gctx.releaseResource(bind_group_layout);
@@ -843,7 +837,7 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !GameState {
     });
 
     // Create bind group with shadow map
-    const bind_group = gctx.createBindGroup(bind_group_layout, &.{
+    const bind_group = gctx.createBindGroup(bind_group_layout, &[_]zgpu.BindGroupEntryInfo{
         .{
             .binding = 0,
             .buffer_handle = gctx.uniforms.buffer,
