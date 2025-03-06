@@ -15,8 +15,11 @@ const common =
 \\  struct FrameUniforms {
 \\      world_to_clip: mat4x4<f32>,
 \\      camera_position: vec3<f32>,
+\\      light_view_proj: mat4x4<f32>,  // Added for shadow mapping
 \\  }
 \\  @group(0) @binding(0) var<uniform> frame_uniforms: FrameUniforms;
+\\  @group(0) @binding(1) var shadow_sampler: sampler;
+\\  @group(0) @binding(2) var shadow_texture: texture_depth_2d;
 ;
 pub const vs = common ++
 \\  struct Instance {
@@ -82,6 +85,37 @@ pub const fs = common ++
 \\
 \\  fn saturate(x: f32) -> f32 { return clamp(x, 0.0, 1.0); }
 \\
+\\  // Shadow mapping function
+\\  fn getShadowFactor(world_pos: vec3<f32>) -> f32 {
+\\      // Transform world position to light space
+\\      let pos_light_space = vec4(world_pos, 1.0) * frame_uniforms.light_view_proj;
+\\      
+\\      // Perspective division
+\\      let proj_coords = pos_light_space.xyz / pos_light_space.w;
+\\      
+\\      // Transform to [0,1] range
+\\      let uv = vec2(proj_coords.xy * vec2(0.5, -0.5) + vec2(0.5));
+\\      
+\\      // Get depth from shadow map
+\\      let closest_depth = textureSample(shadow_texture, shadow_sampler, uv);
+\\      
+\\      // Current fragment depth
+\\      let current_depth = proj_coords.z * 0.5 + 0.5;
+\\      
+\\      // Check if fragment is in shadow
+\\      let bias = 0.005; // Adjust based on your scene
+\\      let shadow = 0.0;
+\\      if (uv.x >= 0.0 && uv.x <= 1.0 && uv.y >= 0.0 && uv.y <= 1.0) {
+\\          shadow = select(1.0, 0.5, current_depth - bias > closest_depth);
+\\      }
+\\      
+\\      return shadow;
+\\  }
+\\
+\\  const pi = 3.1415926;
+\\
+\\  fn saturate(x: f32) -> f32 { return clamp(x, 0.0, 1.0); }
+\\
 \\  // Trowbridge-Reitz GGX normal distribution function.
 \\  fn distributionGgx(n: vec3<f32>, h: vec3<f32>, alpha: f32) -> f32 {
 \\      let alpha_sq = alpha * alpha;
@@ -125,52 +159,39 @@ pub const fs = common ++
 \\      var f0 = vec3(0.04);
 \\      f0 = mix(f0, base_color, metallic);
 \\
-\\      let light_positions = array<vec3<f32>, 4>(
-\\          vec3(25.0, 15.0, 25.0),
-\\          vec3(-25.0, 15.0, 25.0),
-\\          vec3(25.0, 15.0, -25.0),
-\\          vec3(-25.0, 15.0, -25.0),
-\\      );
-\\      let light_radiance = array<vec3<f32>, 4>(
-\\          4.0 * vec3(0.0, 100.0, 250.0),
-\\          8.0 * vec3(200.0, 150.0, 250.0),
-\\          3.0 * vec3(200.0, 0.0, 0.0),
-\\          9.0 * vec3(200.0, 150.0, 0.0),
-\\      );
+\\      // Use a single directional light (sun) instead of the 4 point lights
+\\      let light_dir = normalize(vec3(0.5, -0.8, -0.2));
+\\      let light_radiance = vec3(10.0);
+\\
+\\      // Get shadow factor
+\\      let shadow_factor = getShadowFactor(position);
 \\
 \\      var lo = vec3(0.0);
-\\      for (var light_index: i32 = 0; light_index < 4; light_index = light_index + 1) {
-\\          let lvec = light_positions[light_index] - position;
+\\      
+\\      // Calculate lighting with the directional light
+\\      let l = -light_dir;  // Light direction (pointing from surface to light)
+\\      let h = normalize(l + v);
 \\
-\\          let l = normalize(lvec);
-\\          let h = normalize(l + v);
+\\      let f = fresnelSchlick(saturate(dot(h, v)), f0);
 \\
-\\          let distance_sq = dot(lvec, lvec);
-\\          let attenuation = 1.0 / distance_sq;
-\\          let radiance = light_radiance[light_index] * attenuation;
+\\      let ndf = distributionGgx(n, h, alpha);
+\\      let g = geometrySmith(n, v, l, k);
 \\
-\\          let f = fresnelSchlick(saturate(dot(h, v)), f0);
+\\      let numerator = ndf * g * f;
+\\      let denominator = 4.0 * saturate(dot(n, v)) * saturate(dot(n, l));
+\\      let specular = numerator / max(denominator, 0.001);
 \\
-\\          let ndf = distributionGgx(n, h, alpha);
-\\          let g = geometrySmith(n, v, l, k);
+\\      let ks = f;
+\\      let kd = (vec3(1.0) - ks) * (1.0 - metallic);
 \\
-\\          let numerator = ndf * g * f;
-\\          let denominator = 4.0 * saturate(dot(n, v)) * saturate(dot(n, l));
-\\          let specular = numerator / max(denominator, 0.001);
-\\
-\\          let ks = f;
-\\          let kd = (vec3(1.0) - ks) * (1.0 - metallic);
-\\
-\\          let n_dot_l = saturate(dot(n, l));
-\\          lo = lo + (kd * base_color / pi + specular) * radiance * n_dot_l;
-\\      }
+\\      let n_dot_l = saturate(dot(n, l));
+\\      lo = (kd * base_color / pi + specular) * light_radiance * n_dot_l * shadow_factor;
 \\
 \\      let ambient = vec3(0.03) * base_color * ao;
 \\      var color = ambient + lo;
 \\      color = color / (color + 1.0);
 \\      color = pow(color, vec3(1.0 / 2.2));
 \\
-\\      // wireframe
 \\      return vec4(color, 1.0);
 \\  }
 // zig fmt: on
@@ -238,6 +259,14 @@ const GameState = struct {
     depth_texture: zgpu.TextureHandle,
     depth_texture_view: zgpu.TextureViewHandle,
 
+    shadow_texture: zgpu.TextureHandle,
+    shadow_texture_view: zgpu.TextureViewHandle,
+    shadow_bind_group: zgpu.BindGroupHandle,
+    shadow_pipeline: zgpu.RenderPipelineHandle,
+
+    // light_direction: [3]f32 = .{ 0.5, -0.8, -0.2 }, // Directional light (sun)
+    // light_view_proj: zm.Mat = undefined,
+
     meshes: std.ArrayList(Mesh),
     drawables: std.ArrayList(Drawable),
     mouse: struct {
@@ -292,7 +321,6 @@ const GameState = struct {
                 @field(self, @tagName(field_tag)) = value;
                 self.should_render = true;
             },
-
             .terrain_mesh => {
                 const gctx = self.gctx;
                 const vertices = try self.frame_arena.allocator().alloc(Vertex, value.position.len);
@@ -344,10 +372,12 @@ const GameState = struct {
                         &.{instance},
                     );
                 }
-                const result = self.mesh_resources.getOrPut("terrain") catch unreachable;
+                const result = try self.mesh_resources.getOrPut("terrain");
                 const resources = result.value_ptr;
-                resources.num_instances = 1;
-                resources.instance_buffer = instance_buffer;
+                {
+                    resources.num_instances = 1;
+                    resources.instance_buffer = instance_buffer;
+                }
                 self.should_render = true;
             },
             .models => {
@@ -367,8 +397,10 @@ const GameState = struct {
                                 try submeshes.append(submesh);
                                 for (greybox.position, greybox.normal) |position, normal| {
                                     var vertex: Vertex = undefined;
-                                    zm.storeArr3(&vertex.position, position);
-                                    zm.storeArr3(&vertex.normal, normal);
+                                    {
+                                        zm.storeArr3(&vertex.position, position);
+                                        zm.storeArr3(&vertex.normal, normal);
+                                    }
                                     try vertices.append(vertex);
                                 }
                                 try indices.appendSlice(greybox.indices);
@@ -388,11 +420,13 @@ const GameState = struct {
                         .size = indices.items.len * @sizeOf(IndexType),
                     });
                     gctx.queue.writeBuffer(gctx.lookupResource(index_buffer).?, 0, IndexType, indices.items);
-                    const result = self.mesh_resources.getOrPut(model.label) catch unreachable;
+                    const result = try self.mesh_resources.getOrPut(model.label);
                     const resources = result.value_ptr;
-                    resources.submesh = submeshes.items;
-                    resources.vertex_buffer = vertex_buffer;
-                    resources.index_buffer = index_buffer;
+                    {
+                        resources.submesh = submeshes.items;
+                        resources.vertex_buffer = vertex_buffer;
+                        resources.index_buffer = index_buffer;
+                    }
                     self.should_render = true;
                 }
             },
@@ -401,11 +435,16 @@ const GameState = struct {
                 for (value) |_instances| {
                     var instances: std.ArrayList(Instance) = .init(self.frame_arena.allocator());
                     for (_instances.positions, _instances.rotations, _instances.scales) |position, rotation, scale| {
-                        var instance: Instance = undefined;
-                        zm.storeArr3(&instance.position, position);
-                        zm.storeArr4(&instance.rotation, rotation);
-                        instance.scale = scale[0];
-                        instance.basecolor_roughness = .{ 1, 1, 1, 0.5 };
+                        var instance: Instance = .{
+                            .scale = scale[0],
+                            .basecolor_roughness = .{ 1, 1, 1, 0.5 },
+                            .position = undefined,
+                            .rotation = undefined,
+                        };
+                        {
+                            zm.storeArr3(&instance.position, position);
+                            zm.storeArr4(&instance.rotation, rotation);
+                        }
                         try instances.append(instance);
                     }
                     const instance_buffer = gctx.createBuffer(.{
@@ -418,10 +457,12 @@ const GameState = struct {
                         Instance,
                         instances.items,
                     );
-                    const result = self.mesh_resources.getOrPut(_instances.label) catch unreachable;
+                    const result = try self.mesh_resources.getOrPut(_instances.label);
                     const resources = result.value_ptr;
-                    resources.num_instances = @intCast(instances.items.len);
-                    resources.instance_buffer = instance_buffer;
+                    {
+                        resources.num_instances = @intCast(instances.items.len);
+                        resources.instance_buffer = instance_buffer;
+                    }
                     self.should_render = true;
                 }
             },
@@ -571,8 +612,10 @@ fn initScene(
     {
         var mesh = zmesh.Shape.initSubdividedSphere(3);
         defer mesh.deinit();
-        mesh.unweld();
-        mesh.computeNormals();
+        {
+            mesh.unweld();
+            mesh.computeNormals();
+        }
 
         drawables.append(.{
             .mesh_index = @as(u32, @intCast(meshes.items.len)),
@@ -645,10 +688,12 @@ fn initScene(
         };
         var ground = zmesh.Shape.initParametric(local.terrain, 40, 40, null);
         defer ground.deinit();
-        ground.translate(-0.5, -0.0, -0.5);
-        ground.invert(0, 0);
-        ground.scale(20, 20, 20);
-        ground.computeNormals();
+        {
+            ground.translate(-0.5, -0.0, -0.5);
+            ground.invert(0, 0);
+            ground.scale(20, 20, 20);
+            ground.computeNormals();
+        }
 
         drawables.append(.{
             .mesh_index = @as(u32, @intCast(meshes.items.len)),
@@ -686,6 +731,8 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !GameState {
 
     const bind_group_layout = gctx.createBindGroupLayout(&.{
         zgpu.bufferEntry(0, .{ .vertex = true, .fragment = true }, .uniform, true, 0),
+        zgpu.samplerEntry(1, .{ .fragment = true }, .filtering),
+        zgpu.textureEntry(2, .{ .fragment = true }, .depth, .tvdim_2d, false),
     });
     defer gctx.releaseResource(bind_group_layout);
 
@@ -768,12 +815,48 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !GameState {
         break :pipeline gctx.createRenderPipeline(pipeline_layout, pipeline_descriptor);
     };
 
+    // Create shadow map texture and view
+    const shadow_map_size: u32 = 2048;
+    const shadow_texture = gctx.createTexture(.{
+        .usage = .{ .render_attachment = true, .texture_binding = true },
+        .dimension = .tdim_2d,
+        .size = .{
+            .width = shadow_map_size,
+            .height = shadow_map_size,
+            .depth_or_array_layers = 1,
+        },
+        .format = .depth32_float,
+        .mip_level_count = 1,
+        .sample_count = 1,
+    });
+    const shadow_texture_view = gctx.createTextureView(shadow_texture, .{});
+
+    // Create shadow sampler
+    const shadow_sampler = gctx.createSampler(.{
+        .address_mode_u = .clamp_to_edge,
+        .address_mode_v = .clamp_to_edge,
+        .address_mode_w = .clamp_to_edge,
+        .mag_filter = .linear,
+        .min_filter = .linear,
+        .mipmap_filter = .linear,
+        .compare = .less,
+    });
+
+    // Create bind group with shadow map
     const bind_group = gctx.createBindGroup(bind_group_layout, &.{
         .{
             .binding = 0,
             .buffer_handle = gctx.uniforms.buffer,
             .offset = 0,
             .size = @sizeOf(FrameUniforms),
+        },
+        .{
+            .binding = 1,
+            .sampler_handle = shadow_sampler,
+        },
+        .{
+            .binding = 2,
+            .texture_view_handle = shadow_texture_view,
         },
     });
 
@@ -809,7 +892,9 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !GameState {
         .usage = .{ .copy_dst = true, .index = true },
         .size = total_num_indices * @sizeOf(IndexType),
     });
-    gctx.queue.writeBuffer(gctx.lookupResource(index_buffer).?, 0, IndexType, meshes_indices.items);
+    {
+        gctx.queue.writeBuffer(gctx.lookupResource(index_buffer).?, 0, IndexType, meshes_indices.items);
+    }
 
     var instances = std.ArrayList(Instance).init(allocator);
     for (drawables.items) |drawable| {
@@ -824,7 +909,9 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !GameState {
         .usage = .{ .copy_dst = true, .vertex = true },
         .size = instances.items.len * @sizeOf(Instance),
     });
-    gctx.queue.writeBuffer(gctx.lookupResource(instance_buffer).?, 0, Instance, instances.items);
+    {
+        gctx.queue.writeBuffer(gctx.lookupResource(instance_buffer).?, 0, Instance, instances.items);
+    }
 
     // Create a depth texture and its 'view'.
     const depth = createDepthTexture(gctx);
@@ -838,6 +925,121 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !GameState {
         .index_buffer = index_buffer,
         .instance_buffer = instance_buffer,
     });
+    // Create shadow pipeline for depth-only rendering
+    const shadow_pipeline = shadow_pipeline: {
+        const vs_module = zgpu.createWgslShaderModule(gctx.device,
+            \\  struct FrameUniforms {
+            \\      light_view_proj: mat4x4<f32>,
+            \\  }
+            \\  @group(0) @binding(0) var<uniform> frame_uniforms: FrameUniforms;
+            \\
+            \\  struct Instance {
+            \\      @location(10) position: vec3<f32>,
+            \\      @location(11) rotation: vec4<f32>,
+            \\      @location(12) scale: f32,
+            \\      @location(13) basecolor_roughness: vec4<f32>,
+            \\  }
+            \\
+            \\  struct Vertex {
+            \\      @location(0) position: vec3<f32>,
+            \\      @location(1) normal: vec3<f32>,
+            \\  }
+            \\
+            \\  fn matrix_from_instance(i: Instance) -> mat4x4<f32> {
+            \\    var x: f32 = i.rotation.x;
+            \\    var y: f32 = i.rotation.y;
+            \\    var z: f32 = i.rotation.z;
+            \\    var w: f32 = i.rotation.w;
+            \\    var rotationMatrix: mat3x3<f32> = mat3x3(
+            \\        1.0 - 2.0 * (y * y + z * z), 2.0 * (x * y - w * z), 2.0 * (x * z + w * y),
+            \\        2.0 * (x * y + w * z), 1.0 - 2.0 * (x * x + z * z), 2.0 * (y * z - w * x),
+            \\        2.0 * (x * z - w * y), 2.0 * (y * z + w * x), 1.0 - 2.0 * (x * x + y * y)
+            \\    );
+            \\    var scaledRotation: mat3x3<f32> = mat3x3(
+            \\        rotationMatrix[0] * i.scale,
+            \\        rotationMatrix[1] * i.scale,
+            \\        rotationMatrix[2] * i.scale
+            \\    );
+            \\    var transform: mat4x4<f32> = mat4x4(
+            \\        vec4(scaledRotation[0], i.position.x),
+            \\        vec4(scaledRotation[1], i.position.y),
+            \\        vec4(scaledRotation[2], i.position.z),
+            \\        vec4(0.0, 0.0, 0.0, 1.0),
+            \\    );
+            \\    return transform;
+            \\  }
+            \\
+            \\  @vertex fn main(
+            \\      vertex: Vertex,
+            \\      instance: Instance,
+            \\  ) -> @builtin(position) vec4<f32> {
+            \\      let transform = matrix_from_instance(instance);
+            \\      return vec4(vertex.position, 1.0) * transform * frame_uniforms.light_view_proj;
+            \\  }
+        , "shadow_vs");
+        defer vs_module.release();
+
+        const vertex_attributes = [_]wgpu.VertexAttribute{ .{
+            .format = .float32x3,
+            .offset = @offsetOf(Vertex, "position"),
+            .shader_location = 0,
+        }, .{
+            .format = .float32x3,
+            .offset = @offsetOf(Vertex, "normal"),
+            .shader_location = 1,
+        } };
+        const instance_attributes = [_]wgpu.VertexAttribute{ .{
+            .format = .float32x3,
+            .offset = @offsetOf(Instance, "position"),
+            .shader_location = 10,
+        }, .{
+            .format = .float32x4,
+            .offset = @offsetOf(Instance, "rotation"),
+            .shader_location = 11,
+        }, .{
+            .format = .float32,
+            .offset = @offsetOf(Instance, "scale"),
+            .shader_location = 12,
+        }, .{
+            .format = .float32x4,
+            .offset = @offsetOf(Instance, "basecolor_roughness"),
+            .shader_location = 13,
+        } };
+        const vertex_buffers = [_]wgpu.VertexBufferLayout{ .{
+            .array_stride = @sizeOf(Vertex),
+            .attribute_count = vertex_attributes.len,
+            .attributes = &vertex_attributes,
+        }, .{
+            .array_stride = @sizeOf(Instance),
+            .step_mode = .instance,
+            .attribute_count = instance_attributes.len,
+            .attributes = &instance_attributes,
+        } };
+
+        const shadow_pipeline_layout = gctx.createPipelineLayout(&.{bind_group_layout});
+        defer gctx.releaseResource(shadow_pipeline_layout);
+
+        const pipeline_descriptor = wgpu.RenderPipelineDescriptor{
+            .vertex = wgpu.VertexState{
+                .module = vs_module,
+                .entry_point = "main",
+                .buffer_count = vertex_buffers.len,
+                .buffers = &vertex_buffers,
+            },
+            .primitive = wgpu.PrimitiveState{
+                .front_face = .cw,
+                .cull_mode = .back,
+                .topology = .triangle_list,
+            },
+            .depth_stencil = &wgpu.DepthStencilState{
+                .format = .depth32_float,
+                .depth_write_enabled = true,
+                .depth_compare = .less,
+            },
+            // No fragment shader needed for shadow map generation
+        };
+        break :shadow_pipeline gctx.createRenderPipeline(shadow_pipeline_layout, pipeline_descriptor);
+    };
 
     return GameState{
         .window = window,
@@ -850,6 +1052,10 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !GameState {
         .meshes = meshes,
         .drawables = drawables,
         .frame_arena = .init(allocator),
+        .shadow_texture = shadow_texture,
+        .shadow_texture_view = shadow_texture_view,
+        .shadow_bind_group = bind_group,
+        .shadow_pipeline = shadow_pipeline,
     };
 }
 
@@ -1077,14 +1283,17 @@ pub fn main() !void {
     defer zgui.backend.deinit();
 
     zgui.backend.newFrame(0, 0);
-    game.graph = .init(allocator, &game, .{ .orbit_camera = .{
-        .position = .{ -3, 0, 0, 1 },
-        .rotation = .{ 0, 0, 0, 1 },
-        .track_distance = 10,
-    }, .player = .{
-        .position = .{ 0, 0, 0, 1 },
-        .euler_rotation = .{ 0, 0, 0, 0 },
-    } });
+    game.graph = .init(allocator, &game, .{
+        .orbit_camera = .{
+            .position = .{ -3, 0, 0, 1 },
+            .rotation = .{ 0, 0, 0, 1 },
+            .track_distance = 10,
+        },
+        .player = .{
+            .position = .{ 0, 0, 0, 1 },
+            .euler_rotation = .{ 0, 0, 0, 0 },
+        },
+    });
 
     zgui.getStyle().scaleAllSizes(scale_factor);
 
