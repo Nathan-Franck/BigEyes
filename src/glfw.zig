@@ -91,19 +91,16 @@ pub const fs = common ++
 \\      // Transform world position to light space
 \\      let pos_light_space = vec4(world_pos, 1.0) * frame_uniforms.light_view_proj;
 \\      
-\\      // Perspective division
-\\      let proj_coords = pos_light_space.xyz / pos_light_space.w;
-\\      
 \\      // Transform to [0,1] range
-\\      let uv = vec2(proj_coords.xy * vec2(0.5, -0.5) + vec2(0.5));
+\\      let uv = vec2(pos_light_space.xy * vec2(0.5, -0.5) + vec2(0.5));
 \\      
 \\      // Current fragment depth
-\\      let current_depth = proj_coords.z * 0.5 + 0.5;
+\\      let current_depth = pos_light_space.z * 0.5 + 0.5;
 \\      
 \\      // Check if fragment is in shadow
 \\      let bias = 0.005; // Adjust based on your scene
 \\      let shadow_sample = textureSampleCompare(shadow_texture, shadow_sampler, uv, current_depth - bias);
-\\      var shadow: f32 = 0.0;
+\\      var shadow: f32 = 1.0;
 \\      if (uv.x >= 0.0 && uv.x <= 1.0 && uv.y >= 0.0 && uv.y <= 1.0) {
 \\          shadow = shadow_sample;
 \\      }
@@ -187,7 +184,7 @@ pub const fs = common ++
 \\      color = color / (color + 1.0);
 \\      color = pow(color, vec3(1.0 / 2.2));
 \\
-\\      return vec4(color, 1.0);
+\\      return vec4( getShadowFactor(position), 0, 0, 1);//color, 1.0);
 \\  }
 // zig fmt: on
     ;
