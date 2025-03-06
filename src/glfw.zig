@@ -18,8 +18,6 @@ const common =
 \\      light_view_proj: mat4x4<f32>,  // Added for shadow mapping
 \\  }
 \\  @group(0) @binding(0) var<uniform> frame_uniforms: FrameUniforms;
-\\  @group(0) @binding(1) var shadow_sampler: sampler_comparison;
-\\  @group(0) @binding(2) var shadow_texture: texture_depth_2d;
 ;
 pub const vs = common ++
 \\  struct Instance {
@@ -82,6 +80,9 @@ pub const vs = common ++
 ;
 pub const fs = common ++
 \\  const pi = 3.1415926;
+\\
+\\  @group(0) @binding(1) var shadow_sampler: sampler_comparison;
+\\  @group(0) @binding(2) var shadow_texture: texture_depth_2d;
 \\
 \\  fn saturate(x: f32) -> f32 { return clamp(x, 0.0, 1.0); }
 \\
@@ -212,6 +213,7 @@ const Instance = struct {
 const FrameUniforms = struct {
     world_to_clip: zm.Mat,
     camera_position: [3]f32,
+    light_view_proj: zm.Mat,
 };
 
 const Mesh = struct {
@@ -330,11 +332,15 @@ const GameState = struct {
                 {
                     gctx.queue.writeBuffer(gctx.lookupResource(vertex_buffer).?, 0, Vertex, vertices);
                 }
+
                 const index_buffer = gctx.createBuffer(.{
                     .usage = .{ .copy_dst = true, .index = true },
                     .size = value.indices.len * @sizeOf(IndexType),
                 });
-                gctx.queue.writeBuffer(gctx.lookupResource(index_buffer).?, 0, IndexType, value.indices);
+                {
+                    gctx.queue.writeBuffer(gctx.lookupResource(index_buffer).?, 0, IndexType, value.indices);
+                }
+
                 const result = self.mesh_resources.getOrPut("terrain") catch unreachable;
                 const resources = result.value_ptr;
                 resources.submesh = try self.frame_arena.allocator().dupe(Submesh, &.{Submesh{
@@ -836,6 +842,21 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !GameState {
         .compare = .less,
     });
 
+    const shadow_bind_group_layout = gctx.createBindGroupLayout(&.{
+        zgpu.bufferEntry(0, .{ .vertex = true, .fragment = true }, .uniform, true, 0),
+    });
+    defer gctx.releaseResource(shadow_bind_group_layout);
+
+    // Create bind group with shadow map
+    const shadow_bind_group = gctx.createBindGroup(shadow_bind_group_layout, &[_]zgpu.BindGroupEntryInfo{
+        .{
+            .binding = 0,
+            .buffer_handle = gctx.uniforms.buffer,
+            .offset = 0,
+            .size = @sizeOf(FrameUniforms),
+        },
+    });
+
     // Create bind group with shadow map
     const bind_group = gctx.createBindGroup(bind_group_layout, &[_]zgpu.BindGroupEntryInfo{
         .{
@@ -919,6 +940,7 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !GameState {
         .index_buffer = index_buffer,
         .instance_buffer = instance_buffer,
     });
+
     // Create shadow pipeline for depth-only rendering
     const shadow_pipeline = shadow_pipeline: {
         const vs_module = zgpu.createWgslShaderModule(gctx.device,
@@ -1010,7 +1032,7 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !GameState {
             .attributes = &instance_attributes,
         } };
 
-        const shadow_pipeline_layout = gctx.createPipelineLayout(&.{bind_group_layout});
+        const shadow_pipeline_layout = gctx.createPipelineLayout(&.{shadow_bind_group_layout});
         defer gctx.releaseResource(shadow_pipeline_layout);
 
         const pipeline_descriptor = wgpu.RenderPipelineDescriptor{
@@ -1048,7 +1070,7 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !GameState {
         .frame_arena = .init(allocator),
         .shadow_texture = shadow_texture,
         .shadow_texture_view = shadow_texture_view,
-        .shadow_bind_group = bind_group,
+        .shadow_bind_group = shadow_bind_group,
         .shadow_pipeline = shadow_pipeline,
     };
 }
@@ -1098,6 +1120,106 @@ fn draw(game: *GameState) void {
         const encoder = gctx.device.createCommandEncoder(null);
         defer encoder.release();
 
+        // Shadow pass - render depth from light's perspective
+        pass: {
+            const pipeline = gctx.lookupResource(game.shadow_pipeline) orelse break :pass;
+            const bind_group = gctx.lookupResource(game.shadow_bind_group) orelse break :pass;
+            const shadow_view = gctx.lookupResource(game.shadow_texture_view) orelse break :pass;
+
+            const depth_attachment = wgpu.RenderPassDepthStencilAttachment{
+                .view = shadow_view,
+                .depth_load_op = .clear,
+                .depth_store_op = .store,
+                .depth_clear_value = 1.0,
+            };
+
+            const render_pass_info = wgpu.RenderPassDescriptor{
+                .depth_stencil_attachment = &depth_attachment,
+                .color_attachments = null,
+                .color_attachment_count = 0,
+            };
+
+            const pass = encoder.beginRenderPass(render_pass_info);
+            defer {
+                pass.end();
+                pass.release();
+            }
+
+            // Update bindings
+            {
+                const mem = gctx.uniformsAllocate(FrameUniforms, 1);
+                mem.slice[0].world_to_clip = zm.transpose(game.world_matrix);
+                mem.slice[0].camera_position = @as([4]f32, @bitCast(game.camera_position))[0..3].*;
+
+                const light_position = zm.f32x4(0.0, 20.0, 0.0, 1.0);
+                const light_target = zm.f32x4(0.0, 0.0, 0.0, 1.0);
+                const light_up = zm.f32x4(0.0, 0.0, 1.0, 0.0);
+                const light_view = zm.lookAtRh(light_position, light_target, light_up);
+                const light_proj = zm.orthographicRh(40.0, 40.0, 0.1, 50.0);
+
+                mem.slice[0].light_view_proj = zm.transpose(zm.mul(light_view, light_proj));
+
+                pass.setBindGroup(0, bind_group, &.{mem.offset});
+            }
+
+            pass.setPipeline(pipeline);
+
+            // Set up light view-projection matrix for shadow pass
+            {
+                const mem = gctx.uniformsAllocate(struct {
+                    light_view_proj: zm.Mat,
+                }, 1);
+
+                // Same light setup as in main pass
+                const light_position = zm.f32x4(0.0, 20.0, 0.0, 1.0);
+                const light_target = zm.f32x4(0.0, 0.0, 0.0, 1.0);
+                const light_up = zm.f32x4(0.0, 0.0, 1.0, 0.0);
+                const light_view = zm.lookAtRh(light_position, light_target, light_up);
+                const light_proj = zm.orthographicRh(40.0, 40.0, 0.1, 50.0);
+
+                mem.slice[0].light_view_proj = zm.transpose(zm.mul(light_view, light_proj));
+
+                pass.setBindGroup(0, bind_group, &.{mem.offset});
+            }
+
+            // Draw all meshes to shadow map
+            var mesh_resources = game.mesh_resources.iterator();
+            while (mesh_resources.next()) |entry| {
+                const resource = entry.value_ptr;
+                const key = entry.key_ptr.*;
+
+                const vb_info = gctx.lookupResourceInfo(resource.vertex_buffer) orelse continue;
+                const itb_info = gctx.lookupResourceInfo(resource.instance_buffer) orelse continue;
+                const ib_info = gctx.lookupResourceInfo(resource.index_buffer) orelse continue;
+
+                pass.setVertexBuffer(0, vb_info.gpuobj.?, 0, vb_info.size);
+                pass.setVertexBuffer(1, itb_info.gpuobj.?, 0, itb_info.size);
+                pass.setIndexBuffer(ib_info.gpuobj.?, .uint32, 0, ib_info.size);
+
+                if (std.mem.eql(u8, key, "demo")) {
+                    for (game.drawables.items) |drawable| {
+                        pass.drawIndexed(
+                            game.meshes.items[drawable.mesh_index].num_indices,
+                            1,
+                            game.meshes.items[drawable.mesh_index].index_offset,
+                            game.meshes.items[drawable.mesh_index].vertex_offset,
+                            drawable.mesh_index,
+                        );
+                    }
+                } else {
+                    for (resource.submesh) |submesh| {
+                        pass.drawIndexed(
+                            submesh.num_indices,
+                            resource.num_instances,
+                            submesh.index_offset,
+                            submesh.vertex_offset,
+                            0,
+                        );
+                    }
+                }
+            }
+        }
+
         // Main pass.
         pass: {
             const pipeline = gctx.lookupResource(game.pipeline) orelse break :pass;
@@ -1125,17 +1247,25 @@ fn draw(game: *GameState) void {
                 pass.end();
                 pass.release();
             }
-
             pass.setPipeline(pipeline);
 
-            // Update "world to clip" (camera) xform.
+            // Update bindings
             {
                 const mem = gctx.uniformsAllocate(FrameUniforms, 1);
                 mem.slice[0].world_to_clip = zm.transpose(game.world_matrix);
                 mem.slice[0].camera_position = @as([4]f32, @bitCast(game.camera_position))[0..3].*;
 
+                const light_position = zm.f32x4(0.0, 20.0, 0.0, 1.0);
+                const light_target = zm.f32x4(0.0, 0.0, 0.0, 1.0);
+                const light_up = zm.f32x4(0.0, 0.0, 1.0, 0.0);
+                const light_view = zm.lookAtRh(light_position, light_target, light_up);
+                const light_proj = zm.orthographicRh(40.0, 40.0, 0.1, 50.0);
+
+                mem.slice[0].light_view_proj = zm.transpose(zm.mul(light_view, light_proj));
+
                 pass.setBindGroup(0, bind_group, &.{mem.offset});
             }
+
             var mesh_resources = game.mesh_resources.iterator();
             while (mesh_resources.next()) |entry| {
                 const resource = entry.value_ptr;
@@ -1172,7 +1302,6 @@ fn draw(game: *GameState) void {
                 }
             }
         }
-
         // Gui pass.
         {
             const color_attachments = [_]wgpu.RenderPassColorAttachment{.{
