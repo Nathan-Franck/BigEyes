@@ -99,10 +99,10 @@ pub const fs = common ++
 \\      
 \\      // Check if fragment is in shadow
 \\      let bias = 0.005; // Adjust based on your scene
-\\      let shadow_sample = textureSampleCompare(shadow_texture, shadow_sampler, uv, current_depth - bias);
+\\      let shadow_sample = textureSample(shadow_texture, shadow_sampler, uv);
 \\      var shadow: f32 = 1.0;
 \\      if (uv.x >= 0.0 && uv.x <= 1.0 && uv.y >= 0.0 && uv.y <= 1.0) {
-\\          shadow = shadow_sample;
+\\          shadow = 1-shadow_sample;
 \\      }
 \\      
 \\      return shadow;
@@ -728,7 +728,7 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !GameState {
 
     const bind_group_layout = gctx.createBindGroupLayout(&.{
         zgpu.bufferEntry(0, .{ .vertex = true, .fragment = true }, .uniform, true, 0),
-        zgpu.samplerEntry(1, .{ .fragment = true }, .comparison),
+        zgpu.samplerEntry(1, .{ .fragment = true }, .filtering),
         zgpu.textureEntry(2, .{ .fragment = true }, .depth, .tvdim_2d, false),
     });
     defer gctx.releaseResource(bind_group_layout);
@@ -836,7 +836,7 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !GameState {
         .mag_filter = .linear,
         .min_filter = .linear,
         .mipmap_filter = .linear,
-        .compare = .less,
+        // .compare = .less,
     });
 
     const shadow_bind_group_layout = gctx.createBindGroupLayout(&.{
