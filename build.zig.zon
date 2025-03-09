@@ -1,5 +1,6 @@
 .{
-    .name = "bigeyes",
+    .name = .bigeyes,
+    .fingerprint = 0x3f29cf7f51d0f74,
     .version = "0.1.0",
     .paths = .{""},
     .minimum_zig_version = "0.14.0-dev.3271+bd237bced",
