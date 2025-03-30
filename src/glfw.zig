@@ -81,7 +81,7 @@ pub const vs = common ++
 pub const fs = common ++
 \\  const pi = 3.1415926;
 \\
-\\  @group(0) @binding(1) var shadow_sampler: sampler_comparison;
+\\  @group(0) @binding(1) var shadow_sampler: sampler;
 \\  @group(0) @binding(2) var shadow_texture: texture_depth_2d;
 \\
 \\  fn saturate(x: f32) -> f32 { return clamp(x, 0.0, 1.0); }
