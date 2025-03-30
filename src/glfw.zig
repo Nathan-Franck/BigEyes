@@ -82,9 +82,6 @@ const GameState = struct {
     shadow_bind_group: zgpu.BindGroupHandle,
     shadow_pipeline: zgpu.RenderPipelineHandle,
 
-    // light_direction: [3]f32 = .{ 0.5, -0.8, -0.2 }, // Directional light (sun)
-    // light_view_proj: zm.Mat = undefined,
-
     meshes: std.ArrayList(Mesh),
     drawables: std.ArrayList(Drawable),
     mouse: struct {
@@ -96,7 +93,6 @@ const GameState = struct {
     world_matrix: zm.Mat = undefined,
     camera_position: zm.Vec = undefined,
 
-    // bounce: bool = false,
     last_cursor_pos: [2]f64 = .{ 0, 0 },
     should_render: bool = false,
 
@@ -104,7 +100,7 @@ const GameState = struct {
 
     // Provide inputs to the back-end from the user, disk and network.
     pub fn poll(self: *@This(), comptime field_tag: GameGraph.InputTag) std.meta.fieldInfo(GameGraph.Inputs, field_tag).type {
-        const ms_delay = 1000 / 15;
+        const ms_delay = 1000 / 15; // 15 FPS
         return switch (field_tag) {
             .time => @intCast(@divFloor(
                 std.time.nanoTimestamp(),
@@ -132,7 +128,7 @@ const GameState = struct {
         };
     }
 
-    // Recieve state changes back to the front-end to show to user.
+    // Receive state changes back to the front-end to show to user.
     pub fn submit(self: *@This(), comptime field_tag: GameGraph.OutputTag, value: std.meta.fieldInfo(GameGraph.Outputs, field_tag).type) !void {
         switch (field_tag) {
             .world_matrix, .camera_position => {
@@ -151,17 +147,13 @@ const GameState = struct {
                     .usage = .{ .copy_dst = true, .vertex = true },
                     .size = vertices.len * @sizeOf(Vertex),
                 });
-                {
-                    gctx.queue.writeBuffer(gctx.lookupResource(vertex_buffer).?, 0, Vertex, vertices);
-                }
+                gctx.queue.writeBuffer(gctx.lookupResource(vertex_buffer).?, 0, Vertex, vertices);
 
                 const index_buffer = gctx.createBuffer(.{
                     .usage = .{ .copy_dst = true, .index = true },
                     .size = value.indices.len * @sizeOf(IndexType),
                 });
-                {
-                    gctx.queue.writeBuffer(gctx.lookupResource(index_buffer).?, 0, IndexType, value.indices);
-                }
+                gctx.queue.writeBuffer(gctx.lookupResource(index_buffer).?, 0, IndexType, value.indices);
 
                 const result = self.mesh_resources.getOrPut("terrain") catch unreachable;
                 const resources = result.value_ptr;
@@ -176,30 +168,27 @@ const GameState = struct {
             },
             .terrain_instance => {
                 const gctx = self.gctx;
-                // Create a vertex buffer.
                 const instance_buffer = gctx.createBuffer(.{
                     .usage = .{ .copy_dst = true, .vertex = true },
                     .size = 1 * @sizeOf(Instance),
                 });
-                {
-                    var instance: Instance = undefined;
-                    zm.storeArr3(&instance.position, value.positions[0]);
-                    zm.storeArr4(&instance.rotation, value.rotations[0]);
-                    instance.scale = value.scales[0][0];
-                    instance.basecolor_roughness = .{ 1, 1, 1, 0.5 };
-                    gctx.queue.writeBuffer(
-                        gctx.lookupResource(instance_buffer).?,
-                        0,
-                        Instance,
-                        &.{instance},
-                    );
-                }
+
+                var instance: Instance = undefined;
+                zm.storeArr3(&instance.position, value.positions[0]);
+                zm.storeArr4(&instance.rotation, value.rotations[0]);
+                instance.scale = value.scales[0][0];
+                instance.basecolor_roughness = .{ 1, 1, 1, 0.5 };
+                gctx.queue.writeBuffer(
+                    gctx.lookupResource(instance_buffer).?,
+                    0,
+                    Instance,
+                    &.{instance},
+                );
+
                 const result = try self.mesh_resources.getOrPut("terrain");
                 const resources = result.value_ptr;
-                {
-                    resources.num_instances = 1;
-                    resources.instance_buffer = instance_buffer;
-                }
+                resources.num_instances = 1;
+                resources.instance_buffer = instance_buffer;
                 self.should_render = true;
             },
             .models => {
@@ -219,10 +208,8 @@ const GameState = struct {
                                 try submeshes.append(submesh);
                                 for (greybox.position, greybox.normal) |position, normal| {
                                     var vertex: Vertex = undefined;
-                                    {
-                                        zm.storeArr3(&vertex.position, position);
-                                        zm.storeArr3(&vertex.normal, normal);
-                                    }
+                                    zm.storeArr3(&vertex.position, position);
+                                    zm.storeArr3(&vertex.normal, normal);
                                     try vertices.append(vertex);
                                 }
                                 try indices.appendSlice(greybox.indices);
@@ -234,21 +221,19 @@ const GameState = struct {
                         .usage = .{ .copy_dst = true, .vertex = true },
                         .size = vertices.items.len * @sizeOf(Vertex),
                     });
-                    {
-                        gctx.queue.writeBuffer(gctx.lookupResource(vertex_buffer).?, 0, Vertex, vertices.items);
-                    }
+                    gctx.queue.writeBuffer(gctx.lookupResource(vertex_buffer).?, 0, Vertex, vertices.items);
+
                     const index_buffer = gctx.createBuffer(.{
                         .usage = .{ .copy_dst = true, .index = true },
                         .size = indices.items.len * @sizeOf(IndexType),
                     });
                     gctx.queue.writeBuffer(gctx.lookupResource(index_buffer).?, 0, IndexType, indices.items);
+
                     const result = try self.mesh_resources.getOrPut(model.label);
                     const resources = result.value_ptr;
-                    {
-                        resources.submesh = submeshes.items;
-                        resources.vertex_buffer = vertex_buffer;
-                        resources.index_buffer = index_buffer;
-                    }
+                    resources.submesh = submeshes.items;
+                    resources.vertex_buffer = vertex_buffer;
+                    resources.index_buffer = index_buffer;
                     self.should_render = true;
                 }
             },
@@ -263,10 +248,8 @@ const GameState = struct {
                             .position = undefined,
                             .rotation = undefined,
                         };
-                        {
-                            zm.storeArr3(&instance.position, position);
-                            zm.storeArr4(&instance.rotation, rotation);
-                        }
+                        zm.storeArr3(&instance.position, position);
+                        zm.storeArr4(&instance.rotation, rotation);
                         try instances.append(instance);
                     }
                     const instance_buffer = gctx.createBuffer(.{
@@ -281,10 +264,8 @@ const GameState = struct {
                     );
                     const result = try self.mesh_resources.getOrPut(_instances.label);
                     const resources = result.value_ptr;
-                    {
-                        resources.num_instances = @intCast(instances.items.len);
-                        resources.instance_buffer = instance_buffer;
-                    }
+                    resources.num_instances = @intCast(instances.items.len);
+                    resources.instance_buffer = instance_buffer;
                     self.should_render = true;
                 }
             },
@@ -434,10 +415,8 @@ fn initScene(
     {
         var mesh = zmesh.Shape.initSubdividedSphere(3);
         defer mesh.deinit();
-        {
-            mesh.unweld();
-            mesh.computeNormals();
-        }
+        mesh.unweld();
+        mesh.computeNormals();
 
         drawables.append(.{
             .mesh_index = @as(u32, @intCast(meshes.items.len)),
@@ -510,12 +489,10 @@ fn initScene(
         };
         var ground = zmesh.Shape.initParametric(local.terrain, 40, 40, null);
         defer ground.deinit();
-        {
-            ground.translate(-0.5, -0.0, -0.5);
-            ground.invert(0, 0);
-            ground.scale(20, 20, 20);
-            ground.computeNormals();
-        }
+        ground.translate(-0.5, -0.0, -0.5);
+        ground.invert(0, 0);
+        ground.scale(20, 20, 20);
+        ground.computeNormals();
 
         drawables.append(.{
             .mesh_index = @as(u32, @intCast(meshes.items.len)),
@@ -551,91 +528,45 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !GameState {
     defer arena_state.deinit();
     const arena = arena_state.allocator();
 
-    const bind_group_layout = gctx.createBindGroupLayout(&.{
-        zgpu.bufferEntry(0, .{ .vertex = true, .fragment = true }, .uniform, true, 0),
-        zgpu.samplerEntry(1, .{ .fragment = true }, .filtering),
-        zgpu.textureEntry(2, .{ .fragment = true }, .depth, .tvdim_2d, false),
-    });
-    defer gctx.releaseResource(bind_group_layout);
+    // Create common vertex and instance attributes for both pipelines
+    const vertex_attributes = [_]wgpu.VertexAttribute{ .{
+        .format = .float32x3,
+        .offset = @offsetOf(Vertex, "position"),
+        .shader_location = 0,
+    }, .{
+        .format = .float32x3,
+        .offset = @offsetOf(Vertex, "normal"),
+        .shader_location = 1,
+    } };
 
-    const pipeline_layout = gctx.createPipelineLayout(&.{bind_group_layout});
-    defer gctx.releaseResource(pipeline_layout);
+    const instance_attributes = [_]wgpu.VertexAttribute{ .{
+        .format = .float32x3,
+        .offset = @offsetOf(Instance, "position"),
+        .shader_location = 10,
+    }, .{
+        .format = .float32x4,
+        .offset = @offsetOf(Instance, "rotation"),
+        .shader_location = 11,
+    }, .{
+        .format = .float32,
+        .offset = @offsetOf(Instance, "scale"),
+        .shader_location = 12,
+    }, .{
+        .format = .float32x4,
+        .offset = @offsetOf(Instance, "basecolor_roughness"),
+        .shader_location = 13,
+    } };
 
-    const pipeline = pipeline: {
-        const vs_module = zgpu.createWgslShaderModule(gctx.device, wgsl.vs, "vs");
-        defer vs_module.release();
-
-        const fs_module = zgpu.createWgslShaderModule(gctx.device, wgsl.fs, "fs");
-        defer fs_module.release();
-
-        const color_targets = [_]wgpu.ColorTargetState{.{
-            .format = zgpu.GraphicsContext.swapchain_format,
-        }};
-
-        const vertex_attributes = [_]wgpu.VertexAttribute{ .{
-            .format = .float32x3,
-            .offset = @offsetOf(Vertex, "position"),
-            .shader_location = 0,
-        }, .{
-            .format = .float32x3,
-            .offset = @offsetOf(Vertex, "normal"),
-            .shader_location = 1,
-        } };
-        const instance_attributes = [_]wgpu.VertexAttribute{ .{
-            .format = .float32x3,
-            .offset = @offsetOf(Instance, "position"),
-            .shader_location = 10,
-        }, .{
-            .format = .float32x4,
-            .offset = @offsetOf(Instance, "rotation"),
-            .shader_location = 11,
-        }, .{
-            .format = .float32,
-            .offset = @offsetOf(Instance, "scale"),
-            .shader_location = 12,
-        }, .{
-            .format = .float32x4,
-            .offset = @offsetOf(Instance, "basecolor_roughness"),
-            .shader_location = 13,
-        } };
-        const vertex_buffers = [_]wgpu.VertexBufferLayout{ .{
-            .array_stride = @sizeOf(Vertex),
-            .attribute_count = vertex_attributes.len,
-            .attributes = &vertex_attributes,
-        }, .{
-            .array_stride = @sizeOf(Instance),
-            .step_mode = .instance,
-            .attribute_count = instance_attributes.len,
-            .attributes = &instance_attributes,
-        } };
-
-        // Create a render pipeline.
-        const pipeline_descriptor = wgpu.RenderPipelineDescriptor{
-            .vertex = wgpu.VertexState{
-                .module = vs_module,
-                .entry_point = "main",
-                .buffer_count = vertex_buffers.len,
-                .buffers = &vertex_buffers,
-            },
-            .primitive = wgpu.PrimitiveState{
-                .front_face = .cw,
-                .cull_mode = .back,
-                .topology = .triangle_list,
-            },
-            .depth_stencil = &wgpu.DepthStencilState{
-                .format = .depth32_float,
-                .depth_write_enabled = true,
-                .depth_compare = .less,
-            },
-            .fragment = &wgpu.FragmentState{
-                .module = fs_module,
-                .entry_point = "main",
-                .target_count = color_targets.len,
-                .targets = &color_targets,
-            },
-        };
-        break :pipeline gctx.createRenderPipeline(pipeline_layout, pipeline_descriptor);
-    };
+    const vertex_buffers = [_]wgpu.VertexBufferLayout{ .{
+        .array_stride = @sizeOf(Vertex),
+        .attribute_count = vertex_attributes.len,
+        .attributes = &vertex_attributes,
+    }, .{
+        .array_stride = @sizeOf(Instance),
+        .step_mode = .instance,
+        .attribute_count = instance_attributes.len,
+        .attributes = &instance_attributes,
+    } };
 
     // Create shadow map texture and view
     const shadow_map_size: u32 = 2048;
@@ -661,107 +592,27 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !GameState {
         .mag_filter = .linear,
         .min_filter = .linear,
         .mipmap_filter = .linear,
-        // .compare = .less,
     });
 
+    // Create bind group layouts
     const shadow_bind_group_layout = gctx.createBindGroupLayout(&.{
         zgpu.bufferEntry(0, .{ .vertex = true, .fragment = true }, .uniform, true, 0),
     });
     defer gctx.releaseResource(shadow_bind_group_layout);
 
-    // Create bind group with shadow map
-    const shadow_bind_group = gctx.createBindGroup(shadow_bind_group_layout, &[_]zgpu.BindGroupEntryInfo{
-        .{
-            .binding = 0,
-            .buffer_handle = gctx.uniforms.buffer,
-            .offset = 0,
-            .size = @sizeOf(FrameUniforms),
-        },
+    const bind_group_layout = gctx.createBindGroupLayout(&.{
+        zgpu.bufferEntry(0, .{ .vertex = true, .fragment = true }, .uniform, true, 0),
+        zgpu.samplerEntry(1, .{ .fragment = true }, .filtering),
+        zgpu.textureEntry(2, .{ .fragment = true }, .depth, .tvdim_2d, false),
     });
+    defer gctx.releaseResource(bind_group_layout);
 
-    // Create bind group with shadow map
-    const bind_group = gctx.createBindGroup(bind_group_layout, &[_]zgpu.BindGroupEntryInfo{
-        .{
-            .binding = 0,
-            .buffer_handle = gctx.uniforms.buffer,
-            .offset = 0,
-            .size = @sizeOf(FrameUniforms),
-        },
-        .{
-            .binding = 1,
-            .sampler_handle = shadow_sampler,
-        },
-        .{
-            .binding = 2,
-            .texture_view_handle = shadow_texture_view,
-        },
-    });
+    // Create pipeline layouts
+    const shadow_pipeline_layout = gctx.createPipelineLayout(&.{shadow_bind_group_layout});
+    defer gctx.releaseResource(shadow_pipeline_layout);
 
-    var drawables = std.ArrayList(Drawable).init(allocator);
-    var meshes = std.ArrayList(Mesh).init(allocator);
-    var meshes_indices = std.ArrayList(IndexType).init(arena);
-    var meshes_positions = std.ArrayList([3]f32).init(arena);
-    var meshes_normals = std.ArrayList([3]f32).init(arena);
-    initScene(allocator, &drawables, &meshes, &meshes_indices, &meshes_positions, &meshes_normals);
-
-    const total_num_vertices = @as(u32, @intCast(meshes_positions.items.len));
-    const total_num_indices = @as(u32, @intCast(meshes_indices.items.len));
-
-    // Create a vertex buffer.
-    const vertex_buffer = gctx.createBuffer(.{
-        .usage = .{ .copy_dst = true, .vertex = true },
-        .size = total_num_vertices * @sizeOf(Vertex),
-    });
-    {
-        var vertex_data = std.ArrayList(Vertex).init(arena);
-        defer vertex_data.deinit();
-        vertex_data.resize(total_num_vertices) catch unreachable;
-
-        for (meshes_positions.items, 0..) |_, i| {
-            vertex_data.items[i].position = meshes_positions.items[i];
-            vertex_data.items[i].normal = meshes_normals.items[i];
-        }
-        gctx.queue.writeBuffer(gctx.lookupResource(vertex_buffer).?, 0, Vertex, vertex_data.items);
-    }
-
-    // Create an index buffer.
-    const index_buffer = gctx.createBuffer(.{
-        .usage = .{ .copy_dst = true, .index = true },
-        .size = total_num_indices * @sizeOf(IndexType),
-    });
-    {
-        gctx.queue.writeBuffer(gctx.lookupResource(index_buffer).?, 0, IndexType, meshes_indices.items);
-    }
-
-    var instances = std.ArrayList(Instance).init(allocator);
-    for (drawables.items) |drawable| {
-        try instances.append(.{
-            .position = drawable.position,
-            .rotation = .{ 0, 0, 0, 1 },
-            .scale = 1,
-            .basecolor_roughness = drawable.basecolor_roughness,
-        });
-    }
-    const instance_buffer = gctx.createBuffer(.{
-        .usage = .{ .copy_dst = true, .vertex = true },
-        .size = instances.items.len * @sizeOf(Instance),
-    });
-    {
-        gctx.queue.writeBuffer(gctx.lookupResource(instance_buffer).?, 0, Instance, instances.items);
-    }
-
-    // Create a depth texture and its 'view'.
-    const depth = createDepthTexture(gctx);
-
-    var mesh_resources: std.StringHashMap(MeshResources) = .init(allocator);
-
-    try mesh_resources.put("demo", .{
-        .submesh = &.{},
-        .num_instances = @intCast(drawables.items.len),
-        .vertex_buffer = vertex_buffer,
-        .index_buffer = index_buffer,
-        .instance_buffer = instance_buffer,
-    });
+    const pipeline_layout = gctx.createPipelineLayout(&.{bind_group_layout});
+    defer gctx.releaseResource(pipeline_layout);
 
     // Create shadow pipeline for depth-only rendering
     const shadow_pipeline = shadow_pipeline: {
@@ -817,46 +668,6 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !GameState {
         , "shadow_vs");
         defer vs_module.release();
 
-        const vertex_attributes = [_]wgpu.VertexAttribute{ .{
-            .format = .float32x3,
-            .offset = @offsetOf(Vertex, "position"),
-            .shader_location = 0,
-        }, .{
-            .format = .float32x3,
-            .offset = @offsetOf(Vertex, "normal"),
-            .shader_location = 1,
-        } };
-        const instance_attributes = [_]wgpu.VertexAttribute{ .{
-            .format = .float32x3,
-            .offset = @offsetOf(Instance, "position"),
-            .shader_location = 10,
-        }, .{
-            .format = .float32x4,
-            .offset = @offsetOf(Instance, "rotation"),
-            .shader_location = 11,
-        }, .{
-            .format = .float32,
-            .offset = @offsetOf(Instance, "scale"),
-            .shader_location = 12,
-        }, .{
-            .format = .float32x4,
-            .offset = @offsetOf(Instance, "basecolor_roughness"),
-            .shader_location = 13,
-        } };
-        const vertex_buffers = [_]wgpu.VertexBufferLayout{ .{
-            .array_stride = @sizeOf(Vertex),
-            .attribute_count = vertex_attributes.len,
-            .attributes = &vertex_attributes,
-        }, .{
-            .array_stride = @sizeOf(Instance),
-            .step_mode = .instance,
-            .attribute_count = instance_attributes.len,
-            .attributes = &instance_attributes,
-        } };
-
-        const shadow_pipeline_layout = gctx.createPipelineLayout(&.{shadow_bind_group_layout});
-        defer gctx.releaseResource(shadow_pipeline_layout);
-
         const pipeline_descriptor = wgpu.RenderPipelineDescriptor{
             .vertex = wgpu.VertexState{
                 .module = vs_module,
@@ -878,6 +689,137 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !GameState {
         };
         break :shadow_pipeline gctx.createRenderPipeline(shadow_pipeline_layout, pipeline_descriptor);
     };
+
+    // Create main rendering pipeline
+    const pipeline = pipeline: {
+        const vs_module = zgpu.createWgslShaderModule(gctx.device, wgsl.vs, "vs");
+        defer vs_module.release();
+
+        const fs_module = zgpu.createWgslShaderModule(gctx.device, wgsl.fs, "fs");
+        defer fs_module.release();
+
+        const color_targets = [_]wgpu.ColorTargetState{.{
+            .format = zgpu.GraphicsContext.swapchain_format,
+        }};
+
+        // Create a render pipeline.
+        const pipeline_descriptor = wgpu.RenderPipelineDescriptor{
+            .vertex = wgpu.VertexState{
+                .module = vs_module,
+                .entry_point = "main",
+                .buffer_count = vertex_buffers.len,
+                .buffers = &vertex_buffers,
+            },
+            .primitive = wgpu.PrimitiveState{
+                .front_face = .cw,
+                .cull_mode = .back,
+                .topology = .triangle_list,
+            },
+            .depth_stencil = &wgpu.DepthStencilState{
+                .format = .depth32_float,
+                .depth_write_enabled = true,
+                .depth_compare = .less,
+            },
+            .fragment = &wgpu.FragmentState{
+                .module = fs_module,
+                .entry_point = "main",
+                .target_count = color_targets.len,
+                .targets = &color_targets,
+            },
+        };
+        break :pipeline gctx.createRenderPipeline(pipeline_layout, pipeline_descriptor);
+    };
+
+    // Create bind groups
+    const shadow_bind_group = gctx.createBindGroup(shadow_bind_group_layout, &[_]zgpu.BindGroupEntryInfo{
+        .{
+            .binding = 0,
+            .buffer_handle = gctx.uniforms.buffer,
+            .offset = 0,
+            .size = @sizeOf(FrameUniforms),
+        },
+    });
+
+    const bind_group = gctx.createBindGroup(bind_group_layout, &[_]zgpu.BindGroupEntryInfo{
+        .{
+            .binding = 0,
+            .buffer_handle = gctx.uniforms.buffer,
+            .offset = 0,
+            .size = @sizeOf(FrameUniforms),
+        },
+        .{
+            .binding = 1,
+            .sampler_handle = shadow_sampler,
+        },
+        .{
+            .binding = 2,
+            .texture_view_handle = shadow_texture_view,
+        },
+    });
+
+    // Initialize scene meshes
+    var drawables = std.ArrayList(Drawable).init(allocator);
+    var meshes = std.ArrayList(Mesh).init(allocator);
+    var meshes_indices = std.ArrayList(IndexType).init(arena);
+    var meshes_positions = std.ArrayList([3]f32).init(arena);
+    var meshes_normals = std.ArrayList([3]f32).init(arena);
+    initScene(allocator, &drawables, &meshes, &meshes_indices, &meshes_positions, &meshes_normals);
+
+    const total_num_vertices = @as(u32, @intCast(meshes_positions.items.len));
+    const total_num_indices = @as(u32, @intCast(meshes_indices.items.len));
+
+    // Create a vertex buffer.
+    const vertex_buffer = gctx.createBuffer(.{
+        .usage = .{ .copy_dst = true, .vertex = true },
+        .size = total_num_vertices * @sizeOf(Vertex),
+    });
+    {
+        var vertex_data = std.ArrayList(Vertex).init(arena);
+        defer vertex_data.deinit();
+        vertex_data.resize(total_num_vertices) catch unreachable;
+
+        for (meshes_positions.items, 0..) |_, i| {
+            vertex_data.items[i].position = meshes_positions.items[i];
+            vertex_data.items[i].normal = meshes_normals.items[i];
+        }
+        gctx.queue.writeBuffer(gctx.lookupResource(vertex_buffer).?, 0, Vertex, vertex_data.items);
+    }
+
+    // Create an index buffer.
+    const index_buffer = gctx.createBuffer(.{
+        .usage = .{ .copy_dst = true, .index = true },
+        .size = total_num_indices * @sizeOf(IndexType),
+    });
+    gctx.queue.writeBuffer(gctx.lookupResource(index_buffer).?, 0, IndexType, meshes_indices.items);
+
+    // Create instance buffer
+    var instances = std.ArrayList(Instance).init(allocator);
+    for (drawables.items) |drawable| {
+        try instances.append(.{
+            .position = drawable.position,
+            .rotation = .{ 0, 0, 0, 1 },
+            .scale = 1,
+            .basecolor_roughness = drawable.basecolor_roughness,
+        });
+    }
+    const instance_buffer = gctx.createBuffer(.{
+        .usage = .{ .copy_dst = true, .vertex = true },
+        .size = instances.items.len * @sizeOf(Instance),
+    });
+    gctx.queue.writeBuffer(gctx.lookupResource(instance_buffer).?, 0, Instance, instances.items);
+
+    // Create a depth texture and its 'view'.
+    const depth = createDepthTexture(gctx);
+
+    // Initialize mesh resources
+    var mesh_resources: std.StringHashMap(MeshResources) = .init(allocator);
+    try mesh_resources.put("demo", .{
+        .submesh = &.{},
+        .num_instances = @intCast(drawables.items.len),
+        .vertex_buffer = vertex_buffer,
+        .index_buffer = index_buffer,
+        .instance_buffer = instance_buffer,
+    });
 
     return GameState{
         .window = window,
@@ -904,7 +846,7 @@ fn deinit(allocator: std.mem.Allocator, game: *GameState) void {
     game.* = undefined;
 }
 
-fn update(game: *GameState) void {
+fn updateGui(game: *const GameState) void {
     zgui.backend.newFrame(
         game.gctx.swapchain_descriptor.width,
         game.gctx.swapchain_descriptor.height,
@@ -924,6 +866,59 @@ fn update(game: *GameState) void {
     zgui.end();
 }
 
+// Helper function to draw meshes in both shadow and main passes
+fn drawMeshes(
+    pass: wgpu.RenderPassEncoder,
+    game: *const GameState,
+) void {
+    var mesh_resources = game.mesh_resources.iterator();
+    while (mesh_resources.next()) |entry| {
+        const resource = entry.value_ptr;
+        const key = entry.key_ptr.*;
+
+        const vb_info = game.gctx.lookupResourceInfo(resource.vertex_buffer) orelse continue;
+        const itb_info = game.gctx.lookupResourceInfo(resource.instance_buffer) orelse continue;
+        const ib_info = game.gctx.lookupResourceInfo(resource.index_buffer) orelse continue;
+
+        pass.setVertexBuffer(0, vb_info.gpuobj.?, 0, vb_info.size);
+        pass.setVertexBuffer(1, itb_info.gpuobj.?, 0, itb_info.size);
+        pass.setIndexBuffer(ib_info.gpuobj.?, .uint32, 0, ib_info.size);
+
+        if (std.mem.eql(u8, key, "demo")) {
+            for (game.drawables.items) |drawable| {
+                pass.drawIndexed(
+                    game.meshes.items[drawable.mesh_index].num_indices,
+                    1,
+                    game.meshes.items[drawable.mesh_index].index_offset,
+                    game.meshes.items[drawable.mesh_index].vertex_offset,
+                    drawable.mesh_index,
+                );
+            }
+        } else {
+            for (resource.submesh) |submesh| {
+                pass.drawIndexed(
+                    submesh.num_indices,
+                    resource.num_instances,
+                    submesh.index_offset,
+                    submesh.vertex_offset,
+                    0,
+                );
+            }
+        }
+    }
+}
+
+// Helper function to set up light view-projection matrix
+fn setupLightViewProj() struct { view: zm.Mat, proj: zm.Mat } {
+    const light_position = zm.f32x4(0.0, 20.0, 0.0, 1.0);
+    const light_target = zm.f32x4(0.0, 0.0, 0.0, 1.0);
+    const light_up = zm.f32x4(0.0, 0.0, 1.0, 0.0);
+    const light_view = zm.lookAtRh(light_position, light_target, light_up);
+    const light_proj = zm.orthographicRh(40.0, 40.0, 0.1, 50.0);
+
+    return .{ .view = light_view, .proj = light_proj };
+}
+
 fn draw(game: *GameState) void {
     if (!game.should_render) {
         std.Thread.sleep(1_000_000);
@@ -931,7 +926,7 @@ fn draw(game: *GameState) void {
     }
     game.should_render = false;
 
-    update(game);
+    updateGui(game);
 
     const gctx = game.gctx;
 
@@ -942,11 +937,15 @@ fn draw(game: *GameState) void {
         const encoder = gctx.device.createCommandEncoder(null);
         defer encoder.release();
 
+        // Set up light view-projection matrix once for both passes
+        const light = setupLightViewProj();
+        const light_view_proj = zm.mul(light.view, light.proj);
+
         // Shadow pass - render depth from light's perspective
-        pass: {
-            const pipeline = gctx.lookupResource(game.shadow_pipeline) orelse break :pass;
-            const bind_group = gctx.lookupResource(game.shadow_bind_group) orelse break :pass;
-            const shadow_view = gctx.lookupResource(game.shadow_texture_view) orelse break :pass;
+        {
+            const pipeline = gctx.lookupResource(game.shadow_pipeline) orelse break :commands encoder.finish(null);
+            const bind_group = gctx.lookupResource(game.shadow_bind_group) orelse break :commands encoder.finish(null);
+            const shadow_view = gctx.lookupResource(game.shadow_texture_view) orelse break :commands encoder.finish(null);
 
             const depth_attachment = wgpu.RenderPassDepthStencilAttachment{
                 .view = shadow_view,
@@ -967,86 +966,24 @@ fn draw(game: *GameState) void {
                 pass.release();
             }
 
-            // Update bindings
-            {
-                const mem = gctx.uniformsAllocate(FrameUniforms, 1);
-                mem.slice[0].world_to_clip = zm.transpose(game.world_matrix);
-                mem.slice[0].camera_position = @as([4]f32, @bitCast(game.camera_position))[0..3].*;
-
-                const light_position = zm.f32x4(0.0, 20.0, 0.0, 1.0);
-                const light_target = zm.f32x4(0.0, 0.0, 0.0, 1.0);
-                const light_up = zm.f32x4(0.0, 0.0, 1.0, 0.0);
-                const light_view = zm.lookAtRh(light_position, light_target, light_up);
-                const light_proj = zm.orthographicRh(40.0, 40.0, 0.1, 50.0);
-
-                mem.slice[0].light_view_proj = zm.transpose(zm.mul(light_view, light_proj));
-
-                pass.setBindGroup(0, bind_group, &.{mem.offset});
-            }
-
-            pass.setPipeline(pipeline);
-
             // Set up light view-projection matrix for shadow pass
             {
                 const mem = gctx.uniformsAllocate(struct {
                     light_view_proj: zm.Mat,
                 }, 1);
-
-                // Same light setup as in main pass
-                const light_position = zm.f32x4(0.0, 20.0, 0.0, 1.0);
-                const light_target = zm.f32x4(0.0, 0.0, 0.0, 1.0);
-                const light_up = zm.f32x4(0.0, 0.0, 1.0, 0.0);
-                const light_view = zm.lookAtRh(light_position, light_target, light_up);
-                const light_proj = zm.orthographicRh(40.0, 40.0, 0.1, 50.0);
-
-                mem.slice[0].light_view_proj = zm.transpose(zm.mul(light_view, light_proj));
-
+                mem.slice[0].light_view_proj = zm.transpose(light_view_proj);
                 pass.setBindGroup(0, bind_group, &.{mem.offset});
             }
 
-            // Draw all meshes to shadow map
-            var mesh_resources = game.mesh_resources.iterator();
-            while (mesh_resources.next()) |entry| {
-                const resource = entry.value_ptr;
-                const key = entry.key_ptr.*;
-
-                const vb_info = gctx.lookupResourceInfo(resource.vertex_buffer) orelse continue;
-                const itb_info = gctx.lookupResourceInfo(resource.instance_buffer) orelse continue;
-                const ib_info = gctx.lookupResourceInfo(resource.index_buffer) orelse continue;
-
-                pass.setVertexBuffer(0, vb_info.gpuobj.?, 0, vb_info.size);
-                pass.setVertexBuffer(1, itb_info.gpuobj.?, 0, itb_info.size);
-                pass.setIndexBuffer(ib_info.gpuobj.?, .uint32, 0, ib_info.size);
-
-                if (std.mem.eql(u8, key, "demo")) {
-                    for (game.drawables.items) |drawable| {
-                        pass.drawIndexed(
-                            game.meshes.items[drawable.mesh_index].num_indices,
-                            1,
-                            game.meshes.items[drawable.mesh_index].index_offset,
-                            game.meshes.items[drawable.mesh_index].vertex_offset,
-                            drawable.mesh_index,
-                        );
-                    }
-                } else {
-                    for (resource.submesh) |submesh| {
-                        pass.drawIndexed(
-                            submesh.num_indices,
-                            resource.num_instances,
-                            submesh.index_offset,
-                            submesh.vertex_offset,
-                            0,
-                        );
-                    }
-                }
-            }
+            pass.setPipeline(pipeline);
+            drawMeshes(pass, game);
         }
 
-        // Main pass.
-        pass: {
-            const pipeline = gctx.lookupResource(game.pipeline) orelse break :pass;
-            const bind_group = gctx.lookupResource(game.bind_group) orelse break :pass;
-            const depth_view = gctx.lookupResource(game.depth_texture_view) orelse break :pass;
+        // Main pass
+        {
+            const pipeline = gctx.lookupResource(game.pipeline) orelse break :commands encoder.finish(null);
+            const bind_group = gctx.lookupResource(game.bind_group) orelse break :commands encoder.finish(null);
+            const depth_view = gctx.lookupResource(game.depth_texture_view) orelse break :commands encoder.finish(null);
 
             const color_attachments = [_]wgpu.RenderPassColorAttachment{.{
                 .view = back_buffer_view,
@@ -1064,7 +1001,7 @@ fn draw(game: *GameState) void {
                 .color_attachments = &color_attachments,
                 .depth_stencil_attachment = &depth_attachment,
             };
-            const pass = encoder.beginRenderPass(render_pass_info);
+            var pass = encoder.beginRenderPass(render_pass_info);
             defer {
                 pass.end();
                 pass.release();
@@ -1076,55 +1013,14 @@ fn draw(game: *GameState) void {
                 const mem = gctx.uniformsAllocate(FrameUniforms, 1);
                 mem.slice[0].world_to_clip = zm.transpose(game.world_matrix);
                 mem.slice[0].camera_position = @as([4]f32, @bitCast(game.camera_position))[0..3].*;
-
-                const light_position = zm.f32x4(0.0, 20.0, 0.0, 1.0);
-                const light_target = zm.f32x4(0.0, 0.0, 0.0, 1.0);
-                const light_up = zm.f32x4(0.0, 0.0, 1.0, 0.0);
-                const light_view = zm.lookAtRh(light_position, light_target, light_up);
-                const light_proj = zm.orthographicRh(40.0, 40.0, 0.1, 50.0);
-
-                mem.slice[0].light_view_proj = zm.transpose(zm.mul(light_view, light_proj));
-
+                mem.slice[0].light_view_proj = zm.transpose(light_view_proj);
                 pass.setBindGroup(0, bind_group, &.{mem.offset});
             }
 
-            var mesh_resources = game.mesh_resources.iterator();
-            while (mesh_resources.next()) |entry| {
-                const resource = entry.value_ptr;
-                const key = entry.key_ptr.*;
-
-                const vb_info = gctx.lookupResourceInfo(resource.vertex_buffer) orelse break :pass;
-                const itb_info = gctx.lookupResourceInfo(resource.instance_buffer) orelse break :pass;
-                const ib_info = gctx.lookupResourceInfo(resource.index_buffer) orelse break :pass;
-
-                pass.setVertexBuffer(0, vb_info.gpuobj.?, 0, vb_info.size);
-                pass.setVertexBuffer(1, itb_info.gpuobj.?, 0, itb_info.size);
-                pass.setIndexBuffer(ib_info.gpuobj.?, .uint32, 0, ib_info.size);
-
-                if (std.mem.eql(u8, key, "demo")) {
-                    for (game.drawables.items) |drawable| {
-                        pass.drawIndexed(
-                            game.meshes.items[drawable.mesh_index].num_indices,
-                            1,
-                            game.meshes.items[drawable.mesh_index].index_offset,
-                            game.meshes.items[drawable.mesh_index].vertex_offset,
-                            drawable.mesh_index,
-                        );
-                    }
-                } else {
-                    for (resource.submesh) |submesh| {
-                        pass.drawIndexed(
-                            submesh.num_indices,
-                            resource.num_instances,
-                            submesh.index_offset,
-                            submesh.vertex_offset,
-                            0,
-                        );
-                    }
-                }
-            }
+            drawMeshes(pass, game);
         }
-        // Gui pass.
+
+        // Gui pass
         {
             const color_attachments = [_]wgpu.RenderPassColorAttachment{.{
                 .view = back_buffer_view,
@@ -1215,10 +1111,6 @@ pub fn main() !void {
     zgui.init(allocator);
     defer zgui.deinit();
 
-    const dir = content_dir ++ "Roboto-Medium.ttf";
-    std.debug.print("dir {s}\n", .{dir});
-    // _ = zgui.io.addFontFromFile(content_dir ++ "Roboto-Medium.ttf", math.floor(16.0 * scale_factor));
-
     zgui.backend.init(
         window,
         game.gctx.device,
@@ -1243,7 +1135,6 @@ pub fn main() !void {
     zgui.getStyle().scaleAllSizes(scale_factor);
 
     while (!window.shouldClose() and window.getKey(.escape) != .press) {
-        zglfw.pollEvents();
         game.graph.update();
         draw(&game);
     }
