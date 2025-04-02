@@ -38,19 +38,6 @@ const FrameUniforms = struct {
     light_view_proj: zm.Mat,
 };
 
-const Mesh = struct {
-    index_offset: u32,
-    vertex_offset: i32,
-    num_indices: u32,
-    num_vertices: u32,
-};
-
-const Drawable = struct {
-    mesh_index: u32,
-    position: [3]f32,
-    basecolor_roughness: [4]f32,
-};
-
 const Submesh = struct {
     index_offset: u32,
     vertex_offset: i32,
@@ -82,8 +69,6 @@ const GameState = struct {
     shadow_bind_group: zgpu.BindGroupHandle,
     shadow_pipeline: zgpu.RenderPipelineHandle,
 
-    meshes: std.ArrayList(Mesh),
-    drawables: std.ArrayList(Drawable),
     mouse: struct {
         cursor_pos: [2]f64 = .{ 0, 0 },
     } = .{},
@@ -102,6 +87,11 @@ const GameState = struct {
     pub fn poll(self: *@This(), comptime field_tag: GameGraph.InputTag) std.meta.fieldInfo(GameGraph.Inputs, field_tag).type {
         const ms_delay = 1000 / 15; // 15 FPS
         return switch (field_tag) {
+            .orbit_speed => 0.01,
+            .bounce => false,
+            .size_multiplier => 1,
+            .selected_camera => .orbit,
+            .player_settings => .{ .movement_speed = 0.01, .look_speed = 0.001 },
             .time => @intCast(@divFloor(
                 std.time.nanoTimestamp(),
                 std.time.ns_per_ms * ms_delay,
@@ -120,11 +110,6 @@ const GameState = struct {
                     .movement = .{ .left = null, .right = null, .forward = null, .backward = null },
                 };
             },
-            .selected_camera => .orbit,
-            .orbit_speed => 0.01,
-            .player_settings => .{ .movement_speed = 0.01, .look_speed = 0.001 },
-            .bounce => false,
-            .size_multiplier => 1,
         };
     }
 
@@ -274,236 +259,6 @@ const GameState = struct {
     }
 };
 
-fn appendMesh(
-    mesh: zmesh.Shape,
-    meshes: *std.ArrayList(Mesh),
-    meshes_indices: *std.ArrayList(IndexType),
-    meshes_positions: *std.ArrayList([3]f32),
-    meshes_normals: *std.ArrayList([3]f32),
-) void {
-    meshes.append(.{
-        .index_offset = @as(u32, @intCast(meshes_indices.items.len)),
-        .vertex_offset = @as(i32, @intCast(meshes_positions.items.len)),
-        .num_indices = @as(u32, @intCast(mesh.indices.len)),
-        .num_vertices = @as(u32, @intCast(mesh.positions.len)),
-    }) catch unreachable;
-
-    meshes_indices.appendSlice(mesh.indices) catch unreachable;
-    meshes_positions.appendSlice(mesh.positions) catch unreachable;
-    meshes_normals.appendSlice(mesh.normals.?) catch unreachable;
-}
-
-fn initScene(
-    allocator: std.mem.Allocator,
-    drawables: *std.ArrayList(Drawable),
-    meshes: *std.ArrayList(Mesh),
-    meshes_indices: *std.ArrayList(IndexType),
-    meshes_positions: *std.ArrayList([3]f32),
-    meshes_normals: *std.ArrayList([3]f32),
-) void {
-    var arena_state = std.heap.ArenaAllocator.init(allocator);
-    defer arena_state.deinit();
-    const arena = arena_state.allocator();
-
-    zmesh.init(arena);
-    defer zmesh.deinit();
-
-    // Trefoil knot.
-    {
-        var mesh = zmesh.Shape.initTrefoilKnot(10, 128, 0.8);
-        defer mesh.deinit();
-        mesh.rotate(math.pi * 0.5, 1.0, 0.0, 0.0);
-        mesh.unweld();
-        mesh.computeNormals();
-
-        drawables.append(.{
-            .mesh_index = @as(u32, @intCast(meshes.items.len)),
-            .position = .{ 0, 1, 0 },
-            .basecolor_roughness = .{ 0.0, 0.7, 0.0, 0.6 },
-        }) catch unreachable;
-
-        appendMesh(mesh, meshes, meshes_indices, meshes_positions, meshes_normals);
-    }
-    // Parametric sphere.
-    {
-        var mesh = zmesh.Shape.initParametricSphere(20, 20);
-        defer mesh.deinit();
-        mesh.rotate(math.pi * 0.5, 1.0, 0.0, 0.0);
-        mesh.unweld();
-        mesh.computeNormals();
-
-        drawables.append(.{
-            .mesh_index = @as(u32, @intCast(meshes.items.len)),
-            .position = .{ 3, 1, 0 },
-            .basecolor_roughness = .{ 0.7, 0.0, 0.0, 0.2 },
-        }) catch unreachable;
-
-        appendMesh(mesh, meshes, meshes_indices, meshes_positions, meshes_normals);
-    }
-    // Icosahedron.
-    {
-        var mesh = zmesh.Shape.initIcosahedron();
-        defer mesh.deinit();
-        mesh.unweld();
-        mesh.computeNormals();
-
-        drawables.append(.{
-            .mesh_index = @as(u32, @intCast(meshes.items.len)),
-            .position = .{ -3, 1, 0 },
-            .basecolor_roughness = .{ 0.7, 0.6, 0.0, 0.4 },
-        }) catch unreachable;
-
-        appendMesh(mesh, meshes, meshes_indices, meshes_positions, meshes_normals);
-    }
-    // Dodecahedron.
-    {
-        var mesh = zmesh.Shape.initDodecahedron();
-        defer mesh.deinit();
-        mesh.unweld();
-        mesh.computeNormals();
-
-        drawables.append(.{
-            .mesh_index = @as(u32, @intCast(meshes.items.len)),
-            .position = .{ 0, 1, 3 },
-            .basecolor_roughness = .{ 0.0, 0.1, 1.0, 0.2 },
-        }) catch unreachable;
-
-        appendMesh(mesh, meshes, meshes_indices, meshes_positions, meshes_normals);
-    }
-    // Cylinder with top and bottom caps.
-    {
-        var disk = zmesh.Shape.initParametricDisk(10, 2);
-        defer disk.deinit();
-        disk.invert(0, 0);
-
-        var cylinder = zmesh.Shape.initCylinder(10, 4);
-        defer cylinder.deinit();
-
-        cylinder.merge(disk);
-        cylinder.translate(0, 0, -1);
-        disk.invert(0, 0);
-        cylinder.merge(disk);
-
-        cylinder.scale(0.5, 0.5, 2);
-        cylinder.rotate(math.pi * 0.5, 1.0, 0.0, 0.0);
-
-        cylinder.unweld();
-        cylinder.computeNormals();
-
-        drawables.append(.{
-            .mesh_index = @as(u32, @intCast(meshes.items.len)),
-            .position = .{ -3, 0, 3 },
-            .basecolor_roughness = .{ 1.0, 0.0, 0.0, 0.3 },
-        }) catch unreachable;
-
-        appendMesh(cylinder, meshes, meshes_indices, meshes_positions, meshes_normals);
-    }
-    // Torus.
-    {
-        var mesh = zmesh.Shape.initTorus(10, 20, 0.2);
-        defer mesh.deinit();
-
-        drawables.append(.{
-            .mesh_index = @as(u32, @intCast(meshes.items.len)),
-            .position = .{ 3, 1.5, 3 },
-            .basecolor_roughness = .{ 1.0, 0.5, 0.0, 0.2 },
-        }) catch unreachable;
-
-        appendMesh(mesh, meshes, meshes_indices, meshes_positions, meshes_normals);
-    }
-    // Subdivided sphere.
-    {
-        var mesh = zmesh.Shape.initSubdividedSphere(3);
-        defer mesh.deinit();
-        mesh.unweld();
-        mesh.computeNormals();
-
-        drawables.append(.{
-            .mesh_index = @as(u32, @intCast(meshes.items.len)),
-            .position = .{ 3, 1, 6 },
-            .basecolor_roughness = .{ 0.0, 1.0, 0.0, 0.2 },
-        }) catch unreachable;
-
-        appendMesh(mesh, meshes, meshes_indices, meshes_positions, meshes_normals);
-    }
-    // Tetrahedron.
-    {
-        var mesh = zmesh.Shape.initTetrahedron();
-        defer mesh.deinit();
-        mesh.unweld();
-        mesh.computeNormals();
-
-        drawables.append(.{
-            .mesh_index = @as(u32, @intCast(meshes.items.len)),
-            .position = .{ 0, 0.5, 6 },
-            .basecolor_roughness = .{ 1.0, 0.0, 1.0, 0.2 },
-        }) catch unreachable;
-
-        appendMesh(mesh, meshes, meshes_indices, meshes_positions, meshes_normals);
-    }
-    // Octahedron.
-    {
-        var mesh = zmesh.Shape.initOctahedron();
-        defer mesh.deinit();
-        mesh.unweld();
-        mesh.computeNormals();
-
-        drawables.append(.{
-            .mesh_index = @as(u32, @intCast(meshes.items.len)),
-            .position = .{ -3, 1, 6 },
-            .basecolor_roughness = .{ 0.2, 0.0, 1.0, 0.2 },
-        }) catch unreachable;
-
-        appendMesh(mesh, meshes, meshes_indices, meshes_positions, meshes_normals);
-    }
-    // Rock.
-    {
-        var rock = zmesh.Shape.initRock(123, 4);
-        defer rock.deinit();
-        rock.unweld();
-        rock.computeNormals();
-
-        drawables.append(.{
-            .mesh_index = @as(u32, @intCast(meshes.items.len)),
-            .position = .{ -6, 0, 3 },
-            .basecolor_roughness = .{ 1.0, 1.0, 1.0, 1.0 },
-        }) catch unreachable;
-
-        appendMesh(rock, meshes, meshes_indices, meshes_positions, meshes_normals);
-    }
-    // Custom parametric (simple terrain).
-    {
-        const gen = znoise.FnlGenerator{
-            .fractal_type = .fbm,
-            .frequency = 2.0,
-            .octaves = 5,
-            .lacunarity = 2.02,
-        };
-        const local = struct {
-            fn terrain(uv: *const [2]f32, position: *[3]f32, userdata: ?*anyopaque) callconv(.C) void {
-                _ = userdata;
-                position[0] = uv[0];
-                position[1] = 0.025 * gen.noise2(uv[0], uv[1]);
-                position[2] = uv[1];
-            }
-        };
-        var ground = zmesh.Shape.initParametric(local.terrain, 40, 40, null);
-        defer ground.deinit();
-        ground.translate(-0.5, -0.0, -0.5);
-        ground.invert(0, 0);
-        ground.scale(20, 20, 20);
-        ground.computeNormals();
-
-        drawables.append(.{
-            .mesh_index = @as(u32, @intCast(meshes.items.len)),
-            .position = .{ 0, 0, 0 },
-            .basecolor_roughness = .{ 0.1, 0.1, 0.1, 1.0 },
-        }) catch unreachable;
-
-        appendMesh(ground, meshes, meshes_indices, meshes_positions, meshes_normals);
-    }
-}
-
 fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !GameState {
     const gctx = try zgpu.GraphicsContext.create(
         allocator,
@@ -523,10 +278,6 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !GameState {
         },
     );
     errdefer gctx.destroy(allocator);
-
-    var arena_state = std.heap.ArenaAllocator.init(allocator);
-    defer arena_state.deinit();
-    const arena = arena_state.allocator();
 
     // Create common vertex and instance attributes for both pipelines
     const vertex_attributes = [_]wgpu.VertexAttribute{ .{
@@ -616,56 +367,11 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !GameState {
 
     // Create shadow pipeline for depth-only rendering
     const shadow_pipeline = shadow_pipeline: {
-        const vs_module = zgpu.createWgslShaderModule(gctx.device,
-            \\  struct FrameUniforms {
-            \\      light_view_proj: mat4x4<f32>,
-            \\  }
-            \\  @group(0) @binding(0) var<uniform> frame_uniforms: FrameUniforms;
-            \\
-            \\  struct Instance {
-            \\      @location(10) position: vec3<f32>,
-            \\      @location(11) rotation: vec4<f32>,
-            \\      @location(12) scale: f32,
-            \\      @location(13) basecolor_roughness: vec4<f32>,
-            \\  }
-            \\
-            \\  struct Vertex {
-            \\      @location(0) position: vec3<f32>,
-            \\      @location(1) normal: vec3<f32>,
-            \\  }
-            \\
-            \\  fn matrix_from_instance(i: Instance) -> mat4x4<f32> {
-            \\    var x: f32 = i.rotation.x;
-            \\    var y: f32 = i.rotation.y;
-            \\    var z: f32 = i.rotation.z;
-            \\    var w: f32 = i.rotation.w;
-            \\    var rotationMatrix: mat3x3<f32> = mat3x3(
-            \\        1.0 - 2.0 * (y * y + z * z), 2.0 * (x * y - w * z), 2.0 * (x * z + w * y),
-            \\        2.0 * (x * y + w * z), 1.0 - 2.0 * (x * x + z * z), 2.0 * (y * z - w * x),
-            \\        2.0 * (x * z - w * y), 2.0 * (y * z + w * x), 1.0 - 2.0 * (x * x + y * y)
-            \\    );
-            \\    var scaledRotation: mat3x3<f32> = mat3x3(
-            \\        rotationMatrix[0] * i.scale,
-            \\        rotationMatrix[1] * i.scale,
-            \\        rotationMatrix[2] * i.scale
-            \\    );
-            \\    var transform: mat4x4<f32> = mat4x4(
-            \\        vec4(scaledRotation[0], i.position.x),
-            \\        vec4(scaledRotation[1], i.position.y),
-            \\        vec4(scaledRotation[2], i.position.z),
-            \\        vec4(0.0, 0.0, 0.0, 1.0),
-            \\    );
-            \\    return transform;
-            \\  }
-            \\
-            \\  @vertex fn main(
-            \\      vertex: Vertex,
-            \\      instance: Instance,
-            \\  ) -> @builtin(position) vec4<f32> {
-            \\      let transform = matrix_from_instance(instance);
-            \\      return vec4(vertex.position, 1.0) * transform * frame_uniforms.light_view_proj;
-            \\  }
-        , "shadow_vs");
+        const vs_module = zgpu.createWgslShaderModule(
+            gctx.device,
+            @embedFile("shaders/shadow_vert.wgsl"),
+            "shadow_vs",
+        );
         defer vs_module.release();
 
         const pipeline_descriptor = wgpu.RenderPipelineDescriptor{
@@ -757,69 +463,11 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !GameState {
         },
     });
 
-    // Initialize scene meshes
-    var drawables = std.ArrayList(Drawable).init(allocator);
-    var meshes = std.ArrayList(Mesh).init(allocator);
-    var meshes_indices = std.ArrayList(IndexType).init(arena);
-    var meshes_positions = std.ArrayList([3]f32).init(arena);
-    var meshes_normals = std.ArrayList([3]f32).init(arena);
-    initScene(allocator, &drawables, &meshes, &meshes_indices, &meshes_positions, &meshes_normals);
-
-    const total_num_vertices = @as(u32, @intCast(meshes_positions.items.len));
-    const total_num_indices = @as(u32, @intCast(meshes_indices.items.len));
-
-    // Create a vertex buffer.
-    const vertex_buffer = gctx.createBuffer(.{
-        .usage = .{ .copy_dst = true, .vertex = true },
-        .size = total_num_vertices * @sizeOf(Vertex),
-    });
-    {
-        var vertex_data = std.ArrayList(Vertex).init(arena);
-        defer vertex_data.deinit();
-        vertex_data.resize(total_num_vertices) catch unreachable;
-
-        for (meshes_positions.items, 0..) |_, i| {
-            vertex_data.items[i].position = meshes_positions.items[i];
-            vertex_data.items[i].normal = meshes_normals.items[i];
-        }
-        gctx.queue.writeBuffer(gctx.lookupResource(vertex_buffer).?, 0, Vertex, vertex_data.items);
-    }
-
-    // Create an index buffer.
-    const index_buffer = gctx.createBuffer(.{
-        .usage = .{ .copy_dst = true, .index = true },
-        .size = total_num_indices * @sizeOf(IndexType),
-    });
-    gctx.queue.writeBuffer(gctx.lookupResource(index_buffer).?, 0, IndexType, meshes_indices.items);
-
-    // Create instance buffer
-    var instances = std.ArrayList(Instance).init(allocator);
-    for (drawables.items) |drawable| {
-        try instances.append(.{
-            .position = drawable.position,
-            .rotation = .{ 0, 0, 0, 1 },
-            .scale = 1,
-            .basecolor_roughness = drawable.basecolor_roughness,
-        });
-    }
-    const instance_buffer = gctx.createBuffer(.{
-        .usage = .{ .copy_dst = true, .vertex = true },
-        .size = instances.items.len * @sizeOf(Instance),
-    });
-    gctx.queue.writeBuffer(gctx.lookupResource(instance_buffer).?, 0, Instance, instances.items);
-
     // Create a depth texture and its 'view'.
     const depth = createDepthTexture(gctx);
 
     // Initialize mesh resources
-    var mesh_resources: std.StringHashMap(MeshResources) = .init(allocator);
-    try mesh_resources.put("demo", .{
-        .submesh = &.{},
-        .num_instances = @intCast(drawables.items.len),
-        .vertex_buffer = vertex_buffer,
-        .index_buffer = index_buffer,
-        .instance_buffer = instance_buffer,
-    });
+    const mesh_resources: std.StringHashMap(MeshResources) = .init(allocator);
 
     return GameState{
         .window = window,
@@ -829,8 +477,6 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !GameState {
         .mesh_resources = mesh_resources,
         .depth_texture = depth.texture,
         .depth_texture_view = depth.view,
-        .meshes = meshes,
-        .drawables = drawables,
         .frame_arena = .init(allocator),
         .shadow_texture = shadow_texture,
         .shadow_texture_view = shadow_texture_view,
@@ -840,8 +486,6 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !GameState {
 }
 
 fn deinit(allocator: std.mem.Allocator, game: *GameState) void {
-    game.meshes.deinit();
-    game.drawables.deinit();
     game.gctx.destroy(allocator);
     game.* = undefined;
 }
@@ -874,7 +518,6 @@ fn drawMeshes(
     var mesh_resources = game.mesh_resources.iterator();
     while (mesh_resources.next()) |entry| {
         const resource = entry.value_ptr;
-        const key = entry.key_ptr.*;
 
         const vb_info = game.gctx.lookupResourceInfo(resource.vertex_buffer) orelse continue;
         const itb_info = game.gctx.lookupResourceInfo(resource.instance_buffer) orelse continue;
@@ -884,26 +527,14 @@ fn drawMeshes(
         pass.setVertexBuffer(1, itb_info.gpuobj.?, 0, itb_info.size);
         pass.setIndexBuffer(ib_info.gpuobj.?, .uint32, 0, ib_info.size);
 
-        if (std.mem.eql(u8, key, "demo")) {
-            for (game.drawables.items) |drawable| {
-                pass.drawIndexed(
-                    game.meshes.items[drawable.mesh_index].num_indices,
-                    1,
-                    game.meshes.items[drawable.mesh_index].index_offset,
-                    game.meshes.items[drawable.mesh_index].vertex_offset,
-                    drawable.mesh_index,
-                );
-            }
-        } else {
-            for (resource.submesh) |submesh| {
-                pass.drawIndexed(
-                    submesh.num_indices,
-                    resource.num_instances,
-                    submesh.index_offset,
-                    submesh.vertex_offset,
-                    0,
-                );
-            }
+        for (resource.submesh) |submesh| {
+            pass.drawIndexed(
+                submesh.num_indices,
+                resource.num_instances,
+                submesh.index_offset,
+                submesh.vertex_offset,
+                0,
+            );
         }
     }
 }
