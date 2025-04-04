@@ -100,15 +100,15 @@ pub const graph_nodes = struct {
             .orbit => {
                 props.orbit_camera.rotation = props.orbit_camera.rotation +
                     props.input.mouse_delta *
-                    zmath.splat(Vec4, -props.orbit_speed);
-                const view_projection = zmath.perspectiveFovLh(
+                        zmath.splat(Vec4, -props.orbit_speed);
+                const projection_matrix = zmath.perspectiveFovLh(
                     0.25 * 3.14151,
                     @as(f32, @floatFromInt(props.render_resolution.x)) /
                         @as(f32, @floatFromInt(props.render_resolution.y)),
                     0.1,
                     500,
                 );
-                const location = location: {
+                const view_matrix = location: {
                     const t = zmath.translationV(props.orbit_camera.position);
                     const r = .{
                         .y = zmath.matFromRollPitchYaw(0, props.orbit_camera.rotation[0], 0),
@@ -119,17 +119,17 @@ pub const graph_nodes = struct {
                 };
 
                 return .{
-                    .camera_position = zmath.mul(zmath.inverse(location), Vec4{ 0, 0, 0, 1 }),
+                    .camera_position = zmath.mul(zmath.inverse(view_matrix), Vec4{ 0, 0, 0, 1 }),
                     .world_matrix = zmath.mul(
-                        location,
-                        view_projection,
+                        view_matrix,
+                        projection_matrix,
                     ),
                 };
             },
             .first_person => {
                 props.player.euler_rotation = props.player.euler_rotation +
                     props.input.mouse_delta *
-                    zmath.splat(Vec4, -props.player_settings.look_speed);
+                        zmath.splat(Vec4, -props.player_settings.look_speed);
 
                 const rotation_matrix = zmath.matFromRollPitchYaw(
                     -props.player.euler_rotation[1],

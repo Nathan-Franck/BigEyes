@@ -5,7 +5,6 @@ const pi = 3.1415926;
 
 fn saturate(x: f32) -> f32 { return clamp(x, 0.0, 1.0); }
 
-// Shadow mapping function
 fn getShadowFactor(world_pos: vec3<f32>) -> f32 {
   // Transform world position to light space
   let pos_light_space = vec4(world_pos, 1.0) * frame_uniforms.light_view_proj;
@@ -16,15 +15,46 @@ fn getShadowFactor(world_pos: vec3<f32>) -> f32 {
   // Current fragment depth
   let current_depth = pos_light_space.z * 0.5 + 0.5;
   
+  // Sample depth from shadow map - this returns a single f32 value
+  let shadow_depth = textureSample(shadow_texture, shadow_sampler, uv);
+  
   // Check if fragment is in shadow
-  let bias = 0.005; // Adjust based on your scene
-  let shadow_sample = textureSample(shadow_texture, shadow_sampler, uv);
-  var shadow: f32 = 1.0;
+  var shadow: f32 = 1.0; // Default to fully lit
   if (uv.x >= 0.0 && uv.x <= 1.0 && uv.y >= 0.0 && uv.y <= 1.0) {
-      shadow = 1-shadow_sample;
+    // Compare current depth with shadow map depth
+    // If current_depth > shadow_depth, the fragment is in shadow
+    if (current_depth > shadow_depth + 0.005) { // Add bias to avoid shadow acne
+      shadow = 0.0; // In shadow
+    }
   }
   
-  return shadow;
+  return shadow_depth;
+}
+
+fn shadowDebug(world_pos: vec3<f32>) -> vec4<f32> {
+  // Transform world position to light space
+  var pos_light_space = vec4(world_pos, 1.0) * frame_uniforms.light_view_proj;
+  
+  // Transform to [0,1] range
+  let uv = vec2(pos_light_space.xy * vec2(0.5, -0.5) + vec2(0.5, 0.5));
+  
+  // Current fragment depth
+  let current_depth = pos_light_space.z * 0.5 + 0.5;
+  
+  // Sample depth from shadow map - this returns a single f32 value
+  let shadow_depth = textureSample(shadow_texture, shadow_sampler, uv);
+  
+  // Check if fragment is in shadow
+  var shadow: f32 = 1.0; // Default to fully lit
+  if (uv.x >= 0.0 && uv.x <= 1.0 && uv.y >= 0.0 && uv.y <= 1.0) {
+    // Compare current depth with shadow map depth
+    // If current_depth > shadow_depth, the fragment is in shadow
+    if (current_depth > shadow_depth + 0.005) { // Add bias to avoid shadow acne
+      shadow = 0.0; // In shadow
+    }
+  }
+  
+  return vec4(frame_uniforms.light_view_proj[0].xyz, 1);
 }
 
 // Trowbridge-Reitz GGX normal distribution function.
@@ -103,5 +133,5 @@ fn fresnelSchlick(h_dot_v: f32, f0: vec3<f32>) -> vec3<f32> {
   color = color / (color + 1.0);
   color = pow(color, vec3(1.0 / 2.2));
 
-  return vec4( getShadowFactor(position), 0, 0, 1);//color, 1.0);
+  return shadowDebug(position);//vec4( getShadowFactor(position), 0, 0, 1);//color, 1.0);
 }

@@ -499,7 +499,7 @@ fn updateGui(game: *const GameState) void {
     zgui.setNextWindowPos(.{ .x = 20.0, .y = 20.0, .cond = .always });
     zgui.setNextWindowSize(.{ .w = -1.0, .h = -1.0, .cond = .always });
 
-    if (zgui.begin("Gamer Settings", .{ .flags = .{ .no_move = true, .no_resize = true } })) {
+    if (zgui.begin("Game Settings", .{ .flags = .{ .no_move = true, .no_resize = true } })) {
         zgui.bulletText(
             "Average : {d:.3} ms/frame ({d:.1} fps)",
             .{ game.gctx.stats.average_cpu_time, game.gctx.stats.fps },
@@ -541,11 +541,13 @@ fn drawMeshes(
 
 // Helper function to set up light view-projection matrix
 fn setupLightViewProj() struct { view: zm.Mat, proj: zm.Mat } {
-    const light_position = zm.f32x4(0.0, 20.0, 0.0, 1.0);
+    const light_position = zm.f32x4(0.0, 20.0, 1.0, 1.0);
     const light_target = zm.f32x4(0.0, 0.0, 0.0, 1.0);
-    const light_up = zm.f32x4(0.0, 0.0, 1.0, 0.0);
-    const light_view = zm.lookAtRh(light_position, light_target, light_up);
-    const light_proj = zm.orthographicRh(40.0, 40.0, 0.1, 50.0);
+    const light_up = zm.f32x4(0.0, 1.0, 0.0, 0.0);
+    const light_view = zm.lookAtLh(light_position, light_target, light_up);
+    const light_proj = zm.orthographicLh(20.0, 20.0, 0.1, 50.0);
+
+    std.debug.print("{any} {any}\n", .{ light_view, light_proj });
 
     return .{ .view = light_view, .proj = light_proj };
 }
@@ -569,8 +571,12 @@ fn draw(game: *GameState) void {
         defer encoder.release();
 
         // Set up light view-projection matrix once for both passes
-        const light = setupLightViewProj();
-        const light_view_proj = zm.mul(light.view, light.proj);
+        // const light = setupLightViewProj();
+        const light_view_proj = zm.identity(); //zm.mul(light.view, light.proj);
+        std.debug.print("As an example.... {any}\n", .{zm.mul(
+            zm.loadArr3w(.{ 0, 0, 3 }, 1),
+            light_view_proj,
+        )});
 
         // Shadow pass - render depth from light's perspective
         {
