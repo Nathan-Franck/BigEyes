@@ -23,7 +23,7 @@ fn getShadowFactor(world_pos: vec3<f32>) -> f32 {
   if (uv.x >= 0.0 && uv.x <= 1.0 && uv.y >= 0.0 && uv.y <= 1.0) {
     // Compare current depth with shadow map depth
     // If current_depth > shadow_depth, the fragment is in shadow
-    if (current_depth > shadow_depth + 0.005) { // Add bias to avoid shadow acne
+    if (current_depth > shadow_depth + 0.0) { // Add bias to avoid shadow acne
       shadow = 0.0; // In shadow
     }
   }

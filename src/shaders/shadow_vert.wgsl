@@ -44,5 +44,6 @@ return transform;
   instance: Instance,
 ) -> @builtin(position) vec4<f32> {
   let transform = matrix_from_instance(instance);
-  return vec4(vertex.position, 1.0) * transform * frame_uniforms.light_view_proj;
+  let offset = normalize(vertex.normal) * 0.004;
+  return vec4(vertex.position - offset, 1.0) * transform * frame_uniforms.light_view_proj;
 }

@@ -541,7 +541,7 @@ fn drawMeshes(
 
 // Helper function to set up light view-projection matrix
 fn setupLightViewProj() struct { view: zm.Mat, proj: zm.Mat } {
-    const light_position = zm.f32x4(0.0, 20.0, 1.0, 1.0);
+    const light_position = zm.f32x4(20.0, 20.0, 20.0, 1.0);
     const light_target = zm.f32x4(0.0, 0.0, 0.0, 1.0);
     const light_up = zm.f32x4(0.0, 1.0, 0.0, 0.0);
     const light_view = zm.lookAtLh(light_position, light_target, light_up);
