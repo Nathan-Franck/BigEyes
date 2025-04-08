@@ -547,8 +547,6 @@ fn setupLightViewProj() struct { view: zm.Mat, proj: zm.Mat } {
     const light_view = zm.lookAtLh(light_position, light_target, light_up);
     const light_proj = zm.orthographicLh(20.0, 20.0, 0.1, 50.0);
 
-    std.debug.print("{any} {any}\n", .{ light_view, light_proj });
-
     return .{ .view = light_view, .proj = light_proj };
 }
 
@@ -571,12 +569,8 @@ fn draw(game: *GameState) void {
         defer encoder.release();
 
         // Set up light view-projection matrix once for both passes
-        // const light = setupLightViewProj();
-        const light_view_proj = zm.identity(); //zm.mul(light.view, light.proj);
-        std.debug.print("As an example.... {any}\n", .{zm.mul(
-            zm.loadArr3w(.{ 0, 0, 3 }, 1),
-            light_view_proj,
-        )});
+        const light = setupLightViewProj();
+        const light_view_proj = zm.mul(light.view, light.proj);
 
         // Shadow pass - render depth from light's perspective
         {
