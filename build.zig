@@ -174,7 +174,7 @@ pub fn build(
 
         {
             @import("zgpu").addLibraryPathsTo(exe);
-            if (target.query.os_tag == .linux)
+            if (target.result.os.tag == .linux)
                 exe.linkSystemLibrary("X11");
 
             exe.linkLibrary(zglfw.artifact("glfw"));
