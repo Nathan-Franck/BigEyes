@@ -34,7 +34,7 @@ const Instance = struct {
 
 const FrameUniforms = struct {
     world_to_clip: zm.Mat,
-    camera_position: [3]f32,
+    camera_position: zm.Vec, // You can't have a uniform member that is 12 bytes!
     light_view_proj: zm.Mat,
 };
 
@@ -649,7 +649,7 @@ fn draw(game: *GameState) void {
             {
                 const mem = gctx.uniformsAllocate(FrameUniforms, 1);
                 mem.slice[0].world_to_clip = zm.transpose(game.world_matrix);
-                mem.slice[0].camera_position = @as([4]f32, @bitCast(game.camera_position))[0..3].*;
+                mem.slice[0].camera_position = game.camera_position;
                 mem.slice[0].light_view_proj = zm.transpose(light_view_proj);
                 pass.setBindGroup(0, bind_group, &.{mem.offset});
             }
