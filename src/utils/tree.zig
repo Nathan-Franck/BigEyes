@@ -224,14 +224,14 @@ pub fn generateTaperedWood(allocator: Allocator, skeleton: Skeleton, settings: M
             const child_size = zm.lerpV(grandchild.size, child.size, child.growth) * settings.thickness;
 
             const vertices = [_]Vec4{
-                Vec4{ 0.5 * parent_size, 0.5 * parent_size, 0, 1 },
-                Vec4{ -0.5 * parent_size, 0.5 * parent_size, 0, 1 },
-                Vec4{ -0.5 * parent_size, -0.5 * parent_size, 0, 1 },
-                Vec4{ 0.5 * parent_size, -0.5 * parent_size, 0, 1 },
                 Vec4{ 0.5 * child_size, 0.5 * child_size, height, 1 },
                 Vec4{ -0.5 * child_size, 0.5 * child_size, height, 1 },
                 Vec4{ -0.5 * child_size, -0.5 * child_size, height, 1 },
                 Vec4{ 0.5 * child_size, -0.5 * child_size, height, 1 },
+                Vec4{ 0.5 * parent_size, 0.5 * parent_size, 0, 1 },
+                Vec4{ -0.5 * parent_size, 0.5 * parent_size, 0, 1 },
+                Vec4{ -0.5 * parent_size, -0.5 * parent_size, 0, 1 },
+                Vec4{ 0.5 * parent_size, -0.5 * parent_size, 0, 1 },
             };
 
             const vertex_offset = node_index * 8;

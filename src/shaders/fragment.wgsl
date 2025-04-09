@@ -75,7 +75,7 @@ fn fresnelSchlick(h_dot_v: f32, f0: vec3<f32>) -> vec3<f32> {
   f0 = mix(f0, base_color, metallic);
 
   // Use a single directional light (sun) instead of the 4 point lights
-  let light_dir = normalize(vec3(0.5, -0.8, -0.2));
+  let light_dir = normalize(frame_uniforms.light_direction);
   let light_radiance = vec3(10.0);
 
   // Get shadow factor
@@ -107,5 +107,5 @@ fn fresnelSchlick(h_dot_v: f32, f0: vec3<f32>) -> vec3<f32> {
   color = color / (color + 1.0);
   color = pow(color, vec3(1.0 / 2.2));
 
-  return vec4( getShadowFactor(position), 0, 0, 1);//color, 1.0);
+  return vec4(color, 1.0);
 }

@@ -35,6 +35,7 @@ const Instance = struct {
 const FrameUniforms = struct {
     world_to_clip: zm.Mat,
     camera_position: zm.Vec, // You can't have a uniform member that is 12 bytes!
+    light_direction: zm.Vec, // You can't have a uniform member that is 12 bytes!
     light_view_proj: zm.Mat,
 };
 
@@ -540,14 +541,15 @@ fn drawMeshes(
 }
 
 // Helper function to set up light view-projection matrix
-fn setupLightViewProj() struct { view: zm.Mat, proj: zm.Mat } {
+fn setupLightViewProj() struct { view: zm.Mat, projection: zm.Mat, direction: zm.Vec } {
     const light_position = zm.f32x4(20.0, 20.0, 20.0, 1.0);
     const light_target = zm.f32x4(0.0, 0.0, 0.0, 1.0);
     const light_up = zm.f32x4(0.0, 1.0, 0.0, 0.0);
-    const light_view = zm.lookAtLh(light_position, light_target, light_up);
-    const light_proj = zm.orthographicLh(20.0, 20.0, 0.1, 50.0);
-
-    return .{ .view = light_view, .proj = light_proj };
+    return .{
+        .view = zm.lookAtLh(light_position, light_target, light_up),
+        .projection = zm.orthographicLh(20.0, 20.0, 0.1, 50.0),
+        .direction = light_target - light_position,
+    };
 }
 
 fn draw(game: *GameState) void {
@@ -570,7 +572,7 @@ fn draw(game: *GameState) void {
 
         // Set up light view-projection matrix once for both passes
         const light = setupLightViewProj();
-        const light_view_proj = zm.mul(light.view, light.proj);
+        const light_view_proj = zm.mul(light.view, light.projection);
 
         // Shadow pass - render depth from light's perspective
         {
@@ -644,6 +646,7 @@ fn draw(game: *GameState) void {
                 const mem = gctx.uniformsAllocate(FrameUniforms, 1);
                 mem.slice[0].world_to_clip = zm.transpose(game.world_matrix);
                 mem.slice[0].camera_position = game.camera_position;
+                mem.slice[0].light_direction = light.direction;
                 mem.slice[0].light_view_proj = zm.transpose(light_view_proj);
                 pass.setBindGroup(0, bind_group, &.{mem.offset});
             }

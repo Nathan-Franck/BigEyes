@@ -119,7 +119,7 @@ pub const graph_nodes = struct {
                 };
 
                 return .{
-                    .camera_position = zmath.mul(zmath.inverse(view_matrix), Vec4{ 0, 0, 0, 1 }),
+                    .camera_position = zmath.mul(Vec4{ 0, 0, 0, 1 }, zmath.inverse(view_matrix)),
                     .world_matrix = zmath.mul(
                         view_matrix,
                         projection_matrix,
@@ -204,7 +204,7 @@ pub const graph_nodes = struct {
                 );
 
                 return .{
-                    .camera_position = zmath.mul(zmath.inverse(location), Vec4{ 0, 0, 0, 1 }),
+                    .camera_position = zmath.mul(Vec4{ 0, 0, 0, 1 }, zmath.inverse(location)),
                     .world_matrix = zmath.mul(
                         location,
                         view_projection,
