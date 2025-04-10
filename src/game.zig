@@ -98,9 +98,10 @@ pub const graph_nodes = struct {
     } {
         switch (props.selected_camera) {
             .orbit => {
-                props.orbit_camera.rotation = props.orbit_camera.rotation +
-                    props.input.mouse.delta *
-                        zmath.splat(Vec4, -props.orbit_speed);
+                if (props.input.mouse.left_click) |_|
+                    props.orbit_camera.rotation = props.orbit_camera.rotation +
+                        props.input.mouse.delta *
+                            zmath.splat(Vec4, -props.orbit_speed);
                 const projection_matrix = zmath.perspectiveFovLh(
                     0.25 * 3.14151,
                     @as(f32, @floatFromInt(props.render_resolution.x)) /

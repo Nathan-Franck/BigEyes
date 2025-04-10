@@ -84,6 +84,23 @@ const GameState = struct {
 
     frame_arena: std.heap.ArenaAllocator,
 
+    button_lookup: std.StringHashMap(?u64),
+
+    pub fn buttonAccum(self: *@This(), comptime src: std.builtin.SourceLocation, action: zglfw.Action) ?u64 {
+        const src_key = std.fmt.comptimePrint("{s}:{d}:{d}", .{ src.file, src.line, src.column });
+        const previous_entry = self.button_lookup.getOrPutValue(src_key, null) catch unreachable;
+        switch (action) {
+            .release => {
+                previous_entry.value_ptr.* = null;
+            },
+            .press => {
+                previous_entry.value_ptr.* = @intCast(@divFloor(std.time.nanoTimestamp(), std.time.ns_per_ms));
+            },
+            .repeat => {},
+        }
+        return previous_entry.value_ptr.*;
+    }
+
     // Provide inputs to the back-end from the user, disk and network.
     pub fn poll(self: *@This(), comptime field_tag: GameGraph.InputTag) std.meta.fieldInfo(GameGraph.Inputs, field_tag).type {
         const ms_delay = 1000 / 15; // 15 FPS
@@ -109,9 +126,9 @@ const GameState = struct {
                 break :blk .{
                     .mouse = .{
                         .delta = .{ @floatCast(cursor_pos[0] - self.last_cursor_pos[0]), @floatCast(cursor_pos[1] - self.last_cursor_pos[1]), 0, 0 },
-                        .left_click = self.window.getMouseButton(.left),
-                        .middle_click = self.window.getMouseButton(.middle),
-                        .right_click = self.window.getMouseButton(.right),
+                        .left_click = self.buttonAccum(@src(), self.window.getMouseButton(.left)),
+                        .middle_click = self.buttonAccum(@src(), self.window.getMouseButton(.middle)),
+                        .right_click = self.buttonAccum(@src(), self.window.getMouseButton(.right)),
                     },
                     .movement = .{ .left = null, .right = null, .forward = null, .backward = null },
                 };
@@ -488,6 +505,7 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !GameState {
         .shadow_texture_view = shadow_texture_view,
         .shadow_bind_group = shadow_bind_group,
         .shadow_pipeline = shadow_pipeline,
+        .button_lookup = .init(allocator),
     };
 }
 
