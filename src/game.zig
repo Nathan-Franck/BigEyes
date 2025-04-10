@@ -99,7 +99,7 @@ pub const graph_nodes = struct {
         switch (props.selected_camera) {
             .orbit => {
                 props.orbit_camera.rotation = props.orbit_camera.rotation +
-                    props.input.mouse_delta *
+                    props.input.mouse.delta *
                         zmath.splat(Vec4, -props.orbit_speed);
                 const projection_matrix = zmath.perspectiveFovLh(
                     0.25 * 3.14151,
@@ -128,7 +128,7 @@ pub const graph_nodes = struct {
             },
             .first_person => {
                 props.player.euler_rotation = props.player.euler_rotation +
-                    props.input.mouse_delta *
+                    props.input.mouse.delta *
                         zmath.splat(Vec4, -props.player_settings.look_speed);
 
                 const rotation_matrix = zmath.matFromRollPitchYaw(

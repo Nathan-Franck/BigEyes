@@ -107,7 +107,12 @@ const GameState = struct {
                 defer self.last_cursor_pos = cursor_pos;
 
                 break :blk .{
-                    .mouse_delta = .{ @floatCast(cursor_pos[0] - self.last_cursor_pos[0]), @floatCast(cursor_pos[1] - self.last_cursor_pos[1]), 0, 0 },
+                    .mouse = .{
+                        .delta = .{ @floatCast(cursor_pos[0] - self.last_cursor_pos[0]), @floatCast(cursor_pos[1] - self.last_cursor_pos[1]), 0, 0 },
+                        .left_click = self.window.getMouseButton(.left),
+                        .middle_click = self.window.getMouseButton(.middle),
+                        .right_click = self.window.getMouseButton(.right),
+                    },
                     .movement = .{ .left = null, .right = null, .forward = null, .backward = null },
                 };
             },
@@ -511,7 +516,6 @@ fn updateGui(game: *const GameState) void {
     zgui.end();
 }
 
-// Helper function to draw meshes in both shadow and main passes
 fn drawMeshes(
     pass: wgpu.RenderPassEncoder,
     game: *const GameState,
@@ -520,13 +524,13 @@ fn drawMeshes(
     while (mesh_resources.next()) |entry| {
         const resource = entry.value_ptr;
 
-        const vb_info = game.gctx.lookupResourceInfo(resource.vertex_buffer) orelse continue;
-        const itb_info = game.gctx.lookupResourceInfo(resource.instance_buffer) orelse continue;
-        const ib_info = game.gctx.lookupResourceInfo(resource.index_buffer) orelse continue;
+        const vertex_buffer_info = game.gctx.lookupResourceInfo(resource.vertex_buffer) orelse continue;
+        const instance_buffer_info = game.gctx.lookupResourceInfo(resource.instance_buffer) orelse continue;
+        const index_buffer_info = game.gctx.lookupResourceInfo(resource.index_buffer) orelse continue;
 
-        pass.setVertexBuffer(0, vb_info.gpuobj.?, 0, vb_info.size);
-        pass.setVertexBuffer(1, itb_info.gpuobj.?, 0, itb_info.size);
-        pass.setIndexBuffer(ib_info.gpuobj.?, .uint32, 0, ib_info.size);
+        pass.setVertexBuffer(0, vertex_buffer_info.gpuobj.?, 0, vertex_buffer_info.size);
+        pass.setVertexBuffer(1, instance_buffer_info.gpuobj.?, 0, instance_buffer_info.size);
+        pass.setIndexBuffer(index_buffer_info.gpuobj.?, .uint32, 0, index_buffer_info.size);
 
         for (resource.submesh) |submesh| {
             pass.drawIndexed(

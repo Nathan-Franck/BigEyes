@@ -64,7 +64,12 @@ pub const QuadMeshHelper = mesh_helper.Polygon(.Quad);
 pub const PixelPoint = struct { x: u32, y: u32 };
 
 pub const Input = struct {
-    mouse_delta: Vec4,
+    mouse: struct {
+        delta: Vec4,
+        left_click: ?u64,
+        right_click: ?u64,
+        middle_click: ?u64,
+    },
     movement: struct {
         left: ?u64,
         right: ?u64,
