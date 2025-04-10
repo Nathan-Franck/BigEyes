@@ -604,7 +604,9 @@ fn draw(game: *GameState) void {
                 const mem = gctx.uniformsAllocate(struct {
                     light_view_proj: zm.Mat,
                 }, 1);
-                mem.slice[0].light_view_proj = zm.transpose(light_view_proj);
+                mem.slice[0] = .{
+                    .light_view_proj = zm.transpose(light_view_proj),
+                };
                 pass.setBindGroup(0, bind_group, &.{mem.offset});
             }
 
@@ -644,10 +646,12 @@ fn draw(game: *GameState) void {
             // Update bindings
             {
                 const mem = gctx.uniformsAllocate(FrameUniforms, 1);
-                mem.slice[0].world_to_clip = zm.transpose(game.world_matrix);
-                mem.slice[0].camera_position = game.camera_position;
-                mem.slice[0].light_direction = light.direction;
-                mem.slice[0].light_view_proj = zm.transpose(light_view_proj);
+                mem.slice[0] = .{
+                    .world_to_clip = zm.transpose(game.world_matrix),
+                    .camera_position = game.camera_position,
+                    .light_direction = light.direction,
+                    .light_view_proj = zm.transpose(light_view_proj),
+                };
                 pass.setBindGroup(0, bind_group, &.{mem.offset});
             }
 
