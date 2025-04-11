@@ -272,25 +272,21 @@ pub fn Runtime(graph_types: type) type {
                 };
 
                 var node_output = state.arena.allocator().create(NodeOutputs(@"fn")) catch unreachable;
-                inline for (@typeInfo(@TypeOf(fn_output)).@"struct".fields) |field| {
-                    const raw = @field(fn_output, field.name);
-                    @field(node_output, field.name) = .{
-                        .raw = raw,
-                        .is_dirty = if (maybe_last_output) |last_output|
-                            !std.meta.eql(raw, @field(last_output, field.name).raw)
-                        else
-                            true,
-                    };
-                }
-                inline for (@typeInfo(@TypeOf(mutable_props)).@"struct".fields) |field| {
-                    const raw = @field(mutable_props, field.name);
-                    @field(node_output, field.name) = .{
-                        .raw = raw,
-                        .is_dirty = if (maybe_last_output) |last_output|
-                            !std.meta.eql(raw, @field(last_output, field.name).raw)
-                        else
-                            true,
-                    };
+
+                inline for (&.{
+                    fn_output,
+                    mutable_props
+                }) |outputs| {
+                    inline for (@typeInfo(@TypeOf(outputs)).@"struct".fields) |field| {
+                        const raw = @field(outputs, field.name);
+                        @field(node_output, field.name) = .{
+                            .raw = raw,
+                            .is_dirty = if (maybe_last_output) |last_output|
+                                !std.meta.eql(raw, @field(last_output, field.name).raw)
+                            else
+                                true,
+                        };
+                    }
                 }
 
                 state.data = @ptrCast(node_output);
