@@ -176,6 +176,7 @@ pub fn Runtime(graph_types: type) type {
             self: *@This(),
             comptime src: std.builtin.SourceLocation,
             @"fn": anytype,
+            comptime options: struct { checkOutputEquality: bool = false },
             dirtyable_props: NodeInputs(@"fn"),
         ) *NodeOutputs(@"fn") {
             const src_key = std.fmt.comptimePrint("{s}:{d}:{d}", .{ src.file, src.line, src.column });
@@ -235,8 +236,30 @@ pub fn Runtime(graph_types: type) type {
                 @field(props, prop.name) = input_field;
             }
 
-            if (is_input_dirty or state.data == null) {
+            if (!is_input_dirty and state.data != null) {
+                // Just use the existing data from the last time the function had to run.
+                const last_output: *NodeOutputs(@"fn") = @ptrCast(@alignCast(state.data.?));
+                inline for (@typeInfo(@TypeOf(last_output.*)).@"struct".fields) |field| {
+                    @field(last_output, field.name).is_dirty = false;
+                }
+                return last_output;
+            } else {
+                var last_arena = std.heap.ArenaAllocator.init(self.allocator);
+                defer last_arena.deinit();
+
                 // The node is dirty, or there's no data, so let's run the function!
+                const maybe_last_output = if (options.checkOutputEquality)
+                    if (state.data) |last_data|
+                        utils.deepClone(
+                            NodeOutputs(@"fn"),
+                            last_arena.allocator(),
+                            @as(*NodeOutputs(@"fn"), @ptrCast(@alignCast(last_data))).*,
+                        ) catch unreachable
+                    else
+                        null
+                else
+                    null;
+
                 _ = state.arena.reset(.retain_capacity);
 
                 const raw_fn_output = @call(.auto, @"fn", if (comptime isAllocatorFirstParam(@TypeOf(@"fn")))
@@ -250,22 +273,29 @@ pub fn Runtime(graph_types: type) type {
 
                 var node_output = state.arena.allocator().create(NodeOutputs(@"fn")) catch unreachable;
                 inline for (@typeInfo(@TypeOf(fn_output)).@"struct".fields) |field| {
-                    @field(node_output, field.name) = .{ .raw = @field(fn_output, field.name), .is_dirty = true };
+                    const raw = @field(fn_output, field.name);
+                    @field(node_output, field.name) = .{
+                        .raw = raw,
+                        .is_dirty = if (maybe_last_output) |last_output|
+                            !std.meta.eql(raw, @field(last_output, field.name).raw)
+                        else
+                            true,
+                    };
                 }
                 inline for (@typeInfo(@TypeOf(mutable_props)).@"struct".fields) |field| {
-                    @field(node_output, field.name) = .{ .raw = @field(mutable_props, field.name), .is_dirty = true };
+                    const raw = @field(mutable_props, field.name);
+                    @field(node_output, field.name) = .{
+                        .raw = raw,
+                        .is_dirty = if (maybe_last_output) |last_output|
+                            !std.meta.eql(raw, @field(last_output, field.name).raw)
+                        else
+                            true,
+                    };
                 }
 
                 state.data = @ptrCast(node_output);
 
                 return node_output;
-            } else {
-                // Just use the existing data from the last time the function had to run.
-                const last_output: *NodeOutputs(@"fn") = @ptrCast(@alignCast(state.data.?));
-                inline for (@typeInfo(@TypeOf(last_output.*)).@"struct".fields) |field| {
-                    @field(last_output, field.name).is_dirty = false;
-                }
-                return last_output;
             }
         }
 

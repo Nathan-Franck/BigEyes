@@ -59,9 +59,9 @@ pub const GameGraph = Runtime.build(struct {
         // This stuff could exist outside of this graph probably, since it doesn't take any inputs,
         // but because it's here, means that I could change my mind later!
         // TODO - Make resources load pngs and .blend.json files from disk instead of embedding, to help compile times!
-        const get_resources = rt.node(@src(), graph_nodes.getResources, .{});
+        const get_resources = rt.node(@src(), graph_nodes.getResources, .{}, .{});
         // TODO - just combine with resources, unless I really want to have some sliders show show off
-        const display_trees = rt.node(@src(), graph_nodes.displayTrees, .{
+        const display_trees = rt.node(@src(), graph_nodes.displayTrees, .{}, .{
             .cutout_leaf = get_resources.cutout_leaf,
             .trees = get_resources.trees,
         });
@@ -71,24 +71,24 @@ pub const GameGraph = Runtime.build(struct {
 
         // Behold - all the things the game loop can do BEFORE user input, that we can compute without needing to know what the user will do!
         // Terrain things below!
-        const calculate_terrain_density_influence_range = rt.node(@src(), graph_nodes.calculateTerrainDensityInfluenceRange, .{
+        const calculate_terrain_density_influence_range = rt.node(@src(), graph_nodes.calculateTerrainDensityInfluenceRange, .{}, .{
             .size_multiplier = frontend.poll(.size_multiplier),
         });
-        const display_forest = rt.node(@src(), graph_nodes.displayForest, .{
+        const display_forest = rt.node(@src(), graph_nodes.displayForest, .{}, .{
             .terrain_sampler = calculate_terrain_density_influence_range.terrain_sampler,
         });
-        const display_terrain = rt.node(@src(), graph_nodes.displayTerrain, .{
+        const display_terrain = rt.node(@src(), graph_nodes.displayTerrain, .{}, .{
             .terrain_sampler = calculate_terrain_density_influence_range.terrain_sampler,
         });
         // Animated things below!
-        const timing = rt.node(@src(), graph_nodes.timing, .{
+        const timing = rt.node(@src(), graph_nodes.timing, .{}, .{
             .time = frontend.poll(.time),
         });
-        const animate_meshes = rt.node(@src(), graph_nodes.animateMeshes, .{
+        const animate_meshes = rt.node(@src(), graph_nodes.animateMeshes, .{}, .{
             .models = get_resources.models,
             .seconds_since_start = timing.seconds_since_start,
         });
-        const display_bike = rt.node(@src(), graph_nodes.displayBike, .{
+        const display_bike = rt.node(@src(), graph_nodes.displayBike, .{}, .{
             .terrain_sampler = calculate_terrain_density_influence_range.terrain_sampler,
             .seconds_since_start = timing.seconds_since_start,
             .model_transforms = get_resources.model_transforms,
@@ -111,7 +111,7 @@ pub const GameGraph = Runtime.build(struct {
         });
 
         // Polling user input! (We can do it late, which should lead to lower latency!)
-        const orbit = rt.node(@src(), graph_nodes.orbit, .{
+        const orbit = rt.node(@src(), graph_nodes.orbit, .{ .checkOutputEquality = true }, .{
             .delta_time = timing.delta_time,
             .render_resolution = frontend.poll(.render_resolution),
             .orbit_speed = frontend.poll(.orbit_speed),
@@ -123,7 +123,7 @@ pub const GameGraph = Runtime.build(struct {
             .terrain_sampler = calculate_terrain_density_influence_range.terrain_sampler,
         });
 
-        const get_screenspace_mesh = rt.node(@src(), graph_nodes.getScreenspaceMesh, .{
+        const get_screenspace_mesh = rt.node(@src(), graph_nodes.getScreenspaceMesh, .{}, .{
             .camera_position = orbit.camera_position,
             .world_matrix = orbit.world_matrix,
         });

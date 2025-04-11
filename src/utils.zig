@@ -66,7 +66,7 @@ pub fn copyWith(source_data: anytype, field_changes: anytype) @TypeOf(source_dat
                 unused_field_changes = next_unused_field_changes;
             }
             if (unused_field_changes.len > 0) {
-                @compileError(std.fmt.comptimePrint("Unused fields found: {s}", .{unused_field_changes}));
+                @compileError(std.fmt.comptimePrint("Unused fields found: {s} for {any}", .{ unused_field_changes, @TypeOf(source_data) }));
             }
             return result;
         },
@@ -281,7 +281,7 @@ fn deepCloneInner(
             };
         },
         .pointer => |pointer_info| switch (pointer_info.size) {
-            .Many, .Slice => blk: {
+            .many, .slice => blk: {
                 var elements = std.ArrayList(pointer_info.child).init(allocator);
                 for (source) |elem| {
                     const result = try deepCloneInner(pointer_info.child, allocator, elem);
