@@ -1,10 +1,12 @@
 const std = @import("std");
 const Dirtyable = @import("node_graph").Dirtyable;
-const types = @import("utils").types;
+const utils = @import("utils");
 const config = @import("resources").config;
 const zmath = @import("zmath");
 const game = @import("../game.zig");
 const graph_nodes = game.graph_nodes;
+
+const types = utils.types;
 
 const Runtime = @import("node_graph").Runtime(struct {
     pub const Store = struct {
@@ -24,6 +26,7 @@ const Runtime = @import("node_graph").Runtime(struct {
     pub const Outputs = struct {
         screen_space_mesh: types.ScreenspaceMesh,
         skybox: types.ProcessedCubeMap,
+        shadow_update_bounds: []const utils.Bounds,
         models: []const types.GameModel,
         model_instances: []const types.ModelInstances,
         terrain_mesh: types.GreyboxMesh,
@@ -98,12 +101,35 @@ pub const GameGraph = Runtime.build(struct {
             .terrain_mesh = display_terrain.terrain_mesh,
             .terrain_instance = display_terrain.terrain_instance,
         });
-        frontend.submit(.{
-            .models = concatChanged(rt.frame_arena.allocator(), types.GameModel, &.{
+        const changed_models = concatChanged(rt.frame_arena.allocator(), types.GameModel, &.{
+            resources.models,
+            animate_meshes.models,
+            display_trees.models,
+        });
+
+        const shadow_update_bounds = blk: {
+            const changed_instances = concatChanged(rt.frame_arena.allocator(), types.ModelInstances, &.{
+                forest.model_instances,
+                display_bike.model_instances,
+            });
+
+            var model_lookup = std.StringHashMap(types.GameModel).init(rt.frame_arena);
+            for (&.{
                 resources.models,
                 animate_meshes.models,
                 display_trees.models,
-            }),
+            }) |model| {
+                model_lookup.put(model.name, model);
+            }
+
+            for (changed_instances) |instance| {
+                const model = model_lookup(instance.label);
+                zmath.translationV(instance.positions
+            }
+        };
+        frontend.submit(.{
+            .shadow_update_bounds = shadow_update_bounds,
+            .models = changed_models,
             .model_instances = concatChanged(rt.frame_arena.allocator(), types.ModelInstances, &.{
                 forest.model_instances,
                 display_bike.model_instances,

@@ -506,8 +506,8 @@ pub const graph_nodes = struct {
         try terrain_chunk_cache.ensureTotalCapacity(256);
         const terrain_sampler = props.terrain_sampler.loadCache(&terrain_chunk_cache);
 
-        // const terrain_resolution = 512;
-        const terrain_resolution = 255;
+        const terrain_resolution = 512;
+        // const terrain_resolution = 255;
         // const terrain_resolution = 128;
 
         var vertex_iterator = CoordIterator.init(@splat(0), @splat(terrain_resolution + 1));

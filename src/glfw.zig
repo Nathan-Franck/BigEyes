@@ -284,6 +284,9 @@ const GameState = struct {
                     self.should_render = true;
                 }
             },
+            .shadow_update_bounds => {
+                std.debug.print("Bounds get! {any}\n", .{value});
+            },
             else => {},
         }
     }
@@ -350,7 +353,7 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !GameState {
     } };
 
     // Create shadow map texture and view
-    const shadow_map_size: u32 = 2048;
+    const shadow_map_size: u32 = 8192;
     const shadow_texture = gctx.createTexture(.{
         .usage = .{ .render_attachment = true, .texture_binding = true },
         .dimension = .tdim_2d,
