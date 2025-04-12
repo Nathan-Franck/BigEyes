@@ -580,18 +580,6 @@ fn drawMeshes(
     }
 }
 
-// Helper function to set up light view-projection matrix
-fn setupLightViewProj() struct { view: zm.Mat, projection: zm.Mat, direction: zm.Vec } {
-    const light_position = zm.f32x4(20.0, 20.0, 20.0, 1.0);
-    const light_target = zm.f32x4(0.0, 0.0, 0.0, 1.0);
-    const light_up = zm.f32x4(0.0, 1.0, 0.0, 0.0);
-    return .{
-        .view = zm.lookAtLh(light_position, light_target, light_up),
-        .projection = zm.orthographicLh(20.0, 20.0, 0.1, 50.0),
-        .direction = light_target - light_position,
-    };
-}
-
 fn draw(game: *GameState) void {
     if (!game.should_render) {
         std.Thread.sleep(1_000_000);
@@ -611,7 +599,16 @@ fn draw(game: *GameState) void {
         defer encoder.release();
 
         // Set up light view-projection matrix once for both passes
-        const light = setupLightViewProj();
+        const light = blk: {
+            const light_position = zm.f32x4(20.0, 20.0, 20.0, 1.0);
+            const light_target = zm.f32x4(0.0, 0.0, 0.0, 1.0);
+            const light_up = zm.f32x4(0.0, 1.0, 0.0, 0.0);
+            break :blk .{
+                .view = zm.lookAtLh(light_position, light_target, light_up),
+                .projection = zm.orthographicLh(20.0, 20.0, 0.1, 50.0),
+                .direction = light_target - light_position,
+            };
+        };
         const light_view_proj = zm.mul(light.view, light.projection);
 
         // Shadow pass - render depth from light's perspective
