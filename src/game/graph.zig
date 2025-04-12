@@ -59,39 +59,39 @@ pub const GameGraph = Runtime.build(struct {
         // This stuff could exist outside of this graph probably, since it doesn't take any inputs,
         // but because it's here, means that I could change my mind later!
         // TODO - Make resources load pngs and .blend.json files from disk instead of embedding, to help compile times!
-        const get_resources = rt.node(@src(), graph_nodes.getResources, .{}, .{});
+        const resources = rt.node(@src(), graph_nodes.getResources, .{}, .{});
         // TODO - just combine with resources, unless I really want to have some sliders show show off
         const display_trees = rt.node(@src(), graph_nodes.displayTrees, .{}, .{
-            .cutout_leaf = get_resources.cutout_leaf,
-            .trees = get_resources.trees,
+            .cutout_leaf = resources.cutout_leaf,
+            .trees = resources.trees,
         });
         frontend.submitDirty(.{
-            .skybox = get_resources.skybox,
+            .skybox = resources.skybox,
         });
 
         // Behold - all the things the game loop can do BEFORE user input, that we can compute without needing to know what the user will do!
         // Terrain things below!
-        const calculate_terrain_density_influence_range = rt.node(@src(), graph_nodes.calculateTerrainDensityInfluenceRange, .{}, .{
+        const terrain = rt.node(@src(), graph_nodes.terrain, .{}, .{
             .size_multiplier = frontend.poll(.size_multiplier),
         });
-        const display_forest = rt.node(@src(), graph_nodes.displayForest, .{}, .{
-            .terrain_sampler = calculate_terrain_density_influence_range.terrain_sampler,
+        const forest = rt.node(@src(), graph_nodes.displayForest, .{}, .{
+            .terrain_sampler = terrain.sampler,
         });
         const display_terrain = rt.node(@src(), graph_nodes.displayTerrain, .{}, .{
-            .terrain_sampler = calculate_terrain_density_influence_range.terrain_sampler,
+            .terrain_sampler = terrain.sampler,
         });
         // Animated things below!
         const timing = rt.node(@src(), graph_nodes.timing, .{}, .{
             .time = frontend.poll(.time),
         });
         const animate_meshes = rt.node(@src(), graph_nodes.animateMeshes, .{}, .{
-            .models = get_resources.models,
+            .models = resources.models,
             .seconds_since_start = timing.seconds_since_start,
         });
         const display_bike = rt.node(@src(), graph_nodes.displayBike, .{}, .{
-            .terrain_sampler = calculate_terrain_density_influence_range.terrain_sampler,
+            .terrain_sampler = terrain.sampler,
             .seconds_since_start = timing.seconds_since_start,
-            .model_transforms = get_resources.model_transforms,
+            .model_transforms = resources.model_transforms,
             .bounce = frontend.poll(.bounce),
         });
         frontend.submitDirty(.{
@@ -100,12 +100,12 @@ pub const GameGraph = Runtime.build(struct {
         });
         frontend.submit(.{
             .models = concatChanged(rt.frame_arena.allocator(), types.GameModel, &.{
-                get_resources.models,
+                resources.models,
                 animate_meshes.models,
                 display_trees.models,
             }),
             .model_instances = concatChanged(rt.frame_arena.allocator(), types.ModelInstances, &.{
-                display_forest.model_instances,
+                forest.model_instances,
                 display_bike.model_instances,
             }),
         });
@@ -120,7 +120,7 @@ pub const GameGraph = Runtime.build(struct {
             .selected_camera = frontend.poll(.selected_camera),
             .player_settings = frontend.poll(.player_settings),
             .player = store.player,
-            .terrain_sampler = calculate_terrain_density_influence_range.terrain_sampler,
+            .terrain_sampler = terrain.sampler,
         });
 
         const get_screenspace_mesh = rt.node(@src(), graph_nodes.getScreenspaceMesh, .{}, .{

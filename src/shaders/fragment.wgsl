@@ -61,7 +61,7 @@ fn fresnelSchlick(h_dot_v: f32, f0: vec3<f32>) -> vec3<f32> {
   let v = normalize(frame_uniforms.camera_position - position);
   let n = normalize(normal);
 
-  let base_color = basecolor_roughness.xyz;
+  let base_color = frame_uniforms.color * basecolor_roughness.xyz;
   let ao = 1.0;
   var roughness = basecolor_roughness.a;
   var metallic: f32;

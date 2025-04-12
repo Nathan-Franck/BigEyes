@@ -39,14 +39,14 @@ pub fn init(allocator: std.mem.Allocator) void {
 }
 
 pub const graph_nodes = struct {
-    pub fn calculateTerrainDensityInfluenceRange(
+    pub fn terrain(
         arena: std.mem.Allocator,
         props: struct { size_multiplier: f32 },
     ) !struct {
-        terrain_sampler: TerrainSampler,
+        sampler: TerrainSampler,
     } {
         return .{
-            .terrain_sampler = try TerrainSampler.init(arena, .{
+            .sampler = try TerrainSampler.init(arena, .{
                 .size_multiplier = props.size_multiplier,
             }),
         };
@@ -444,6 +444,7 @@ pub const graph_nodes = struct {
                             .label = model.label,
                             .meshes = try arena.dupe(types.GameMesh, &[_]types.GameMesh{.{
                                 .greybox = types.GreyboxMesh{
+                                    .color = .{ 0.2, 0.2, 0.7, 1 },
                                     .indices = subdiv_mesh.top_indices,
                                     .position = subdiv_result,
                                     .normal = mesh_helper.Polygon(.Quad).calculateNormals(arena, subdiv_result, subdiv_mesh.quads_per_subdiv[subdiv_levels - 1]),
@@ -472,6 +473,7 @@ pub const graph_nodes = struct {
                 .label = tree_mesh.label,
                 .meshes = try arena.dupe(types.GameMesh, &.{
                     .{ .greybox = .{
+                        .color = .{ 0.4, 0.3, 0.2, 1 },
                         .indices = tree_mesh.bark_mesh.triangles,
                         .normal = tree_mesh.bark_mesh.vertices.slice().items(.normal),
                         .position = tree_mesh.bark_mesh.vertices.slice().items(.position),
@@ -553,6 +555,7 @@ pub const graph_nodes = struct {
 
         return .{
             .terrain_mesh = types.GreyboxMesh{
+                .color = .{ 0.9, 0.9, 0.9, 0.9 },
                 .indices = indices,
                 .position = positions,
                 .normal = normals,

@@ -35,8 +35,9 @@ const Instance = struct {
 const FrameUniforms = struct {
     world_to_clip: zm.Mat,
     camera_position: zm.Vec, // You can't have a uniform member that is 12 bytes!
-    light_direction: zm.Vec, // You can't have a uniform member that is 12 bytes!
+    light_direction: zm.Vec,
     light_view_proj: zm.Mat,
+    color: zm.Vec,
 };
 
 const Submesh = struct {
@@ -47,6 +48,7 @@ const Submesh = struct {
 
 const MeshResources = struct {
     num_instances: u32,
+    color: zm.Vec,
     submesh: []const Submesh,
     vertex_buffer: zgpu.BufferHandle,
     index_buffer: zgpu.BufferHandle,
@@ -165,6 +167,7 @@ const GameState = struct {
 
                 const result = self.mesh_resources.getOrPut("terrain") catch unreachable;
                 const resources = result.value_ptr;
+                resources.color = value.color;
                 resources.submesh = try self.frame_arena.allocator().dupe(Submesh, &.{Submesh{
                     .index_offset = 0,
                     .vertex_offset = 0,
@@ -205,9 +208,11 @@ const GameState = struct {
                     var vertices: std.ArrayList(Vertex) = .init(self.frame_arena.allocator());
                     var indices: std.ArrayList(u32) = .init(self.frame_arena.allocator());
                     var submeshes: std.ArrayList(Submesh) = .init(self.frame_arena.allocator());
+                    var color: zm.Vec = undefined;
                     for (model.meshes) |mesh| {
                         switch (mesh) {
                             .greybox => |greybox| {
+                                color = greybox.color;
                                 const submesh: Submesh = .{
                                     .index_offset = @intCast(indices.items.len),
                                     .vertex_offset = @intCast(vertices.items.len),
@@ -225,6 +230,7 @@ const GameState = struct {
                             else => {},
                         }
                     }
+
                     const vertex_buffer = gctx.createBuffer(.{
                         .usage = .{ .copy_dst = true, .vertex = true },
                         .size = vertices.items.len * @sizeOf(Vertex),
@@ -239,6 +245,7 @@ const GameState = struct {
 
                     const result = try self.mesh_resources.getOrPut(model.label);
                     const resources = result.value_ptr;
+                    resources.color = color;
                     resources.submesh = submeshes.items;
                     resources.vertex_buffer = vertex_buffer;
                     resources.index_buffer = index_buffer;
@@ -537,10 +544,21 @@ fn updateGui(game: *const GameState) void {
 fn drawMeshes(
     pass: wgpu.RenderPassEncoder,
     game: *const GameState,
+    per_model_render: ?struct {
+        bind_group: wgpu.BindGroup,
+        frame_uniforms: FrameUniforms,
+    },
 ) void {
     var mesh_resources = game.mesh_resources.iterator();
     while (mesh_resources.next()) |entry| {
         const resource = entry.value_ptr;
+
+        if (per_model_render) |render| {
+            const mem = game.gctx.uniformsAllocate(FrameUniforms, 1);
+            mem.slice[0] = render.frame_uniforms;
+            mem.slice[0].color = resource.color;
+            pass.setBindGroup(0, render.bind_group, &.{mem.offset});
+        }
 
         const vertex_buffer_info = game.gctx.lookupResourceInfo(resource.vertex_buffer) orelse continue;
         const instance_buffer_info = game.gctx.lookupResourceInfo(resource.instance_buffer) orelse continue;
@@ -633,7 +651,7 @@ fn draw(game: *GameState) void {
             }
 
             pass.setPipeline(pipeline);
-            drawMeshes(pass, game);
+            drawMeshes(pass, game, null);
         }
 
         // Main pass
@@ -667,17 +685,18 @@ fn draw(game: *GameState) void {
 
             // Update bindings
             {
-                const mem = gctx.uniformsAllocate(FrameUniforms, 1);
-                mem.slice[0] = .{
+                const frame_uniforms: FrameUniforms = .{
                     .world_to_clip = zm.transpose(game.world_matrix),
                     .camera_position = game.camera_position,
                     .light_direction = light.direction,
                     .light_view_proj = zm.transpose(light_view_proj),
+                    .color = undefined,
                 };
-                pass.setBindGroup(0, bind_group, &.{mem.offset});
+                drawMeshes(pass, game, .{
+                    .bind_group = bind_group,
+                    .frame_uniforms = frame_uniforms,
+                });
             }
-
-            drawMeshes(pass, game);
         }
 
         // Gui pass

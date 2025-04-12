@@ -82,6 +82,7 @@ pub fn loadModelsFromBlends(
                     const model: types.GameModel = .{
                         .label = label,
                         .meshes = try arena.dupe(types.GameMesh, &.{.{ .greybox = .{
+                            .color = .{ 0.6, 0.6, 0.6, 0.6 },
                             .indices = mesh_helper.Polygon(.Face).toTriangleIndices(arena, mesh.polygons),
 
                             .normal = mesh_helper.Polygon(.Face).calculateNormals(arena, positions, mesh.polygons),

@@ -273,10 +273,7 @@ pub fn Runtime(graph_types: type) type {
 
                 var node_output = state.arena.allocator().create(NodeOutputs(@"fn")) catch unreachable;
 
-                inline for (&.{
-                    fn_output,
-                    mutable_props
-                }) |outputs| {
+                inline for (&.{ fn_output, mutable_props }) |outputs| {
                     inline for (@typeInfo(@TypeOf(outputs)).@"struct".fields) |field| {
                         const raw = @field(outputs, field.name);
                         @field(node_output, field.name) = .{

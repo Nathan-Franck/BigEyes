@@ -17,6 +17,7 @@ pub const Face = []const u32;
 pub const Quad = [4]u32;
 
 pub const GreyboxMesh = struct {
+    color: Vec4,
     indices: []const u32,
     position: []const Vec4,
     normal: []const Vec4,
