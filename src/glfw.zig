@@ -185,9 +185,9 @@ const GameState = struct {
                 });
 
                 var instance: Instance = undefined;
-                zm.storeArr3(&instance.position, value.positions[0]);
-                zm.storeArr4(&instance.rotation, value.rotations[0]);
-                instance.scale = value.scales[0][0];
+                zm.storeArr3(&instance.position, value.instances[0].position);
+                zm.storeArr4(&instance.rotation, value.instances[0].position);
+                instance.scale = value.instances[0].scale[0];
                 instance.basecolor_roughness = .{ 1, 1, 1, 0.5 };
                 gctx.queue.writeBuffer(
                     gctx.lookupResource(instance_buffer).?,
@@ -256,15 +256,15 @@ const GameState = struct {
                 const gctx = self.gctx;
                 for (value) |_instances| {
                     var instances: std.ArrayList(Instance) = .init(self.frame_arena.allocator());
-                    for (_instances.positions, _instances.rotations, _instances.scales) |position, rotation, scale| {
+                    for (_instances.instances) |_instance| {
                         var instance: Instance = .{
-                            .scale = scale[0],
+                            .scale = _instance.scale[0],
                             .basecolor_roughness = .{ 1, 1, 1, 0.5 },
                             .position = undefined,
                             .rotation = undefined,
                         };
-                        zm.storeArr3(&instance.position, position);
-                        zm.storeArr4(&instance.rotation, rotation);
+                        zm.storeArr3(&instance.position, _instance.position);
+                        zm.storeArr4(&instance.rotation, _instance.rotation);
                         try instances.append(instance);
                     }
                     const instance_buffer = gctx.createBuffer(.{
@@ -353,7 +353,8 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !GameState {
     } };
 
     // Create shadow map texture and view
-    const shadow_map_size: u32 = 8192;
+    // const shadow_map_size: u32 = 8192;
+    const shadow_map_size: u32 = 128;
     const shadow_texture = gctx.createTexture(.{
         .usage = .{ .render_attachment = true, .texture_binding = true },
         .dimension = .tdim_2d,
@@ -800,6 +801,8 @@ pub fn main() !void {
 
     zgui.backend.newFrame(0, 0);
     game.graph = .init(allocator, &game, .{
+        .all_models = &.{},
+        .all_instances = &.{},
         .orbit_camera = .{
             .position = .{ -3, 0, 0, 1 },
             .rotation = .{ 0, 0, 0, 1 },

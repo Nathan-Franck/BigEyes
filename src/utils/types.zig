@@ -108,11 +108,15 @@ pub const TreeMesh = struct {
     bark_mesh: tree.Mesh,
 };
 
+pub const Instance = struct {
+    position: Vec4,
+    rotation: Vec4,
+    scale: Vec4,
+};
+
 pub const ModelInstances = struct {
     label: []const u8,
-    positions: []const Vec4,
-    rotations: []const Vec4,
-    scales: []const Vec4,
+    instances: []const Instance,
 };
 
 pub const GameModel = struct {

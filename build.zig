@@ -90,6 +90,7 @@ pub fn build(
         } },
     });
 
+    const dizzy = b.dependency("dizzy", .{});
     const zglfw = b.dependency("zglfw", .{ .target = target, .x11 = false });
     const zgpu = b.dependency("zgpu", .{ .target = target });
     const zmesh = b.dependency("zmesh", .{ .target = target });
@@ -119,11 +120,12 @@ pub fn build(
     const game = b.createModule(.{
         .root_source_file = b.path("src/game.zig"),
         .imports = &.{
-            .{ .name = "zmath", .module = zmath.module("root") },
-            .{ .name = "zbullet", .module = zbullet.module("root") },
+            .{ .name = "dizzy", .module = dizzy.module("dizzy") },
             .{ .name = "node_graph", .module = node_graph },
             .{ .name = "resources", .module = resources },
             .{ .name = "utils", .module = utils },
+            .{ .name = "zbullet", .module = zbullet.module("root") },
+            .{ .name = "zmath", .module = zmath.module("root") },
         },
     });
 
@@ -161,6 +163,7 @@ pub fn build(
             elem.root_module.addImport("zmath", zmath.module("root"));
             elem.root_module.addImport("node_graph", node_graph);
             elem.root_module.addImport("resources", resources);
+            elem.root_module.addImport("dizzy", dizzy.module("dizzy"));
             elem.root_module.addImport("zglfw", zglfw.module("root"));
             elem.root_module.addImport("zgpu", zgpu.module("root"));
             elem.root_module.addImport("zgui", zgui.module("root"));

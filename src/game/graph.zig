@@ -4,6 +4,7 @@ const utils = @import("utils");
 const config = @import("resources").config;
 const zmath = @import("zmath");
 const game = @import("../game.zig");
+const dizzy = @import("dizzy");
 const graph_nodes = game.graph_nodes;
 
 const types = utils.types;
@@ -12,6 +13,8 @@ const Runtime = @import("node_graph").Runtime(struct {
     pub const Store = struct {
         orbit_camera: types.OrbitCamera,
         player: types.Player,
+        all_models: []const types.GameModel,
+        all_instances: []const types.ModelInstances,
     };
     pub const Inputs = struct {
         time: u64,
@@ -36,6 +39,7 @@ const Runtime = @import("node_graph").Runtime(struct {
     };
 });
 
+/// take a bunch of Dirtyable inputs and put them together, only including dirty ones
 pub fn concatChanged(arena: std.mem.Allocator, T: type, inputs: []const Dirtyable([]const T)) []const T {
     for (inputs) |input| {
         if (input.is_dirty) break;
@@ -47,6 +51,34 @@ pub fn concatChanged(arena: std.mem.Allocator, T: type, inputs: []const Dirtyabl
         }
     }
     return std.mem.concat(arena, T, to_concat.items) catch unreachable;
+}
+
+/// Take a bunch of Dirtyable inputs and put them together into a single Dirtyable, where it's dirty if any is dirty
+pub fn concatDirty(arena: std.mem.Allocator, T: type, inputs: []const Dirtyable([]const T)) Dirtyable([]const T) {
+    var to_concat: std.ArrayList([]const T) = .init(arena);
+    var is_dirty = false;
+    for (inputs) |input| {
+        to_concat.append(input.raw) catch unreachable;
+        if (input.is_dirty)
+            is_dirty = true;
+    }
+    return .{
+        .raw = std.mem.concat(arena, T, to_concat.items) catch unreachable,
+        .is_dirty = is_dirty,
+    };
+}
+
+pub fn diff(T: type, arena: std.mem.Allocator, a: []const T, b: []const T) []const dizzy.Edit {
+    const scratch_len = 4 * (a.len + b.len) + 2;
+    const scratch = arena.alloc(u32, scratch_len) catch unreachable;
+    const differ = dizzy.SliceDiffer(T, struct {
+        pub fn eql(_: @This(), _a: T, _b: T) bool {
+            return std.meta.eql(_a, _b);
+        }
+    });
+    var edits = std.ArrayListUnmanaged(dizzy.Edit){};
+    differ.diff(arena, &edits, a, b, scratch) catch unreachable;
+    return edits.items;
 }
 
 pub const GameGraph = Runtime.build(struct {
@@ -101,39 +133,33 @@ pub const GameGraph = Runtime.build(struct {
             .terrain_mesh = display_terrain.terrain_mesh,
             .terrain_instance = display_terrain.terrain_instance,
         });
-        const changed_models = concatChanged(rt.frame_arena.allocator(), types.GameModel, &.{
+        const model_sources = &.{
             resources.models,
             animate_meshes.models,
             display_trees.models,
-        });
-
-        const shadow_update_bounds = blk: {
-            const changed_instances = concatChanged(rt.frame_arena.allocator(), types.ModelInstances, &.{
-                forest.model_instances,
-                display_bike.model_instances,
-            });
-
-            var model_lookup = std.StringHashMap(types.GameModel).init(rt.frame_arena);
-            for (&.{
-                resources.models,
-                animate_meshes.models,
-                display_trees.models,
-            }) |model| {
-                model_lookup.put(model.name, model);
-            }
-
-            for (changed_instances) |instance| {
-                const model = model_lookup(instance.label);
-                zmath.translationV(instance.positions
-            }
         };
+        const changed_models = concatChanged(rt.frame_arena.allocator(), types.GameModel, model_sources);
+        const all_models = concatDirty(rt.frame_arena.allocator(), types.GameModel, model_sources);
+        const instance_sources = &.{
+            forest.model_instances,
+            display_bike.model_instances,
+        };
+        const changed_instances = concatChanged(rt.frame_arena.allocator(), types.ModelInstances, instance_sources);
+        const all_instances = concatDirty(rt.frame_arena.allocator(), types.ModelInstances, instance_sources);
+        const shadow_update_bounds = blk: {
+            var model_lookup = std.StringHashMap(types.GameModel).init(rt.frame_arena.allocator());
+            for (all_models.raw) |model| {
+                model_lookup.put(model.label, model) catch unreachable;
+            }
+            // _ = diff(types.ModelInstances, rt.frame_arena.allocator(), store.all_instances.raw, all_instances.raw);
+
+            break :blk null;
+        };
+
         frontend.submit(.{
             .shadow_update_bounds = shadow_update_bounds,
             .models = changed_models,
-            .model_instances = concatChanged(rt.frame_arena.allocator(), types.ModelInstances, &.{
-                forest.model_instances,
-                display_bike.model_instances,
-            }),
+            .model_instances = changed_instances,
         });
 
         // Polling user input! (We can do it late, which should lead to lower latency!)
@@ -162,6 +188,8 @@ pub const GameGraph = Runtime.build(struct {
         return .{
             .orbit_camera = orbit.orbit_camera,
             .player = orbit.player,
+            .all_instances = all_instances,
+            .all_models = all_models,
         };
     }
 });

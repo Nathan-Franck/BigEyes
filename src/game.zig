@@ -272,42 +272,24 @@ pub const graph_nodes = struct {
             config.demo_terrain_bounds,
         );
 
-        const InstanceEntry = struct { position: Vec4, rotation: Vec4, scale: Vec4 };
-        var instances = try arena.alloc(std.ArrayList(InstanceEntry), config.ForestSpawner.length);
-        for (instances) |*position| {
-            position.* = std.ArrayList(InstanceEntry).init(arena);
+        var tree_to_instance_list = try arena.alloc(std.ArrayList(types.Instance), config.ForestSpawner.length);
+        for (tree_to_instance_list) |*instances| {
+            instances.* = std.ArrayList(types.Instance).init(arena);
         }
         for (spawns) |spawn| {
             const pos_2d = Vec2{ spawn.position[0], spawn.position[1] };
             const height = try terrain_sampler.sample(arena, pos_2d);
-            try instances[spawn.id].append(.{
+            try tree_to_instance_list[spawn.id].append(.{
                 .position = .{ spawn.position[0], height, spawn.position[1], 1 },
                 .rotation = zmath.qidentity(),
                 .scale = .{ 1, 1, 1, 0 },
             });
         }
         const instances_items = try arena.alloc(types.ModelInstances, config.ForestSpawner.length);
-        for (instances_items, @typeInfo(config.ForestSettings).@"struct".decls, 0..) |*instance, decl, i| {
-            instance.* = .{
+        for (instances_items, @typeInfo(config.ForestSettings).@"struct".decls, tree_to_instance_list) |*instances, decl, instance_list| {
+            instances.* = .{
                 .label = decl.name,
-                .positions = positions: {
-                    const res = try arena.alloc(Vec4, instances[i].items.len);
-                    for (instances[i].items, 0..) |entry, j| {
-                        res[j] = entry.position;
-                    } else break :positions res;
-                },
-                .rotations = rotations: {
-                    const res = try arena.alloc(Vec4, instances[i].items.len);
-                    for (instances[i].items, 0..) |entry, j| {
-                        res[j] = entry.rotation;
-                    } else break :rotations res;
-                },
-                .scales = scales: {
-                    const res = try arena.alloc(Vec4, instances[i].items.len);
-                    for (instances[i].items, 0..) |entry, j| {
-                        res[j] = entry.scale;
-                    } else break :scales res;
-                },
+                .instances = instance_list.items,
             };
         }
 
@@ -372,13 +354,15 @@ pub const graph_nodes = struct {
             // } else Vec4{ 0, 0, 0, 0 };
             try instances.append(.{
                 .label = label,
-                .positions = try arena.dupe(Vec4, &.{zmath.loadArr3w(zmath.vecToArr3(transform[3] + entry.offset), 1)}),
-                .rotations = try arena.dupe(Vec4, &.{zmath.matToQuat(transform)}),
-                .scales = try arena.dupe(Vec4, &.{.{
-                    zmath.length3(transform[0])[0],
-                    zmath.length3(transform[1])[0],
-                    zmath.length3(transform[2])[0],
-                    0,
+                .instances = try arena.dupe(types.Instance, &.{.{
+                    .position = zmath.loadArr3w(zmath.vecToArr3(transform[3] + entry.offset), 1),
+                    .rotation = zmath.matToQuat(transform),
+                    .scale = .{
+                        zmath.length3(transform[0])[0],
+                        zmath.length3(transform[1])[0],
+                        zmath.length3(transform[2])[0],
+                        0,
+                    },
                 }}),
             });
         }
@@ -506,8 +490,8 @@ pub const graph_nodes = struct {
         try terrain_chunk_cache.ensureTotalCapacity(256);
         const terrain_sampler = props.terrain_sampler.loadCache(&terrain_chunk_cache);
 
-        const terrain_resolution = 512;
-        // const terrain_resolution = 255;
+        // const terrain_resolution = 512;
+        const terrain_resolution = 255;
         // const terrain_resolution = 128;
 
         var vertex_iterator = CoordIterator.init(@splat(0), @splat(terrain_resolution + 1));
@@ -562,9 +546,11 @@ pub const graph_nodes = struct {
             },
             .terrain_instance = types.ModelInstances{
                 .label = "terrain",
-                .positions = try arena.dupe(Vec4, &.{.{ 0, 0, 0, 1 }}),
-                .rotations = try arena.dupe(Vec4, &.{zmath.qidentity()}),
-                .scales = try arena.dupe(Vec4, &.{.{ 1, 1, 1, 0 }}),
+                .instances = try arena.dupe(types.Instance, &.{.{
+                    .position = .{ 0, 0, 0, 1 },
+                    .rotation = zmath.qidentity(),
+                    .scale = .{ 1, 1, 1, 0 },
+                }}),
             },
         };
     }
