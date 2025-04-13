@@ -12,6 +12,25 @@ avg_ms: f64 = 0,
 p99_ms: f64 = 0, // 1% high (99th percentile)
 p999_ms: f64 = 0, // 0.1% high (99.9th percentile)
 
+// Helper function to determine text color based on millisecond timing
+pub fn getTimingColor(ms: f64) [4]f32 {
+    if (ms > 16.0) {
+        return .{ 1.0, 0.0, 0.0, 1.0 }; // Red
+    } else if (ms > 8.0) {
+        return .{ 1.0, 0.4, 0.0, 1.0 }; // Red-Orange
+    } else if (ms > 4.0) {
+        return .{ 1.0, 0.65, 0.0, 1.0 }; // Orange
+    } else if (ms > 2.0) {
+        return .{ 1.0, 0.85, 0.4, 1.0 }; // Orange-Yellow
+    } else if (ms > 1.0) {
+        return .{ 1.0, 1.0, 0.7, 1.0 }; // Light Yellow
+    } else {
+        // Default color (e.g., white or use zgui.getStyleColorVec4(.text))
+        // For simplicity, let's use white here.
+        return .{ 1.0, 1.0, 1.0, 1.0 }; // White
+    }
+}
+
 // Adds a new sample time in nanoseconds
 pub fn addSample(self: *@This(), arena: std.mem.Allocator, duration_ns: u64) void {
     self.times_ns[self.index] = duration_ns;

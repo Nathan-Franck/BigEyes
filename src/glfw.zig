@@ -357,7 +357,7 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !GameState {
 
     // Create shadow map texture and view
     // const shadow_map_size: u32 = 8192;
-    const shadow_map_size: u32 = 128;
+    const shadow_map_size: u32 = 1024;
     const shadow_texture = gctx.createTexture(.{
         .usage = .{ .render_attachment = true, .texture_binding = true },
         .dimension = .tdim_2d,
@@ -545,11 +545,34 @@ fn updateGui(game: *const GameState) void {
         zgui.bulletText("RMB + drag : rotate camera", .{});
         zgui.bulletText("W, A, S, D : move camera", .{});
         zgui.separator();
-        zgui.text("game update:", .{});
+        zgui.text("Update stats:", .{});
         if (game.update_timing.count > 0) {
-            zgui.bulletText("  Avg: {d:.3} ms", .{game.update_timing.avg_ms});
-            zgui.bulletText("  1% High (P99): {d:.3} ms", .{game.update_timing.p99_ms});
-            zgui.bulletText("  0.1% High (P99.9): {d:.3} ms", .{game.update_timing.p999_ms});
+            // Average
+            zgui.bullet();
+            zgui.textColored(
+                TimingStats.getTimingColor(game.update_timing.avg_ms),
+                "Avg: {d:.3} ms",
+                .{game.update_timing.avg_ms},
+            );
+
+            // P99
+            zgui.bullet();
+            zgui.textColored(
+                TimingStats.getTimingColor(game.update_timing.p99_ms),
+                "1% High (P99): {d:.3} ms",
+                .{game.update_timing.p99_ms},
+            );
+
+            // P99.9
+            zgui.bullet();
+            zgui.textColored(
+                TimingStats.getTimingColor(game.update_timing.p999_ms),
+                "0.1% High (P99.9): {d:.3} ms",
+                .{game.update_timing.p999_ms},
+            );
+
+            // Display sample count (optional, no coloring needed)
+            zgui.text("  (Based on last {d} frames)", .{game.update_timing.count});
         } else {
             zgui.text("  (Collecting data...)", .{});
         }
