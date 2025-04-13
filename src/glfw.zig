@@ -14,6 +14,7 @@ const wgsl = struct {
     pub const vs = common ++ @embedFile("shaders/vertex.wgsl");
     pub const fs = common ++ @embedFile("shaders/fragment.wgsl");
 };
+const TimingStats = @import("TimingStats.zig");
 
 const content_dir = @import("build_options").content_dir;
 const window_title = "zig-gamedev: procedural mesh (wgpu)";
@@ -71,6 +72,8 @@ const GameState = struct {
     shadow_texture_view: zgpu.TextureViewHandle,
     shadow_bind_group: zgpu.BindGroupHandle,
     shadow_pipeline: zgpu.RenderPipelineHandle,
+
+    update_timing: TimingStats = .{},
 
     mouse: struct {
         cursor_pos: [2]f64 = .{ 0, 0 },
@@ -541,6 +544,15 @@ fn updateGui(game: *const GameState) void {
         );
         zgui.bulletText("RMB + drag : rotate camera", .{});
         zgui.bulletText("W, A, S, D : move camera", .{});
+        zgui.separator();
+        zgui.text("game update:", .{});
+        if (game.update_timing.count > 0) {
+            zgui.bulletText("  Avg: {d:.3} ms", .{game.update_timing.avg_ms});
+            zgui.bulletText("  1% High (P99): {d:.3} ms", .{game.update_timing.p99_ms});
+            zgui.bulletText("  0.1% High (P99.9): {d:.3} ms", .{game.update_timing.p999_ms});
+        } else {
+            zgui.text("  (Collecting data...)", .{});
+        }
     }
     zgui.end();
 }
@@ -817,7 +829,19 @@ pub fn main() !void {
     zgui.getStyle().scaleAllSizes(scale_factor);
 
     while (!window.shouldClose() and window.getKey(.escape) != .press) {
-        game.graph.update();
+        // _ = game.frame_arena.reset(.retain_capacity);
+
+        {
+            const start_time = std.time.nanoTimestamp();
+            defer {
+                const end_time = std.time.nanoTimestamp();
+                const duration_ns = end_time - start_time;
+                game.update_timing.addSample(game.frame_arena.allocator(), @intCast(duration_ns));
+            }
+
+            game.graph.update();
+        }
+
         draw(&game);
     }
 }
