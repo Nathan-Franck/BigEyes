@@ -1,4 +1,5 @@
 const std = @import("std");
+const json = std.json;
 
 // Structure to hold and calculate timing statistics
 const history_size = 120; // How many samples to keep
@@ -11,6 +12,41 @@ count: usize = 0, // Number of valid entries (up to buffer size)
 avg_ms: f64 = 0,
 p99_ms: f64 = 0, // 1% high (99th percentile)
 p999_ms: f64 = 0, // 0.1% high (99.9th percentile)
+
+const perf_json_filename = "timing_stats.json";
+
+pub fn saveJson(self: @This()) !void {
+
+    // Only save if we have collected some stats
+    if (self.count == 0) {
+        std.debug.print("No timing stats collected, skipping JSON save.\n", .{});
+        return;
+    }
+
+    // Prepare the data structure
+    const stats_to_save = .{
+        .avg_ms = self.avg_ms,
+        .p99_ms = self.p99_ms,
+        .p999_ms = self.p999_ms,
+    };
+
+    // Create/overwrite the file.
+    // Using createFile ensures it truncates if it exists.
+    var file = try std.fs.cwd().createFile(perf_json_filename, .{});
+    defer file.close();
+
+    // Use a buffered writer for potentially better performance
+    var buf_writer = std.io.bufferedWriter(file.writer());
+
+    // Stringify the data directly to the buffered writer
+    // Using .pretty = true makes the JSON file human-readable
+    try json.stringify(stats_to_save, .{ .whitespace = .indent_4 }, buf_writer.writer());
+
+    // Ensure all buffered data is written to the file
+    try buf_writer.flush();
+
+    std.debug.print("Performance stats saved to {s}\n", .{perf_json_filename});
+}
 
 // Helper function to determine text color based on millisecond timing
 pub fn getTimingColor(ms: f64) [4]f32 {

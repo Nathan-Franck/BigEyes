@@ -524,6 +524,9 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !GameState {
 }
 
 fn deinit(allocator: std.mem.Allocator, game: *GameState) void {
+    game.update_timing.saveJson() catch |err| {
+        std.debug.print("Failed to write performance stats JSON: {any}\n", .{err});
+    };
     game.gctx.destroy(allocator);
     game.* = undefined;
 }
