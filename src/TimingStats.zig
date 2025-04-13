@@ -2,7 +2,7 @@ const std = @import("std");
 const json = std.json;
 
 // Structure to hold and calculate timing statistics
-const history_size = 120; // How many samples to keep
+const history_size = 2000; // How many samples to keep
 
 times_ns: [history_size]u64 = .{0} ** history_size,
 index: usize = 0, // Current index in the circular buffer
@@ -25,9 +25,9 @@ pub fn saveJson(self: @This()) !void {
 
     // Prepare the data structure
     const stats_to_save = .{
-        .avg_ms = self.avg_ms,
-        .p99_ms = self.p99_ms,
-        .p999_ms = self.p999_ms,
+        .@"average ms" = self.avg_ms,
+        .@"99% ms" = self.p99_ms,
+        .@"99.9% ms" = self.p999_ms,
     };
 
     // Create/overwrite the file.
