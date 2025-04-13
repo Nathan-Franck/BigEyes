@@ -586,7 +586,7 @@ fn updateGui(game: *const GameState) void {
 
 fn drawMeshes(
     pass: wgpu.RenderPassEncoder,
-    game: *const GameState,
+    game: *GameState,
     per_model_render: ?struct {
         bind_group: wgpu.BindGroup,
         frame_uniforms: FrameUniforms,
@@ -620,6 +620,9 @@ fn drawMeshes(
                 0,
             );
         }
+
+        // HACK - Keep the submesh data alive by cloning it in the current arena
+        resource.submesh = utils.deepClone([]const Submesh, game.frame_arena.allocator(), resource.submesh) catch unreachable;
     }
 }
 
@@ -856,19 +859,63 @@ pub fn main() !void {
     zgui.getStyle().scaleAllSizes(scale_factor);
 
     while (!window.shouldClose() and window.getKey(.escape) != .press) {
-        // _ = game.frame_arena.swap();
-
         {
             const start_time = std.time.nanoTimestamp();
             defer {
                 const end_time = std.time.nanoTimestamp();
                 const duration_ns = end_time - start_time;
-                game.update_timing.addSample(game.frame_arena.allocator(), @intCast(duration_ns));
+                _ = .{ end_time, duration_ns };
+                // game.update_timing.addSample(game.frame_arena.allocator(), @intCast(duration_ns));
             }
 
             game.graph.update();
         }
 
+        WorkDoneContext.waitForGpu(game.gctx);
+
+        _ = game.frame_arena.swap();
+
         draw(&game);
     }
 }
+
+const Thread = std.Thread;
+
+const WorkDoneContext = struct {
+    var state = @This(){};
+
+    mutex: Thread.Mutex = .{},
+    cond: Thread.Condition = .{},
+    is_done: bool = false, // Protected by mutex
+
+    fn onWorkDoneCallbackBlocking(status: wgpu.QueueWorkDoneStatus, user_data: ?*anyopaque) callconv(.C) void {
+        if (user_data == null) {
+            std.log.err("onWorkDoneCallbackBlocking received null user_data!", .{});
+            return;
+        }
+        const context: *WorkDoneContext = @ptrCast(@alignCast(user_data.?));
+
+        if (status != .success) {
+            std.log.err("GPU work completed with status: {s}", .{@tagName(status)});
+        }
+
+        context.mutex.lock();
+        defer context.mutex.unlock();
+
+        context.is_done = true;
+        context.cond.signal(); // Wake up the waiting main thread
+    }
+
+    fn waitForGpu(gctx: *zgpu.GraphicsContext) void {
+        gctx.queue.onSubmittedWorkDone(0, onWorkDoneCallbackBlocking, @ptrCast(&state));
+
+        state.mutex.lock();
+        defer state.mutex.unlock();
+
+        while (!state.is_done) {
+            state.cond.wait(&state.mutex);
+        }
+
+        state.is_done = false;
+    }
+};
