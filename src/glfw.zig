@@ -89,6 +89,7 @@ const GameState = struct {
     should_render: bool = false,
 
     frame_arena: utils.DoubleBufferedArena,
+    allocator: std.mem.Allocator,
 
     button_lookup: std.StringHashMap(?u64),
 
@@ -151,7 +152,7 @@ const GameState = struct {
             },
             .terrain_mesh => {
                 const gctx = self.gctx;
-                const vertices = try self.frame_arena.allocator().alloc(Vertex, value.position.len);
+                const vertices = try self.allocator.alloc(Vertex, value.position.len);
                 for (vertices, value.position, value.normal) |*vertex, position, normal| {
                     zm.storeArr3(&vertex.position, position);
                     zm.storeArr3(&vertex.normal, normal);
@@ -171,8 +172,10 @@ const GameState = struct {
 
                 const result = self.mesh_resources.getOrPut("terrain") catch unreachable;
                 const resources = result.value_ptr;
+                if (result.found_existing)
+                    self.allocator.free(resources.submesh);
                 resources.color = value.color;
-                resources.submesh = try self.frame_arena.allocator().dupe(Submesh, &.{Submesh{
+                resources.submesh = try self.allocator.dupe(Submesh, &.{Submesh{
                     .index_offset = 0,
                     .vertex_offset = 0,
                     .num_indices = @intCast(value.indices.len),
@@ -211,7 +214,7 @@ const GameState = struct {
                 for (value) |model| {
                     var vertices: std.ArrayList(Vertex) = .init(self.frame_arena.allocator());
                     var indices: std.ArrayList(u32) = .init(self.frame_arena.allocator());
-                    var submeshes: std.ArrayList(Submesh) = .init(self.frame_arena.allocator());
+                    var submeshes: std.ArrayList(Submesh) = .init(self.allocator);
                     var color: zm.Vec = undefined;
                     for (model.meshes) |mesh| {
                         switch (mesh) {
@@ -249,8 +252,10 @@ const GameState = struct {
 
                     const result = try self.mesh_resources.getOrPut(model.label);
                     const resources = result.value_ptr;
+                    if (result.found_existing)
+                        self.allocator.free(resources.submesh);
                     resources.color = color;
-                    resources.submesh = submeshes.items;
+                    resources.submesh = submeshes.toOwnedSlice() catch unreachable;
                     resources.vertex_buffer = vertex_buffer;
                     resources.index_buffer = index_buffer;
                     self.should_render = true;
@@ -516,6 +521,7 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !GameState {
         .depth_texture = depth.texture,
         .depth_texture_view = depth.view,
         .frame_arena = .init(allocator),
+        .allocator = allocator,
         .shadow_texture = shadow_texture,
         .shadow_texture_view = shadow_texture_view,
         .shadow_bind_group = shadow_bind_group,
@@ -620,9 +626,6 @@ fn drawMeshes(
                 0,
             );
         }
-
-        // HACK - Keep the submesh data alive by cloning it in the current arena
-        resource.submesh = utils.deepClone([]const Submesh, game.frame_arena.allocator(), resource.submesh) catch unreachable;
     }
 }
 
@@ -768,6 +771,8 @@ fn draw(game: *GameState) void {
 
     gctx.submit(&.{commands});
 
+    // WorkDoneContext.registerNext(gctx);
+
     if (gctx.present() == .swap_chain_resized) {
         // Release old depth texture.
         gctx.releaseResource(game.depth_texture_view);
@@ -862,16 +867,14 @@ pub fn main() !void {
         {
             const start_time = std.time.nanoTimestamp();
             defer {
-                const end_time = std.time.nanoTimestamp();
-                const duration_ns = end_time - start_time;
-                _ = .{ end_time, duration_ns };
-                // game.update_timing.addSample(game.frame_arena.allocator(), @intCast(duration_ns));
+                const duration_ns = std.time.nanoTimestamp() - start_time;
+                game.update_timing.addSample(game.allocator, @intCast(duration_ns));
             }
 
             game.graph.update();
         }
 
-        WorkDoneContext.waitForGpu(game.gctx);
+        // WorkDoneContext.waitForGpu(game.gctx);
 
         _ = game.frame_arena.swap();
 
@@ -886,9 +889,10 @@ const WorkDoneContext = struct {
 
     mutex: Thread.Mutex = .{},
     cond: Thread.Condition = .{},
-    is_done: bool = false, // Protected by mutex
+    is_done: bool = true,
 
     fn onWorkDoneCallbackBlocking(status: wgpu.QueueWorkDoneStatus, user_data: ?*anyopaque) callconv(.C) void {
+        std.debug.print("Callback triggered! \n", .{});
         if (user_data == null) {
             std.log.err("onWorkDoneCallbackBlocking received null user_data!", .{});
             return;
@@ -906,16 +910,22 @@ const WorkDoneContext = struct {
         context.cond.signal(); // Wake up the waiting main thread
     }
 
-    fn waitForGpu(gctx: *zgpu.GraphicsContext) void {
-        gctx.queue.onSubmittedWorkDone(0, onWorkDoneCallbackBlocking, @ptrCast(&state));
-
-        state.mutex.lock();
-        defer state.mutex.unlock();
-
-        while (!state.is_done) {
-            state.cond.wait(&state.mutex);
-        }
-
+    fn registerNext(gctx: *zgpu.GraphicsContext) void {
+        std.debug.print("Registering \n", .{});
         state.is_done = false;
+        gctx.queue.onSubmittedWorkDone(0, onWorkDoneCallbackBlocking, @ptrCast(&state));
+    }
+
+    fn waitForGpu(gctx: *zgpu.GraphicsContext) void {
+        std.debug.print("Waiting... \n", .{});
+
+        while (true) {
+            {
+                state.mutex.lock();
+                defer state.mutex.unlock();
+                if (state.is_done) break;
+            }
+            gctx.device.tick();
+        }
     }
 };
