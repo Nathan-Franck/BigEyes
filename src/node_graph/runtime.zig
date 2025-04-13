@@ -169,6 +169,7 @@ pub fn Runtime(graph_types: type) type {
         pub const Store = GraphStore(_Store);
 
         frame_arena: std.heap.ArenaAllocator,
+        store_arena: std.heap.ArenaAllocator,
         allocator: std.mem.Allocator,
         node_states: std.StringHashMap(NodeState),
 
@@ -325,6 +326,7 @@ pub fn Runtime(graph_types: type) type {
                                 .runtime = .{
                                     .allocator = allocator,
                                     .frame_arena = .init(allocator),
+                                    .store_arena = .init(allocator),
                                     .node_states = std.StringHashMap(NodeState).init(allocator),
                                 },
                             };
@@ -378,6 +380,8 @@ pub fn Runtime(graph_types: type) type {
                         pub fn update(self: *@This()) void {
                             _ = self.runtime.frame_arena.reset(.retain_capacity);
                             self.store = graph.update(&self.runtime, self, self.store);
+                            _ = self.runtime.store_arena.reset(.retain_capacity);
+                            self.store = utils.deepClone(Store, self.runtime.store_arena.allocator(), self.store) catch unreachable;
                             inline for (@typeInfo(@TypeOf(self.store)).@"struct".fields) |field| {
                                 @field(self.store, field.name).is_dirty = false;
                             }
