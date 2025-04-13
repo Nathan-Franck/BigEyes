@@ -151,7 +151,7 @@ pub const GameGraph = Runtime.build(struct {
             for (all_models.raw) |model| {
                 model_lookup.put(model.label, model) catch unreachable;
             }
-            // _ = diff(types.ModelInstances, rt.frame_arena.allocator(), store.all_instances.raw, all_instances.raw);
+            _ = diff(types.ModelInstances, rt.frame_arena.allocator(), store.all_instances.raw, all_instances.raw);
 
             break :blk null;
         };
