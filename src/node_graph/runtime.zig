@@ -168,8 +168,7 @@ pub fn Runtime(graph_types: type) type {
 
         pub const Store = GraphStore(_Store);
 
-        frame_arena: *std.heap.ArenaAllocator,
-        frame_arenas: [2]std.heap.ArenaAllocator,
+        frame_arena: utils.DoubleBufferedArena,
         allocator: std.mem.Allocator,
         node_states: std.StringHashMap(NodeState),
 
@@ -325,8 +324,7 @@ pub fn Runtime(graph_types: type) type {
                                 .store = undefined,
                                 .runtime = .{
                                     .allocator = allocator,
-                                    .frame_arena = undefined,
-                                    .frame_arenas = .{ .init(allocator), .init(allocator) },
+                                    .frame_arena = .init(allocator),
                                     .node_states = std.StringHashMap(NodeState).init(allocator),
                                 },
                             };
@@ -378,13 +376,7 @@ pub fn Runtime(graph_types: type) type {
                         }
 
                         pub fn update(self: *@This()) void {
-                            self.runtime.frame_arena = &self.runtime.frame_arenas[
-                                if (self.runtime.frame_arena == &self.runtime.frame_arenas[0])
-                                    1
-                                else
-                                    0
-                            ];
-                            _ = self.runtime.frame_arena.reset(.retain_capacity);
+                            self.runtime.frame_arena.swap();
                             self.store = graph.update(&self.runtime, self, self.store);
 
                             inline for (@typeInfo(@TypeOf(self.store)).@"struct".fields) |field| {

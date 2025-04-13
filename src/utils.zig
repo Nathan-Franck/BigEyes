@@ -11,6 +11,7 @@ pub const subdiv = @import("utils/subdiv.zig");
 pub const CoordIterator = @import("utils/CoordIterator.zig");
 pub const BlendMeshSpec = @import("utils/BlendMeshSpec.zig");
 pub const BlendAnimatedMeshSpec = @import("utils/BlendAnimatedMeshSpec.zig");
+pub const DoubleBufferedArena = @import("utils/DoubleBufferedArena.zig");
 pub const terrain_sampler = @import("utils/terrain_sampler.zig");
 pub const Stamp = @import("utils/Stamp.zig");
 

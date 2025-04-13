@@ -8,6 +8,7 @@ const zm = @import("zmath");
 const zmesh = @import("zmesh");
 const znoise = @import("znoise");
 const runtime = @import("node_graph").Runtime;
+const utils = @import("utils");
 const GameGraph = @import("game").GameGraph;
 const wgsl = struct {
     const common = @embedFile("shaders/common.wgsl");
@@ -87,7 +88,7 @@ const GameState = struct {
     last_cursor_pos: [2]f64 = .{ 0, 0 },
     should_render: bool = false,
 
-    frame_arena: std.heap.ArenaAllocator,
+    frame_arena: utils.DoubleBufferedArena,
 
     button_lookup: std.StringHashMap(?u64),
 
@@ -855,7 +856,7 @@ pub fn main() !void {
     zgui.getStyle().scaleAllSizes(scale_factor);
 
     while (!window.shouldClose() and window.getKey(.escape) != .press) {
-        // _ = game.frame_arena.reset(.retain_capacity);
+        // _ = game.frame_arena.swap();
 
         {
             const start_time = std.time.nanoTimestamp();
