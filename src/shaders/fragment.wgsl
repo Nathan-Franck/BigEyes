@@ -19,7 +19,6 @@ fn getShadowFactor(world_pos: vec3<f32>) -> f32 {
   // --- PCF Implementation ---
   let shadow_map_size = vec2<f32>(textureDimensions(shadow_texture));
   let texel_size = 1.0 / shadow_map_size;
-  let shadow_bias = 0.005;
 
   // 3x3 PCF loop
   for (var y: i32 = -1; y <= 1; y = y + 1) {
@@ -29,7 +28,7 @@ fn getShadowFactor(world_pos: vec3<f32>) -> f32 {
 
       let shadow_depth = textureSample(shadow_texture, shadow_sampler, sample_uv);
 
-      if (current_depth <= shadow_depth + shadow_bias) {
+      if (current_depth <= shadow_depth) {
         shadow_factor = shadow_factor + 1.0;
       }
     }

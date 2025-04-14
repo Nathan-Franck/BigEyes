@@ -362,8 +362,8 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !GameState {
     } };
 
     // Create shadow map texture and view
-    // const shadow_map_size: u32 = 8192;
-    const shadow_map_size: u32 = 1024;
+    const shadow_map_size: u32 = 8192;
+    // const shadow_map_size: u32 = 1024;
     const shadow_texture = gctx.createTexture(.{
         .usage = .{ .render_attachment = true, .texture_binding = true },
         .dimension = .tdim_2d,
@@ -654,7 +654,7 @@ fn draw(game: *GameState) void {
             const light_up = zm.f32x4(0.0, 1.0, 0.0, 0.0);
             break :blk .{
                 .view = zm.lookAtLh(light_position, light_target, light_up),
-                .projection = zm.orthographicLh(20.0, 20.0, 0.1, 50.0),
+                .projection = zm.orthographicLh(15.0, 15.0, 0.1, 50.0),
                 .direction = light_target - light_position,
             };
         };
@@ -853,7 +853,7 @@ pub fn main() !void {
         .orbit_camera = .{
             .position = .{ -3, 0, 0, 1 },
             .rotation = .{ 0, 0, 0, 1 },
-            .track_distance = 10,
+            .track_distance = 6,
         },
         .player = .{
             .position = .{ 0, 0, 0, 1 },

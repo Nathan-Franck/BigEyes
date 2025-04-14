@@ -152,9 +152,9 @@ pub fn Forest(comptime chunk_size: i32) type {
                                 const rand = .{
                                     .spawn = hashFn(context, .{ hash_coord, 0 }),
                                     .position_x = hashFn(context, .{ hash_coord, 1 }),
-                                    .position_y = hashFn(context, .{ hash_coord, 1 }),
-                                    .rotation = hashFn(context, .{ hash_coord, 2 }),
-                                    .scale = hashFn(context, .{ hash_coord, 3 }),
+                                    .position_y = hashFn(context, .{ hash_coord, 2 }),
+                                    .rotation = hashFn(context, .{ hash_coord, 3 }),
+                                    .scale = hashFn(context, .{ hash_coord, 4 }),
                                 };
                                 item.* = if (self.source.tree_range[
                                     @intCast(rand.spawn % quantization)
