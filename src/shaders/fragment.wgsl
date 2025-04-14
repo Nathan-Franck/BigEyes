@@ -6,31 +6,41 @@ const pi = 3.1415926;
 fn saturate(x: f32) -> f32 { return clamp(x, 0.0, 1.0); }
 
 fn getShadowFactor(world_pos: vec3<f32>) -> f32 {
-  // Transform world position to light space
-  let pos_light_space = vec4(world_pos, 1.0) * frame_uniforms.light_view_proj;
+  let pos_light_space_clip = vec4(world_pos, 1.0) * frame_uniforms.light_view_proj;
+
+  let pos_light_space = pos_light_space_clip.xyz / pos_light_space_clip.w;
+
+  let uv = pos_light_space.xy * vec2(0.5, -0.5) + vec2(0.5);
+
+  let current_depth = pos_light_space.z; // Assuming Z is already [0, 1] after divide
+
+  var shadow_factor: f32 = 0.0;
   
-  // Transform to [0,1] range
-  let uv = vec2(pos_light_space.xy * vec2(0.5, -0.5) + vec2(0.5));
-  
-  // Current fragment depth
-  let current_depth = pos_light_space.z;
-  
-  // Sample depth from shadow map - this returns a single f32 value
-  let shadow_depth = textureSample(shadow_texture, shadow_sampler, uv);
-  
-  // Check if fragment is in shadow
-  var shadow: f32 = 1.0; // Default to fully lit
-  if (uv.x >= 0.0 && uv.x <= 1.0 && uv.y >= 0.0 && uv.y <= 1.0) {
-    // Compare current depth with shadow map depth
-    // If current_depth > shadow_depth, the fragment is in shadow
-    if (current_depth > shadow_depth + 0.0) { // Add bias to avoid shadow acne
-      shadow = 0.0; // In shadow
+  // --- PCF Implementation ---
+  let shadow_map_size = vec2<f32>(textureDimensions(shadow_texture));
+  let texel_size = 1.0 / shadow_map_size;
+  let shadow_bias = 0.005;
+
+  // 3x3 PCF loop
+  for (var y: i32 = -1; y <= 1; y = y + 1) {
+    for (var x: i32 = -1; x <= 1; x = x + 1) {
+      let offset = vec2<f32>(f32(x), f32(y)) * texel_size;
+      let sample_uv = uv + offset;
+
+      let shadow_depth = textureSample(shadow_texture, shadow_sampler, sample_uv);
+
+      if (current_depth <= shadow_depth + shadow_bias) {
+        shadow_factor = shadow_factor + 1.0;
+      }
     }
   }
-  
-  return shadow;
-}
 
+  if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) {
+    return 1.0;  
+  }
+  // Average the results (divide by the number of samples)
+  return shadow_factor / 9.0;
+}
 // Trowbridge-Reitz GGX normal distribution function.
 fn distributionGgx(n: vec3<f32>, h: vec3<f32>, alpha: f32) -> f32 {
   let alpha_sq = alpha * alpha;

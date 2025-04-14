@@ -383,9 +383,9 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !GameState {
         .address_mode_u = .clamp_to_edge,
         .address_mode_v = .clamp_to_edge,
         .address_mode_w = .clamp_to_edge,
-        .mag_filter = .linear,
-        .min_filter = .linear,
-        .mipmap_filter = .linear,
+        .mag_filter = .nearest,
+        .min_filter = .nearest,
+        .mipmap_filter = .nearest,
     });
 
     // Create bind group layouts
@@ -631,7 +631,7 @@ fn drawMeshes(
 
 fn draw(game: *GameState) void {
     if (!game.should_render) {
-        std.Thread.sleep(1_000_000);
+        zglfw.waitEventsTimeout(1.0 / 60.0);
         return;
     }
     game.should_render = false;
@@ -874,58 +874,8 @@ pub fn main() !void {
             game.graph.update();
         }
 
-        // WorkDoneContext.waitForGpu(game.gctx);
-
         _ = game.frame_arena.swap();
 
         draw(&game);
     }
 }
-
-const Thread = std.Thread;
-
-const WorkDoneContext = struct {
-    var state = @This(){};
-
-    mutex: Thread.Mutex = .{},
-    cond: Thread.Condition = .{},
-    is_done: bool = true,
-
-    fn onWorkDoneCallbackBlocking(status: wgpu.QueueWorkDoneStatus, user_data: ?*anyopaque) callconv(.C) void {
-        std.debug.print("Callback triggered! \n", .{});
-        if (user_data == null) {
-            std.log.err("onWorkDoneCallbackBlocking received null user_data!", .{});
-            return;
-        }
-        const context: *WorkDoneContext = @ptrCast(@alignCast(user_data.?));
-
-        if (status != .success) {
-            std.log.err("GPU work completed with status: {s}", .{@tagName(status)});
-        }
-
-        context.mutex.lock();
-        defer context.mutex.unlock();
-
-        context.is_done = true;
-        context.cond.signal(); // Wake up the waiting main thread
-    }
-
-    fn registerNext(gctx: *zgpu.GraphicsContext) void {
-        std.debug.print("Registering \n", .{});
-        state.is_done = false;
-        gctx.queue.onSubmittedWorkDone(0, onWorkDoneCallbackBlocking, @ptrCast(&state));
-    }
-
-    fn waitForGpu(gctx: *zgpu.GraphicsContext) void {
-        std.debug.print("Waiting... \n", .{});
-
-        while (true) {
-            {
-                state.mutex.lock();
-                defer state.mutex.unlock();
-                if (state.is_done) break;
-            }
-            gctx.device.tick();
-        }
-    }
-};

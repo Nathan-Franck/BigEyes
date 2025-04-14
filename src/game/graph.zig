@@ -138,6 +138,7 @@ pub const GameGraph = Runtime.build(struct {
             animate_meshes.models,
             display_trees.models,
         };
+
         const changed_models = concatChanged(rt.frame_arena.allocator(), types.GameModel, model_sources);
         const all_models = concatDirty(rt.frame_arena.allocator(), types.GameModel, model_sources);
         const instance_sources = &.{
