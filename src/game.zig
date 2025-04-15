@@ -60,29 +60,38 @@ pub const graph_nodes = struct {
     }
 
     var start: u64 = 0;
-    var last_time: u64 = 0;
     pub fn timing(
         props: struct {
             time: u64,
         },
     ) struct {
-        delta_time: f32,
-        seconds_since_start: f32,
+        realtime: types.Timing,
+        low_update: types.Timing,
     } {
         if (start == 0) start = props.time;
         const delta_time = @as(f32, @floatFromInt(props.time - last_time)) / 1000.0;
         const seconds_since_start = @as(f32, @floatFromInt(props.time - start)) / 1000.0;
+        const low_update_rate = 15;
+        const low_update_seconds_since_start = @floor(seconds_since_start * low_update_rate) / @as(f32, @floatFromInt(low_update_rate));
         last_time = props.time;
         return .{
-            .seconds_since_start = seconds_since_start,
-            .delta_time = delta_time,
+            .realtime = .{
+                .delta = delta_time,
+                .seconds_since_start = seconds_since_start,
+            },
+            .low_update = .{
+                .delta = 1000.0 / @as(f32, @floatFromInt(low_update_rate)),
+                .seconds_since_start = low_update_seconds_since_start,
+            },
         };
     }
+
+    var last_time: u64 = 0;
 
     pub fn orbit(
         arena: std.mem.Allocator,
         props: struct {
-            delta_time: queryable.Value(f32),
+            timing: queryable.Value(types.Timing),
             orbit_speed: f32,
             render_resolution: types.PixelPoint,
             input: types.Input,
@@ -98,7 +107,7 @@ pub const graph_nodes = struct {
     } {
         switch (props.selected_camera) {
             .orbit => {
-                if (props.input.mouse.left_click) |_|
+                if (props.input.mouse.left_click)
                     props.orbit_camera.rotation = props.orbit_camera.rotation +
                         props.input.mouse.delta *
                             zmath.splat(Vec4, -props.orbit_speed);
@@ -144,28 +153,16 @@ pub const graph_nodes = struct {
                 var horizontal_movement = Vec4{ 0, 0, 0, 0 };
                 const movement = props.input.movement;
 
-                if (movement.left != null and movement.right != null) {
-                    if (movement.left.? > movement.right.?) {
-                        horizontal_movement = horizontal_movement - right;
-                    } else {
-                        horizontal_movement = horizontal_movement + right;
-                    }
-                } else if (movement.left != null) {
+                if (movement.left) {
                     horizontal_movement = horizontal_movement - right;
-                } else if (movement.right != null) {
+                } else if (movement.right) {
                     horizontal_movement = horizontal_movement + right;
                 }
 
                 var vertical_movement = Vec4{ 0, 0, 0, 0 };
-                if (movement.forward != null and movement.backward != null) {
-                    if (movement.forward.? > movement.backward.?) {
-                        vertical_movement = vertical_movement + forward;
-                    } else {
-                        vertical_movement = vertical_movement - forward;
-                    }
-                } else if (movement.forward != null) {
+                if (movement.forward) {
                     vertical_movement = vertical_movement + forward;
-                } else if (movement.backward != null) {
+                } else if (movement.backward) {
                     vertical_movement = vertical_movement - forward;
                 }
 
@@ -174,7 +171,7 @@ pub const graph_nodes = struct {
                 if (zmath.length3(combined_movement)[0] > 0.001) {
                     const final_movement = blk: {
                         const world_direction = zmath.mul(zmath.normalize3(combined_movement), rotation_matrix);
-                        const movement_delta: Vec4 = @splat(props.player_settings.movement_speed * props.delta_time.get());
+                        const movement_delta: Vec4 = @splat(props.player_settings.movement_speed * props.timing.get().delta);
                         break :blk world_direction * movement_delta;
                     };
 
@@ -301,7 +298,7 @@ pub const graph_nodes = struct {
     pub fn displayBike(
         arena: std.mem.Allocator,
         props: struct {
-            seconds_since_start: queryable.Value(f32),
+            timing: queryable.Value(types.Timing),
             model_transforms: std.StringHashMap(zmath.Mat),
             terrain_sampler: TerrainSampler,
             bounce: bool,
@@ -374,7 +371,7 @@ pub const graph_nodes = struct {
     pub fn animateMeshes(
         arena: std.mem.Allocator,
         props: struct {
-            seconds_since_start: f32,
+            timing: types.Timing,
             models: []const types.GameModel,
         },
     ) !struct {
@@ -392,7 +389,7 @@ pub const graph_nodes = struct {
                             const bone = subdiv_mesh.armature.bones[bone_index];
                             const animation = subdiv_mesh.armature.animation;
                             const fps = 12;
-                            const inter_frame = props.seconds_since_start * fps;
+                            const inter_frame = props.timing.seconds_since_start * fps;
                             const frame: usize = @intFromFloat(inter_frame);
                             const animated_bone = .{
                                 animation[frame % animation.len].bones[bone_index],

@@ -129,7 +129,8 @@ pub const queryable = struct {
             ) @This() {
                 if (!queried.*)
                     is_field_dirty.* = false;
-                queried.* = false;
+                if (is_field_dirty.*)
+                    queried.* = false;
                 return @This(){ .raw = value, .queried = queried };
             }
         };

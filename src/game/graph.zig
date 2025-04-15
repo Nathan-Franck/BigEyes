@@ -116,16 +116,16 @@ pub const GameGraph = Runtime.build(struct {
             .terrain_sampler = terrain.sampler,
         });
         // Animated things below!
-        const timing = rt.node(@src(), graph_nodes.timing, .{}, .{
+        const timing = rt.node(@src(), graph_nodes.timing, .{ .check_output_equality = true }, .{
             .time = frontend.poll(.time),
         });
         const animate_meshes = rt.node(@src(), graph_nodes.animateMeshes, .{}, .{
+            .timing = timing.low_update,
             .models = resources.models,
-            .seconds_since_start = timing.seconds_since_start,
         });
         const display_bike = rt.node(@src(), graph_nodes.displayBike, .{}, .{
+            .timing = timing.realtime,
             .terrain_sampler = terrain.sampler,
-            .seconds_since_start = timing.seconds_since_start,
             .model_transforms = resources.model_transforms,
             .bounce = frontend.poll(.bounce),
         });
@@ -166,8 +166,8 @@ pub const GameGraph = Runtime.build(struct {
         });
 
         // Polling user input! (We can do it late, which should lead to lower latency!)
-        const orbit = rt.node(@src(), graph_nodes.orbit, .{ .checkOutputEquality = true }, .{
-            .delta_time = timing.delta_time,
+        const orbit = rt.node(@src(), graph_nodes.orbit, .{ .check_output_equality = true }, .{
+            .timing = timing.realtime,
             .render_resolution = frontend.poll(.render_resolution),
             .orbit_speed = frontend.poll(.orbit_speed),
             .input = frontend.poll(.input),

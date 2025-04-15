@@ -64,18 +64,23 @@ pub const QuadMeshHelper = mesh_helper.Polygon(.Quad);
 
 pub const PixelPoint = struct { x: u32, y: u32 };
 
+pub const Timing = struct {
+    delta: f32,
+    seconds_since_start: f32,
+};
+
 pub const Input = struct {
     mouse: struct {
         delta: Vec4,
-        left_click: ?u64,
-        right_click: ?u64,
-        middle_click: ?u64,
+        left_click: bool,
+        right_click: bool,
+        middle_click: bool,
     },
     movement: struct {
-        left: ?u64,
-        right: ?u64,
-        forward: ?u64,
-        backward: ?u64,
+        left: bool,
+        right: bool,
+        forward: bool,
+        backward: bool,
     },
 };
 

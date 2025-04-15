@@ -113,17 +113,16 @@ const GameState = struct {
 
     // Provide inputs to the back-end from the user, disk and network.
     pub fn poll(self: *@This(), comptime field_tag: GameGraph.InputTag) std.meta.fieldInfo(GameGraph.Inputs, field_tag).type {
-        const ms_delay = 1000 / 15; // 15 FPS
         return switch (field_tag) {
             .orbit_speed => 0.01,
             .bounce => false,
             .size_multiplier => 1,
             .selected_camera => if (self.first_person_camera) .first_person else .orbit,
-            .player_settings => .{ .movement_speed = 0.1, .look_speed = 0.01 },
+            .player_settings => .{ .movement_speed = 2, .look_speed = 0.01 },
             .time => @intCast(@divFloor(
                 std.time.nanoTimestamp(),
-                std.time.ns_per_ms * ms_delay,
-            ) * ms_delay),
+                std.time.ns_per_ms,
+            )),
             .render_resolution => blk: {
                 const size = self.window.getSize();
                 break :blk .{ .x = @intCast(size[0]), .y = @intCast(size[1]) };
@@ -136,15 +135,15 @@ const GameState = struct {
                 break :blk .{
                     .mouse = .{
                         .delta = .{ @floatCast(cursor_pos[0] - self.last_cursor_pos[0]), @floatCast(cursor_pos[1] - self.last_cursor_pos[1]), 0, 0 },
-                        .left_click = self.buttonAccum(@src(), self.window.getMouseButton(.left)),
-                        .middle_click = self.buttonAccum(@src(), self.window.getMouseButton(.middle)),
-                        .right_click = self.buttonAccum(@src(), self.window.getMouseButton(.right)),
+                        .left_click = self.window.getMouseButton(.left) == .press,
+                        .middle_click = self.window.getMouseButton(.middle) == .press,
+                        .right_click = self.window.getMouseButton(.right) == .press,
                     },
                     .movement = .{
-                        .left = self.buttonAccum(@src(), self.window.getKey(.a)),
-                        .right = self.buttonAccum(@src(), self.window.getKey(.d)),
-                        .forward = self.buttonAccum(@src(), self.window.getKey(.w)),
-                        .backward = self.buttonAccum(@src(), self.window.getKey(.s)),
+                        .left = self.window.getKey(.a) == .press,
+                        .right = self.window.getKey(.d) == .press,
+                        .forward = self.window.getKey(.w) == .press,
+                        .backward = self.window.getKey(.s) == .press,
                     },
                 };
             },

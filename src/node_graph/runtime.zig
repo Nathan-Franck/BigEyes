@@ -176,7 +176,7 @@ pub fn Runtime(graph_types: type) type {
             self: *@This(),
             comptime src: std.builtin.SourceLocation,
             @"fn": anytype,
-            comptime options: struct { checkOutputEquality: bool = false },
+            comptime options: struct { check_output_equality: bool = false },
             dirtyable_props: NodeInputs(@"fn"),
         ) *NodeOutputs(@"fn") {
             const src_key = std.fmt.comptimePrint("{s}:{d}:{d}", .{ src.file, src.line, src.column });
@@ -214,11 +214,14 @@ pub fn Runtime(graph_types: type) type {
                 const input_field = switch (@typeInfo(prop.type)) {
                     .@"struct" => blk: {
                         if (utils_node.queryable.getSourceOrNull(prop.type)) |t| {
-                            const queried = if (state.queried.getPtr(prop.name)) |queried| queried else queried: {
-                                state.queried.put(prop.name, false) catch unreachable;
-                                break :queried state.queried.getPtr(prop.name).?;
-                            };
-                            break :blk utils_node.queryable.Value(t).initQueryable(default, &dirtyable_prop.is_dirty, queried);
+                            const result = state.queried.getOrPut(prop.name) catch unreachable;
+                            if (!result.found_existing)
+                                result.value_ptr.* = false;
+                            break :blk utils_node.queryable.Value(t).initQueryable(
+                                default,
+                                &dirtyable_prop.is_dirty,
+                                result.value_ptr,
+                            );
                         } else {
                             break :blk default;
                         }
@@ -248,7 +251,7 @@ pub fn Runtime(graph_types: type) type {
                 defer last_arena.deinit();
 
                 // The node is dirty, or there's no data, so let's run the function!
-                const maybe_last_output = if (options.checkOutputEquality)
+                const maybe_last_output = if (options.check_output_equality)
                     if (state.data) |last_data|
                         utils.deepClone(
                             NodeOutputs(@"fn"),
