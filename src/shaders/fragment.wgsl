@@ -1,6 +1,6 @@
 const pi = 3.1415926;
 
-@group(0) @binding(1) var shadow_sampler: sampler;
+@group(0) @binding(1) var shadow_sampler: sampler_comparison;
 @group(0) @binding(2) var shadow_texture: texture_depth_2d;
 
 fn saturate(x: f32) -> f32 { return clamp(x, 0.0, 1.0); }
@@ -21,16 +21,13 @@ fn getShadowFactor(world_pos: vec3<f32>) -> f32 {
   let texel_size = 1.0 / shadow_map_size;
 
   // 3x3 PCF loop
-  for (var y: i32 = -1; y <= 1; y = y + 1) {
-    for (var x: i32 = -1; x <= 1; x = x + 1) {
-      let offset = vec2<f32>(f32(x), f32(y)) * texel_size;
+  let pcf_rate = 2;
+  for (var y: i32 = 0; y < pcf_rate; y += 1) {
+    for (var x: i32 = 0; x < pcf_rate; x += 1) {
+      let offset = (vec2<f32>(f32(x), f32(y)) - f32(pcf_rate - 1) / 2.0) * texel_size;
       let sample_uv = uv + offset;
 
-      let shadow_depth = textureSample(shadow_texture, shadow_sampler, sample_uv);
-
-      if (current_depth <= shadow_depth) {
-        shadow_factor = shadow_factor + 1.0;
-      }
+      shadow_factor += textureSampleCompare(shadow_texture, shadow_sampler, sample_uv, current_depth);
     }
   }
 
@@ -38,7 +35,7 @@ fn getShadowFactor(world_pos: vec3<f32>) -> f32 {
     return 1.0;  
   }
   // Average the results (divide by the number of samples)
-  return shadow_factor / 9.0;
+  return shadow_factor / f32(pcf_rate * pcf_rate);
 }
 // Trowbridge-Reitz GGX normal distribution function.
 fn distributionGgx(n: vec3<f32>, h: vec3<f32>, alpha: f32) -> f32 {

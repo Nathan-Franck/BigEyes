@@ -76,6 +76,8 @@ const GameState = struct {
 
     update_timing: TimingStats = .{},
 
+    poly_count: usize = 0,
+
     mouse: struct {
         cursor_pos: [2]f64 = .{ 0, 0 },
     } = .{},
@@ -383,9 +385,10 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !GameState {
         .address_mode_u = .clamp_to_edge,
         .address_mode_v = .clamp_to_edge,
         .address_mode_w = .clamp_to_edge,
-        .mag_filter = .nearest,
-        .min_filter = .nearest,
-        .mipmap_filter = .nearest,
+        .mag_filter = .linear,
+        .min_filter = .linear,
+        .mipmap_filter = .linear,
+        .compare = .less,
     });
 
     // Create bind group layouts
@@ -396,7 +399,7 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !GameState {
 
     const bind_group_layout = gctx.createBindGroupLayout(&.{
         zgpu.bufferEntry(0, .{ .vertex = true, .fragment = true }, .uniform, true, 0),
-        zgpu.samplerEntry(1, .{ .fragment = true }, .filtering),
+        zgpu.samplerEntry(1, .{ .fragment = true }, .comparison),
         zgpu.textureEntry(2, .{ .fragment = true }, .depth, .tvdim_2d, false),
     });
     defer gctx.releaseResource(bind_group_layout);
@@ -555,6 +558,8 @@ fn updateGui(game: *const GameState) void {
         zgui.bulletText("RMB + drag : rotate camera", .{});
         zgui.bulletText("W, A, S, D : move camera", .{});
         zgui.separator();
+        zgui.text("Poly count: {d}", .{game.poly_count});
+        zgui.separator();
         zgui.text("Update stats:", .{});
         if (game.update_timing.count > 0) {
             // Average
@@ -625,9 +630,12 @@ fn drawMeshes(
                 submesh.vertex_offset,
                 0,
             );
+            game.poly_count += resource.num_instances * submesh.num_indices / 3;
         }
     }
 }
+
+var alreadyRenderedOnce: bool = false;
 
 fn draw(game: *GameState) void {
     if (!game.should_render) {
@@ -660,8 +668,11 @@ fn draw(game: *GameState) void {
         };
         const light_view_proj = zm.mul(light.view, light.projection);
 
+        game.poly_count = 0;
+
         // Shadow pass - render depth from light's perspective
-        {
+        if (!alreadyRenderedOnce) {
+            alreadyRenderedOnce = true;
             const pipeline = gctx.lookupResource(game.shadow_pipeline) orelse break :commands encoder.finish(null);
             const bind_group = gctx.lookupResource(game.shadow_bind_group) orelse break :commands encoder.finish(null);
             const shadow_view = gctx.lookupResource(game.shadow_texture_view) orelse break :commands encoder.finish(null);

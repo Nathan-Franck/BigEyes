@@ -83,17 +83,17 @@ pub const TerrainStamps = struct {
 };
 pub const ForestSettings = struct {
     pub const grass1 = Forest.Tree{
-        .density = -2,
+        .density = 0,
         .likelihood = 0.4,
         .scale_range = .{ .x_range = .{ 0, 1 }, .y_values = &.{ 0.8, 1.0 } },
     };
     pub const grass2 = Forest.Tree{
-        .density = -2,
+        .density = 0,
         .likelihood = 0.3,
         .scale_range = .{ .x_range = .{ 0, 1 }, .y_values = &.{ 0.8, 1.0 } },
     };
     pub const little_tree = Forest.Tree{
-        .density = 0,
+        .density = 1,
         .likelihood = 1,
         .scale_range = .{ .x_range = .{ 0, 1 }, .y_values = &.{ 0.8, 1.0 } },
     };
