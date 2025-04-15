@@ -186,7 +186,7 @@ pub const graph_nodes = struct {
                         .loadCache(&terrain_chunk_cache)
                         .sample(arena, Vec2{ new_position[0], new_position[2] });
 
-                    new_position[1] = terrain_height + 0.7;
+                    new_position[1] = terrain_height + 0.3;
 
                     props.player.position = new_position;
                 }

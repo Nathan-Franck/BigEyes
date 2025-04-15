@@ -76,6 +76,7 @@ const GameState = struct {
 
     update_timing: TimingStats = .{},
 
+    first_person_camera: bool = true,
     poly_count: usize = 0,
 
     mouse: struct {
@@ -117,8 +118,8 @@ const GameState = struct {
             .orbit_speed => 0.01,
             .bounce => false,
             .size_multiplier => 1,
-            .selected_camera => .orbit,
-            .player_settings => .{ .movement_speed = 0.01, .look_speed = 0.001 },
+            .selected_camera => if (self.first_person_camera) .first_person else .orbit,
+            .player_settings => .{ .movement_speed = 0.1, .look_speed = 0.01 },
             .time => @intCast(@divFloor(
                 std.time.nanoTimestamp(),
                 std.time.ns_per_ms * ms_delay,
@@ -139,7 +140,12 @@ const GameState = struct {
                         .middle_click = self.buttonAccum(@src(), self.window.getMouseButton(.middle)),
                         .right_click = self.buttonAccum(@src(), self.window.getMouseButton(.right)),
                     },
-                    .movement = .{ .left = null, .right = null, .forward = null, .backward = null },
+                    .movement = .{
+                        .left = self.buttonAccum(@src(), self.window.getKey(.a)),
+                        .right = self.buttonAccum(@src(), self.window.getKey(.d)),
+                        .forward = self.buttonAccum(@src(), self.window.getKey(.w)),
+                        .backward = self.buttonAccum(@src(), self.window.getKey(.s)),
+                    },
                 };
             },
         };
@@ -541,7 +547,7 @@ fn deinit(allocator: std.mem.Allocator, game: *GameState) void {
     game.* = undefined;
 }
 
-fn updateGui(game: *const GameState) void {
+fn updateGui(game: *GameState) void {
     zgui.backend.newFrame(
         game.gctx.swapchain_descriptor.width,
         game.gctx.swapchain_descriptor.height,
@@ -557,6 +563,7 @@ fn updateGui(game: *const GameState) void {
         );
         zgui.bulletText("RMB + drag : rotate camera", .{});
         zgui.bulletText("W, A, S, D : move camera", .{});
+        _ = zgui.checkbox("First Person", .{ .v = &game.first_person_camera });
         zgui.separator();
         zgui.text("Poly count: {d}", .{game.poly_count});
         zgui.separator();
