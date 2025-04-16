@@ -134,9 +134,11 @@ fn PartialFields(t: type) type {
 pub fn Dirtyable(T: type) type {
     return struct {
         raw: T,
+        previous_raw: T,
         is_dirty: bool,
-        fn set(self: *@This(), value: T) void {
+        fn set(self: *@This(), value: T, previous_value: T) void {
             self.is_dirty = true;
+            self.previous_raw = previous_value;
             self.raw = value;
         }
     };
@@ -184,9 +186,10 @@ pub fn Runtime(graph_types: type) type {
             // Find existing state for this node.
             const state = if (self.node_states.getPtr(src_key)) |arena| arena else blk: {
                 const new_state: NodeState = .{
-                    .arena = std.heap.ArenaAllocator.init(self.allocator),
-                    .queried = std.StringHashMap(bool).init(self.allocator),
+                    .arena = .init(self.allocator),
+                    .queried = .init(self.allocator),
                     .data = null,
+                    .previous_data = null,
                 };
 
                 self.node_states.put(src_key, new_state) catch unreachable;
@@ -247,23 +250,9 @@ pub fn Runtime(graph_types: type) type {
                 }
                 return last_output;
             } else {
-                var last_arena = std.heap.ArenaAllocator.init(self.allocator);
-                defer last_arena.deinit();
-
                 // The node is dirty, or there's no data, so let's run the function!
-                const maybe_last_output = if (options.check_output_equality)
-                    if (state.data) |last_data|
-                        utils.deepClone(
-                            NodeOutputs(@"fn"),
-                            last_arena.allocator(),
-                            @as(*NodeOutputs(@"fn"), @ptrCast(@alignCast(last_data))).*,
-                        ) catch unreachable
-                    else
-                        null
-                else
-                    null;
-
-                _ = state.arena.reset(.retain_capacity);
+                state.previous_data = state.data;
+                state.arena.swap();
 
                 const raw_fn_output = @call(.auto, @"fn", if (comptime isAllocatorFirstParam(@TypeOf(@"fn")))
                     .{ state.arena.allocator(), props }
@@ -281,8 +270,17 @@ pub fn Runtime(graph_types: type) type {
                         const raw = @field(outputs, field.name);
                         @field(node_output, field.name) = .{
                             .raw = raw,
-                            .is_dirty = if (maybe_last_output) |last_output|
-                                !std.meta.eql(raw, @field(last_output, field.name).raw)
+                            .is_dirty = if (options.check_output_equality)
+                                if (state.previous_data) |last_data|
+                                    !std.meta.eql(
+                                        raw,
+                                        @field(
+                                            @as(*NodeOutputs(@"fn"), @ptrCast(@alignCast(last_data))).*,
+                                            field.name,
+                                        ).raw,
+                                    )
+                                else
+                                    true
                             else
                                 true,
                         };
@@ -296,9 +294,10 @@ pub fn Runtime(graph_types: type) type {
         }
 
         const NodeState = struct {
-            arena: std.heap.ArenaAllocator,
+            arena: utils.DoubleBufferedArena,
             queried: std.StringHashMap(bool),
             data: ?*anyopaque,
+            previous_data: ?*anyopaque,
         };
 
         pub fn build(graph: type) type {
@@ -350,6 +349,7 @@ pub fn Runtime(graph_types: type) type {
                             const is_dirty = !std.meta.eql(previous.*, current);
                             return .{
                                 .is_dirty = is_dirty,
+                                .previous_raw = previous,
                                 .raw = current,
                             };
                         }

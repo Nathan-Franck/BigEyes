@@ -116,14 +116,20 @@ pub const queryable = struct {
 
             queried: *bool,
             raw: T,
+            raw_previous: T,
 
             pub fn get(self: @This()) T {
                 self.queried.* = true;
                 return self.raw;
             }
 
+            pub fn previous(self: @This()) T {
+                return self.raw_previous;
+            }
+
             pub fn initQueryable(
                 value: T,
+                previous_value: T,
                 is_field_dirty: *bool,
                 queried: *bool,
             ) @This() {
@@ -131,7 +137,7 @@ pub const queryable = struct {
                     is_field_dirty.* = false;
                 if (is_field_dirty.*)
                     queried.* = false;
-                return @This(){ .raw = value, .queried = queried };
+                return @This(){ .raw = value, .raw_previous = previous_value, .queried = queried };
             }
         };
     }
