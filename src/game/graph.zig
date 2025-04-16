@@ -4,10 +4,11 @@ const utils = @import("utils");
 const config = @import("resources").config;
 const zmath = @import("zmath");
 const game = @import("../game.zig");
-const dizzy = @import("dizzy");
+
 const graph_nodes = game.graph_nodes;
 
 const types = utils.types;
+const vec_math = utils.vec_math;
 
 const Runtime = @import("node_graph").Runtime(struct {
     pub const Store = struct {
@@ -29,7 +30,7 @@ const Runtime = @import("node_graph").Runtime(struct {
     pub const Outputs = struct {
         screen_space_mesh: types.ScreenspaceMesh,
         skybox: types.ProcessedCubeMap,
-        shadow_update_bounds: []const utils.Bounds,
+        shadow_update_bounds: void,
         models: []const types.GameModel,
         model_instances: []const types.ModelInstances,
         terrain_mesh: types.GreyboxMesh,
@@ -68,19 +69,6 @@ pub fn concatDirty(arena: std.mem.Allocator, T: type, inputs: []const Dirtyable(
     };
 }
 
-pub fn diff(T: type, arena: std.mem.Allocator, a: []const T, b: []const T) []const dizzy.Edit {
-    const scratch_len = 4 * (a.len + b.len) + 2;
-    const scratch = arena.alloc(u32, scratch_len) catch unreachable;
-    const differ = dizzy.SliceDiffer(T, struct {
-        pub fn eql(_: @This(), _a: T, _b: T) bool {
-            return std.meta.eql(_a, _b);
-        }
-    });
-    var edits = std.ArrayListUnmanaged(dizzy.Edit){};
-    differ.diff(arena, &edits, a, b, scratch) catch unreachable;
-    return edits.items;
-}
-
 pub const GameGraph = Runtime.build(struct {
     pub fn init(allocator: std.mem.Allocator) void {
         game.init(allocator);
@@ -103,6 +91,8 @@ pub const GameGraph = Runtime.build(struct {
         frontend.submitDirty(.{
             .skybox = resources.skybox,
         });
+
+        const light = rt.node(@src(), graph_nodes.light, .{}, .{});
 
         // Behold - all the things the game loop can do BEFORE user input, that we can compute without needing to know what the user will do!
         // Terrain things below!
@@ -139,30 +129,25 @@ pub const GameGraph = Runtime.build(struct {
             display_trees.models,
         };
 
-        const changed_models = concatChanged(rt.frame_arena.allocator(), types.GameModel, model_sources);
         const all_models = concatDirty(rt.frame_arena.allocator(), types.GameModel, model_sources);
         const instance_sources = &.{
             forest.model_instances,
             display_bike.model_instances,
         };
-        const changed_instances = concatChanged(rt.frame_arena.allocator(), types.ModelInstances, instance_sources);
         const all_instances = concatDirty(rt.frame_arena.allocator(), types.ModelInstances, instance_sources);
-        const shadow_update_bounds = blk: {
-            var model_lookup = std.StringHashMap(types.GameModel).init(rt.frame_arena.allocator());
-            for (all_models.raw) |model| {
-                model_lookup.put(model.label, model) catch unreachable;
-            }
-            for (store.all_instances.raw, all_instances.raw) |store_instances, instances| {
-                _ = diff(types.Instance, rt.frame_arena.allocator(), store_instances.instances, instances.instances);
-            }
 
-            break :blk null;
-        };
+        const shadow = rt.node(@src(), graph_nodes.shadow, .{}, .{
+            .light = light.sun,
+            .all_models = all_models,
+            .last_all_models = store.all_models,
+            .all_instances = all_instances,
+            .last_all_instances = store.all_instances,
+        });
+        _ = shadow;
 
         frontend.submit(.{
-            .shadow_update_bounds = shadow_update_bounds,
-            .models = changed_models,
-            .model_instances = changed_instances,
+            .models = concatChanged(rt.frame_arena.allocator(), types.GameModel, model_sources),
+            .model_instances = concatChanged(rt.frame_arena.allocator(), types.ModelInstances, instance_sources),
         });
 
         // Polling user input! (We can do it late, which should lead to lower latency!)

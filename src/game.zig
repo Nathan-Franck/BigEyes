@@ -8,21 +8,20 @@ const gen = @import("generated");
 const _ = gen.GeneratedData;
 
 const node_graph = @import("node_graph");
-const CoordIterator = @import("utils").CoordIterator;
-const Bounds = @import("utils").Bounds;
-const Coord = @import("utils").Coord;
-const Vec2 = @import("utils").Vec2;
-const Vec4 = @import("utils").Vec4;
-const Image = @import("utils").Image;
-const mesh_helper = @import("utils").mesh_helper;
-const raytrace = @import("utils").raytrace;
-const subdiv = @import("utils").subdiv;
-const tree = @import("utils").tree;
-const math = @import("utils").vec_math;
+const utils = @import("utils");
 const resources = @import("resources");
 
-const graph = @import("./game/graph.zig");
-
+const CoordIterator = utils.CoordIterator;
+const Bounds = utils.Bounds;
+const Coord = utils.Coord;
+const Vec2 = utils.Vec2;
+const Vec4 = utils.Vec4;
+const Image = utils.Image;
+const mesh_helper = utils.mesh_helper;
+const raytrace = utils.raytrace;
+const subdiv = utils.subdiv;
+const tree = utils.tree;
+const vec_math = utils.vec_math;
 const print = std.debug.print;
 const queryable = node_graph.utils_node.queryable;
 const mesh_loader = resources.mesh_loader;
@@ -84,6 +83,53 @@ pub const graph_nodes = struct {
                 .seconds_since_start = low_update_seconds_since_start,
             },
         };
+    }
+
+    pub fn light(props: struct {}) struct { sun: types.DirectionalLight } {
+        _ = props;
+        const light_position = Vec4{ 20.0, 20.0, 20.0, 1.0 };
+        const light_target = Vec4{ 0.0, 0.0, 0.0, 1.0 };
+        const light_up = Vec4{ 0.0, 1.0, 0.0, 0.0 };
+        const view = zmath.lookAtLh(light_position, light_target, light_up);
+        const projection = zmath.orthographicLh(15.0, 15.0, 0.1, 50.0);
+        return .{
+            .sun = .{
+                .view = view,
+                .projection = projection,
+                .direction = light_target - light_position,
+                .view_projection = zmath.mul(view, projection),
+            },
+        };
+    }
+
+    pub fn shadow(arena: std.mem.Allocator, props: struct {
+        light: types.DirectionalLight,
+        all_models: []const types.GameModel,
+        all_instances: []const types.ModelInstances,
+        last_all_models: []const types.GameModel,
+        last_all_instances: []const types.ModelInstances,
+    }) struct {} {
+        var model_lookup = std.StringHashMap(types.GameModel).init(arena);
+        for (props.all_models) |model| {
+            model_lookup.put(model.label, model) catch unreachable;
+        }
+        for (props.last_all_instances, props.all_instances) |last_all_instances, instances| {
+            const edits = utils.diff(types.Instance, arena, last_all_instances.instances, instances.instances);
+            for (edits) |edit| {
+                const referenced_instances = switch (edit.kind) {
+                    .equal => continue,
+                    .insert => instances,
+                    .delete => last_all_instances,
+                };
+                for (edit.range.start..edit.range.end) |i| {
+                    const world_matrix = referenced_instances.instances[i].toMatrix();
+                    _ = world_matrix;
+
+                    // light.sun.
+                }
+            }
+        }
+        return undefined;
     }
 
     var last_time: u64 = 0;
@@ -400,14 +446,14 @@ pub const graph_nodes = struct {
                                 zmath.mul(
                                     position.*,
                                     zmath.inverse(
-                                        mesh_loader.translationRotationScaleToMatrix(
+                                        vec_math.translationRotationScaleToMatrix(
                                             bone.rest.position,
                                             bone.rest.rotation,
                                             bone.rest.scale,
                                         ),
                                     ),
                                 ),
-                                mesh_loader.translationRotationScaleToMatrix(
+                                vec_math.translationRotationScaleToMatrix(
                                     zmath.lerp(animated_bone[0].position, animated_bone[1].position, lerp),
                                     zmath.slerp(animated_bone[0].rotation, animated_bone[1].rotation, lerp),
                                     zmath.lerp(animated_bone[0].scale, animated_bone[1].scale, lerp),

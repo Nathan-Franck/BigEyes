@@ -1,16 +1,18 @@
 const std = @import("std");
 
 const zm = @import("zmath");
+const utils = @import("../utils.zig");
 
-const forest = @import("../utils.zig").forest;
-const Vec2 = @import("../utils.zig").Vec2;
-const Vec4 = @import("../utils.zig").Vec4;
-const Image = @import("../utils.zig").Image;
-const mesh_helper = @import("../utils.zig").mesh_helper;
-const raytrace = @import("../utils.zig").raytrace;
-const subdiv = @import("../utils.zig").subdiv;
-const tree = @import("../utils.zig").tree;
-const Armature = @import("../utils.zig").BlendMeshSpec.Armature;
+const forest = utils.forest;
+const Vec2 = utils.Vec2;
+const Vec4 = utils.Vec4;
+const Image = utils.Image;
+const mesh_helper = utils.mesh_helper;
+const raytrace = utils.raytrace;
+const subdiv = utils.subdiv;
+const tree = utils.tree;
+const Armature = utils.BlendMeshSpec.Armature;
+const vec_math = utils.vec_math;
 
 pub const Point = @Vector(4, f32);
 pub const Face = []const u32;
@@ -61,6 +63,13 @@ pub const SubdivAnimationMesh = struct {
 };
 
 pub const QuadMeshHelper = mesh_helper.Polygon(.Quad);
+
+pub const DirectionalLight = struct {
+    view: zm.Mat,
+    projection: zm.Mat,
+    view_projection: zm.Mat,
+    direction: Vec4,
+};
 
 pub const PixelPoint = struct { x: u32, y: u32 };
 
@@ -117,6 +126,14 @@ pub const Instance = struct {
     position: Vec4,
     rotation: Vec4,
     scale: Vec4,
+
+    pub fn toMatrix(self: @This()) zm.Mat {
+        return vec_math.translationRotationScaleToMatrix(
+            self.position,
+            self.rotation,
+            self.scale,
+        );
+    }
 };
 
 pub const ModelInstances = struct {

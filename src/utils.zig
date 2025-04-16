@@ -1,4 +1,5 @@
 const std = @import("std");
+const dizzy = @import("dizzy");
 
 pub const types = @import("utils/types.zig");
 pub const Image = @import("utils/Image.zig");
@@ -23,6 +24,19 @@ pub const Bounds = struct {
     min: Vec2,
     size: Vec2,
 };
+
+pub fn diff(T: type, arena: std.mem.Allocator, a: []const T, b: []const T) []const dizzy.Edit {
+    const scratch_len = 4 * (a.len + b.len) + 2;
+    const scratch = arena.alloc(u32, scratch_len) catch unreachable;
+    const differ = dizzy.SliceDiffer(T, struct {
+        pub fn eql(_: @This(), _a: T, _b: T) bool {
+            return std.meta.eql(_a, _b);
+        }
+    });
+    var edits = std.ArrayListUnmanaged(dizzy.Edit){};
+    differ.diff(arena, &edits, a, b, scratch) catch unreachable;
+    return edits.items;
+}
 
 pub const SmoothCurve = struct {
     y_values: []const f32,

@@ -102,6 +102,7 @@ pub fn build(
         .root_source_file = b.path("src/utils.zig"),
         .imports = &.{
             .{ .name = "zmath", .module = zmath.module("root") },
+            .{ .name = "dizzy", .module = dizzy.module("dizzy") },
         },
     });
     const node_graph = b.createModule(.{
@@ -120,7 +121,6 @@ pub fn build(
     const game = b.createModule(.{
         .root_source_file = b.path("src/game.zig"),
         .imports = &.{
-            .{ .name = "dizzy", .module = dizzy.module("dizzy") },
             .{ .name = "node_graph", .module = node_graph },
             .{ .name = "resources", .module = resources },
             .{ .name = "utils", .module = utils },

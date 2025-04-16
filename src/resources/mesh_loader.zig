@@ -8,6 +8,7 @@ const mesh_helper = @import("utils").mesh_helper;
 const subdiv = @import("utils").subdiv;
 const Vec4 = @import("utils").Vec4;
 const types = @import("utils").types;
+const vec_math = @import("utils").vec_math;
 
 pub const Vertex = struct {
     position: [3]f32,
@@ -93,7 +94,7 @@ pub fn loadModelsFromBlends(
                 }
                 try model_transforms.put(
                     label,
-                    translationRotationScaleToMatrix(
+                    vec_math.translationRotationScaleToMatrix(
                         node.position,
                         node.rotation,
                         node.scale,
@@ -106,13 +107,6 @@ pub fn loadModelsFromBlends(
         .models = models,
         .model_transforms = model_transforms,
     };
-}
-
-pub fn translationRotationScaleToMatrix(translation: Vec4, rotation: Vec4, scale: Vec4) zmath.Mat {
-    const t = zmath.translationV(translation);
-    const r = zmath.matFromQuat(rotation);
-    const s = zmath.scalingV(scale);
-    return zmath.mul(zmath.mul(r, s), t);
 }
 
 pub fn loadBlendFromJson(allocator: std.mem.Allocator, json_data: []const u8) !BlendMeshSpec {
