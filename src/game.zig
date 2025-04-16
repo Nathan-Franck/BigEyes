@@ -122,10 +122,11 @@ pub const graph_nodes = struct {
                     .delete => last_all_instances,
                 };
                 for (edit.range.start..edit.range.end) |i| {
-                    const world_matrix = referenced_instances.instances[i].toMatrix();
-                    _ = world_matrix;
-
-                    // light.sun.
+                    const instance_to_light = zmath.mul(
+                        referenced_instances.instances[i].toMatrix(),
+                        props.light.view_projection,
+                    );
+                    _ = instance_to_light;
                 }
             }
         }
@@ -183,9 +184,10 @@ pub const graph_nodes = struct {
                 };
             },
             .first_person => {
-                props.player.euler_rotation = props.player.euler_rotation +
-                    props.input.mouse.delta *
-                        zmath.splat(Vec4, -props.player_settings.look_speed);
+                if (props.input.mouse.left_click)
+                    props.player.euler_rotation = props.player.euler_rotation +
+                        props.input.mouse.delta *
+                            zmath.splat(Vec4, -props.player_settings.look_speed);
 
                 const rotation_matrix = zmath.matFromRollPitchYaw(
                     -props.player.euler_rotation[1],
