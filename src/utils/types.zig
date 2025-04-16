@@ -79,6 +79,7 @@ pub const Timing = struct {
 };
 
 pub const Input = struct {
+    escape: bool,
     mouse: struct {
         delta: Vec4,
         left_click: bool,

@@ -150,6 +150,8 @@ pub const graph_nodes = struct {
     ) !struct {
         camera_position: Vec4,
         world_matrix: zmath.Mat,
+        exit: bool,
+        lock_mouse: bool,
     } {
         const fov_y_degrees: f32 = 90;
         switch (props.selected_camera) {
@@ -176,6 +178,8 @@ pub const graph_nodes = struct {
                 };
 
                 return .{
+                    .exit = false,
+                    .lock_mouse = false,
                     .camera_position = zmath.mul(Vec4{ 0, 0, 0, 1 }, zmath.inverse(view_matrix)),
                     .world_matrix = zmath.mul(
                         view_matrix,
@@ -186,11 +190,11 @@ pub const graph_nodes = struct {
             .first_person => {
                 props.player.euler_rotation = props.player.euler_rotation +
                     props.input.mouse.delta *
-                        zmath.splat(Vec4, -props.player_settings.look_speed);
+                        zmath.splat(Vec4, props.player_settings.look_speed);
 
                 const rotation_matrix = zmath.matFromRollPitchYaw(
-                    -props.player.euler_rotation[1],
-                    -props.player.euler_rotation[0],
+                    props.player.euler_rotation[1],
+                    props.player.euler_rotation[0],
                     0,
                 );
 
@@ -249,6 +253,8 @@ pub const graph_nodes = struct {
                 );
 
                 return .{
+                    .exit = props.input.escape,
+                    .lock_mouse = true,
                     .camera_position = zmath.mul(Vec4{ 0, 0, 0, 1 }, zmath.inverse(location)),
                     .world_matrix = zmath.mul(
                         location,

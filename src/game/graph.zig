@@ -28,6 +28,8 @@ const Runtime = @import("node_graph").Runtime(struct {
         size_multiplier: f32,
     };
     pub const Outputs = struct {
+        lock_mouse: bool,
+        exit: bool,
         screen_space_mesh: types.ScreenspaceMesh,
         skybox: types.ProcessedCubeMap,
         shadow_update_bounds: void,
@@ -168,6 +170,8 @@ pub const GameGraph = Runtime.build(struct {
             .world_matrix = orbit.world_matrix,
         });
         frontend.submitDirty(.{
+            .lock_mouse = orbit.lock_mouse,
+            .exit = orbit.exit,
             .world_matrix = orbit.world_matrix,
             .camera_position = orbit.camera_position,
             .screen_space_mesh = get_screenspace_mesh.screen_space_mesh,
