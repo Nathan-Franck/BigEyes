@@ -151,6 +151,7 @@ pub const graph_nodes = struct {
         camera_position: Vec4,
         world_matrix: zmath.Mat,
     } {
+        const fov_y_degrees: f32 = 90;
         switch (props.selected_camera) {
             .orbit => {
                 if (props.input.mouse.left_click)
@@ -158,7 +159,7 @@ pub const graph_nodes = struct {
                         props.input.mouse.delta *
                             zmath.splat(Vec4, -props.orbit_speed);
                 const projection_matrix = zmath.perspectiveFovLh(
-                    0.25 * 3.14151,
+                    fov_y_degrees * std.math.pi / 180,
                     @as(f32, @floatFromInt(props.render_resolution.x)) /
                         @as(f32, @floatFromInt(props.render_resolution.y)),
                     0.1,
@@ -235,7 +236,7 @@ pub const graph_nodes = struct {
                 }
 
                 const view_projection = zmath.perspectiveFovLh(
-                    0.25 * 3.14151,
+                    fov_y_degrees * std.math.pi / 180,
                     @as(f32, @floatFromInt(props.render_resolution.x)) /
                         @as(f32, @floatFromInt(props.render_resolution.y)),
                     0.1,
