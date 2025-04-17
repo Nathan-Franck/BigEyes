@@ -659,7 +659,7 @@
                 "split": 1
             },
             "uids": {
-                "0": "2456b9b6afd31e0ff46cc3ff6da74b1a94173d2d"
+                "0": "c2c8605aa38bee9161a481326d425b6cf3e5c3c8"
             },
             "internalFolder": "{cache}/{nodeType}/{uid0}/",
             "inputs": {
@@ -668,7 +668,7 @@
                     "{Texturing_1.outputTextures}",
                     "{Texturing_1.outputMaterial}"
                 ],
-                "output": "",
+                "output": "meshes",
                 "verboseLevel": "info"
             },
             "internalInputs": {
