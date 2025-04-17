@@ -24,7 +24,7 @@ dist-ssr
 
 art-pipeline/Meshroom-2023.3.0
 art-pipeline/extracted_frames
-art-pipeline/meshroom-cache
+art-pipeline/MeshroomCache
 art-pipeline/project-files
 art-pipeline/meshes
 

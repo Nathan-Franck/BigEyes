@@ -5,22 +5,22 @@ import sys
 # --- Configuration ---
 
 # Path to the Meshroom batch executable
-MESHROOM_BATCH_EXE = r"Meshroom-2023.3.0/meshroom_batch.exe" # <-- CHANGE THIS
+MESHROOM_BATCH_EXE = r"Meshroom-2023.3.0/meshroom_batch.exe"
 
 # Main folder containing the subfolders with images
-INPUT_BASE_DIR = r"extracted_frames" # <-- CHANGE THIS
+INPUT_BASE_DIR = r"extracted_frames"
 
 # Main folder where the output subfolders will be created
-OUTPUT_BASE_DIR = r"meshes" # <-- CHANGE THIS
+OUTPUT_BASE_DIR = r"meshes"
 
 # Path to your Meshroom template pipeline file (.mg)
-PIPELINE_TEMPLATE_MG = r"meshroom-template.mg" # <-- CHANGE THIS
+PIPELINE_TEMPLATE_MG = r"meshroom-template.mg"
 
 # Base directory for Meshroom cache files (subfolders will be created here)
-CACHE_BASE_DIR = r"meshroom-cache" # <-- CHANGE THIS (Optional, but recommended)
+CACHE_BASE_DIR = r"MeshroomCache"
 
 # Base directory to save the specific .mg project file for each run (Optional)
-SAVE_PROJECT_BASE_DIR = r"project-files" # <-- CHANGE THIS (Optional)
+SAVE_PROJECT_BASE_DIR = r"project-files"
 
 # Meshroom verbosity level (e.g., info, debug, warning, error)
 VERBOSITY = "info"
