@@ -22,6 +22,8 @@ dist-zip
 dist-ssr
 *.local
 
+art-pipeline/extracted_frames
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
