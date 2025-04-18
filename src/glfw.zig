@@ -133,6 +133,7 @@ const GameState = struct {
                 defer self.last_cursor_pos = cursor_pos;
 
                 break :blk .{
+                    .escape = self.window.getKey(.escape) == .press,
                     .mouse = .{
                         .delta = .{ @floatCast(cursor_pos[0] - self.last_cursor_pos[0]), @floatCast(cursor_pos[1] - self.last_cursor_pos[1]), 0, 0 },
                         .left_click = self.window.getMouseButton(.left) == .press,
@@ -153,6 +154,10 @@ const GameState = struct {
     // Receive state changes back to the front-end to show to user.
     pub fn submit(self: *@This(), comptime field_tag: GameGraph.OutputTag, value: std.meta.fieldInfo(GameGraph.Outputs, field_tag).type) !void {
         switch (field_tag) {
+            .exit => if (value) {
+                self.first_person_camera = false;
+            },
+            .lock_mouse => try self.window.setInputMode(.cursor, if (value) .disabled else .normal),
             .world_matrix, .camera_position => {
                 @field(self, @tagName(field_tag)) = value;
                 self.should_render = true;
@@ -880,7 +885,7 @@ pub fn main() !void {
 
     zgui.getStyle().scaleAllSizes(scale_factor);
 
-    while (!window.shouldClose() and window.getKey(.escape) != .press) {
+    while (!window.shouldClose()) {
         {
             const start_time = std.time.nanoTimestamp();
             defer {

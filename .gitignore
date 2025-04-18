@@ -22,6 +22,12 @@ dist-zip
 dist-ssr
 *.local
 
+art-pipeline/Meshroom-2023.3.0
+art-pipeline/extracted_frames
+art-pipeline/MeshroomCache
+art-pipeline/project-files
+art-pipeline/meshes
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

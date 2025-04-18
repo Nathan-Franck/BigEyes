@@ -68,7 +68,7 @@ def extract_frames(
     # Return the next frame number to use
     return frame_number
 
-def load_settings(folder_path: str, default_settings: VideoSettings) -> VideoSettings:
+def load_settings(folder_path: str) -> Optional[VideoSettings]:
     """Load settings from settings.json in the folder if it exists, otherwise return default settings."""
     settings_path: str = os.path.join(folder_path, "settings.json")
     if os.path.exists(settings_path):
@@ -79,8 +79,8 @@ def load_settings(folder_path: str, default_settings: VideoSettings) -> VideoSet
             return settings
         except json.JSONDecodeError:
             print(f"Error reading settings file {settings_path}, using default settings")
-            return default_settings
-    return default_settings
+            return None
+    return None
 
 def create_default_settings_file(folder_path: str, settings: VideoSettings) -> None:
     """Create a default settings.json file in the specified folder."""
@@ -119,9 +119,6 @@ def organize_videos_into_subfolders(input_base_folder: str, default_settings: Vi
         if not os.path.exists(subfolder_path):
             os.makedirs(subfolder_path)
             print(f"Created new subfolder: {subfolder_path}")
-            
-            # Create a default settings.json in the new subfolder
-            create_default_settings_file(subfolder_path, default_settings)
         
         # Source and destination paths
         source_path: str = os.path.join(input_base_folder, video_file)
@@ -250,7 +247,10 @@ def process_video_folders(
         output_subfolder_path: str = os.path.join(output_base_folder, subfolder)
         
         # Load settings for this subfolder or use defaults
-        settings = load_settings(input_subfolder_path, default_settings)
+        settings = load_settings(input_subfolder_path)
+        if (settings is None):
+            settings = default_settings
+            create_default_settings_file(input_subfolder_path, settings)
         print(f"Processing subfolder: {subfolder}")
         print(f"Using settings: {settings}")
         
@@ -346,7 +346,7 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument('--output', '-o', type=str, default="extracted_frames",
                         help='Base output folder for extracted frames')
     
-    parser.add_argument('--frames', '-f', type=int, default=30,
+    parser.add_argument('--frames', '-f', type=int, default=180,
                         help='Default number of frames to extract per subfolder')
     
     parser.add_argument('--clean', action='store_true',

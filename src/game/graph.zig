@@ -28,6 +28,8 @@ const Runtime = @import("node_graph").Runtime(struct {
         size_multiplier: f32,
     };
     pub const Outputs = struct {
+        lock_mouse: bool,
+        exit: bool,
         screen_space_mesh: types.ScreenspaceMesh,
         skybox: types.ProcessedCubeMap,
         shadow_update_bounds: void,
@@ -54,18 +56,15 @@ pub fn concatChanged(arena: std.mem.Allocator, T: type, inputs: []const Dirtyabl
     return std.mem.concat(arena, T, to_concat.items) catch unreachable;
 }
 
-/// Take a bunch of Dirtyable inputs and put them together into a single Dirtyable, where it's dirty if any is dirty
-pub fn concatDirty(arena: std.mem.Allocator, T: type, inputs: []const Dirtyable([]const T)) Dirtyable([]const T) {
-    var to_concat: std.ArrayList([]const T) = .init(arena);
-    var is_dirty = false;
-    for (inputs) |input| {
-        to_concat.append(input.raw) catch unreachable;
-        if (input.is_dirty)
-            is_dirty = true;
-    }
-    return .{
-        .raw = std.mem.concat(arena, T, to_concat.items) catch unreachable,
-        .is_dirty = is_dirty,
+/// Concat wrapped in a node function
+pub fn concat(T: type) type {
+    return struct {
+        arena: std.mem.Allocator,
+        pub fn update(self: @This(), inputs: []const []const T) struct { value: []const T } {
+            return .{
+                .value = std.mem.concat(self.arena, T, inputs) catch unreachable,
+            };
+        }
     };
 }
 
@@ -129,12 +128,12 @@ pub const GameGraph = Runtime.build(struct {
             display_trees.models,
         };
 
-        const all_models = concatDirty(rt.frame_arena.allocator(), types.GameModel, model_sources);
+        const all_models = rt.node(@src(), concat(types.GameModel), .{}, model_sources);
         const instance_sources = &.{
             forest.model_instances,
             display_bike.model_instances,
         };
-        const all_instances = concatDirty(rt.frame_arena.allocator(), types.ModelInstances, instance_sources);
+        const all_instances = rt.node(@src(), concat(types.ModelInstances), .{}, instance_sources);
 
         const shadow = rt.node(@src(), graph_nodes.shadow, .{}, .{
             .light = light.sun,
@@ -168,6 +167,8 @@ pub const GameGraph = Runtime.build(struct {
             .world_matrix = orbit.world_matrix,
         });
         frontend.submitDirty(.{
+            .lock_mouse = orbit.lock_mouse,
+            .exit = orbit.exit,
             .world_matrix = orbit.world_matrix,
             .camera_position = orbit.camera_position,
             .screen_space_mesh = get_screenspace_mesh.screen_space_mesh,
