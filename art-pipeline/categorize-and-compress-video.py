@@ -301,7 +301,7 @@ def batch_process_recursive(root_directory, codec="hevc", crf=23, whisper_model_
 # --- Main Execution Block ---
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Compress MOV files to MP4 format recursively, naming based on speech.")
-    parser.add_argument("directory", help="Root directory to search for MOV files")
+    parser.add_argument("directory", help="Root directory to search for MOV files", default="raw_videos")
     parser.add_argument("--codec", default="hevc", choices=["hevc", "libx264"], help="Video codec (default: hevc)")
     parser.add_argument("--crf", type=int, default=23, help="Quality parameter (default: 23, lower is better quality, 18-28 typical range)")
     parser.add_argument("--whisper-model", default="base", choices=["tiny", "base", "small", "medium", "large"], help="Whisper model size (default: base)")
