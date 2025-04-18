@@ -24,8 +24,8 @@ def sanitize_filename(text):
     # Replace spaces/underscores with dashes
     text = re.sub(r'[\s_]+', '-', text)
 
-    # Remove invalid filename characters (allow letters, numbers, dash, dot)
-    text = re.sub(r'[^\w\-.]', '', text)
+    # Remove invalid filename characters (allow letters, numbers, dash)
+    text = re.sub(r'[^\w\-]', '', text)
 
     # Replace multiple consecutive dashes with a single dash
     text = re.sub(r'-+', '-', text)
