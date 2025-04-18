@@ -1,33 +1,58 @@
 # Big Eyes
 
-Can 3D toon graphics be easy?
+It's a game engine - how so? It has shadowmapping 😀
 
-[Check out the current working build!](https://nathan-franck.github.io/BigEyes/)
+![image](Readme-shadow_mapping.png)
 
-![image](docs/Cat2024-07-28.png)
+### Objectives
 
-### Objective
-
-* Make a simple renderer and game loop to test out mesh generation techniques in zig
-* Have fun!
 
 ### Building
 
-Requires Zig 0.14
-> Currently on zig version 0.14.0-dev.1632+d83a3f174
+Requires Zig 0.14.0
 
 ```
-zig build wasm
+zig build glfw-run --release=small
 ```
 
-### Release Build
+Currently debug and safe builds fail.
 
-The game won't run fast unless you build the wasm bundle on ReleaseFast, though this takes much longer to build
-```
-zig build wasm --release=fast
-```
+### Cool Features
 
-### Custom Blender Export
+
+## NodeGraph
+
+Lazy execution of functions
+* Alternative to Entity Component Systems or GameObject/Behaviour for coordinating gameplay logic
+  * Instead of managing a pool of entities, your game loop can be thought of as a data pipeline
+  * Your gameplay elements are kept in strict types and can be wired into singleton nodes for different gameplay systems
+  * The input of the graph is user input, system events (time, disk, job results)
+  * The output of the graph is mesh data, graphics updates, job requests
+* At `comptime`, nodes are wired up to each other, and their inputs and outputs validated for correctness
+* At runtime, the nodes will only execute the internal function if the inputs have changed (dirty)
+  * Optionally, the nodes can also run change detection on their outputs to determine if they're dirty
+* Optimized for ultra-low-latency!
+  * Inputs to the node graph can be polled late, allowing for the freshest user inputs for button presses
+  * Outputs to the node graph can be submitted early, to get ahead of the main graphics render for mesh/instance/texture/buffer updates
+
+## Realtime Subdivision Surface on Meshes
+
+Performant enough to run during game loop, can be run after armature deformations, allowing for smooth toon-like characters without needing super granular vertex weighting
+
+## Natural Detail v3 
+
+v1 - Call back to my first cpp project :) - https://www.youtube.com/watch?v=rmxJNBdGSkk
+
+ *(previous v2 version was for a game company)*
+
+Spawns trees (and other things) deterministically in a cascade of grids, from low density large models, to high-density small models.
+Feature shared with terrain stamps, where the whole world can be made of procedural stamps (broad mountain stamps, hill stamps, finer grain texture stamps)
+
+In future:
+* Small models can be affected by the locations of large models (less grass around trees, more sticks and saplings)
+* Grid of cascades spawns indefinitely into the distance where you go, where larger cascades spawn farther and smaller cascades stay closer (grass up-close, large trees seen in the distance)
+
+## Custom Blender Export
 
 * Ensure your blender is in the path
 ** Flatpak version currently doesn't work
@@ -36,14 +61,6 @@ blender triangle_wgpu_content/cube.blend --background --python .\tools\custom-gl
 ```
 This is automatically executed from the build script!
 
-### Zig->Typescript Node Types
+## Zig->Typescript Node Types
 `zig run src/tool_game_build_type_definitions.zig`
-
-### Future Development Directions
-
-- Cat animations!
-- Forest rendering would be really nice to try out, just to satisfy my personal interests
-  - Just go full 3D since that can look the coolest, with a dense forest
-  - Use that cool algorithm that I already know about
-- Orthographic rendering would be cool because I can optimize it pretty strongly for low-end hardware and power concious devices like phones
-- Loading in 3D models with multiple textures (diffuse, normal, rough-spec) and having a basic display for those models with maybe some cubemap lighting
+Currently these are unused, as I've gone to a native entrypoint, instead of web.

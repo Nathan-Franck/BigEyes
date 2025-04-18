@@ -108,18 +108,18 @@ pub const graph_nodes = struct {
         all_instances: []const types.ModelInstances,
         last_all_models: []const types.GameModel,
         last_all_instances: []const types.ModelInstances,
-    }) struct {} {
+    }) !struct {} {
         var model_lookup = std.StringHashMap(types.GameModel).init(arena);
         for (props.all_models) |model| {
-            model_lookup.put(model.label, model) catch unreachable;
+            try model_lookup.put(model.label, model);
         }
-        for (props.last_all_instances, props.all_instances) |last_all_instances, instances| {
-            const edits = utils.diff(types.Instance, arena, last_all_instances.instances, instances.instances);
+        for (props.last_all_instances, props.all_instances) |last_instances, instances| {
+            const edits = utils.diff(types.Instance, arena, last_instances.instances, instances.instances);
             for (edits) |edit| {
                 const referenced_instances = switch (edit.kind) {
                     .equal => continue,
                     .insert => instances,
-                    .delete => last_all_instances,
+                    .delete => last_instances,
                 };
                 for (edit.range.start..edit.range.end) |i| {
                     const instance_to_light = zmath.mul(
